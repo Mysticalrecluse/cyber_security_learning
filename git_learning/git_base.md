@@ -1,4 +1,4 @@
-git# Git 基础
+# Git 基础
 ## git的最小配置
 ```shell
 # 配置user.name和user.email
