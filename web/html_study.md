@@ -687,9 +687,8 @@
     ```
     - 标签：`<select>`  `</select>`嵌套 `<option>` `</option>`
       - option是下拉菜单的每一项
-      - `<optgroup>` `</optgroup>`
-        - 对选择项目进行分组
-    <br>
+      - `<optgroup>` `</optgroup>`：对选择项目进行分组
+  
     ```html
     <select name="选择城市">
         <optgroup label="山东省">
