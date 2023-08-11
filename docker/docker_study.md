@@ -82,3 +82,43 @@
   - 操作系统与应用层分别是两个虚拟机，位于Hpyer-V之上。
 ### Docker系统架构
 - 能够对Docker系统架构图进行简述即可
+
+# Docker引擎
+## Docker引擎发展历史
+### 首发版本架构
+- Docker在首次发布时，其引擎由两个核心组件构成：LXC（Linux Container）与 Docker Daemon。
+  - 弊病1：受到LXC版本更新影响，Docker Daemon也要进行匹配
+  - 弊病2：由于依赖LXC，所以无法做到跨平台，只能在linux运行
+  - 弊病3：Docker Daemon的“大而全”也带来了严重问题：
+    - 版本更新与功能扩展难
+    - 运行慢，带来性能问题
+    - 不符合软件哲学（小而专，后多软件组装）
+  - 弊病4：Docker Daemon运行出问题，会直接影响所有容器运行。
+### Docker0.9版本架构
+- 从Docker0.9版本开始，Docker使用自研的Libcontainer工具替换了LXC。
+### Docker1.1版本架构
+-  2017年7月OCI基金会发布了两个规范（镜像规范与容器运行时规范）的OCI1.0版本；<br>2016年底发布的Docker1.1版本基本遵循了OCI1.0版本 <br>从Docker1.1版本开始，Docker Daemon中不再包含任何容器运行时代码，而是将容器运行时单独剥离出来，形成了Runc项目。
+  
+## Docker引擎架构
+- Docker引擎是用来运行和管理容器的核心软件，其现代架构由四部分主要组件构成：Docker Client、Dockerd、Containerd和Runc
+  - Docker Client
+    - Docker客户端，Docker引擎提供的CLI工具，用于用户向Docker提交命令请求。
+  - Dockerd
+    - Dockerd，即Docker Daemon。在现代Dockerd中的主要包含的功能有镜像构建、镜像管理、REST API、核心网络及编排等。其通过gRPC与Containerd进行通信 
+  - Containerd
+    - Contained，即Container Daemon，该项目的主要功能是管理容器的生命周期。不过其本身并不会去创建容器，而是调用Runc来完成容器的创建。<br>Docker公司后来将Containerd项目捐献给了<abbr title="云原生基金会">CNCF</abbr>。
+    - 详解：在运行docker run的时候，Dockerd接到指令，直接转给Containerd， Containerd接到后fork出一个Runc的子进程，然后将镜像转换成OCI格式，并传递给Runc,由Runc来完成容器的创建。
+  - Runc
+    - Runc,Run Container,是<abbr title="开放容器倡议基金会">OCI</abbr>容器运行时规范的实现，Runc项目的目标之一就是与OCI规范保持一致。所以，Runc所在层也称为OCI层。这使得Docker Daemon中不用再包含任何容器运行时的代码，简化了Docker Daemon。<br>Runc只有一个作用——创建容器，其本质是一个独立的容器运行时CLI工具。其在fork出一个容器子进程后会启用该容器进程。在容器进程启动完毕后，Runc会自动退出。
+  - Shim
+    - Shim（垫片）是实现“<abbr title="无Docker Deamon和Container Deamon">Deamonless</abbr> Container”不可或缺的工具，其Runc与Docker Daemon解耦，使得Docker Daemon的维护与升级不会影响运行中的容器<br>每次创建容器时，Contained同时会fork出Runc进程与Shim进程。当Runc自动退出之前，会先将新容器进程的父进程指定为相应的Shim进程。<br>除了作为容器的父进程外，Shim进程还具有两个重要功能：
+      - 保持所有STDIN与STDOUT流的开启状态，从而使得当Docker Daemon重启时，容器不会因为Pipe的关闭而终止。
+      - 将容器的退出状态反馈给Docker Deamon。
+  - ![Alt text](images/image6.png)
+
+## Docker引擎分类
+- 在安装Docker之前需要先了解Docker官方对其版本的分类。Docker的版本分为大版本与小版本
+### 大版本
+- Docker从大版本来说，分为三类：Moby，社区版Docker-CE和企业版Docker-EE
+### 小版本
+- 从V1.13.1之后，Docker的发布计划发生了变更，每个大版本下都出现了两个小版本Edge月版和Stable季版。不过，现在的官网中一般只能看到Stable版本
