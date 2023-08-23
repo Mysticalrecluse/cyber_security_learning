@@ -156,6 +156,32 @@
   </style>
   ```
 
+#### 相邻选择器(+)
+- 作用：选中某元素的同级相邻的元素(最近的一个)
+- 选择器写法：选择器 + 兄弟选择器{CSS属性}
+```html
+<style>
+    h1 + p {    /*相邻兄弟选择器*/
+        color:pink;
+    }
+</style>
+```
+
+#### 通用兄弟选择器(~)
+- 作用：选中某元素同级的全部元素
+- 选择器写法：选择器 ~ 兄弟选择器{CSS属性}
+```html
+<style>
+    h1 ~ p {    /*通用兄弟选择器*/
+        color:pink;
+    }
+</style>
+```
+#### 属性选择器
+- 作用；一般是给标签设置专用属性，再通过这些属性单词和值来进行对应的标签样式设置
+- 选择器写法：标签单词[属性名='值']{CSS样式}
+- 场景：一般是用在表单的input标签上
+
 #### 并集选择器(,)
 - 作用：选中多组标签设置相同的样式
 - 选择器写法：选择器1，选择器2...选择器N {CSS属性}，选择器之间用，隔开
@@ -217,10 +243,112 @@
             <td>:active</td>
             <td>点击时（激活）</td>
         </tr>
+        tr>
+            <td>:focus</td>
+            <td>聚焦时（激活）</td>
+        </tr>
     </tbody>
 </table>
 
 - 提示：如果要给超链接设置以上四个状态，要按<font color=tomato>LVHA</font>的顺序书写
+
+#### 结构伪类选择器
+
+- 作用：根据元素的<font color=tomato>结构关系</font>查找元素
+
+<table>
+    <thead>
+        <th>选择器</th>
+        <th>说明</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>E:first-child</td>
+            <td>查找第一个E元素</td>
+        </tr>
+        <tr>
+            <td>E:last-child</td>
+            <td>查找最后一个E元素</td>
+        </tr>
+        <tr>
+            <td>E:nth-child(N)</td>
+            <td>查找第N个E元素(第一个元素N为1)</td>
+        </tr>
+        <tr>
+            <td>E:nth-child(公式)</td>
+            <td>根据元素的结构关系查找多个元素</td>
+        </tr>
+    </tbody>
+</table>
+
+- 示例
+```html
+<style>
+    li:first-child {
+        background-color: green;
+    }
+</style>
+
+<!-- ：nth-child(公式) -->
+公式详解：
+偶数标签：              2n
+奇数标签：              2n+1;2n-1
+找到5的倍数的标签：      5n
+找到第5个以后的标签：    n+5
+找到第5个以前的标签：    -n+5
+
+<style>
+    li:nth-child(2n) {
+        background-color: green;
+    }
+</style>
+```
+
+#### 伪元素选择器
+- 作用：创建虚拟元素（伪元素），用来摆放装饰性内容
+
+<table>
+    <thead>
+        <th>选择器</th>
+        <th>说明</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>E::before</td>
+            <td>在E元素里面最前面添加一个伪元素</td>
+        </tr>
+        <tr>
+            <td>E::after</td>
+            <td>在E元素里面最后面添加一个伪元素</td>
+        </tr>
+    </tbody>
+</table>
+
+示例；
+```html
+<style> 
+    div::before {
+        conntent: "老鼠";
+
+        width: 100px;
+        height: 100px;
+        background-color: brown;
+        display: block;
+    }
+
+    div::after {
+        conntent: "大米";
+
+        width: 100px;
+        height: 100px;
+        background-color: brown;
+        display: block;
+    }
+</style>
+
+# 伪元素默认行内元素
+# 必须有content属性
+```
 
 ## 练习一：画盒子
 - 目标：使用合适的选择器画盒子
@@ -565,3 +693,428 @@
         </tr>
     </tbody>
    </table>
+
+## 盒子模型
+- 作用：布局网页，摆放盒子和内容
+- 组成：
+  - 内容区域：width & height
+  - 内边距：padding（出现在内容于盒子边缘之间）
+  - 边框线：border
+  - 外边距：margin（出现在盒子外面）
+- 图例
+
+    ![Alt text](image/image03.png)
+
+### 盒子模型-边框线
+- 属性名：border(bd)
+- 属性值：边框线粗细、线条样式、颜色（不区分顺序）
+- 常用线条样式：
+  
+    <table>
+        <thead>
+            <th style="background-color: darkred; color: white;">属性值</th>
+            <th style="background-color: darkred; color: white;">线条样式</th>
+        </thead>
+        <tbody>
+            <tr>
+                <td>solid</td>
+                <td>实线</td>
+            </tr>
+            <tr>
+                <td>dashed</td>
+                <td>虚线</td>
+            </tr>
+            <tr>
+                <td>dotted</td>
+                <td>点线</td>
+            </tr>
+        </tbody>
+    </table>
+
+- 设置单方向边框线
+  - 属性名：border-方位名词
+  - 属性值：边框线粗细，样式，颜色
+  - 代码示例
+  
+  ```html
+  <style>
+    div {
+        border-top: 2px solid red;
+        border-right: 3px dashed green;
+        border-bottom: 4px dotted blue;
+        border-left: 5px solid orange;
+
+        width: 200px;
+        height: 200px;
+        background-color: pink;
+    }
+  </style>
+  ```
+
+### 盒子模型-内边距
+- 作用：设置内容与盒子边缘之间的距离
+- 属性名：padding/padding-方位名词
+- 代码示例
+```html
+<style>
+    div {
+        /* 四个方向 内边距相同 */
+        padding： 30px;
+
+        /* 单独设置一个方向内边距 */
+        padding-top: 10px;
+        padding-right: 20px;
+        padding-bottom: 40px;
+        padding-left: 80px;
+
+        width: 200px;
+        height: 200px;
+        background-color: pink;
+    }
+</style>
+
+<!-- padding 简化代码-多值写法 -->
+
+<style>
+    div {
+        width: 200px;
+        height: 200px;
+        background-color: pink;
+
+        /* 四值：上 右 下 左 */
+        padding: 10px 20px 40px 80px;
+
+        /* 三值：上 左右 下 */
+        padding: 10px 40px 80px;
+
+        /* 两值：上下 左右 */
+        padding: 10px 80px;
+        /* 一个值表示四周数值一样 */
+
+        /* 记忆方法：从上开始顺时针转一圈，如果当前方向没有数值，取值跟对面一样。*/
+    }
+</style>
+```
+
+### 盒子模型-尺寸计算
+- 默认情况
+  - 盒子尺寸 = 内容尺寸 + border尺寸 + 内边距尺寸
+
+```html
+<style>
+
+    /* 启动內减模式 */
+    div {
+        width: 200px;
+        height: 200px;
+        background-color: pink;
+
+        /* 內减模式：不需要手动减法，浏览器自动计算 */
+        box-sizing: border-box;
+    }
+</style>
+```
+
+### 盒子模型-外边距
+- 作用：拉开两个盒子之间的距离
+- 属性名：margin
+- 提示：与padding属性值写法、含义相同
+- 版心居中效果：
+  - 上下数值随意，左右数值：auto，浏览器自适应计算
+
+- 合并现象
+  - 场景：垂直排列的兄弟元素，上下margin会合并
+  - 现象；取两个margin中的较大值生效
+
+- 塌陷问题
+  - 场景：父子级的标签，子级的添加，上边距会产生塌陷问题
+  - 现象：导致父级一起向下移动
+  - 解决方案：
+    - 取消子级margin，父级设置padding
+    - 父级设置overflow:hidden;
+    - 父级设置：border-top
+
+### 盒子模型-元素溢出
+- 作用：控制溢出元素的内容的显示方式
+- 属性名；overflow
+- 属性值：
+  
+    <table>
+            <thead>
+                <th style="background-color: darkred; color: white;">属性值</th>
+                <th style="background-color: darkred; color: white;">效果</th>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>hidden</td>
+                    <td>溢出隐藏</td>
+                </tr>
+                <tr>
+                    <td>scroll</td>
+                    <td>溢出滚动(无论是否溢出，都显示滚动条位置)</td>
+                </tr>
+                <tr>
+                    <td>auto</td>
+                    <td>溢出滚动(溢出才显示滚动条位置)</td>
+                </tr>
+            </tbody>
+        </table>
+### 盒子模型-圆角
+- 作用：设置元素的外边框为圆角
+- 属性名：border-radius
+- 属性值：数字+px / 百分比 （半径）
+```html
+<style>
+    div {
+        margin: 50px auto;
+        width: 200px;
+        height: 200px;
+        background-color: orange;
+
+        /* border-redius: 20px; */
+        /* 记忆：从左上角顺时针赋值，没有取值的角与对角取值相同 */
+
+        border-radius: 10px 20px 40px 80px;
+    }
+</style>
+```
+- 常见应用-正圆形状
+  - 给正方形盒子设置圆角属性值为宽高的一半/50%
+- 常见应用-胶囊形状
+  - 给长方形盒子设置圆角属性值为盒子高度的一半
+
+### 盒子模型-阴影
+- 作用：给元素设置阴影效果
+- 属性名：box-shadow
+- 属性值：x轴偏移量 y轴偏移量 模糊半径 扩散半径 颜色 内外阴影
+- 注意：
+  - x轴偏移量和y轴偏移量必须书写
+  - 默认是外阴影，内阴影需要添加inset
+
+
+## 行内元素-内外边距问题
+- 场景：行内元素添加margin和padding，无法改变元素垂直位置
+- 解决方法：给行内元素添加line-height可以改变垂直位置
+```html
+<style>
+    span {
+        /* margin 和 padding 属性，无法改变垂直位置 */
+        margin: 50px;
+        padding: 20px;
+
+        /* 行高可以改变垂直位置 */
+        line-height: 100px;
+    }
+</style>
+```
+## 清除默认样式
+- 清除标签默认样式，比如：默认的内外边距 
+- 京东代码示例：
+```html
+<style>
+    /* 取消边距样式*/
+    * {
+        padding: 0px;
+        margin: 0px;
+        /*可以直接统一內减模式*/
+        box-sizing: border-box;
+    }
+
+    /* 取消列表样式*/
+    li {
+        list-style: none;
+    }
+</style>
+```
+## 标准流
+- 定义：标准流也叫文档流，指的是标签在页面中默认的排布规则 例如:块元素独占一行，行内元素可以一行显示多个。
+
+## 浮动
+- 作用：让块级元素水平排列
+- 属性名：float
+- 属性值：left 左对齐；right 右对齐；
+```html
+<head>
+    <style>
+    /* 浮动特点：顶对齐；具备行内块显示模式
+    浮动的盒子会脱标 */
+        .one {
+            width: 100px;
+            height: 100px;
+            background-color: brown;
+
+            float: left;
+        }
+
+        .two {
+            width: 200px;
+            height: 200px;
+            background-color: orange;
+
+            /* float: left; */
+            float: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="one">one</div>
+    <div class="two">two</div>
+</body>
+```
+### 清除浮动
+- 场景：浮动元素会脱标，如果父级没有高度，子级无法撑开父级高度（可能导致页面布局错乱）
+- 解决方法：清除浮动（清除浮动带来的影响）
+  - 方法1：额外标签法
+  <br>在父元素内容的最后添加一个块级元素，设置CSS属性clear: both
+  - 方法2：单伪元素法
+  ```css
+  .clearfix :after {
+    content: "";
+    display: block;
+    clear: both;
+  }
+  ```
+  - 方法3：双伪元素法（推荐）
+  ```css
+  /* before 解决外边距塌陷问题 */
+  /* after 清除浮动 */
+  .clearfix :: before,
+  .clearfix :: after {
+    content: "";
+    display: table;
+  }
+
+  .clearfix :: after {
+    clear: both;
+  }
+  ```
+  - 方法4：overflow
+  <br> 父级元素添加CSS属性 overflow: hidden
+  <br> 解决原理：利用overflow：hidden这个属性，使浏览器检查元素的高，大小，从而避免一开始的，有无浏览器没见检测外层块元素的高度，导致的子级无法撑开父级，从而布局混乱。
+
+- 拓展：浮动本质作用是实现图文混排效果
+
+## Flex布局
+### Flex-认识
+- 概述：Flex 布局也叫弹性布局，是浏览器提倡的布局模型，非常适合结构化布局，提供了强大的空间分布和对齐能力。 Flex模型不会产生浮动布局中的脱标现象，布局网页更简单，更灵活。
+
+### Flex-组成
+- 设置方式：给父级元素设置 <font color=tomato>display: flex</font>，子元素可以<font color=tomato>自动挤压或拉伸</font>
+- 组成部分：
+  - 弹性容器
+  - 弹性盒子（弹性盒子沿着主轴方向排列）
+  - 主轴：默认在水平方向
+  - 侧轴/交叉轴：默认在垂直方向
+
+### Flex-布局
+```css
+/* 创建flex容器 */
+display: flex;
+
+/* 主轴对齐方式 */
+justify-content
+
+/* 侧轴对齐方式 */
+align-items
+
+/* 某个弹性盒子侧轴对齐方式 */
+align-self
+
+/* 改变主轴方向 */
+flex-direction
+
+/* 弹性伸缩比*/
+flex
+
+/* 弹性盒子换行 */
+flex-wrap
+
+/* 行对齐方式 */
+align-content
+```
+
+- 主轴对齐方式（justify-content）
+<table>
+    <thead>
+        <th style="background-color: darkred; color: white;">属性值</th>
+        <th style="background-color: darkred; color: white;">效果</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>flex-start</td>
+            <td>默认值，弹性盒子从起点开始依次排列</td>
+        </tr>
+        <tr>
+            <td>flex-end</td>
+            <td>弹性盒子从终点开始依次排列</td>
+        </tr>
+        <tr>
+            <td><strong>center</strong></td>
+            <td>弹性盒子沿主轴居中排列</td>
+        </tr>
+        <tr>
+            <td><strong>space-between</strong></td>
+            <td>弹性盒子沿主轴均匀排列，空白间距均分在弹性盒子之间</td>
+        </tr>
+        <tr>
+            <td><strong>space-around</strong></td>
+            <td>弹性盒子沿主轴均匀排列，空白间距均分在弹性盒子两侧</td>
+        </tr>
+        <tr>
+            <td><strong>space-evenly</strong></td>
+            <td>弹性盒子沿主轴均匀排列，弹性盒子与容器之间间距相等</td>
+        </tr>
+    </tbody>
+</table>
+
+- 侧轴对齐方式
+  - 属性名：
+    - align-items: 当前弹性容器内所有弹性盒子的侧轴对齐方式（给弹性容器设置）
+    - align-self: 单独控制某个弹性盒子的侧轴对齐方式（给弹性盒子设置）
+    <p></p>
+    <table>
+        <thead>
+            <th style="background-color: darkred; color: white;">属性值</th>
+            <th style="background-color: darkred; color: white;">效果</th>
+        </thead>
+        <tbody>
+            <tr>
+                <td>stretch</td>
+                <td>弹性盒子沿着侧轴线被拉甚至铺满容器（弹性盒子没有设置侧轴方向尺寸则默认拉伸）</td>
+            </tr>
+            <tr>
+                <td>center</td>
+                <td>弹性盒子沿侧轴居中排列</td>
+            </tr>
+            <tr>
+                <td>flex-start</td>
+                <td>弹性盒子从起点开始依次排列</td>
+            </tr>
+            <tr>
+                <td>flex-end</td>
+                <td>弹性盒子从终点开始依次排列</td>
+            </tr>
+        </tbody>
+    </table>
+
+- 修改主轴方向
+  - 主轴默认水平方向，侧轴默认垂直方向
+  - 属性名：flex-direction
+  - 常用属性值：column 垂直方向，从上向下
+
+- 弹性伸缩比
+  - 作用：控制弹性盒子的主轴方向的尺寸
+  - 属性名：flex
+  - 属性值：整数数字，表示占用父级剩余尺寸的份数
+
+- 弹性盒子换行
+  - 作用：弹性盒子可以自动挤压或拉伸，默认情况下，所有盒子都在一行显示
+  - 属性名：flex-wrap
+  - 属性值
+    - wrap：换行
+    - nowarp：不换行（默认）
+
+- 行对其方式
+- 属性名：align-content
+- 属性值：与主轴对齐方式相同
+- 总结：相当于侧轴版的主轴对齐

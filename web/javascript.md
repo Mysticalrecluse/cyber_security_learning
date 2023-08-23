@@ -408,7 +408,7 @@ console.log(G)
   - 示例
   ```js
   let i = 1
-  while (i <= 3>) {
+  while (i <= 3) {
       document.write('我会循环3次<br>')
       i++
   }
@@ -543,3 +543,6 @@ console.log(num) // 1
 
 ``` 
 
+## <a href='prac/数据可视化案例.html'>综合练习1：数据可视化案例</a>
+
+## 函数
