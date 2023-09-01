@@ -23,7 +23,9 @@
 /*输出语法*/
 document.write('要出的内容')
 document.write('<h1>一级标题</h1>') //允许打印标签
-alert('要出的内容') // 弹出窗口
+// document.write无自动换行功能
+alert('要出的内容') // 弹出窗口，只有确定
+confirm('要出得内容') // 弹出对话框，和alert对比多了个取消得选择
 console.log('控制台打印') // 程序员调试使用，页面不显示，只显示在控制台
 
 /*输入语法*/
@@ -130,6 +132,16 @@ console.log(G)
   - 函数形式：typeof(x)
 - 引用数据类型（引用类型）
   - object 对象类型：内置对象Function，Array，Date，RegExp，Error等都是属于Object类型。也就是说，除了那物种基本数据类型之外，其他的，都称之为Object类型。
+    - Dirct类型（相当于字典）由键值对组成得无需集合
+      - {键名1:值1,键名2:值2,...}
+      - 注意：在js中，键一般是字符串，值可以是任意数据类型
+      - 取值方式
+      ```js
+      let a = {'name':'lucy','age':19}
+      document.write('g变量中name得值：',g.name,'<br>')
+      document.write('g变量中age得值：',g.['age'],'<br>')
+      // 对象类型得两种取值方式
+      ```
   
 ## 类型转换
 - 隐式转换
