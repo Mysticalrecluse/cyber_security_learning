@@ -52,7 +52,6 @@
   //这里的每个信息都用“:”隔开，一共7个信息，分别是：
   //name,password(密码被迁到别的地方存储),UID,GID,GECOS（描述）,directory(家目录),shell类型
 
-
   /etc/shadow #存放指令的文件，密码，日期
 
   root@ubuntu2004:/etc# cat shadow
@@ -81,10 +80,8 @@
     ...
   此处省略
 
-
   //组成：密码（加密后），时间（以1970年以基准到更改密码的天数），最短有效期（0代表可随时更改）,密码有效期，密码以前几天提醒，再过几天账号锁定
   //账号有效期
-
 
   /etc/group    
 
@@ -1459,7 +1456,6 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   使用tracepath 和traceroute，都能查看主机到目标经过的路由
   # tracepath <目标ip>
   # traceroute <目标ip>
-
 
   配置动态路由（了解即可，后续有时间再深入了解）
 

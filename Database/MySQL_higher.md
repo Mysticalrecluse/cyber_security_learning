@@ -379,3 +379,70 @@ SELECT * FROM employees WHERE last_name = 'King';
   >>    按位右移
   <<    按位左移
   ```
+### 排序与分页
+- 排序数据
+  - 排序规则
+  ```sql
+  # 使用ORDER BY对查询到的数据进行排序
+
+  SELECT employee_id,last_name,salary FROM employees ORDER BY salary;
+  -- 升序：ASC 默认
+  -- 降序：DESC
+
+  # 我们可以使用列的别名，进行排序
+
+  SELECT employee_id,salary,salary*12 as annual_sal FROM employees ORDER BY annual_sal;
+
+  # 列的别名只能在ORDER BY中使用，不能在WHERE中使用
+  SELECT employee_id salary,salary*12 as annual_sal FROM employees WHERE annual_sal > 81600;
+  -- 会报错
+
+  -- 数据表的查询顺序：
+  -- 先执行FROM table_name;
+  -- 再执行 where 条件；
+  -- 然后执行，select后要查找的字段（包含别名）
+  -- 最后看order by排序
+  -- 也因此，where不能使用别名，但是order by可以，因为再执行where的时候，还没有执行到字段的别名。
+
+  # 二级排序
+  示例：显示员工信息，按照department_id的降序排列，department_id相同的情况下，按照salary的升序排列
+
+  SELECT employee_id,salary,department_id FROM employees ORDER BY department_id DESC,salary ASC;
+  -- 多个排序嵌套查询，各级之间用逗号排序
+
+  ```
+
+- 分页
+  - 规则实现
+  ```sql
+  # 使用LIMIT实现数据的分页显示
+
+  # 需求1：每页显示20条记录，此时显示第1页
+  SELECT employee_id, last_name FROM employees LIMIT 0，20；
+
+  # 需求2：每页显示20条记录，此时显示第2页
+  SELECT employee_id, last_name FROM employees LIMIT 20，20；
+  
+  -- 格式：LIMIT 位置偏移量, 条目数量;
+
+  # WHERE ... ORDER BY ... LIMIT 声明顺序如下；
+  SELECT employee_id, last_name, salary FROM employees
+  WHERE salary > 6000
+  ORDER BY salary DESC
+  LIMIT 0,10;
+
+  # MySQL8.0新特性：LIMIT ... OFFSET ...
+  -- 与老版本相反，LIMIT 条目数量 OFFSET 位置偏移量
+  SELECT employee_id, last_name, salary FROM employees
+  WHERE salary > 6000
+  ORDER BY salary DESC
+  LIMIT 10 OFFSET 0;
+  ```
+  - 注意：LIMIT必须放在整个SELECT语句的最后！
+
+
+### 多表查询 
+- 定义：也称为关联查询，指两个或更多个表一起完成查询操作
+- 前提条件：这些一起查询的表之间是有关系的（一对一、一对多），它们之间一定是关联字段，这个关联字段可能建立了外键，也可能没有建立外键。比如：员工表和部门表，这两个表依靠“部门编号”进行关联
+
+- 一个案例引发的多表连接
