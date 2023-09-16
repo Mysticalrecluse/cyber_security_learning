@@ -200,13 +200,24 @@ console.log(arr.length) //返回数组的长度
 ```
 
 ## 常量
-  - 概念：使用const声明的变量称为：“常量”
-  - 注意：常量不允许重新赋值，声明的时候必须赋值（初始化）
+- 概念：使用const声明的变量称为：“常量”
+- 注意：常量不允许重新赋值，声明的时候必须赋值（初始化）
 ```javascript
 // 声明一个常量
 const G = 9.8
 console.log(G)
+
+const arr = ['red','pink']
+arr.push('blue')
+console.log(arr)
+// 不报错，即使const声明arr，arr的值依然可以改变
+
+const arr = ['red','pink']
+arr = [1,2,3]
+// 报错，因为这里相当于在堆中，重新分配了一个地址给新数组，然后将新地址赋值给arr
+// 这里栈中的arr记录的地址变了
 ```
+- 注意2：这里虽然arr的值改变了，但是实际上，变量arr在栈中存放的是数组在堆中的地址，栈中地址是不变的，变得是堆里的值，所以对于引用数据类型，是可以用const声明之后，改变里面的属性或方法的值的
 
 ## 数据类型
 - 分类：基本数据类型；引用（复杂）数据类型
@@ -526,6 +537,11 @@ console.log(G)
       document.write('g变量中age得值：',g.['age'],'<br>')
       // 对象类型得两种取值方式
       ```
+
+### 扩展：栈和堆
+- 栈堆空间分配的区别：
+  - 栈（操作系统）：由操作系统自动分配释放存放函数的参数值、局部变量的值等。其操作方式类似于数据结构中的栈。
+  - 堆（操作系统）：存储复杂类型（对象），一般由程序员分配释放，若程序员不释放，由垃圾回收机制回收。
   
 ## 类型转换
 - 隐式转换
@@ -972,6 +988,7 @@ console.log(num) // 1
 - <a href='prac/数据可视化案例.html'>综合练习1：数据可视化案例</a>
 
 ## 函数
+### 函数简介
 - 基本语法
 ```js
 function functionName(arg0, arg1, ..., argN) {
@@ -991,3 +1008,698 @@ function sum(num1, num2) {
 const result = sum(5, 10);
 // 只要碰到return语句，函数就会立即停止执行并退出。因此，return语句后面的代码不会执行。
 ```
+### 函数传参
+- 声明语法
+```js
+function 函数名(参数列表) {
+  函数体
+}
+
+// 实参与形参
+
+function getSum(num1,num2) {
+  // 这里num1和num2是形参，默认值为undefined
+  // 建议初始化形参，num1=0,num2=0
+  document.write(num1 + num2)
+}
+
+function getSum(num1=0,num2=0) {
+  // 这里num1和num2是形参，默认值为undefined
+  // 建议初始化形参，num1=0,num2=0
+  document.write(num1 + num2)
+}
+
+getSum() // 输出结果为0
+getSum(10,20) // 10和20是实参
+```
+- 参数
+  - 形参；声明函数时写在函数名右边小括号里的叫形参
+  - 实参：调用函数时写在函数名右边小括号里的叫实参
+
+### 函数返回值
+- 使用关键字return：`return 数据`
+- 注意：
+  - 在函数体中使用return关键字能将内部的执行结果交给函数外部使用
+  - return后面代码不会再被执行，会立即结束当前函数，所以return后面的数据不要换行写
+  - return函数可以没有return，这种情况函数默认返回值为undefined
+
+### 函数作用域
+### 匿名函数
+- 函数表达式
+```js
+let fn = function(){
+  console.log('我是函数表达式')
+}
+
+fn() // 调用函数表达式
+
+let fn1 = function(x,y) {
+  console.log(x + y)
+}
+
+fn1(1,2)
+
+// 使用场景：后续webAPI会用到函数表达式
+```
+
+- 立即执行函数
+```js
+// 使用场景：避免全局变量之间的污染
+
+// 方式1
+(function () { console.log(11) })();
+
+// 方式2
+(function () { console.log(11) }());
+
+// 不需要调用，立即执行
+// 分号必须加,多个立即执行函数之间用分号隔开
+
+// 加入参数
+(function(x,y) {
+  console.log(x+y)
+})(1,2);
+```
+
+### 逻辑中断
+```js
+// 逻辑中断的表现形式
+function fn(x,y) {
+  x = x || 0
+  y = y || 0
+  console.log(x + y)
+}
+fn(1,2)
+fn()
+```
+
+## 对象
+### 对象概述
+- 对象（object）：JavaScript里的一种数据类型
+- 可以理解为一种无序的数据集合
+```js
+let obj = {
+  uname:'mystical'，
+  age: 18,
+  gender: 'male'
+}
+
+// 类似于python中的字典
+```
+- 对象声明语法
+```js
+// 方法1
+let 对象名 = {}
+
+// 方法2
+let 对象名 = new Object() // 构造函数
+```
+
+- 对象的组成
+  - 属性
+  - 方法
+
+```js
+// 对象的组成
+let 对象名 = {
+  属性名: 属性值,
+  方法名: 函数
+}
+```
+
+### 对象使用
+- 对象的本质是无序的数据集合，操作数据无非是增删改查
+  - 查询对象
+    - 语法：对象名.属性名
+    - 语法2：对象名['属性名']
+      - 使用场景：遍历属性名时会经常使用
+  - 更改对象属性
+    - 语法：对象名.属性名 = 新值
+  - 增加对象属性
+    - 语法：对象名.新属性名 = 新值
+  - 删除对象属性
+    - 语法：delete 对象名.属性名
+
+### 遍历对象
+```js
+// 数组遍历2
+let arr = ['pink','red','blue']
+for (let k in arr) {
+  console.log(k) // 数组的小标，索引号
+  console.log(type(k)) // k是字符串类型
+}
+
+// for in 不推荐遍历数组，推荐遍历对象
+let obj = {
+  uname: 'mystical',
+  age: 18,
+  gender: 'male' 
+}
+
+for (let k in obj) {
+  console.log(k) // 属性名 'uname','age','gender'
+  console.log(obj[k])
+}
+```
+
+### 内置对象
+- 概述：JavaScript内部提供的对象，包含各种属性和方法给开发者调用
+- 内置对象 - Math
+  - 介绍: Math对象是JavaScript提供的一个“数学”对象
+  - 作用: 提供了一系列做数学运算的方法
+  - Math对象包含的方法
+    - random：生成0-1之间的随机数（包含0不包括1）
+    - ceil：向上取整
+    - floor：向下取整
+    - max：找最大数
+    - min：找最小数
+    - pow：幂运算
+    - ads：绝对值
+  ```js
+  // 属性
+  console.log(Math.PI)
+
+  // 方法
+  // ceil() 向上取整
+  console.log(Math.ceil(1.5)) // 2
+
+  // floor() 向下取整
+  console.log(Math.floor(1.9)) // 1
+
+  // round() 四舍五入
+  console.log(Math.round(1.2)) // 1
+  console.log(Math.round(1.5)) // 2
+
+  // random() 生成任意范围随机数
+  // 默认返回一个0-1的数，区间[0,1)
+  console.log(Math.random())
+  // 0-10之间的整数
+  console.log(Math.floor(Math.random() * 11))
+  
+  ```
+
+# Web APIs
+## Web API基本认知
+- 作用和分类
+  - 作用：就是使用js去操作html和浏览器
+  - 分类：DOM(文档对象模型)、BOM(浏览器对象模型)
+
+## DOM
+### DOM概述
+- 定义：什么是DOM
+  - DOM(Domcument Object Model——文档对象模型)是用来呈现以及与任意HTML或XML文档交互的API
+  - 人话：DOM是浏览器提供的一套专门用来操作网页内容的功能
+  - 作用：
+    - 开发网页内容特效和实现用户交互
+
+- DOM树
+  - 定义：将HTML文档以树状结构直观的表现出来，我们称之为文档树或DOM树
+  - 作用：文档树直观的体现了标签与标签之间的关系
+
+- DOM对象（重要）
+  - 定义：浏览器根据html标签生成的JS对象
+    - 所有的标签属性都可以在这个对象上面找到
+    - 修改这个对象的属性会自动映射到标签身上
+  - 示例：
+  ```js
+  const div = document.querySelector('div')
+  // 打印对象
+  console.dir(div) //dom对象
+  ```
+
+  - 核心思想
+    - 把网页内容当作<font color=tomato>对象</font>来处理
+
+  - document对象
+    - 是DOM里提供的一个对象
+    - document是一个网页最大的对象，网页的所有内容都在document里面
+    - 所以它提供的属性和方法都是用来访问和操作网页内容的
+      - 例：document.write()
+    - 网页所有内容都在document里面
+  
+ ### 获取DOM对象
+- 获取DOM元素的方式
+  - 根据CSS选择器来获取DOM元素（重点）
+  - 其他获取DOM元素的方法（了解 ）
+
+- 根据CSS选择器来获取DOM元素（重点）
+  - 选择匹配单个元素
+    - 语法：`document.querySelector('CSS选择器')`
+    - 可以直接修改对象的值
+  - 选择匹配多个元素
+    - 语法：`document.querySelectorAll('CSS选择器')`
+    - 参数：包含一个或多个有效的CSS选择器字符串
+    - 返回值：CSS选择器匹配的NodeList对象集合
+      - 得到一个伪数组
+        - 有长度有索引号的数组
+        - 但是没有pop()、push()等数组方法，无法增删改查
+    - 不能直接修改对象里的属性，需要遍历(for)后修改
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+      .box {
+        width: 200px;
+        height: 200px;
+      }
+    </style>
+</head>
+<body>
+  <div class="box">123</div>
+  <div class="box">abc</div>
+  <p id="nav">导航栏</p>
+  <ul>
+    <li>测试1</li>
+    <li>测试2</li>
+    <li>测试3</li>
+  </ul>
+  <script>
+    // 1. 获取匹配的第一个元素
+    const box = document.querySelector('div')
+  // 等同于 const box = document.querySelector('.box')
+    console.log(box)
+
+    const nav = document.querySelector('#nav')
+    console.log(nav)
+    const first_li = document.querySelector('ul li:first-child')
+    cnosole.log(li)
+
+
+    // 选择匹配多个元素
+    const lists = document.querySelectorAll('ul li')
+    console.log(lists)
+  </script>
+</body>
+</html>
+```
+- 其他获取DOM元素方法（了解）
+```js
+// 根据id获取一个元素
+document.getElementById('nav')
+// 根据标签获取一类元素，例如：获取页面所有div,返回伪数组
+document.getElementsByTagName('div')
+// 根据 类名获取元素 获取页面所有类名为w的，返回伪数组
+document.getElementsByClassName('w')
+```
+
+### 操作元素内容
+- 原理：
+  - Dom对象都是根据标签生成的，所以操作标签，本质上就是操作DOM对象
+  - 就是操作对象使用的点语法
+  - 如果想要修改标签元素里面的内容，可以使用如下方式：
+    - 对象.innerText 属性
+    - 对象.innerHTML 属性
+
+- 对象.innerText 属性
+  - 元素innerText属性
+    - 将文本内容添加/更新到任意标签位置
+    - 显示纯文本，不解析标签
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+  <div class="box">我是文字内容</div>
+  <script>
+    // 1. 获取元素
+    const box = document.querySelector('.box')
+    // 2. 修改文字内容 对象.innerText = '文字内容'
+    console.log(box.innerText) // 获取元素的文字内容
+    box.innerText = '我是修改后的文字内容,hahah'
+
+    box.innerText = '<strong>我是盒子</strong>' // 不解析标签
+    // 页面显示<strong>我是盒子</strong>
+
+  </script>
+</body>
+</html>
+```
+
+- 对象.innerHTML 属性
+  - 将文本内容添加/更新到任意标签位置
+  - 会解析标签，多标签建议使用模板字符
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+  <div class="box">我是文字内容</div>
+  <script>
+    const box = document.querySelector('.box')
+    // innerHTML 解析标签
+    console.log(box.innerHTML)
+    // box.innerHTML = '我要更换'
+    box.innerHTML = '<strong>我要更换</strong>'
+
+  </script>
+</body>
+</html>
+```
+
+### 操作元素属性
+- 操作元素常用属性
+  - 可以通过JS设置/修改标签元素属性，比如通过src更换图片
+  - 语法：`对象.属性 = 值`
+  ```js
+  // 获取元素
+  const pic = document.querySelector('img')
+  // 操作元素
+  pic.src = './images/...'
+  pic.title = 'XXXX'
+  ```
+- 操作元素样式属性
+  - 可以通过js设置/修改标签元素的样式属性
+  - 生成的是行内样式表，权重比价高
+  - 学习路径：
+    - 通过style属性操作CSS
+      - 语法：`对象.sytle.样式属性 = 值`
+  ```html
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Document</title>
+      <style>
+        .box {
+          width:200px;
+          height:200px;
+          background-color:red;
+        }
+      </style>
+  </head>
+  <body>
+    <div class="box">我是文字内容</div>
+    <script>
+      const box = document.querySelector('.box')
+      box.style.width = '300px'
+      box.sytle.backgroundColor = 'darkred'
+      // 如果样式属性有多个单词构成，采用小驼峰命名提到"-"
+    </script>
+  </body>
+  </html>
+  ```
+- 操作类名(className)操作CSS
+  - 如果修改的样式比较多，直接通过style属性修改比较繁琐，我们可以借助于CSS类名的形式
+  - 语法：`元素.className = 'active'`
+  ```html
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Document</title>
+      <style>
+        div {
+          width:200px;
+          height:200px;
+          background-color:red;
+        }
+        .box {
+          width:300px;
+          height:300px;
+          background-color:blue;
+          border: 1px soild black;
+        }
+        .nav {
+
+        }
+      </style>
+  </head>
+  <body>
+    <div class="box">我是文字内容</div>
+    <script>
+      // 获取元素
+      const div = document.querySelector('div')
+      div.className = 'box'
+      // 更改切换样式
+      div.className = 'nav box'
+      // 同时引用多个CSS标签，中间用空格隔开
+    </script>
+  </body>
+  </html>
+  ```
+- 通过classList操作类控制CSS
+  - 通过className容易覆盖以前的类名，我们可以通过classList方式追加和删除类名
+  - 语法
+  ```js
+  // 追加一个类
+  元素.classList.add('类名')
+  // 删除一个类
+  元素.classList.remove('类名')
+  // 切换一个类
+  元素.classList.toggle('类名')
+  ```
+  - 示例：
+    ```html
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Document</title>
+        <style>
+          .box {
+            width:300px;
+            height:300px;
+            background-color:blue;
+            border: 1px soild black;
+          }
+          .active {
+            color:red;
+            background-color:pink;
+          }
+        </style>
+    </head>
+    <body>
+      <div class="box">我是文字内容</div>
+      <script>
+        // 获取元素
+        const box = document.querySelector('.box')
+        // 追加类 add() 类名不加点，并且是字符串
+        box.classList.add('active')
+
+        // 删除一个类 remove()
+        box.classList.remove('box')
+
+        // 切换类 toggle()
+        box.classList.toggle('box')
+
+      </script>
+    </body>
+    </html>
+    ```
+  
+- 操作表单元素属性
+  - 示例
+  ```html
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Document</title>
+  </head>
+  <body>
+    <input type="text" value="电脑">
+    <!-- checked，不写默认值为false，写上默认值为true -->
+    <input type="checkbox" name="" id="" >
+    <script>
+      // 获取元素
+      const uname = document.querySelector('input')
+      // 获取值  获取表单里面的值，用的 表单.value
+      // console.log(uname.value) // 电脑
+      uname.value = '改变值 '     
+      uname.type = 'password'
+      const ipt = document.querySelector('input:nth-child(2)')
+      ipt.checked = true
+    </script>
+    </body>
+  </html>
+  ```
+  - 表单属性中添加就有效果，移除就没有效果，一律使用布尔值表示，如果为true代表添加了该属性，如果是false代表移除了该属性
+  - 比如：disabled、checked、selected
+- 自定义属性
+  - 在html5中推出来了专门的data-自定义属性
+  - 在标签上一律以data-开头
+  - 在DOM对象上一律以dataset对象方式获取
+  ```html
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Document</title>
+  </head>
+  <body>
+    <div data-id="1" data-spm="unknow">1</div>
+    <div data-id="2">2</div>
+    <div data-id="3">3</div>
+    <div data-id="4">4</div>
+    <div data-id="5">5</div>
+    <script>
+      const one = document.querySelector('div')
+      console.log(one.dataset.id) // 1
+      console.log(one.dataset.spm) // unknow
+      one.dataset
+    </script>
+    </body>
+  </html>
+  ```
+
+### 定时器-间歇函数
+- 使用场景：网页中经常会需要一种功能：每隔一段时间需要自动执行一段代码，不需要我们手动去触发
+  - 例如：网页中的倒计时
+  - 要实现这种需求，需要定时器函数
+
+- 开启定时器：`setInterval(函数, 间隔时间)`
+  - 作用：每隔一段时间调用这个函数
+  - 间隔时间单位是毫秒 (1s = 1000ms)
+  ```html
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Document</title>
+  </head>
+  <body>
+    <script>
+      // setInterval(函数, 间隔时间)
+      let n = setInterval(function(){
+        document.write('一秒执行一次')
+      },1000)
+      // 每个定时器都会返回一个id编号,可以选择一个变量接收
+    </script>
+    </body>
+  </html>
+  ```
+
+- 关闭定时器
+  - 代码示例：
+  ```js
+  let 变量名 = setInterval(函数, 间隔时间)
+  clearInterval(变量名)
+  ```
+
+### 事件监听（绑定）
+- 事件概述：
+  - 什么是事件：
+    - 事件是在编程时，系统内发生的动作或发生的事情
+    - 比如；用户在网页点击一个按钮
+  - 什么是事件监听：
+    - 就是让程序检查是否有事件产生，一旦有事件触发，就立即调用一个函数做出响应，也称为绑定事件或者注册事件
+
+- 语法：
+```js
+元素对象.addEventListener('事件类型', 要执行的函数)
+```
+- 事件监听三要素：
+  - 事件源：那个DOM元素被事件触发了，要获取DOM元素
+  - 事件类型：用什么方式触发，比如：点击，经过等
+  - 事件调用函数：要做什么事
+
+- 扩展（事件监听版本）
+  - DOM LEVEL0
+    - `事件源.on事件 = function(){}`
+  - DOM LEVEL2
+    - `事件源.addEventListener(事件, 事件处理函数)`
+  - 区别：
+    - on方式会被覆盖，addEventListener方式可绑定多次，拥有事件更多特性，推荐使用
+
+### 事件类型
+- 鼠标事件（鼠标触发）
+  - click 鼠标点击
+  - mouseenter 鼠标经过
+  - mouseleave 鼠标离开
+- 焦点事件（表单获得光标）
+  - focus 获得焦点
+  - blur 失去焦点
+- 键盘事件（键盘触发）
+  - Keydown 键盘按下触发
+  - Keyup 键盘抬起触发
+- 文本事件（表单输入触发）
+  - input 用户输入事件
+
+### 事件对象
+- 概述
+  - 什么是事件对象
+    - 也是个对象，这个对象里有事件触发时的相关信息
+    - 例如：鼠标点击事件中，事件对象就存了鼠标点在哪个位置等信息
+  - 使用场景：
+    - 可以判断用户按下哪个键，比如按下回车键可以发布新闻
+    - 可以判断鼠标点击了哪个元素，从而做相应的操作
+- 获取事件对象
+  - 语法：
+    - 在事件绑定的回调函数的第一个参数就是事件对象
+    - 一般命名为event,ev，e
+    ```js
+    元素.addEventListener('click', function(e) { // 这里e就是事件对象
+      // 函数体
+    })
+    ```
+- 事件对象常用属性
+  - type
+    - 获取当前的事件类型
+  - clientX/clientY
+    - 获取光标相对于浏览器可见窗口左上角的位置
+  - offsetX/offsetY
+    - 获取光标相对于当前DOM元素左上角的位置
+  - key
+    - 用户按下的键盘键的值
+    - 现在不提倡使用keyCode
+    ```js
+    const input = document.querySelector('input')
+    input.addEventListener('keyup', function(e) {
+      // console.log(e.key)
+      if (e.key === 'Enter') {
+        console.log('我按下了回车键')
+      }
+    })
+    ```
+
+### 环境对象（重点）
+- 概述：
+  - 环境对象指的是函数内部特殊的变量this，它代表着当前函数运行时所处的环境
+  - <font color=tomato>注意：每个函数里面都有this环境对象</font>
+  - 普通函数中，this对象指向的是浏览器window对象
+  - 在事件监听的函数中，this指向监听对象
+  ```html
+  <button>点击</button>
+  <script>
+    // 每个函数里面都有this对象，普通函数里面this指向的是window
+    /* function fn() {
+      console.log(this)
+    } */
+    // 相当于window.fn()
+    const btn = document.querySelector('button')
+    btn.addEventListener('click', function() {
+      console.log(this) 
+      // 这里 this指向button对象
+    })
+  </script>
+  ```
+
+- 作用：
+  - 弄清除this的方向，可以让我们代码更简洁
+  - 函数的调用方式不同，this指代的对象也不同
+
+### 回调函数
+- 概述：如果将函数A做为参数传递给函数B时，我们称函数A为回调函数
+- 通常，使用匿名函数作为回调函数比较常见
+- 详细的回调函数知识后续补充
+
+
+

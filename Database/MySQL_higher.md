@@ -445,4 +445,142 @@ SELECT * FROM employees WHERE last_name = 'King';
 - 定义：也称为关联查询，指两个或更多个表一起完成查询操作
 - 前提条件：这些一起查询的表之间是有关系的（一对一、一对多），它们之间一定是关联字段，这个关联字段可能建立了外键，也可能没有建立外键。比如：员工表和部门表，这两个表依靠“部门编号”进行关联
 
-- 一个案例引发的多表连接
+- 多表查询的实现
+```SQL
+笛卡尔积错误
+
+-- 错误的实现方式：每个员工与每个部门都匹配了一遍
+SELECT employee_id,department_name
+FROM employees,departments;
+-- 错误的原因：缺少了多表的链接条件
+
+-- 等同于笛卡尔积错误的交叉的查询
+SELECT employee_id,department_name
+From employees CROSS JOIN departments;
+
+-- 多表查询的正确方式：需要有连接条件(关联查询)
+SELECT employee_id,department_name
+From employees,departments
+-- 两个表的连接条件
+WHERE employees.department_id = departments.department_id;
+
+-- 如果查询语句中出现了多个表中都存在的字段，则必须指明此字段所在的表
+SELECT employee_id,department_name,employees.department_id
+FROM employees,departments
+WHERE employees.department_id = departments.department_id;
+-- 建议：从sql优化的角度，建议多表查询时，每个字段都指名其所在的表
+SELECT employees.employee_id,departments.department_name,employees.department_id
+FROM employees,departments
+WHERE employees.department_id = departments.department_id;
+-- 可读性太差，表明过长的话，所以可以给表起别名，在SELECT和WHERE中使用表的别名
+SELECT emp.employee_id,dept.department_name,emp.department_id
+FROM employees emp,departments dept
+WHERE emp.department_id = dept.department_id;
+-- 起别名的方法和给字段起别名一样，都是空格直接加别名
+-- 如果给表起来别名，一但在SELECT或WHERE中使用表明的话，则必须使用表的别名，不能再使用原名
+
+-- 三表(多表)查询
+SELECT e.employee_id,e.last_name,d.department_name,l.city
+FROM employees e,departments d,locations l
+WHERE e.department_id = d.department_id
+AND d.location_id = l.location_id;
+-- 如果有n个表实现多表的查询，则需要至少n-1个连接条件
+
+/*
+演绎式：提出问题1 --> 解决问题1 --> 提出问题2 --> 解决问题2 ...
+归纳式：总 -- 分 -- 总
+*/
+
+-- 多表查询的分类
+-- 角度1：等值连接 vs 非等值连接
+
+-- 角度2：自连接 vs 非自连接
+
+-- 角度3：内连接 vs 外连接 
+
+等值连接 vs 非等值连接
+
+-- 非等值连接的例子
+
+SELECT e.last_name,e.salary,j.grade_level
+FROM employees e,job_grades j
+WHERE e.salary between j.lowest_sal and j.highest_sal;
+
+-- 自连接
+
+SELECT emp.last_name employee,mgr.last_name manager
+FROM employees emp,employees mgr
+WHERE emp.manager_id = mgr.employee_id;
+
+内连接 vs 外连接
+
+内连接定义：；只把满足查询条件的数据列出来，而未满足查询条件的没有列出来，就叫内连接
+
+外连接定义：处理包含多表匹配行之外，还查询到了多个表中不匹配的行，这种查询情况叫外连接
+
+外连接分类：
+左外连接
+右外连接
+满外连接 
+
+SQL92中的内连接：见上，略
+
+SQL92中的外连接：使用 +  
+
+SELECT employee_id,department_name
+From employees e,departments d
+WHERE e.department_id = d.department_id(+);
+-- MySQL不支持SQL92语法中的外连接写法，支持oracle
+
+SQL99中的外连接：使用JOIN...ON的方式实现多表查询，MySQL支持SQL99这种方式
+
+SQL99中的内连接：
+
+SELECT last_name,department_name
+FROM employees e (INNER) JOIN departments d
+on e.department_id = d.department_id
+-- 两个表内连接查询
+
+SELECT last_name,department_name,city
+FROM employees e JOIN departments d
+on e.department_id = d.department_id
+JOIN location l
+ON d.location_id = l.location_id;
+-- 三表（多表）内连接查询
+
+SQL99中的外连接
+
+-- 左外连接
+SELECT last_name,department_name
+FROM employees e LEFT (OUTER) JOIN departments d
+ON e.department_id = d.department_id;
+
+-- 右外连接
+SELECT last_name,department_name
+FROM employees e RIGHT (OUTER) JOIN departments d
+ON e.department_id = d.department_id;
+
+-- 满外连接
+SELECT last_name,department_name
+FROM employees e FULL (OUTER) JOIN departments d
+ON e.department_id = d.department_id;
+-- 不支持mysql,支持oracle
+
+UNION的使用
+
+合并查询结果
+利用UNION关键字，可以给出多条SELECT语句，并将它们的结果组合成单个结果集。合并时，两个表对应的列数和数据类型必须相同，并且相互对应。各个SELECT语句之间使用UNION 或UNION ALL关键字分割
+
+SELECT column, ... FROM table1
+UNION [ALL]
+SELECT column, ... FROM table2
+
+UNION操作符
+返回两个查询的结果集的并集，去除重复记录
+
+UNION操作符
+返回两个查询的结果集的并集。对于两个结果集的重复部分不去重。
+
+
+```
+![Alt text](image.png)

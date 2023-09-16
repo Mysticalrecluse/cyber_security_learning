@@ -238,6 +238,169 @@ int main(void)
   </table>
 
   - 注意：如果变量的类型不同，但占用相同的字节数，则它们仍是不同的。Long 和 int类型占用相同的内存量，但它们仍是不同的类型。
+  - 关于给数值类型赋值是，常量后面加后缀，如：L,LL,UL,ULL等的意义
+    - 一般来说，由于前面已经声明了变量类型，后面的后缀在大多数情况下是多余的，但是在一些编辑器中，并不能完全识别前面如：long int ,long long int 类似这种的说明，因此在这种情况下，需要加后缀防止数值溢出。 
 
 - 浮点数
   - 浮点数在内存中的表现形式，参照 C++中的浮点数在内存中的表现形式（C++_learning.md） 
+  - 浮点数大致共3种类型：float；double；long double
+    - 字节数及精确位数
+      - float       占4个字节，  7位有效位
+      - double      占8个字节，  15位有效位
+      - long double 占12个字节， 18个有效位
+    - 编写一个类型为float的常量，需要在数值的末尾添加一个f，以区别double类型
+      - 例如：`float redius = 2.5f`
+    - 当用E或e指定指数值时，这个常量就不需要包含小数点
+      - 例如：`float num = 1E3f`和`double biggest = 123E30`
+  - 浮点数的格式说明符：%f
+    - 控制输出中的小数位数：`%.3f`(小数点后3位)
+    - 用于浮点数的格式说明符的一般形式：`%[width][.precision][modifier]f`
+      - width: 是一个整数，指定输出的总字符串（包括空格），即字段宽度，数值默认右对齐，即在前面补空格。如果希望左对齐（即在后面补空格），可以用负数
+      - .precision: 指定小数点后的位数
+      - modifier: 当输出值的类型是long double时，modifier部分就是L，否则省略
+
+### 简单介绍scanf() 后续会更详细的说明
+- 语法格式：`scanf(a,&b)`, 共两个参数
+- 简介：scanf()是一个需要包含头文件stdio.h的函数。它专门处理键盘输入，提取通过键盘输入的数据
+  - 第一个参数：放在双引号内的一个控制字符串，用来声明输入的数据类型
+  - 第二个参数：&是寻址运算符，它允许scanf()函数将读入的数值存进指定变量中。
+    - 例如：`scanf("%f", &diameter)` 将输入的浮点数存入变量diameter中
+- scanf()中的更多参数和应用将在后续讲解
+
+### 定义命名常量
+- 定义一个固定不变的值（即常量），有两种方法：
+  - 方法1：是将PI定义为一个符号，此时PI不是一个变量，而是它表示的值的一个别名
+    - 语法：`#define PI 3.14159f`
+    - 注意：#define语句中的标识符都是大写，只要在程序里的表达式中引用PI，预处理器就会用#define指令中的值取代它
+  - 方法2：将Pi定义成变量，但告诉编译器，它的值是固定的，不能改变 （推荐）
+    - 语法：`const float Pi = 3.14159f`
+  - 区别：
+    - 方法1中PI只是一个字符序列，替代代码中的所有PI。
+    - 方法2中Pi为指定类型的一个常量值，在Pi的声明中添加关键字const，会使编译器检查代码是否试图改变它的值，如果改变则会报错。
+
+### 极限值
+- 整数类型的极限值：头文件`<limits.h>`定义的符号表示每种类型的极限值
+<table>
+  <thead>
+    <th style="background-color:darkred;color:white">类 型</th>
+    <th style="background-color:darkred;color:white">下 限</th>
+    <th style="background-color:darkred;color:white">上 限</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>char</td>
+      <td>CHAR_MIN</td>
+      <td>CHAR_MAX</td>
+    </tr>
+    <tr>
+      <td>short</td>
+      <td>SHRT_MIN</td>
+      <td>SHRT_MAX</td>
+    </tr>
+    <tr>
+      <td>int</td>
+      <td>INT_MIN</td>
+      <td>INT_MAX</td>
+    </tr>
+    <tr>
+      <td>long</td>
+      <td>LONG_MIN</td>
+      <td>LONG_MAX</td>
+    </tr>
+    <tr>
+      <td>long long</td>
+      <td>LLONG_MIN</td>
+      <td>LLONG_MAX</td>
+    </tr>
+  </tbody>
+</table>
+
+- 浮点数类型的极限值：头文件`<float.h>`定义了表示浮点数的符号
+<table>
+  <thead>
+    <th style="background-color:darkred;color:white">类 型</th>
+    <th style="background-color:darkred;color:white">下 限</th>
+    <th style="background-color:darkred;color:white">上 限</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>float</td>
+      <td>FLT_MIN</td>
+      <td>FLT_MAX</td>
+    </tr>
+    <tr>
+      <td>double</td>
+      <td>DBL_MIN</td>
+      <td>DBL_MAX</td>
+    </tr>
+    <tr>
+      <td>long double</td>
+      <td>LDBL_MIN</td>
+      <td>LDBL_MAX</td>
+    </tr>
+  </tbody>
+</table>
+
+### sizeof()运算符
+- 使用sizeof运算符可以确定给定的类型占据多少字节。当然，在C语言中sizeof是一个关键字。表达式sizeof(int)会得到int类型的变量所占的字节数，所得的值是一个size_t类型的整数。
+  - 例句：`size_t size = sizeof(long long);`
+- 除了确定某个基本类型的值占用的内存空间之外，sizeof运算符还有其他用途，但这里只使用它确定每种类型占用的字节数
+```C
+// Program 2.12 Finding the size of a type
+#include <stdio.h>
+
+int main(void) {
+  printf("Variables of type char occupy %u bytes\n", sizeof(char));
+  printf("Variables of type short occupy %u bytes\n", sizeof(short));
+  printf("Variables of type int occupy %u bytes\n", sizeof(int));
+  ...
+}
+```
+- 注意：如果希望把sizeof运算符应用于一个类型，则该类型名必须放在括号中，例如sizeof(long double)。将sizeof运算符应用于表达式时，括号就是可选的。
+
+### 强制类型转换
+- 要把变量从一种类型转换为另一种类型，应把目标类型放在变量前面的括号里，和java的强制类型转换相同
+- 例如：`RevQuarter = (float)QuarterSold/150*Revenue_Per_150;`
+
+### 隐式转换
+- 转换规则：
+  - 将值域较小的操作数类型转换为另一个操作数类型（这里和java一致），但在一些情况下，两个操作数都要转换类型
+
+### 字符类型 char
+- 概述
+  - char类型的变量可以存储单个字符的代码。他只能存储一个字符代码（即一个整数），所以也可以看作整数类型。可以像其他整数类型那样处理char类型存储的值。因此可以在算术运算中使用它。
+  - char类型的变量有双重性：可以把它解释为一个字符，也可以解释为一个整数
+    - `char letter = 'C'; letter = letter + 3;`
+
+- 字符的输入输出
+  - scanf()函数和格式说明符%c，可以从键盘上读取单个字符，将它存储在char类型的变量中
+  ```C
+  char ch = 0;
+  scanf("%c",&ch);  // Read One character
+  ```
+
+### 枚举
+- 概述：
+  - 使用场景：在编程时，常常希望变量存储一组可能值中的一个。例如：一个变量存储表示当前月份的值。这时就可以使用枚举
+  - 利用枚举，可以定义一个新的整数类型，该类型变量的值域是我们指定的几个可能值
+    - 例：`enum Weekday {Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday};`
+    - 解析：
+      - 这个语句定义了一个类型，而不是变量。新类型的名称Weekday跟在关键字enum的后面，这个类型名称称为枚举的标记
+      - Weekday类型的变量值可以是类型名称后面的大括号中的名称指定的任意值。这些名称叫做枚举器或枚举常量，其数量可任意。
+      - 每个枚举器都用我们赋予的唯一名称来指定，编译器会把int类型的整数值赋予每个名称。枚举是一个整数类型，因为指定的枚举器对应不同的整数值，这些整数值默认从0开始，即索引。
+      - 可以声明Weekday类型的一个新变量，并初始化它：`enum Weekday today = Wednesday; //2`
+      - 也可以在定义枚举类型时，声明该类型的变量，并初始化变量：`enum Weekday {Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday} today = Monday, tomorrow = Tuesday;`
+      - 枚举类型的变量是整数类型，所以可以在算术表达式中使用：`enum Weekday {Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday} today = Monday, tomorrow = today + 1;`
+
+- 选择枚举值：
+  - 可以给任意或所有枚举器明确指定自己的整数值。尽管枚举器使用的名称必须唯一，但枚举器的值不要求是唯一的。（除非有特殊的原因让某些枚举器的值相同，否则一般应确保这些值也是唯一的）
+  - 例：`enum Weekday {Monday = 1, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday};`
+  - 枚举值相同的例子：`enum Weekday {Monday = 5, Tuesday = 4, Wednesday, Thursday = 10, Friday = 3, Saturday, Sunday};`
+
+### 存储布尔值的变量
+- _Bool类型存储布尔值。
+  - _Bool类型的变量值可以是0或1，对应于布尔值false和true。由于值0和1是整数，所以_Bool类型也被看为整数类型。
+  - 例：`_Bool vaild = 1; // Boolean variable initialized to true`
+  - 在包含使用`<stdbool.h>`头文件后，可以用bool代替_Bool
+
+
