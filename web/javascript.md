@@ -157,6 +157,16 @@ prompt('请输入你的年龄')
     let num2 = num1;
     // 此时num1和num2的值都是5，但是在两个不同的内存空间，二者独立，互不干扰。
     ```
+    - 关于这段代码的底层解释
+    ```
+    按值赋值：
+
+    在JavaScript和C中，基本数据类型（如整数、浮点数、字符等）的赋值都是按值进行的。这意味着当一个变量赋值给另一个变量时，实际上是将值复制到新变量的内存位置。
+
+    独立的内存空间：
+
+    每个基本类型的变量都拥有自己独立的内存空间。例如，如果你在JavaScript或C中有 int n1 = 1; int n2 = n1;，n1 和 n2 会分别占据不同的内存位置，即使它们的值相同。
+    ```
     - 引用值：引用值在复制的时候，实际上复制的是指针，指向存储在堆内存中的对象。操作完成后，两个变量实际指向同一个对象，即同一个内存空间，因此一个对象上面的变化会在另一个对象上反映出来。
     ```js
     let obj1 = new Object();
@@ -198,6 +208,91 @@ let arr = [1,2,3,4,5]
 console.log(arr[0])
 console.log(arr.length) //返回数组的长度
 ```
+### forEach
+- 概述：
+  - forEach 是数组的一个方法，它用于遍历数组的每个元素并执行指定的函数。这个函数对数组中的每一项都会执行一次。
+
+- 基本语法：
+```js
+array.forEach(function(currentValue, index, arr), thisValue)
+```
+
+- 参数：
+  - function(currentValue, index, arr) 必需
+    - currentValue（当前值）：数组中正在处理的当前元素。
+    - index（索引，可选）：数组中正在处理的当前元素的索引。
+    - arr（数组，可选）：forEach 方法正在操作的数组。
+  - thisValue（可选）：当执行函数时，用作 this 的值（参考对象）。
+
+- 代码示例：
+```js
+const fruits = ["apple", "orange", "banana"];
+
+// 只有必选值，遍历数组
+fruits.forEach(function(fruit) {
+  console.log(fruit);
+});
+// 输出:
+// apple
+// orange
+// banana
+
+// 使用index和arr
+fruits.forEach(function(fruit, index, arr) {
+  console.log(`fruit at index ${index} is ${fruit} in array ${arr}`);
+});
+// 输出:
+// fruit at index 0 is apple in array apple,orange,banana
+// fruit at index 1 is orange in array apple,orange,banana
+// fruit at index 2 is banana in array apple,orange,banana
+
+// 使用 thisValue 参数
+const object = {
+  printFruit(fruit) {
+    console.log(`${this.prefix} ${fruit}`);
+  }
+};
+
+fruits.forEach(object.printFruit, {prefix: "I love"});
+// 输出:
+// I love apple
+// I love orange
+// I love banana
+
+```
+- 注意：forEach()无返回值
+  
+### map()和join()
+- 常用作用：可以使用map()和join()数组方法实现字符串拼接
+
+- map()迭代数组
+  - 使用场景：可以遍历数组处理数据，并且返回新的数组
+  - map也称为映射
+  - map的重点在于返回值，forEach没有返回值
+
+- 代码示例：
+```js
+const arr = ['red','blue','green']
+const newArr = arr.map(function(ele,index){
+  console.log(ele) // 数组元素
+  console.log(index) // 数组索引
+  return ele + '颜色'
+})
+
+console.log(newArr) // ['red颜色','blue颜色','green颜色']
+```
+
+- join()
+  - 作用：用于把数组中的所有元素转换为一个字符串
+
+- 代码示例：
+```js
+const arr = ['red颜色','blue颜色','green颜色']
+console.log(arr.join('')) // red颜色blue颜色green颜色
+```
+- 参数：
+  - 数组元素是通过参数里面指定的分隔符进行分隔，空字符串''，则所有元素之间都没有任何字符
+  - 默认用逗号,分隔
 
 ## 常量
 - 概念：使用const声明的变量称为：“常量”
@@ -331,7 +426,7 @@ arr = [1,2,3]
       2. ...values：这是一个包含所有内嵌表达式求值结果的数组。对于上面的模板字符串，values 数组会是 [ 'world' ]。
 
       示例：
-      function myTag(strings, ...values) {
+      function myTag(strings, ...values) { // ...表示不定长参数，不能省略
         let str = '';
         for(let i = 0; i < strings.length; i++) {
           str += strings[i];
@@ -1587,6 +1682,23 @@ document.getElementsByClassName('w')
   </html>
   ```
 
+- `setTimeout`
+  - 概述：
+    - setTimeout 是 JavaScript 中的一个非常有用的函数，它用于设置一个定时器，该定时器在指定的毫秒数后执行指定的函数或代码。这个函数是异步执行的，意味着它不会阻止后续代码的执行。setTimeout 是 Web API 的一部分，在浏览器环境中可用。
+  - 基础语法
+  ```JS
+  setTimeout(function, delay, [arg1, arg2, ...]);
+  // function：要执行的函数。
+  // delay：延迟的时间，以毫秒为单位。
+  // [arg1, arg2, ...]：（可选）传递给函数的额外参数。
+  ```
+  - 代码示例
+  ```JS
+  setTimeout(() => {
+    console.log("Hello after 3 seconds");
+  }, 3000);
+  ```
+
 - 关闭定时器
   - 代码示例：
   ```js
@@ -1701,5 +1813,948 @@ document.getElementsByClassName('w')
 - 通常，使用匿名函数作为回调函数比较常见
 - 详细的回调函数知识后续补充
 
+### 事件流
+- 事件流
+  - 概述：事件流指的是事件完整执行过程中的流动路径
+  ```
+  # 捕获阶段：
+  Document -> Element html -> Element body -> Element div
 
+  # 冒泡阶段
+  Element div -> Element body -> Element html -> Document
+  ```
+  - 总结：捕获阶段就是从父到子；冒泡阶段就是从子到父
+  - 实际工作一般使用事件冒泡为主
+  
+- 事件捕获
+  - 概念：从DOM的根元素开始去执行对应的事件 (从外到里)
+  - 事件捕获需要写对应代码才能看到效果
+  ```js
+  DOM.addEventListener(事件类型，事件处理函数，是否使用捕获机制)
+
+  // addEventListener第三个参数传入true代表捕获阶段触发（很少使用）
+  // 如果第三个参数传入false代表冒泡阶段，默认就是false
+  // 如果使用L0是事件监听，则只有冒泡阶段，没有捕获
+  ```
+  - <a href="./prac/捕获事件流.html">捕获事件流代码示例</a>
+
+- 事件冒泡
+  - 概念：当一个元素的事件被触发时，同样的事件将会在该元素的所有祖先元素中依次被触发。这一过程被称为事件冒泡
+  - 理解：当一个元素触发事件后，会依次向上调用所有父级元素的同名事件
+  - 事件冒泡是默认存在
+
+- 阻止冒泡
+  - 问题：因为默认就有冒泡模式的存在，所以容易导致事件影响到父元素
+  - 需求：若想把事件就限制在当前元素内，就需要阻止事件冒泡
+  - 前提：阻止事件冒泡需要拿到事件对象
+  - 语法：`事件对象.stopPropagation()`
+  - 注意：此方法可以阻断事件流动传播，不光在冒泡阶段有效，捕获阶段也有效
+  - 代码示例：
+  ```js
+  const father = document.querySelector('.father')
+        const son = document.querySelector('.son')
+
+        document.addEventListener('click', function() {
+            alert(`i'm grandfather`)
+        }, true)
+        father.addEventListener('click', function() {
+            alert(`i'm father`)
+        }, true)
+        son.addEventListener('click', function(e) {
+            alert(`i'm son`)
+            e.stopPropagation() 
+            // 阻止冒泡，事件对象.stopPropagation()
+        }, true)
+  ```
+
+- 阻止默认行为
+  - 应用场景：我们某些情况下需要阻止默认行为的发生，比如阻止链接的跳转，表单域跳转
+  - 语法：`e.preventDefault()`
+  - 代码演示
+  ```html
+  <form action="http://www.baidu.com">
+    <input type="submit" value="提交">
+  </form>
+  <script>
+    const form = document.querySelector('form')
+    form.addEventListener('click',function(e) {
+      // 阻止表单默认提交行为
+      e.preventDefault()
+    })
+  </script>
+  ```
+
+- 解绑事件
+  - on事件方式，直接使用null覆盖就可以实现事件的解绑
+  ```js
+  // 绑定事件
+  btn.onclick = function() {
+    alert('点击了')
+  }
+
+  // 解绑事件
+  btn.onclick = null
+  ```
+  - 使用addEventListener方式：
+  ```js
+  // 必须使用removeEventListener(事件类型,事件处理函数,[获取捕获或者冒泡阶段])
+  function fn() {
+    alert('点击了')
+  }
+  // 绑定事件
+  btn.addEventListener('click',fn)
+  // 解绑事件
+  btn.removeEventListener('click',fn)
+  ```
+  - 注意：<font color=tomato>匿名函数无法解绑addEventListener()的事件</font>
+
+- 鼠标经过事件的区别
+  - mouseover(鼠标经过) 和 mouseout(鼠标离开) 会有冒泡效果
+  - mouseenter(鼠标经过) 和 mouseleave(鼠标离开) 没有冒泡效果(推荐)
+
+### 事件委托
+- 概述：
+  - 事件委托是利用事件流的特征解决一些开发需求的知识技巧
+- 优点：
+  - 减少注册次数，可以提供程序性能
+- 原理：
+  - 事件委托其实是利用事件冒泡的特点。
+  - 给父元素注册事件，当我们触发子元素的时候，会冒泡到父元素身上，从而触发父元素的事件
+
+- 代码演示
+```js
+const ul = document.querySelector('ul')
+ul.addEventListener('click',function(e){
+  // console.log(e.target) // 就是点击的对象
+  //e.target.style.color = 'red'
+
+  // 需求：只点击需要的元素，比如li才会有效果
+  if (e.target.tagName === 'LI') {
+    e.target.sytle.color = 'red'
+  }
+
+})
+```
+
+### 其他事件
+#### 页面加载事件1-load
+- 概述
+  - 加载外部资源（如图片、外联CSS和JavaScript等）加载完毕时触发的事件
+
+- 应用场景
+  - 有时候需要等页面资源全部处理完了做一些事情
+  - 老代码喜欢把script写在head中，这时候直接找dom元素，找不到 
+  
+- 事件名：load 
+- 监听页面所有资源加载完毕：
+  - 在window添加load事件
+  - 代码演示
+  ```js
+  // 页面加载事件
+  // 等待页面所有资源加载完毕，就会执行回调函数
+  window.addEventListener('load', function () {
+    // 执行操作
+  })
+  ```
+  - 注意：不光可以监听整个页面资源加载完毕，也可以针对某个资源绑定load事件
+  - 案例：
+  ```js
+  img.addEventListener('load',function() {
+    // 等待图片加载完毕，再去执行里面的代码
+  })
+  ```
+
+#### 页面加载事件2-DOMContentLoaded
+- 概述
+  - 当初始的HTML文档被完全加载和解析完成之后，DOMContentLoaded事件被触发，无需等待样式表，图形等完全加载
+  
+- 事件名：DOMContentLoaded
+
+- 监听页面DOM加载完毕
+  - 给document添加DOMContentLoaded事件
+  - 代码演示
+  ```js
+  ducument.addEventListener('DOMContentLoaded', function() {
+    // 执行操作
+  })
+  ```
+
+#### 元素滚动事件
+- 概述：
+  - 滚动条在滚动的时候持续触发的事件
+
+- 应用场景
+  - 很多网页需要检测用户把页面滚动到某个区域后做一些处理，比如固定导航栏，比如返回顶部
+
+- 事件名：scroll
+
+- 监听整个页面的滚动
+  - 代码示例
+  ```js
+  // 页面滚动事件
+  window.addEventListener('scroll', function() {
+    // 执行操作
+    // console.log('我滚了')
+  })
+
+  // 获取html元素的写法
+  document.documentElement
+
+  // 获取整个页面的滚动像素
+  window.addEventListener('scroll', function() {
+    console.log(document.documentElement.scrollTop)
+  })
+  ```
+
+- 页面滚动事件-获取位置
+  - scrollLeft和scrollTop（属性）
+    - 获取被卷去的大小
+    - 获取元素内容往左，往上滚出去看不到的距离
+    - 这两个值是可读写的 
+  - scrollTop详解
+    - scrollTop: 如果页面滚动条往下拉，实质上页面内容是往上移动，scrollTop就是往上移动的距离
+  - 代码演示：
+  ```js
+  // 获取scrollTop的值
+  const div = document.querySelector('div')
+  div.addEventListener('scroll',function() {
+    console.log(div.scrollTop);
+  })
+  ```
+  - 应用演示
+  ```js
+  // 添加滚动事件
+  window.addEventListener('scroll', function() {
+      const n = document.documentElement.scrollTop;
+      // n得到的数据，为数字型，不带单位
+      if(n > 100) {
+          document.querySelector('.tab').style.display = 'block';
+      } else {
+          document.querySelector('.tab').style.display = 'none';
+      }
+  })
+  ```
+
+- 页面滚动事件-滚动到指定的坐标
+  - scrollTo()方法可以把内容滚动到指定的坐标
+  - 语法
+    - 元素.scrollTo(x,y)
+  - 代码演示
+  ```js
+  // 让页面滚动到y轴1000像素的位置
+  window.scrollTo(0,1000)
+  ```
+
+ - 点击返回页面顶部，代码演示
+  ```js
+  const backTop = document.querySelector('#backTop')
+  backTop.addEventListener('click', function() {
+    // 可读写
+    // 方法1：
+    // document.documentElement.scrollTop = 0
+    // window.scrollTo(x,y)
+    // 方法2：
+    window.scrollTo(0,0)
+  })
+  ```
+
+#### 页面尺寸事件
+- 会在窗口尺寸改变的时候触发
+  - 关键字：resize
+  - 演示代码
+  ```js
+  // resize 浏览器窗口大小发生变化的时候，触发的事件
+  window.addEventListener('resize',function() {
+    // 执行的代码
+  })
+  ```
+
+- 检测屏幕宽度
+  - 属性：clientWidth
+  - 演示代码
+  ```js
+  window.addEventListener('resize', function() {
+    let w = document.documentElement.clientWidth
+    console.log(w)
+  })
+  ```
+
+- 页面尺寸事件-获取元素宽高
+  - 获取宽高
+    - 获取元素的可见部分宽高（不包含边框，margin，滚动条等）
+    - clientWidth 和 clientHeight
+  - 代码演示
+  ```js
+  // set 1rem - viewWidth / 10
+  function setRemUnit() {
+    let rem = document.documentElement.clientWidth / 10
+    document.documentElement.fontSize = rem + 'px'
+  }
+
+  setRemUnit()
+  
+  // reset rem unit on page resize
+  window.addEventListener('resize',setRemUnit)
+  ```
+
+
+### 元素的尺寸和位置
+- 使用场景
+  - 前面的案例滚动多少距离，都是自己计算的，实际上，最好是页面滚动到某个元素，就可以做某事
+  - 简单说，就是通过js的方式，得到元素在页面上的位置
+  - 这样，就可以在页面滚动到这个位置，就可以做某些操作，省去计算了
+
+- 元素尺寸和位置-尺寸
+  - 获取宽高
+    - 获取元素的自身宽高，包含元素自身设置的宽高、padding、border
+    - offsetWidth和offsetHeight
+    - 获取出来的是数值，方便计算
+    - 注意：获取的是可视宽高，如果盒子隐藏，则获取结果为0
+  - 获取位置
+    - 获取元素距离自己定位父元素的左、上距离
+      - 如果父级元素没有定位，则以浏览器边框为准
+      - 如果父级元素有定位（eg:position:relation），则以父级元素为准
+    - offsetLeft和offsetTop 注意是只读属性 
+    - element.getBoundingClientRect()
+      - 方法：返回元素的大小及其<font color=tomato>相对于视口的位置</font>
+    ```js
+    const div = document.querySelector('div')
+    console.log(div.getBoundingClientRect())
+    // 结果得到一个对象
+    ```
+
+### 日期对象
+- 概述：用来表示时间的对象
+
+- 作用：可以得到当前系统时间
+
+- 实例化
+  - 在代码中发现了new关键字时，一般将这个操作称为实例化
+  - 创建一个时间对象并获取时间
+    - 获取当前时间
+    - `const date = new Date()`
+  - 代码示例：
+  ```js
+  // 实例化 new
+  // 1. 得到当前时间
+  const date = new Date()
+  console.log(date)
+
+  // 2. 得到指定时间
+  const date1 = new Date('2022-5-1 08:30:00')
+  console.log(date1)
+  ```
+
+- 日期对象方法
+  - 使用场景：因为日期对象返回的数据，我们不能直接使用，所以需要转换为实际开发中使用的格式
+  - 
+  <table>
+    <thead>
+      <th style="background-color:darkred; color:white;"> 方法</th>
+      <th style="background-color:darkred; color:white;"> 作用</th>
+      <th style="background-color:darkred; color:white;"> 说明</th>
+    </thead>
+    <tbody>
+      <tr>
+        <td>getFullYear()</td>
+        <td>获得年份</td>
+        <td>获取四位年份</td>
+      </tr>
+      <tr>
+        <td>getMonth()</td>
+        <td>获得月份</td>
+        <td>取值为0~11</td>
+      </tr>
+      <tr>
+        <td>getDate()</td>
+        <td>获取月份中的每一天</td>
+        <td>不同各月份取值不同</td>
+      </tr>
+      <tr>
+        <td>getDay()</td>
+        <td>获取星期</td>
+        <td>取值为0~6(0 Sunday)</td>
+      </tr>
+      <tr>
+        <td>getHours()</td>
+        <td>获取小时</td>
+        <td>取值为0~23</td>
+      </tr>
+      <tr>
+        <td>getMinutes</td>
+        <td>获取分钟</td>
+        <td>取值为0~59</td>
+      </tr>
+      <tr>
+        <td>getSeconds</td>
+        <td>获取秒</td>
+        <td>取值为0~59</td>
+      </tr>
+    </tbody>
+  </table>
+
+- 代码演示
+```js
+const div = document.querySelector('div')
+const date = new Date()
+// div.innerHTML = date.tolocaleString()   当前时间+日期
+// div.innerHTML = date.tolocaleDateString()  当前日期
+// div.innerHTML = date.tolocaleTimeString()  当前时间
+setInterval(function(){
+  div.innerHTML = data.tolocaleString()
+},1000)
+```
+
+- 时间戳
+  - 概念
+    - 是指1970年01月01日00时00分00秒起至现在的毫秒数，它是一种特殊的计量时间的方式
+  - 使用场景
+    - 如果计算倒计时效果，前面方法无法直接计算，需要借助于时间戳完成
+  - 算法：
+    - 将来的时间戳 - 现在时间戳 = 剩余时间戳
+    - 剩余时间毫秒数 转换为 剩余时间的 年月日时分秒 就是 倒计时时间
+
+  - 三种方式获取时间戳
+    - 使用getTime() 方法 (可以返回指定时间的时间戳)
+    ```js
+    const date = new Date()
+    console.log(date.getTime())
+    ```
+    - 简写 +new Date() (可以返回指定时间的时间戳)
+    ```js
+    // 获得指定时间的时间戳
+    console.log(+new Date('2023-10-05 17:00:00'))
+    ```
+    - 使用 Date.now() (只能返回当前时间的时间戳)
+
+### DOM节点操作
+- DOM节点：
+  - 概述：DOM树里每一个内容都称之为节点
+
+- 节点类型：
+  - 元素节点：
+    - 所有的标签，比如：body、div
+    - html是根节点
+  - 属性节点：
+    - 所有的属性，比如：href
+  - 文本节点：
+    - 所有的文本
+  - 其他
+
+- 查找节点：
+  - 针对节点关系，进行节点的查找
+    - 父节点
+    - 子节点
+    - 兄弟节点
+
+- 父节点查找
+  - 属性：parentNode
+  - 返回最近一级的父节点，找不到返回为null
+  - `子元素.parentNode`
+  - 代码演示
+  ```html
+  <div class="dad">
+    <div class="baby"></div>
+  </div>
+  <script>
+    const.baby = document.querySelector('.baby')
+    console.log(baby) // 返回dom对象
+    console.log(baby.parentNode) // 返回dom对象（父级div）
+  </script>
+  ```
+
+- 子节点查找：
+  - childNodes
+    - 获得所有子节点（空格、换行）、注释节点等，一般不用
+  - <font color=tomato>children属性（重点）</font>
+    - 仅获得所有元素节点
+    - 返回的还是一个伪数组
+    - `父元素.children`
+
+- 兄弟关系查找
+  - 下一个兄弟节点
+    - nextElementSibling 属性
+  - 上一个兄弟节点
+    - previousElementSibling 属性
+
+
+- 增加节点
+  - 场景：很多情况下，需要在页面中增加元素
+    - 比如：点击发布按钮，可以新增一条信息 
+  - 一般步骤
+    - 创建一个新的节点
+    - 把创建的节点放入到指定元素内部
+  - 创建节点：
+    - 即创建一个新的网页元素，在添加到网页内，一般先创建节点，然后插入节点
+    - 创建元素节点方法：
+    ```js
+    // 创建一个新的元素节点
+    document.createElement('标签名')
+    ```
+    - 追加节点（将新建的节点放到指定位置）
+      - 要想在界面看到，还得插入到某个父元素中
+      - 插入到父元素的最后一个子元素：
+      ```js
+      // 插入到这个父元素的最后
+      父元素.appendChild(要插入的元素)
+      ```
+      - 代码示例：
+      ```html
+      <body>
+        <ul><ul>
+        <script>
+          const ul = document.querySelector('ul')
+          const li = document.createElement('li')
+          li.innerHTML = '我是li'
+          ul.appendChild(li)
+        </script>
+      </body>
+      ```
+      - 插入到父元素的某个子元素的前面
+      ```js
+      // 插入到某个子元素的前面
+      父元素.insertBefore(要插入的元素, 在哪个元素前面)
+      ```
+  - 克隆节点
+    - 特殊情况下，按下列步骤复制节点
+      - 复制一个原有节点
+      - 把复制的节点放入到指定的元素内部
+    - 克隆节点
+    ```js
+    // 克隆一个已有的元素节点
+    元素.cloneNode(布尔值)
+    ```
+    - cloneNode会克隆出一个跟原标签一样的元素，括号内传入布尔值
+      - 若为true，则代表克隆时会包含后代节点一起克隆
+      - 若为false，则代表克隆时不包含后代节点
+      - 默认false
+    - 代码示例
+    ```html
+    <body>
+      <ul>
+        <li>1</li>
+        <li>2</li>
+        <li>3</li>
+      </ul>
+      <script>
+        const ul = document.querySeletor('ul')
+        const li1 = ul.children[0].cloneNode(true)
+        ul.appendChild(li)
+      </script>
+    </body>
+    ```
+  - 删除节点
+    - 若一个节点在页面中已不需要时，可以删除它
+    - 在javascript原生DOM操作中，要删除元素必须通过父元素删除
+    - 语法
+    ```js
+    父元素.removeChild(要删除的元素)
+    ```
+    - 注意：
+      - 如果不存在父子关系则删除不成功
+      - 删除节点和隐藏节点（dispaly:none）有区别的：隐藏节点还是存在的，但是删除，则是从html中删除节点
+
+
+### M端事件
+- 移动端也有自己独特的事件，比如触屏事件touch（也称触摸事件），Android和IOS都有
+
+- 常见触屏事件
+  - touchstart：手指触摸到一个DOM元素时触发
+  - touchmove：手指在一个DOM元素上滑动时触发
+  - touchend：手指从一个DOM元素上移开时触发
+
+### JS插件
+- 概述：就是别人写好的一些代码，只需要复制对应代码，就能实现对应的效果
+- 学习插件的基本过程
+  - 熟悉官网，了解这个插件可以完成什么要求
+    - https://www.swiper.com.cn
+  - 看在线演示，找到符合自己需求的demo
+    - https://www.swiper.com.cn/demo/index.html
+  - 查看基本使用流程
+    - https://www.swiper.com.cn/usage/index.html
+  - 查看APi文档，去配置自己的插件
+    - https://www.swiper.com.cn/api/index.html
+  - 注意：多个swiper同时使用的时候，类名需要注意区分
+
+
+## BOM
+- 概述
+  - BOM(Brower Object Model) 是浏览器对象模型
+  - window对象(BOM)
+    - navigator对象
+    - location对象
+    - document对象(DOM)
+    - history对象
+    - screen对象
+  - window对象是一个全局对象，也可以说是JavaScript中的顶级对象
+  - 像document、alert()、console.log()这些都是window的属性，基本BOM的属性和方法都是window的。
+  - 所有通过var定义的全局作用域的变量，函数都会变成window对象的属性和方法
+  - window对象下的属性和方法调用的时候可以省略window
+
+### 定时器-延时函数
+- JavaScript内置的一个用来让代码延迟执行的函数，叫setTimeout
+- 语法：
+```js
+setTimeout(回调函数, 等待的毫秒数)
+```
+- 作用：
+  - setTimeout仅仅只执行一次，所以可以理解为就是把一段代码延迟执行，平时省略window
+
+- 代码示例
+```js
+setTimeout(function() {
+  console.log('时间到了') // 2s后执行，且只执行一次
+},2000)
+```
+- 清除延时函数
+```js
+let timer = setTimeout(回调函数, 等待的毫秒数)
+clearTimeout(timer)
+```
+- 注意：
+  - 延时器需要等待，所以后面的代码先执行
+  - 每一次调用延时器都会产生一个新的延时器
+
+### JS执行机制
+- 概述
+  - JavaScript语言的一大特点是单线程，即同一时间只能做一件事
+  - 单线程意味着，所有任务需要排队，前一个任务结束，才会执行后一个任务，这就会导致：如果JS执行时间过长，会造成页面的渲染不连贯，导致页面渲染加载阻塞
+  
+- 解决JS单线程导致阻塞的解决方法：
+  - HTML5提出了Web Worker标准，允许JavaScript脚本创建多个线程。于是JS中出现了同步和异步 
+    - 同步：
+      - 前一个任务结束后再执行后一个任务，程序的执行顺序和任务的排列顺序是一致、同步的。
+    - 异步：
+      - 异步操作允许任务在主执行线程之外的一个单独的线程运行，所以它不会阻止其他任务。当异步任务完成时，它会返回结果，但是主线程可以继续执行其他任务。
+
+- 同步任务
+  - 同步任务都是在主线程中执行，形成一个执行栈
+
+- 异步任务
+  - JS得异步是通过回调函数和事件循环实现的
+  - 一般而言，异步任务有以下三种类型
+    - 普通时间：如：click、resize等
+    - 资源加载：如：load、error等
+    - 定时器，包括setInterval、setTimeout等
+  - 异步任务相关添加到任务队列中（任务队列也称为消息队列）
+
+- JS执行机制：
+  - 先执行执行栈中的同步任务
+  - 异步任务放入任务队列中
+  - 一旦执行栈中的所有同步任务执行完毕，系统就会按次序读取任务队列中的异步任务，于是被读取的异步任务结束等待状态，进入执行栈，开始执行
+  - 事件循环(event loop)
+    - JS的执行顺序：堆栈空间的同步代码 -> 微任务队列中的微任务(eg:Promise) -> 任务队列中的任务(eg:对调函数，计时器等)
+    - 详解：
+      - js解析器在主线程即堆栈中优先执行同步代码，
+      - 然后将异步代码提交给WebAPI中的异步API即浏览器进行处理，
+      - 异步任务执行完后，会将结果推入任务队列中，
+      - 当主线程的同步代码执行完后，查询任务队列，取出一个任务结果推入主线程处理
+      - 重复上述过程，即事件循环
+
+
+### location对象
+- 概述
+  - location的数据类型是对象，它拆分并保存了URL地址中的各个组成部分
+
+- 常见属性和方法
+  - href属性：
+    - 获取完整的URL地址，对其赋值时用于地址的跳转
+    - 代码演示
+    ```html
+    <a href="https://www.baidu.com">
+      支付成功<span>5</span>秒钟之后跳转到首页
+    </a>
+    <script>
+      // 获取元素
+      const a = document.querySelector('a')
+      // 开启定时器
+      // 声明倒计时变量
+      let num = 5
+      let timerId = setInterval(function() {
+        num --
+        // 如果num === 0 则停止定时器，并完成跳转功能
+        if (num === 0) {
+          clearInterval(timerId)
+          location.href = 'https://www.baidu.com'
+        }
+      },1000)
+    </script>
+    ```
+  - search属性：
+    - 获取地址中携带的参数，符号?后面部分(包含?的字符串)
+  - hash属性：
+    - 获取地址中的哈希值，符号#后面部分
+    - 使用场景：后续的vue路由的时候，可以用到，在不切换页面地址的情况下，进行组件切换，实现局部页面切换
+  - reload方法：
+    - 用来刷新当前页面，传入参数true时，表示强制刷新
+    - 代码演示
+    ```html
+    <button>点击刷新</button>
+    <script>
+      let btn = document.querySeletor('button')
+      btn.addEventListener('click', function() {
+        location.reload()       
+        // f5 刷新页面
+      
+        location.reload(true)
+        // 强制刷新 类似ctrl + f5
+      })
+    </script>
+    ```
+
+### navigator对象
+- 概述：
+  - navigator的数据类型是对象，该对象下记录了浏览器自身的相关信息
+
+- 常用属性和方法：
+  - 属性：userAgent检测浏览器的版本及平台
+  - 代码演示
+  ```js
+  // 检测userAgent(浏览器信息)
+  !(function() {
+    const userAgent = navigator.userAgent
+    // 验证是否为Android或iPhone
+    const android = userAgent.match(/(Android);?[\s\/]+([\d.]+)?/)
+    const iphone = userAgent.match(/(iPhone\sOS)\s([\d_]+)/)
+
+    // 如果是Android或iPhone，则跳转至移动站点
+    if(android || iphone) {
+      location.href = 'http://m.itcast.cn'
+    }
+  })()
+
+  // 立即执行函数：
+  格式1：(function(){})()
+  格式2：[!,+,~]function(){}()
+  格式3：[!,+,~](function(){}())
+  格式4：(function(){}())
+  ```
+
+### history对象
+- 概述
+  - history的数据类型是对象，主要管理历史记录，该对象与浏览器地址栏的操作相对应，如前进，后退，历史记录等
+
+- 常用属性和方法：
+  - back(): 后退
+  - forward()：前进功能
+  - go(参数)：前进后退功能，参数如果是1，前进1个页面，如果是-1，后退一个页面
+
+
+### 本地存储
+- 特点：
+  - 数据存储在用户浏览器中
+  - 设置、读取方便、甚至页面刷新不丢失数据
+  - 容量较大，sessionStorage和localStorage约5M左右
+  - 常见的使用场景
+    - https://todomvc.com/examples/vanilla-es6/ 页面刷新数据不丢失
+
+- localStorage
+  - 作用：可以将数据永久存储在本地（用户的电脑），除非手动删除，否则关闭页面也会存在
+  - 特性：
+    - 可以多窗口(页面)共享(同一浏览器可以共享)
+    - 以键值对的形式存储使用
+    - 本地存储只能存储字符串数据类型
+    - 即使关闭浏览器，数据依然存在
+  - 语法：
+  ```js
+  // 存储数据
+  localStorage.setItem(key,value)
+  // f12,Application中的LocalStorage中可以查看存入的数据，刷新不丢失
+
+  // 读取数据,获取值
+  localStorage.getItem(key)
+
+  // 删除本地存储
+  localStorage.removeItem(key)
+  ```
+
+- sessionStorage
+  - 特性：
+    - 生命周期为关闭浏览器窗口
+    - 在同一窗口(页面)下，数据可以共享
+    - 以键值对的形式存储使用
+    - 用法跟localStorage基本相同
+
+- 存储复杂数据类型
+  - 本地存储只能存储字符串，无法直接存储复杂数据类型，因此需要转换
+  - 解决方法：需要将复杂数据类型转换为JSON字符串，在存储到本地
+  - 语法：
+  ```js
+  // 存储使用JSON字符串
+  // JSON.stringify(复杂数据类型)
+  const obj = {
+    uname: 'pink'
+    age: 18
+    gender: 'female'
+  }
+
+  localStorage.setItem('obj',JSON.stringify(obj))
+
+  // 获取之后，将JSON字符串转换为对象
+  // JSON.parse()
+  console.log(JSON.parse(localStorage.getItem('obj')))
+
+  ```
+
+## 正则表达式
+- JavaScript中定义正则表达式的语法
+  - 方法1
+  ```js
+  const 变量名 = /表达式/
+  ```
+
+- 判断是否有符合规则的字符串：
+  - 语法：test()方法
+  - 作用：用来查看正则表达式与指定的字符串是否匹配
+  - 代码演示
+  ```js
+  regObj.test(被检测的字符串)
+  ```
+  - 应用代码演示
+  ```js
+  const str = "IT培训，前端开发培训，Java培训，人工智能"
+  // 定义正则表达式，检测规则
+  const reg = /前端/
+  // 检测方法
+  console.log(reg.test(str)) // 返回true
+  // 如果不匹配，返回false
+  ```
+
+- 检索（查找）符合规则的字符串
+  - 语法：exec()
+  - 作用：在一个指定字符串中执行一个搜索匹配
+  - 代码演示
+  ```js
+  regObj.exec(被检测字符串)
+  ```
+  - 如果匹配成功返回一个数组，否则返回null
+
+# JavaScript进阶
+## 作用域
+- 概述：
+  - 作用域规定了变量能够被访问的“范围”
+
+- 分类：
+  - 局部作用域
+    - 函数作用域
+    - 块作用域
+      - let 和 const有块级作用域
+      - var没有块级作用域，只有函数作用域
+  - 全局作用域
+    - 为window对象动态添加的属性默认是全局，不推荐
+    - 函数中未使用任何关键字声明的变量为全局变量，不推荐
+    - 尽可能少的声明全局变量，防止全局变量被污染
+
+- 作用域链：
+  - 本质：作用域链本质上是底层的变量查找机制
+    - 在函数被执行时，会优先查找当前函数作用域中查找变量
+    - 如果当前作用域查找不到则会一次逐级查找父级作用域直到全局作用域
+
+## 垃圾回收机制
+- 垃圾回收机制（Garbage Collection）简称GC
+  - JS中内存的分配和回收都是自动完成的，内存在不使用的时候会被垃圾回收机制自动回收
+
+- 内存的生命周期 
+  - JS环境中分配的内存，一般有如下生命周期
+    - 内存分配：当我们声明变量、函数、对象的时候，系统会自动为它们分配内存
+    - 内存使用：即读写内存，也就是使用变量，函数等
+    - 内存回收：使用完毕，由垃圾回收器自动回收，不再使用的内存
+
+- 说明：
+  - 全局变量一般不会回收（关闭页面回收）
+  - 一般情况下局部变量的值，不用了，会被自动回收掉
+
+- 内存泄露
+  - 程序分配的内存由于某种原因程序未释放或无法释放叫做内存泄漏
+
+- 算法说明
+  - 引用计数法
+  - 标记清除法
+    - 核心思路：
+      - 从根部扫描对象，能查找到的就使用，查找不到的就要回收
+
+## 闭包
+- 概念：一个函数对周围状态的引用捆绑在一起，内层函数中访问到其外层函数的作用域
+
+- 简单理解：闭包 = 内存函数 + 外层函数的变量
+  
+- 代码示例：
+```js
+function outer() {
+  let a = 1;
+  function f() {
+    console.log(a)
+  }
+  f()
+}
+outer()
+```
+## 自我理解：
+- 函数在多次调用的时候，会开辟多个内存空间，内部变量，参数的调用，都是不同的，不会出现同一个参数在多个函数中使用相同的内存空间的情况
+
+- 演示代码1
+```js
+function hd() {
+  let n = 1;
+  function sum() {
+    console.log(++n);
+  };
+  sum();
+}
+hd() // 2
+hd() // 2
+hd() // 2
+```
+
+- 演示代码1解析：
+  - 此时，无论hd()执行多少次，控制台输出的数值都是2
+  - 因为每次调用的都是新函数，所以会开辟一块新的内存空间，之前的空间的数据都不会在用到，因此会被垃圾回收机制释放掉
+  - 每次调用函数，n都是重新赋值为1，然后进行计算
+  - 而且，每个函数中的变量n，都是不同的内存空间
+
+- 演示代码2
+```js
+function hd() {
+  let n = 1;
+  return function sum() {
+    console.log(++n);
+  };
+}
+let a = hd();
+a() // 2
+a() // 3
+let b = hd() // 相当于重新分配了一块空间
+b() // 2
+b() // 3
+```
+
+- 演示代码2解析：
+  - 如果想要让函数中的数据不被释 放掉，就需要想办法，让里面的数据始终被使用
+  - 这样系统就不会开辟新的空间来创建新的函数
+  - 上述函数返回一个sum()的子函数，然后赋值给a
+  - 因此,每次调用a，都会使用这个函数，这个函数的内存地址，被变量a记录
+  - 因此，由于子函数位于hd()中，因此，整个函数空间都会保留，不会被释放
+  - 这个时候，每次调用的都会是同一个空间地址的数据，数据被累加
+
+
+## 箭头函数
+- 好处：引入箭头函数的目的是更简短的函数写法并且不绑定this，箭头函数的语法比函数表达式更简洁
+- 使用场景：箭头函数更适用于那些本来需要匿名函数的地方
+- 基本语法：
+```js
+// 基本函数
+function fn() {
+  console.log(123)
+}
+
+// 函数表达式
+const fn = function () {
+  console.log(123)
+}
+
+// 箭头函数
+const fn = () => {
+  console.log(123)
+} // 替代匿名函数
+```
 

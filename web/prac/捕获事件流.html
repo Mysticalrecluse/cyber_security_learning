@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>捕获事件流</title>
+    <style>
+        .father {
+            width: 200px;
+            height: 200px;
+            background-color: red;
+        }
+        .son {
+            width: 100px;
+            height: 100px;
+            background-color: green;
+        }
+    </style>
+</head>
+<body>
+    <div class="father">
+        <div class="son"></div>
+    </div>
+
+    <script>
+        const father = document.querySelector('.father')
+        const son = document.querySelector('.son')
+
+        document.addEventListener('click', function(e) {
+            alert(`i'm grandfather`)
+            e.stopPropagation()
+        }, true)
+        father.addEventListener('click', function() {
+            alert(`i'm father`)
+        }, true)
+        son.addEventListener('click', function() {
+            alert(`i'm son`)
+            
+        }, true)
+    </script>
+</body>
+</html>

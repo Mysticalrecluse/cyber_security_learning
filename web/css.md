@@ -219,6 +219,35 @@
 ### 伪类选择器(:)
 - 作用：伪类表示元素<font color=tomato>状态</font>，选中元素的某个状态设置样式。
 - 鼠标悬停状态：选择器:hover {CSS属性}
+#### 伪类-表单
+<table>
+    <thead>
+        <th>选择器</th>
+        <th>作用</th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>:checked</td>
+            <td>被勾选的选框</td>
+        </tr>
+        <tr>
+            <td>待添加</td>
+            <td>待添加</td>
+        </tr>
+        <tr>
+            <td>待添加</td>
+            <td>待添加</td>
+        </tr>
+        <tr>
+            <td>待添加</td>
+            <td>待添加</td>
+        </tr>
+        <tr>
+            <td>待添加</td>
+            <td>待添加</td>
+        </tr>
+    </tbody>
+</table>
 #### 伪类-超链接
 - 超链接共有4种状态
 <table>
@@ -243,7 +272,7 @@
             <td>:active</td>
             <td>点击时（激活）</td>
         </tr>
-        tr>
+        <tr>
             <td>:focus</td>
             <td>聚焦时（激活）</td>
         </tr>
@@ -929,7 +958,7 @@
 ## 标准流
 - 定义：标准流也叫文档流，指的是标签在页面中默认的排布规则 例如:块元素独占一行，行内元素可以一行显示多个。
 
-## 浮动
+ ## 浮动
 - 作用：让块级元素水平排列
 - 属性名：float
 - 属性值：left 左对齐；right 右对齐；
@@ -1001,8 +1030,8 @@
 ### Flex-组成
 - 设置方式：给父级元素设置 <font color=tomato>display: flex</font>，子元素可以<font color=tomato>自动挤压或拉伸</font>
 - 组成部分：
-  - 弹性容器
-  - 弹性盒子（弹性盒子沿着主轴方向排列）
+  - 弹性容器(父级元素)
+  - 弹性盒子（弹性盒子沿着主轴方向排列）—— (子级元素)
   - 主轴：默认在水平方向
   - 侧轴/交叉轴：默认在垂直方向
 
@@ -1105,6 +1134,7 @@ align-content
 - 弹性伸缩比
   - 作用：控制弹性盒子的主轴方向的尺寸
   - 属性名：flex
+  - 默认情况下，主轴方向的尺寸靠内容撑开，侧轴的尺寸默认拉伸
   - 属性值：整数数字，表示占用父级剩余尺寸的份数
 
 - 弹性盒子换行
@@ -1118,3 +1148,653 @@ align-content
 - 属性名：align-content
 - 属性值：与主轴对齐方式相同
 - 总结：相当于侧轴版的主轴对齐
+
+## 定位
+- 作用：灵活的改变盒子在网页中的位置
+
+- 实现过程：
+  - 定位模式：position
+  - 边偏移：设置盒子的位置
+    - 水平方向的位置: left、right
+    - 垂直方向的位置：top、bottom
+
+- 相对定位：position - relation
+  - 特点：
+    - 改变位置的参照物是 自己原来的位置
+    - 不脱标，占位
+    - 标签模式特点不变，原来是block，之后还是
+
+- 绝对定位：position - absolute
+  - 让一个块级元素，始终在父级元素的相对位置的方法
+    - 子级绝对定位，父级相对定位
+  - 特点：
+    - 脱标，不占位
+    - 参照物：先找最近的已经定位的祖先元素，如果所有祖先元素都没有定位，参照浏览器可视区改位置
+    - 标签模式自动具备行内块特点
+
+- 定位居中
+  - 实现步骤：
+    - 绝对定位
+    - 水平、垂直边偏移为50%
+    - 子级向左，上移动自身尺寸的一半
+      - 方法1：左、上外边距margin-尺寸的一半
+      - 方法2：transform: translate(-50%,-50%)
+
+- 固定定位：position-fixed
+  - 场景：元素的位置在网页滚动时不会改变
+  - 特点：
+    - 脱标，不占位
+    - 改变位置的参照物：浏览器窗口
+    - 加宽度生效，固定定位后，元素的显示模式变为行内块特点
+
+- 堆叠层级 z-index
+  - 默认效果：按照标签书写的顺序，后来者居上
+  - 作用：设置定位元素的层级顺序，改变定位元素的显示顺序
+  - z-index：取值参数是整数，默认为0，取值越大，显示顺序越靠上
+
+
+## CSS精灵
+- 原理：
+  - 将众多小图集成在一张图片上，通过调整盒子大小和位置，来显示对应的小图
+
+- 步骤：
+  - 创建盒子，盒子尺寸与小图尺寸相同
+  - 设置盒子背景图为精灵图
+    - background-image: url()
+  - 添加background-position属性，改变背景图位置
+    - 取负数坐标为background-position属性值（向左上移动图片位置）
+
+- 好处
+  - 减少和服务器的交互次数，提升效率
+
+## 字体图标
+- 概念：
+  - 字体图片：展示的是图片，本质是字体，可以用字体的属性对其进行设置
+
+- 作用：在网页中添加简单的、颜色单一的小图标（仅使用纯色简单图标）
+
+- 字体图片-下载字体
+  - iconfont图标库：https://www.iconfont.cn/
+  - 下载字体
+    - 登录 -> 素材库 ->官方图标库 -> 进入图标库 ->选图标，加入购物车 -> 购物车，添加至项目，确定 -> 下载至本地使用
+
+- 字体图标 - 使用字体
+  - 引入字体样式表(iconfont.css)
+  ```html
+  <link rel="stylesheet" href="./iconfont/iconfont.css">
+  ```
+  - 标签使用字体图标类名
+    - iconfont: 字体图标基本样式(字体名，字体大小等等)
+    - icon-xxx: 图标对应的类名
+    - `<span class="iconfont icon-xxx"></span>`
+    ```html
+    <style>
+        .iconfont {
+            font-size: 200px;
+            color: orange;
+        }
+    </style>
+    ```
+
+- 字体图标 - 上传矢量图
+  - 作用：项目特有的图标(.svg文件)上传到iconfont图标库，生成字体
+
+## CSS修饰属性
+- 垂直对齐方式 
+  - 属性名：vertical-align
+  - 属性值：
+    - baseline：基线对齐（默认）
+    - top：顶部对齐
+    - middle：居中对齐
+    - bottom：底部对齐
+  - 注意：
+    - vertical-align的属性填写在最高内容的标签中
+    - 浏览器把行内块、行内标签当作文字处理，默认按基线对齐
+
+- 过渡 transtion
+  - 作用：可以为一个元素在不同状态之间切换的时候添加过渡效果
+  - 属性名：transtion
+  - 属性值：过渡的属性 花费时间(s)
+  - 提示：
+    - 过渡的属性可以是具体的CSS属性
+    - 也可以为all（两个状态属性值不同的所有属性，都产生过渡效果）
+    - transtion设置给元素本身
+
+- 透明度 opacity
+  - 作用：设置整个元素的透明度(包含背景和内容)
+  - 属性名：opacity
+  - 属性值：0-1
+    - 0：完全透明（元素不可见）
+    - 1：不透明
+    - 0-1之间小数：半透明
+
+- 鼠标类型 cursor
+  - 作用：鼠标悬停在元素上时指针显示样式
+  - 属性名：cursor
+  - 属性值：
+    - default：默认值，通常是箭头
+    - pointer：小手效果，提示用户可以点击
+    - text：工字形，提示用户可以选择文字
+    - move：十字光标，提示用户可以移动
+
+## 平面转换
+- 属性名：transform
+- 作用：为元素添加动态效果，一般与过渡配合使用
+- 概念：改变盒子在平面内的形态（位移、旋转、缩放、倾斜）
+
+### 平面转换-平移
+- 属性：
+  - `transform: translate(x轴移动距离, y轴移动距离);`
+
+- 取值：
+  - 像素单位数值
+  - 百分比（参照盒子自身尺寸计算结果）
+  - 正负均可
+
+- 代码示例
+```html
+<style>
+    .father {
+        width: 500px;
+        height: 300px;
+        margin: 100px auto;
+        border: 1px solid #000;
+    }
+
+    .son {
+        width: 200px;
+        height: 100px;
+        background-color: pink;
+        transition: all 0.5s;
+    }
+
+    /* 鼠标移动到父盒子，son改变位置 */
+    .father:hover .son {
+        transform: translate(200px, 100px);
+    }
+</style>
+```
+
+- 技巧：
+  - translate()只写一个值，表示沿着X轴移动
+  - 单独设置X或Y轴移动距离：translateX()或translateY()
+
+### 平面转换-旋转
+- 属性：
+  - `transform: rotate(旋转角度);`
+  - 角度单位是deg
+
+- 技巧
+  - 取值正负均可
+  - 取值为正，顺时针旋转
+  - 取值为负，逆时针旋转
+
+### 平面转换-改变转换原点
+- 默认情况下，转换原点是盒子中心点
+- 属性：
+  - `transform-origin: 水平原点位置 垂直原点位置;`
+
+- 取值：
+  - 方位名词（left、top、right、bottom、center）常用
+  - 像素单位取值
+  - 百分比
+
+### 平面转换-多重转换
+- 多重转换技巧
+  - 先平移再旋转
+  - 代码：`transform: translate() rotate();`
+
+- 注意：
+  - 旋转会改变坐标轴向
+  - 多重转换，以第一种转换形态的坐标轴为准
+
+### 平面转换-缩放
+- 代码示例
+```css
+transform: scale(缩放倍数);
+transform: scale(X轴缩放倍数, Y轴缩放倍数)
+```
+
+### 平面转换-倾斜
+- 属性：
+  - `transform:skew();`
+  
+- 取值：
+  - 角度度数deg
+
+### 渐变
+- 概念：
+  - 渐变是多个颜色逐渐变化的效果，一般用于设置盒子背景
+
+- 分类：
+  - 线性渐变
+  - 径向渐变
+
+- 线性渐变
+  - 属性：
+    ```css
+    background-image： linear-gradient(
+      渐变方向，
+      /* transparent 透明颜色 */
+      颜色1 终点位置， /* 位置可以省略 */
+      颜色2 终点位置，
+      ...
+    )
+    ```
+
+  - 取值：
+    - 渐变方向：可选
+      - to 方位名词
+      - 角度度数
+    - 终点位置：可选
+      - 百分比
+
+- 径向渐变
+  - 作用：给按钮添加高光效果
+  - 代码示例：
+  ```css
+  background-image： radial-gradient (
+    半径 at 圆心位置
+    颜色1 终点位置， /* 位置可以省略 */
+    颜色2 终点位置，
+    ...
+  )
+  ```
+
+- 取值：
+  - 半径可以是2条，则为椭圆
+  - 圆心位置取值：像素单位数值/ 百分比/ 方位名词
+
+
+## 空间转换
+- 空间概念：
+  - 是从坐标轴角度定义的X、Y和Z，三条坐标轴构成了一个立体空间，Z轴位置与视线方向相同
+
+- 属性：transform，和平面转换相同
+
+### 空间平移
+- 代码示例：
+```css
+transform: traslate3d(x, y, z);
+transform: translateX();
+transform: translateY();
+transform: translateZ();
+```
+- 取值（正负均可）
+  - 像素单位数值
+  - 百分比（参照盒子自身尺寸计算结果）
+
+- 实际代码演示
+```css
+.box {
+    width: 200px;
+    height: 200px;
+    margin: 100px auto;
+    background-color: pink;
+    transition: all 0.5s;
+}
+
+.box:hover {
+    /* 电脑是平面，默认无法观察Z轴平移效果 */
+    transform：translate3d(100px,200px,300px);
+}
+```
+### 视距perspective
+- 作用：
+  - 指定了观察者与z=0平面的距离，为元素添加透视效果
+- 透视效果
+  - 近大远小，近实远虚 
+
+- 属性：
+  - 添加给父级，取值范围：800~1200
+  ```css
+  perspective: 视距;
+  ```
+
+### 空间旋转
+- 代码示例：
+```css
+/* 配合perspective使用 */
+/* Z轴旋转默认和平面旋转相同*/
+transform: rotateZ()
+
+/* 正数向后倒，负数向前倒 */
+transform: rotateX()
+
+transform: rotateY()
+```
+- 拓展
+  - rotate3d(x,y,z,角度度数)：用来设置自定义旋转轴的位置及旋转角度
+  - x,y,z取值为0-1之间的数字
+
+
+### 立体呈现
+- 作用：
+  - 设置元素的子元素是位于3D空间中还是平面中
+
+- 属性：
+  - transform-style
+
+- 属性值
+  - flat：子级处于平面中
+  - preserve-3d：子级处于3d空间
+
+- 呈现立体图形步骤
+  - 父元素添加transform-style: preserve-3d;
+  - 子级定位
+  - 调整盒子的位置（位移或旋转）
+
+### 动画
+- 实现步骤：
+  - 定义动画
+  - 代码示例：
+  ```css
+  @keyframes 动画名称 {
+    from {}
+    to {}
+  }
+
+  /* 方式2 */
+  @keyframe 动画名称 {
+    0% {}
+    10% {}
+    ...
+    100% {}
+  }
+  ```
+  - 使用动画
+  - 代码示例：
+  ```css
+  animation: 动画名词 动画花费时长;
+  ```
+
+- 属性：
+  - 动画名词和时长必须赋值
+  - 取值不分先后顺序
+  - 如果有两个时间值，第一个时间表示动画时长，第二个时间表示延迟时间
+  - 代码示例：
+  ```css
+  animation: 动画名称 动画时长 速度曲线 延迟时间 重复次数 动画方向 执行完毕时状态
+  ```
+  - 速度曲线：
+    - linear: 匀速运动
+    - steps(num)：分布动画，num表示分布的数量
+      - 使用场景：配合精灵图，实现精灵动画
+  - 重复次数
+    - 直接写数字，表示播放次数
+    - infinite：表示一直播放
+  - 动画方向：
+    - 默认正向
+    - alternate：反向播放
+  - 执行完毕时状态
+    - forwards：播放完毕后，停留在结束状态
+    - backwards: 播放完毕后，停留在开始状态（默认）
+
+- 动画animation拆分属性
+  - animation-name
+    - 作用：动画名称
+  - animation-duration
+    - 作用：动画时长
+  - animation-delay
+    - 作用：延迟时间
+  - animation-fill-mode
+    - 作用：动画执行完毕时状态
+    - 值：
+      - forwards: 播放完毕后，停留在结束状态
+      - backwards: 播放完毕后，停留在开始状态（默认）
+  - animation-timing-function
+    - 作用：速度曲线
+    - 取值：
+      - steps(数字)：逐帧动画
+  - animation-iteration-count
+    - 作用：重复次数
+    - 取值：
+      - 数字：重复次数
+      - infinite：无限循环
+  - animation-direction
+    - 作用：动画执行方向
+    - 取值：
+      - alternate：反方向
+  - animation-play-state
+    - 作用：暂停动画
+    - 取值：
+      - paused：暂停动画
+    - 应用场景：
+      - 配合:hover使用，实现鼠标经过时暂停动画的作用
+
+
+## 移动端自适应
+### 视口
+- 作用：显示HMTL网页的区域，用来约束HTML尺寸
+- 代码演示：
+```html
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+        <!-- 视口标签 -->
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <title>Document</title>
+    </head>
+    <body>
+    </body>
+</html>
+```
+- width=device-width：视口宽度=设备宽度
+- initial-scale=1.0：缩放1倍（不缩放）
+
+### 二倍图
+- 概念：设计稿中每个元素尺寸的倍数
+- 作用：防止图片在高分辨率屏幕下模糊失真
+
+
+### 适配方案
+- 宽度适配：宽度自适应（PC）
+  - 百分比布局
+  - flex布局
+
+- 等比适配：宽高等比缩放（移动）
+  - rem
+  - vw
+
+### rem 适配方案
+- 简介：
+  - rem单位，是相对单位
+  - rem单位是相对于HTML标签的字号计算结果
+  - 1rem = 1HTML字号大小
+
+- 代码演示
+```html
+<head>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* 给HTML标签添加字号 */
+
+        html {
+            font-size: 30px;
+        }
+
+        .box {
+            width: 5rem;
+            height: 3rem;
+            background-color: pink;
+        } /* 尺寸：150*90 */
+    </style>
+</head>
+<body>
+    <div class="box"></div>
+</body>
+```
+
+- 媒体查询：
+  - 作用：能够检测视口的宽度，然后编写差异化的CSS样式
+  - 当某个条件成立，立即执行对应的CSS样式
+  - 语法
+  ```css
+  @media (媒体特性) {
+    选择器 {
+        CSS属性
+    }
+  }
+  ```
+  - 目前rem布局方案中，将网页分成10份，HTML标签的字号为视口宽度的1/10
+  - 代码示例：
+  ```html
+  <head>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* 使用媒体查询，给不同视口的屏幕设置不同的HTML字号 */
+        @media (width: 320px) {
+            html {
+                font-size: 32px
+            }
+        }
+
+        @media (width: 375px) {
+            html {
+                font-size: 37.5px
+            }
+        }
+
+        @media (width: 414px) {
+            html {
+                font-size: 41.4px
+            }
+        }
+
+        /* 使用rem单位书写尺寸 */
+        .box {
+            width: 5rem;
+            height: 3rem;
+            background-color: pink;
+        } 
+    </style>
+</head>
+<body>
+    <div class="box"></div>
+</body>
+  ```
+
+- rem 配合flexible布局
+  - flexible.js是手淘开发出的一个用来适配移动端的js库
+  - 核心原理：根据不同视口宽度给网页中html根节点设置不同的font-size
+  - 引用方式
+  ```html
+  <body>
+    ......
+    <script src="./js/flexible.js"></script>
+  </body>
+  ```
+
+### less
+- less简介
+  - Less是一个CSS预处理器，Less文件后缀是.less。扩充了CSS语言，使CSS具有一定的逻辑能力，计算能力
+  - 注意：浏览器不识别Less代码，目前阶段，网页要引入对应的CSS文件
+  - VS Code插件：Easy LESS，保存less文件后自动生成对应的CSS文件
+
+- less注释
+  - 单行注释
+    - 语法：// 注释内容
+    - 快捷键：ctrl + /
+  - 块注释
+    - 语法：/* 注释内容 */
+    - 快捷键：Shift + Alt + A
+  - 注意：在生成的CSS文件中，只显示less的块注释，不显示单行注释
+
+- less运算
+  - 加、减、乘直接书写计算表达式
+  - 除法需要添加小括号或点（.）
+  - 代码演示
+  ```less
+  .box {
+    width: 100 + 50px;
+    height: 5 * 32px;
+
+    width: (100 / 4px); //  推荐
+    height: 100 ./ 4px;
+  }
+  ```
+
+- less 嵌套
+  - 作用：快速生成后代选择器
+  - 语法：
+  ```less
+  .父级选择器 {
+    // 父级样式
+    .子级选择器 {
+        // 子级样式
+    }
+  }
+  ```
+  - 代码示例：
+  ```less
+  .father {
+    color: red;
+    .son {
+        width: 100px;
+        a {
+            color: green;
+            // & 表示的使当前选择器，代码写到谁的大括号里面就表示谁，不会生成后台选择器
+            //应用：配合hover伪类或nth-child结构伪类使用
+            &:hover {
+                color: blue;
+            }
+        }
+    }
+  }
+  ```
+
+- less 变量
+  - 概念：容器，存储数据
+  - 作用：存储数据，方便使用和修改
+  - 语法：
+    - 定义变量：@变量名: 数据;
+    - 使用变量：CSS属性: @变量名;
+  - 代码示例：
+  ```less
+  // 定义变量
+  @myColor: pink;
+
+  // 使用变量
+  .box {
+    color: @myColor;
+  }
+
+  a {
+    color: @myColor;
+  }
+  ```
+
+- less 导入
+  - 作用：导入less公共样式文件
+  - 语法：导入：@import "文件路径";
+  - 提示：如果是less文件可以省略后缀
+  - 代码示例：
+  ```less
+  @import './base.less';
+  @import './common'; // less文件可以省略后缀
+  ```
+
+- less 导出
+  - 作用：控制生成的css文件名和路径
+  - 写法：在less文件的第一行添加 // out: 存储URL
+  - 提示：文件夹名称后面添加/
+  - 代码演示：
+  ```less
+  // out: ./index.css
+  // out: ./css/
+  ```
+
+- less 禁止导出
+  - 写法：在less文件第一行，添加：// out: false

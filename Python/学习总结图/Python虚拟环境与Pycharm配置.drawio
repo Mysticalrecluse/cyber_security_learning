@@ -1,0 +1,331 @@
+<mxfile host="Electron" modified="2023-12-31T03:22:14.138Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.16 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="f1Yqc53JFPzCg3ZZHN-U" version="22.1.16" type="device">
+  <diagram name="第 1 页" id="0In8RysJQsfAJqhWj54F">
+    <mxGraphModel dx="1101" dy="990" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-1" value="Python 虚拟环境配置" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=28;" parent="1" vertex="1">
+          <mxGeometry x="253" y="40" width="320" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-2" value="CentOS7, 8" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=16;" parent="1" vertex="1">
+          <mxGeometry x="70" y="150" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-6" value="&lt;div style=&quot;font-size: 11px;&quot;&gt;yum install git gcc make patch gdbm-devel openssl-devel&amp;nbsp;&lt;span style=&quot;background-color: initial; font-size: 11px;&quot;&gt;sqlite-devel readline-devel zlib-devel bzip2-devel&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=0;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="20" y="280" width="230" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-8" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=11.764705882352942;endSize=4.482352941176471;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="130" y="200" as="sourcePoint" />
+            <mxPoint x="130" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-9" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;安装编译依赖&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="150" y="210" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-17" value="Ubuntu20.04" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=16;" parent="1" vertex="1">
+          <mxGeometry x="350" y="150" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-18" value="&lt;div style=&quot;font-size: 11px;&quot;&gt;&lt;div&gt;sudo apt-get update&lt;/div&gt;&lt;div&gt;sudo apt-get install zlib1g-dev bzip2 libbz2-dev libreadline-dev sqlite3 libsqlite3-dev libssl-dev xz-utils liblzma-dev libffi-dev findutils&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=0;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="290" y="280" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-19" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=11.764705882352942;endSize=4.482352941176471;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="410" y="200" as="sourcePoint" />
+            <mxPoint x="410" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-20" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;安装编译依赖&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="430" y="210" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-21" value="CentOS9+" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;fontSize=16;" parent="1" vertex="1">
+          <mxGeometry x="620" y="150" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-22" value="&lt;div style=&quot;font-size: 11px;&quot;&gt;&lt;div&gt;sudo dnf install -y @development zlib-devel bzip2 bzip2-devel readline-devel sqlite \&lt;/div&gt;&lt;div&gt;sqlite-devel openssl-devel xz xz-devel libffi-devel findutils&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=0;fontSize=11;" parent="1" vertex="1">
+          <mxGeometry x="570" y="280" width="230" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-23" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=11.764705882352942;endSize=4.482352941176471;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="680" y="200" as="sourcePoint" />
+            <mxPoint x="680" y="270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-24" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;安装编译依赖&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;" parent="1" vertex="1">
+          <mxGeometry x="700" y="210" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-28" value="" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.annotation_2;align=left;labelPosition=right;pointerEvents=1;direction=north;" parent="1" vertex="1">
+          <mxGeometry x="120" y="360" width="600" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-29" value="&lt;b&gt;&lt;font style=&quot;font-size: 17px;&quot;&gt;安装pyenv&lt;/font&gt;&lt;/b&gt;&lt;br style=&quot;font-size: 15px;&quot;&gt;git clone https://github.com/pyenv/pyenv.git ~/.pyenv" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=0" parent="1" vertex="1">
+          <mxGeometry x="226.5" y="430" width="387" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-31" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=12.941176470588236;endSize=7.223529411764706;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="_HzGRCFyhsjVFmW7Wl8o-29" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="419.40999999999997" y="520" as="sourcePoint" />
+            <mxPoint x="420" y="850" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-37" value="&lt;b&gt;&lt;font style=&quot;font-size: 17px;&quot;&gt;报错&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;div&gt;Cloning into &#39;/home/python/.pyenv&#39;...&lt;/div&gt;&lt;div&gt;fatal: unable to access &#39;https://github.com/pyenv/pyenv.git/&#39;: OpenSSL SSL_read: Connection reset by peer, errno 104&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" parent="1" vertex="1">
+          <mxGeometry x="26.5" y="520" width="263.5" height="105" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-40" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=12.941176470588236;endSize=7.223529411764706;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="157.82" y="630" as="sourcePoint" />
+            <mxPoint x="157.66" y="720" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-43" value="&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;使用以下命令绕过SLL证书验证&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;git -c http.sslVerify=false clone https://github.com/pyenv/pyenv.git ~/.pyenv&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" parent="1" vertex="1">
+          <mxGeometry x="30" y="730" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-45" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=12.941176470588236;endSize=7.223529411764706;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="370" y="680" as="sourcePoint" />
+            <mxPoint x="240" y="680" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-46" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;在~/.basrc的末尾添加&lt;/font&gt;&lt;/b&gt;&lt;br style=&quot;font-size: 15px;&quot;&gt;&lt;div&gt;export PATH=&quot;$HOME/.pyenv/bin:$PATH&quot;&lt;/div&gt;&lt;div&gt;eval &quot;$(pyenv init --path)&quot;&lt;/div&gt;&lt;div&gt;eval &quot;$(pyenv virtualenv-init -)&quot;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=0" parent="1" vertex="1">
+          <mxGeometry x="255" y="860" width="330" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-49" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=12.941176470588236;endSize=7.223529411764706;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420.15999999999997" y="960" as="sourcePoint" />
+            <mxPoint x="419.99999999999994" y="1050" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-50" value="&lt;b&gt;&lt;font style=&quot;font-size: 20px;&quot;&gt;下载插件&lt;/font&gt;&lt;/b&gt;&lt;br style=&quot;font-size: 15px;&quot;&gt;&lt;div&gt;git -c http.sslVerify=false clone https://github.com/pyenv/pyenv-virtualenv.git $(pyenv root)/plugins/pyenv-virtualenv&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=0" parent="1" vertex="1">
+          <mxGeometry x="190" y="1280" width="455" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-51" value="&lt;span style=&quot;font-size: 18px;&quot;&gt;&lt;b&gt;重新加载.bashrc&lt;/b&gt;&lt;br&gt;source .bashrc&lt;br&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=0" parent="1" vertex="1">
+          <mxGeometry x="305" y="1060" width="230" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-53" value="&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;b&gt;缺少插件会出现提示&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;pyenv: no such command `virtualenv-init&#39;&lt;/b&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" parent="1" vertex="1">
+          <mxGeometry x="100" y="1169" width="270" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-54" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=12.941176470588236;endSize=7.223529411764706;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420.15999999999997" y="1140" as="sourcePoint" />
+            <mxPoint x="420" y="1270" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-57" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;&lt;b style=&quot;&quot;&gt;重新加载.bashrc&lt;/b&gt;&lt;br&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=0" parent="1" vertex="1">
+          <mxGeometry x="331.88" y="1460" width="176.25" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-58" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=12.941176470588236;endSize=7.364705882352941;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="420.15999999999997" y="1380" as="sourcePoint" />
+            <mxPoint x="420" y="1450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-63" value="" style="shape=flexArrow;endArrow=classic;html=1;rounded=0;fillColor=#a20025;strokeColor=#6F0000;endWidth=12.941176470588236;endSize=7.223529411764706;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" edge="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="419.58" y="1520" as="sourcePoint" />
+            <mxPoint x="420" y="1600" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-64" value="&lt;font style=&quot;&quot;&gt;&lt;b style=&quot;&quot;&gt;&lt;font style=&quot;font-size: 19px;&quot;&gt;pyenv安装成功&lt;/font&gt;&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;在当前目录下有.pyenv文件&lt;/font&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=15;fontStyle=0" parent="1" vertex="1">
+          <mxGeometry x="301.71999999999997" y="1610" width="231.56" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-146" value="Pycharm远程连接&lt;br&gt;本地和远程开发环境实现同步" style="text;strokeColor=none;align=center;fillColor=none;html=1;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontSize=28;" parent="1" vertex="1">
+          <mxGeometry x="190" y="2390" width="485" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-147" value="&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;&lt;b&gt;插件下载失败，多次尝试至成功&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" parent="1" vertex="1">
+          <mxGeometry x="533.28" y="1400" width="236.72" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-150" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="40" y="1690" width="757" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-138" value="" style="group;fontSize=11;" parent="_HzGRCFyhsjVFmW7Wl8o-150" vertex="1" connectable="0">
+          <mxGeometry width="757" height="264.375" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-66" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;pyenv常用命令&lt;/font&gt;&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=14;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="307.29702970297035" width="112.42574257425743" height="52.87500000000001" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-106" value="&lt;b style=&quot;font-size: 11px;&quot;&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;版本查看&lt;/font&gt;&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="59.960396039603964" y="116.32499999999999" width="74.95049504950497" height="52.87500000000001" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-126" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-66" target="_HzGRCFyhsjVFmW7Wl8o-106" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-110" value="&lt;b style=&quot;font-size: 11px;&quot;&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;解释器下载&lt;/font&gt;&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="277.3168316831683" y="116.32499999999999" width="74.95049504950497" height="52.87500000000001" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-124" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-66" target="_HzGRCFyhsjVFmW7Wl8o-110" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-111" value="切换虚拟环境" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="459.63391089108916" y="116.32499999999999" width="85.06881188118814" height="52.87500000000001" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-135" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-66" target="_HzGRCFyhsjVFmW7Wl8o-111" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-112" value="创建虚拟环境" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="622.0891089108911" y="116.32499999999999" width="74.95049504950497" height="52.87500000000001" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-137" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-66" target="_HzGRCFyhsjVFmW7Wl8o-112" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-116" value="pyenv version" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=9;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry y="222.075" width="74.95049504950497" height="42.300000000000004" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-129" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-106" target="_HzGRCFyhsjVFmW7Wl8o-116" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-117" value="pyenv versions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=9;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="119.92079207920793" y="222.075" width="74.95049504950497" height="42.300000000000004" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-130" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-106" target="_HzGRCFyhsjVFmW7Wl8o-117" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-118" value="pyenv install -l" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=9;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="224.85148514851485" y="222.075" width="82.44554455445544" height="42.300000000000004" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-131" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-110" target="_HzGRCFyhsjVFmW7Wl8o-118" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-119" value="pyenv install 版本号 -vvv" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=9;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="322.2871287128713" y="222.075" width="112.42574257425743" height="42.300000000000004" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-132" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-110" target="_HzGRCFyhsjVFmW7Wl8o-119" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-122" value="pyenv local &amp;lt;版本号&amp;gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=9;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="449.7029702970297" y="222.075" width="104.93069306930694" height="42.300000000000004" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-133" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-111" target="_HzGRCFyhsjVFmW7Wl8o-122" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-123" value="pyenv virtualenv &amp;lt;版本号&amp;gt; &amp;lt;环境别名&amp;gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=9;" parent="_HzGRCFyhsjVFmW7Wl8o-138" vertex="1">
+          <mxGeometry x="577.1188118811882" y="222.075" width="179.8811881188119" height="42.300000000000004" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-134" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.455;entryY=0.039;entryDx=0;entryDy=0;entryPerimeter=0;" parent="_HzGRCFyhsjVFmW7Wl8o-138" source="_HzGRCFyhsjVFmW7Wl8o-112" target="_HzGRCFyhsjVFmW7Wl8o-123" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-145" value="" style="group" parent="_HzGRCFyhsjVFmW7Wl8o-150" vertex="1" connectable="0">
+          <mxGeometry x="100.04352631578948" y="313.3333333333333" width="565.8774210526316" height="156.66666666666666" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-67" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;.pyenv重要目录&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;/font&gt;&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=14;" parent="_HzGRCFyhsjVFmW7Wl8o-145" vertex="1">
+          <mxGeometry x="179.28947368421052" width="119.52631578947367" height="58.75" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-139" value="&lt;b style=&quot;font-size: 13px;&quot;&gt;创建一个cache目录&lt;/b&gt;&lt;br style=&quot;font-size: 13px;&quot;&gt;（放python解释器安装压缩包）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;" parent="_HzGRCFyhsjVFmW7Wl8o-145" vertex="1">
+          <mxGeometry x="-39.84210526315789" y="97.91666666666666" width="219.1315789473684" height="58.75" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-141" value="versions目录&lt;br style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;font-weight: normal; font-size: 14px;&quot;&gt;(所有安装的python解释器下载至都在该目录)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontStyle=1;fontSize=14;fillColor=#d5e8d4;strokeColor=#82b366;" parent="_HzGRCFyhsjVFmW7Wl8o-145" vertex="1">
+          <mxGeometry x="278.89473684210526" y="97.91666666666666" width="286.9826842105263" height="58.75" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-142" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-145" source="_HzGRCFyhsjVFmW7Wl8o-67" target="_HzGRCFyhsjVFmW7Wl8o-139" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-144" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="_HzGRCFyhsjVFmW7Wl8o-145" source="_HzGRCFyhsjVFmW7Wl8o-67" target="_HzGRCFyhsjVFmW7Wl8o-141" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-149" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-150" source="_HzGRCFyhsjVFmW7Wl8o-139" target="_HzGRCFyhsjVFmW7Wl8o-119" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="114.54605263157896" y="337.8125" />
+              <mxPoint x="114.54605263157896" y="337.8125" />
+              <mxPoint x="114.54605263157896" y="303.54166666666663" />
+              <mxPoint x="378.5" y="303.54166666666663" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-157" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="110" y="2220" width="560" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-155" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="_HzGRCFyhsjVFmW7Wl8o-157" source="_HzGRCFyhsjVFmW7Wl8o-151" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="183.07692307692307" y="35" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-151" value="创建工程目录" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFD9EE;strokeColor=#d79b00;fontStyle=1" parent="_HzGRCFyhsjVFmW7Wl8o-157" vertex="1">
+          <mxGeometry width="107.6923076923077" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-152" value="目录内创建所需&lt;br style=&quot;font-size: 11px;&quot;&gt;python版本的环境&lt;br style=&quot;font-size: 11px;&quot;&gt;&lt;span style=&quot;font-weight: normal; font-size: 11px;&quot;&gt;（pyenv virtualenv...）&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFD9EE;strokeColor=#d79b00;fontStyle=1;fontSize=11;" parent="_HzGRCFyhsjVFmW7Wl8o-157" vertex="1">
+          <mxGeometry x="185.10153846153844" width="159.51384615384615" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-153" value="切换至新创建的环境" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFD9EE;strokeColor=#d79b00;fontStyle=1" parent="_HzGRCFyhsjVFmW7Wl8o-157" vertex="1">
+          <mxGeometry x="420" width="140" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-156" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-157" source="_HzGRCFyhsjVFmW7Wl8o-152" target="_HzGRCFyhsjVFmW7Wl8o-153" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-184" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="_HzGRCFyhsjVFmW7Wl8o-158" target="_HzGRCFyhsjVFmW7Wl8o-159" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-158" value="&lt;b&gt;创建工程，选择本地工程目录&lt;/b&gt;&lt;br&gt;（随便选个解释器，后面会改）" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="292.5" y="2500" width="235" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-185" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.518;entryY=-0.003;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="_HzGRCFyhsjVFmW7Wl8o-159" target="_HzGRCFyhsjVFmW7Wl8o-170" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-159" value="" style="rounded=1;whiteSpace=wrap;html=1;container=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="233.25" y="2640" width="351.75" height="140" as="geometry">
+            <mxRectangle x="226.5" y="2480" width="50" height="40" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-166" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-159" source="_HzGRCFyhsjVFmW7Wl8o-160" target="_HzGRCFyhsjVFmW7Wl8o-161" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-160" value="setting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="_HzGRCFyhsjVFmW7Wl8o-159" vertex="1">
+          <mxGeometry x="7.580449936411663" y="28" width="47.773203947368415" height="37.333333333333336" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-168" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-159" source="_HzGRCFyhsjVFmW7Wl8o-161" target="_HzGRCFyhsjVFmW7Wl8o-162" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-161" value="python interpreter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="_HzGRCFyhsjVFmW7Wl8o-159" vertex="1">
+          <mxGeometry x="72.79284215417727" y="28" width="63.99073026315789" height="37.333333333333336" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-169" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-159" source="_HzGRCFyhsjVFmW7Wl8o-162" target="_HzGRCFyhsjVFmW7Wl8o-163" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-162" value="add interpreter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="_HzGRCFyhsjVFmW7Wl8o-159" vertex="1">
+          <mxGeometry x="151.247797153199" y="28" width="66.656625" height="37.333333333333336" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-163" value="选择远程服务器上的python解释器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="_HzGRCFyhsjVFmW7Wl8o-159" vertex="1">
+          <mxGeometry x="229.70137570925456" y="28" width="107.8391447368421" height="37.333333333333336" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-164" value="此时成功设置好了python解释器" style="text;html=1;strokeColor=none;fillColor=#dae8fc;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1" parent="_HzGRCFyhsjVFmW7Wl8o-159" vertex="1">
+          <mxGeometry x="55.355947955390334" y="93.33333333333333" width="232.32063197026022" height="37.333333333333336" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-182" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="290" y="2840" width="230" height="135" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-170" value="" style="rounded=1;whiteSpace=wrap;html=1;container=0;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="_HzGRCFyhsjVFmW7Wl8o-182" vertex="1">
+          <mxGeometry width="230" height="135" as="geometry">
+            <mxRectangle x="597" y="2500" width="50" height="40" as="alternateBounds" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-172" value="tools" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;container=0;" parent="_HzGRCFyhsjVFmW7Wl8o-182" vertex="1">
+          <mxGeometry x="9.583333333333371" y="13.5" width="38.333333333333336" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-175" value="Deployment" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffe6cc;strokeColor=#d79b00;container=0;" parent="_HzGRCFyhsjVFmW7Wl8o-182" vertex="1">
+          <mxGeometry x="67.08333333333337" y="13.5" width="67.08333333333334" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-178" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-182" source="_HzGRCFyhsjVFmW7Wl8o-172" target="_HzGRCFyhsjVFmW7Wl8o-175" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-176" value="Configuration" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffe6cc;strokeColor=#d79b00;container=0;" parent="_HzGRCFyhsjVFmW7Wl8o-182" vertex="1">
+          <mxGeometry x="153.33333333333337" y="13.5" width="67.08333333333334" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-179" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="_HzGRCFyhsjVFmW7Wl8o-182" source="_HzGRCFyhsjVFmW7Wl8o-175" target="_HzGRCFyhsjVFmW7Wl8o-176" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-177" value="更改 Mapping-deployment path" style="rounded=1;whiteSpace=wrap;html=1;fontSize=11;fillColor=#ffe6cc;strokeColor=#d79b00;container=0;" parent="_HzGRCFyhsjVFmW7Wl8o-182" vertex="1">
+          <mxGeometry x="19.16666666666663" y="54" width="191.66666666666669" height="27" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-180" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.879;entryY=0.039;entryDx=0;entryDy=0;entryPerimeter=0;" parent="_HzGRCFyhsjVFmW7Wl8o-182" source="_HzGRCFyhsjVFmW7Wl8o-176" target="_HzGRCFyhsjVFmW7Wl8o-177" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-181" value="将默认的远程服务器同步的目录，更改为指定的工程目录" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;container=0;" parent="_HzGRCFyhsjVFmW7Wl8o-182" vertex="1">
+          <mxGeometry x="28.75" y="88.44827586206884" width="182.08333333333334" height="40.5" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-186" value="在本地工程目录创建程序，查看是否创建成功" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="306.63" y="3040" width="205" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="_HzGRCFyhsjVFmW7Wl8o-188" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;exitX=0.52;exitY=1.001;exitDx=0;exitDy=0;exitPerimeter=0;" parent="1" source="_HzGRCFyhsjVFmW7Wl8o-170" target="_HzGRCFyhsjVFmW7Wl8o-186" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="409" y="2980" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

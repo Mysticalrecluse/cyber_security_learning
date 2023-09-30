@@ -190,7 +190,8 @@ $ git add -u    #批量将当前已被管理的变更文件上传暂存区
 ```
 ## 给文件重命名的简便方法
 ```shell
-$ git rm <file>     #清除仓库里不要文件的记录
+$ git rm  <file>     #清除仓库里不要文件的记录
+$ git restore --staged test1.txt  #清除指定暂存区的文件
 $ git reset --hard  #清空暂存区的记录
 $ git mv <file.name> <new_file.name> #文件重命名
 ```
@@ -271,6 +272,10 @@ $ git branch -D <branch .name>
 
 #切换分支
 $ git checkout <branch.name>
+
+#强制移动分支
+$ git branch -f <branch.name> <relate commit position>
+eg: git branch -f master HEAD~3
 
 
 #查看所有分支的版本历史信息
@@ -398,6 +403,10 @@ index cba8f37..d297a85 100644
    color: white;
  }
 ```
+- 头指针的相对引用
+  - 使用`^`向上移动一个提交记录
+  - 使用`~num`向上移动num个提交记录
+  ![Alt text](images/image02.png)
 ## 修改commit的描述
 ```shell
 #变更最近一次提交的commit
@@ -530,8 +539,22 @@ git checkout master      # 切换到master分支
 git merge feature        # 合并feature分支到当前分支 (master)
 
 ```
-## GitHub的使用技巧
+ ## GitHub的使用技巧
 ### 检索技巧：
 - 关键词：用空格分开
 - in：readme：将关键词检索范围扩展到readme文档
 - star:>1000 查询大于1000星的优质项目仓库
+
+
+### 更新github仓库至本地
+```shell
+git branch --set-upstream-to=github/master master
+# 将分支指向上游
+
+git pull # 本地更新
+```
+
+### 查看本地目录指向的github的哪个仓库
+```shell
+git remote -v
+```

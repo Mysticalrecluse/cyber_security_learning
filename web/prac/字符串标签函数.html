@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        ul {
+            padding: 0;
+            margin: 0;
+            width: 300px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 0 5px #ccc;
+        }
+        li {
+            list-style: none;
+            padding: 10px;
+        }
+
+        li:nth-child(odd) {
+            background: #80ba98;
+            color: white;
+        }
+
+        a {
+            color: #f4b41d;
+            text-decoration: none;
+        }
+
+        a:hover {
+            color:#e34496
+        }
+    </style>
+</head>
+<body>
+    <script>
+        
+        let lessons = [
+        {title: "后盾人媒体查询", author: "后盾人向军"},
+        {title: "FLEX 弹性盒子模型", author: "后盾人"},
+        {title: "GRID 栅格系统", author: "顾老师"}
+        ];
+
+
+
+        function template(){
+            return `<ul>
+                ${lessons.map((item)=>
+                    link`<li>作者:${item.author}, 课程:${item.title}</li>`
+                ).join('')}
+            </ul>
+            `
+        };
+
+        function link(strings,...values){
+            // for(let i=0;i<values.length;i++){
+            //     values[i].replace('后盾人','<a href="http://houdunren.com">后盾人</a>')
+            //     return strings[i]+values[i];
+            // }
+            return strings.map((str,key)=>{
+                return str+(values[key]?values[key].replace('后盾人','<a href="#">后盾人</a>'):'')
+            }).join('')
+
+            }
+        
+
+        document.body.innerHTML += template();
+
+      
+    </script>
+</body>
+</html>

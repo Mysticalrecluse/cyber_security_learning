@@ -1,5 +1,1444 @@
 # LINUX 基础
+## Linux文件基本操作
+### 终端和控制台的区别
+- 区别标志：
+  - <span style="color:tomato">直接交互的标志</span>：控制台通常是指提供直接与操作系统交互的界面，尤其是在系统级别上，如直接查看和管理系统启动过程、内核消息等。
+  - <span style="color:tomato">远程和非系统级交互</span>：相比之下，终端可以是本地的也可以是远程的，提供用户级别的命令行界面，用于执行各种命令和程序，但不一定提供直接的系统级别交互。
+
+- 自我理解：
+  - 如果我使用vmware安装了一个linux系统的虚拟机，那么可以说，直接在vmware上打开这个虚拟机的界面是控制台，而ssh链接这个虚拟机的远程链接界面是终端，但不是控制台，控制台和终端的区别标志是是否直接与系统交互
+
+- Linux中终端是一个设备文件，本质就是一个文件，位置在/dev/pts/0 (终端编号，从0开始)
+
+- 查看当前终端设备
+```bash
+tty
+```
+### 登录前提示
+```bash
+/etc/issue # 里面的内容会在登录前出现在终端加载页面
+```
+### 编辑用户展示公告（登录后提示）
+- 概述：
+  - /etc/motd 文件的全称是 "Message of the Day"（当日消息）。在Linux和Unix系统中，这个文件的内容会在用户登录到系统后显示在他们的终端上。这为系统管理员提供了一个简单的方法来为登录到系统的用户展示公告、重要消息或任何其他信息。
+  - 配置文件
+  ```bash
+  /etc/motd
+  ```
+- 在VIM中输出彩色字体
+  - 步骤：
+  ```
+  1. 打开一个新的或现有的 Vim 编辑器：vim filename
+  2. 按下 i 进入插入模式。
+  3. 按 Ctrl+V 进入 Vim 的特殊字符插入模式。
+  4. 接着按 Ctrl+[。这会插入一个 ^[，这实际上是一个转义字符。
+  5. 然后直接输入 [32;1m。
+  6. 继续输入你的文本，如：Hello, Welcome To My Home - Mystical。
+  7. 然后再次按 Ctrl+V 和 Ctrl+[ 插入另一个转义字符。
+  8. 接着输入 [0m 来结束彩色输出。
+  ```
+  - 示例：
+  ```shell
+  ^[[32;1mHello, Welcome To My Home - Mystical^[[0m
+  ```
+### Prompt提示符
+```shell
+# 格式如下：
+PS1="提示符格式命令"
+
+# 格式命令如下：
+\[  <提示符样式>  \]  # 这个提示符样式外的\[ \] 可以省略
+
+# 提示符样式如下：
+\e[ 样式 + 内容 \e[0m # 以 \e[ 开始，\e[0m 表示关闭设置
+
+# 样式分3部分
+格式：F;B;Sm
+F: 表示前景色
+30 黑色，31 红色，32 绿色，33 黄色，34 蓝色，35 紫色，36 青色，37 白色
+
+B：表示背景色，背景色数值 = F + 10
+
+S：显示的样式如下
+0：表示关闭颜色设置
+1：表示粗体
+4：表示加下划线
+5：表示闪烁
+7：表示前景色，背景色互换
+8：表示隐藏
+
+# 内容：
+\u: 表示当前用户
+\h: 表示主机名简称
+\W: 表示当前工作目录基名
+\$: 表示提示符(普通用户$ root用户#) 实测在rocky9不好用
+\H: 表示完整主机名
+\w: 表示完整工作路径
+\t: 表示24小时时间格式为：时：分：秒
+\A: 表示24小时时间格式为：时：分
+\#: 表示开机命令历史数
+\d: 表示日期，格式为：星期 月 日
+\v: 表示BASH的版本信息
+```
+```shell
+示例：
+  PS1="\e[32;40;1m[\d \t \e[31;40;1m\#] \e[33;40;1m\u@\h:\W \$\e[0m"
+注意：
+实测\$不好用，可以直接在root的目录下的.bashrc文件中改为#
+```
+- 使其永久生效，可以在下列文件中修改配置项
+```Shell
+/etc/profile.d/env.sh #针对CentOS生效
+
+/usr/share/bash-completion/bash_completion 
+# 写在该文件最下方，对所有普通用户生效  
+
+~/.bashrc #针对当前目录的提示符效果生效
+```
+
+### 查看用户登录信息
+- whoami命令：显示当前登录有效用户
+- who命令：显示当前所有的登录会话
+- w：显示系统当前所有的登录会话及其所做的操作
+```shell
+[Fri Oct 13 22:16:15 59] root@rocky9:/ #w
+ 22:20:10 up 1 day,  4:39,  2 users,  load average: 0.00, 0.00, 0.00
+USER     TTY        LOGIN@   IDLE   JCPU   PCPU WHAT
+root     pts/0     21:40    0.00s  0.07s  0.00s w
+root     pts/1     21:56    7:22   0.03s  0.01s vim ps_demo.txt
+
+```
+### 操作系统版本
+- 查看操作系统版本的配置文件
+```bash
+/etc/os-release  # 操作系统详细信息
+
+/etc/redhat-release  # 操作系统版本
+```
+- 扩展
+  - 可以在字符串中直接添加shell命令运行结果
+  ```bash
+  echo `cat /etc/redhat-release ` is OS-Version
+  ```
+
+### 查看硬件信息
+#### 查看CPU
+- command
+```Shell
+lscpu
+
+cat /proc/cpuinfo
+```
+
+#### 查看内存大小
+```Shell
+lsmem
+
+free -h
+free -h -s 1  # 每秒更新一次内存数据
+free -h -c 2  # 总共更新几次，默认一秒一次
+
+cat /proc/meminfo
+```
+
+#### 查看硬盘及分区情况
+```Shell
+lsblk
+
+cat /proc/partitions
+```
+
+### 查看系统版本信息
+#### 查看系统架构
+```shell
+arch
+```
+
+#### 查看内核版本
+```shell
+uname -r
+```
+
+#### 查看操作系统发行版本
+```shell
+# CentOS
+cat /etc/redhat-release
+
+cat /etc/os-release
+
+lsb_release -a
+
+#Ubuntu
+cat /etc/os-release
+
+cat /etc/issue
+```
+
+### 查看日期时间
+#### 系统时间
+```shell
+date  # 查看系统时间
+
+date -R # 显示时区信息
+
+date +%s  # 显示时间戳（从1970年1月1日到当前时间，经过的秒数）
+
+date +"%F %T" # 时间戳格式化，年月日时分秒
+```
+#### 硬件时间
+<scan style="font-weight: 700">- 主板上BIOS的时间</scan>
+```shell
+clock # 显示系统时钟
+
+hwclock # 显示硬件时钟
+```
+
+- <scan style="font-weight: 700">硬件时钟和系统时钟的区别和含义</scan>
+  - <scan style="color: tomato; font-weight: 400">硬件时钟（Real-Time Clock, RTC）</scan>：
+    - <scan style="color: tomato; font-weight: 400">物理设备</scan>：
+      硬件时钟是计算机主板上的一个实际的物理设备，有时被称为 CMOS 时钟。
+    - <scan style="color: tomato; font-weight: 400">独立供电</scan>：
+      它通常由一个小电池供电，这意味着即使计算机断电或关闭，硬件时钟也会继续运行。
+    - <scan style="color: tomato; font-weight: 400">持久性</scan>：
+      硬件时钟保存了日期和时间信息，并在系统启动时提供给操作系统。这个时间通常在计算机启动时由 BIOS 或 UEFI 读取。
+    - <scan style="color: tomato; font-weight: 400">精度</scan>：
+      硬件时钟的精度相对较低，可能会因电池老化或其他原因逐渐偏离准确时间。
+
+#### 对钟
+```shell
+hwclock -s | --hctosys  # 以硬件时钟为准，校正系统时间
+
+hwclock -w | --sysohc   # 以系统时钟为准，矫正硬件时间
+```
+
+#### 设置时区
+```shell
+timedatectl list-timezones  # 列出所有时区
+
+timedatectl set-timezone <时区> #设置时区
+# 示例：timedatectl set-timezone Asia/Shanghai
+```
+
+#### 显示日历
+```shell
+cal
+
+cal 2 2024 # 显示指定月份日历
+
+cal 2024 # 显示指定年份的12个月的所有日历
+```
+
+### 关机与重启
+- 关机
+```shell
+halt
+poweroff
+init 0
+shutdown -h now
+```
+
+- 重启
+```shell
+reboot
+init 6
+shutdown -r now
+```
+
+- shutdown
+```shell
+shutdown              # 一分钟后关机
+shutdown +10          # 十分钟后关机
+shutdown 01:02        # 1点过2分关机
+shutdown -r|--reboot  # 一分钟后重启
+shutdown -r now       # 现在重启
+shutdown -H|--halt    # 一分钟后调用halt关机
+shutdown -P|--poweroff # 一分钟后调用poweroff关机
+shutdown -C           # 取消关机计划 
+```
+
+### 会话管理
+- screen
+
+- Tmux
+
+### 显示模式切换
+- 查看显示模式
+```bash
+runlevel
+```
+- 切换显示模式
+```bash
+init 3 # 切换到字符界面
+
+init 5 # 切换到图形化界面
+```
+
+### 设置主机名hostname
+- 配置文件
+```bash
+/etc/hostname
+```
+- 注意：主机名不要使用下划线
+```bash
+# 临时设置主机名
+hostname 新主机名 
+```
+- ubuntu直接通过命令修改hostname配置文件
+```bash
+hostnamectl set-hostname ubuntu1804.magedu.org
+```
+- 在不重启的情况下，是hostname在prompt上生效，最快的方法是开启一个新的终端会话
+
+
+### 显示字符echo
+- 说明：echo会将字符串显示在标准输出即屏幕上。
+- 语法：echo [SHORT-OPTION] [STRING]
+- SHORT-OPTION说明：
+  - -n: 不自动附加换行符；即都在一行显示
+  - -e: 启用转义符，能使用转义符\
+- 注意：echo后面的字符串建议用单引号括住
+```shell
+echo -e hello\nworld   # 显示hellonworld
+echo -e 'hello\nworld' # 此时转义符生效，符合预期
+```
+
+### 命令分类
+- 判断命令的类别
+```shell
+# 使用type命令
+
+[Sat Oct 14 08:04:11 4] root@rocky9:~ #type type
+type is a shell builtin 
+# 出现这个提示，即可判断该命令是内部命令，type本身也是一个内部命令
+
+[Sat Oct 14 08:04:21 5] root@rocky9:~ #type hostname
+hostname is /usr/bin/hostname
+# 上述提示，即可判断hostname是外部命令
+```
+- 内部命令
+  - 概述：指集成在特定shell中的命令，当用户登陆时，会自动启用shell，而对应的shell程序中包含一些常见工具。默认的/bin/bash shell中就集成了很多内部命令，可以通过enable命令查看所有内部命令
+  ```shell
+  # 通过enable命令查看所有内部命令
+  [Sat Oct 14 08:07:33 8] root@rocky9:bin #enable
+  enable .
+  enable :
+  enable [
+  enable alias
+  enable bg
+  enable bind
+  enable break
+  enable builtin
+  enable caller
+  enable cd
+  enable command
+  enable compgen
+  enable complete
+  enable compopt
+  enable continue
+  enable declare
+  enable dirs
+  enable disown
+  enable echo
+  enable enable
+  enable eval
+  enable exec
+  enable exit
+  enable export
+  enable false
+  enable fc
+  enable fg
+  enable getopts
+  enable hash
+  enable help
+  enable history
+  enable jobs
+  ...
+  # enable -n <指定命令>
+  # 禁用指定内部命令， enable -n是查看禁用的内部命令列表
+  ```
+#### 扩展问题
+- echo是shell内置命令，但是/usr/bin/echo，也存在独立与shell的外部命令echo，存在这个现象的原因
+```
+
+独立的非内置的 echo 存在有几个原因，主要是为了提供兼容性、标准化以及在特定情况下的灵活性。以下是一些具体的原因：
+
+1. 标准化和兼容性
+POSIX 标准：/usr/bin/echo 程序通常会遵循 POSIX 或其他相关标准，确保在不同的 Unix-like 系统上有一致的行为。
+脚本兼容性：在编写可移植的 shell 脚本时，依赖于标准的 /usr/bin/echo 可能比使用特定 shell 的内置 echo 更可靠。
+2. 独立于 Shell
+不依赖于特定的 shell：独立的 echo 可以在没有启动 shell 的情况下直接执行，这对于某些脚本或系统程序很有用，尤其是在资源有限或需要避免启动完整 shell 会话的环境中。
+3. 特定功能的需要
+功能差异：不同的 shell 可能会在其内置的 echo 中实现不同的功能或选项。独立的 /usr/bin/echo 程序提供了一个统一的选项集，这可能在跨不同 shell 环境工作时非常有用。
+4. 历史原因
+遗留系统：在早期的 Unix 系统中，很多现在被认为是内置命令的工具最初是作为独立的程序存在的。随着时间的推移，为了性能和便利性，许多这样的程序被内置到了 shell 中。但是，独立的版本仍然被保留，以保证兼容性和符合标准。
+```
+#### POSIX标准
+```
+POSIX 标准的主要内容包括：
+系统调用和库：定义了一系列的 API，包括文件操作、进程控制、线程管理、输入/输出等。
+
+Shell 和工具：规定了 shell 的行为和一些基本的命令行工具，如 ls、echo 和 grep 等。
+
+程序编程接口（API）：为 C 语言提供了一套标准的库函数接口，用于实现系统服务。
+
+用户和软件环境：包括了用户环境的配置、软件包管理等方面的标准。
+
+POSIX 标准的意义：
+兼容性：POSIX 标准化了 UNIX 系统的核心接口，使得开发者可以编写可在不同 UNIX 系统之间移植的程序。
+
+一致性：通过遵循 POSIX 标准，操作系统厂商可以确保他们的系统提供一致的行为和服务。
+
+可移植性：对于软件开发者来说，POSIX 提供了一套稳定的、不依赖于特定系统的接口，大大提高了代码的可移植性。
+
+在实际应用中，虽然大多数类 UNIX 系统都遵循 POSIX 标准的大部分内容，但很少有系统是完全符合所有 POSIX 规范的。许多系统提供了超出 POSIX 标准的额外功能和扩展，但核心接口和服务通常保持一致。因此，POSIX 标准是理解和使用 UNIX 系统的基础，并且对于确保不同系统之间软件的兼容性和可移植性至关重要。
+```
+
+#### 指令执行过程
+```
+1. 先判断是内部命令还是外部命令
+2. 如果是内部命令：直接执行
+   如果是外部命令：先去hash里找，是否有该命令记录，如果没有，去PATH路径下找，如果还没有，则报错，command not found；如果找到，则直接执行，并将可执行文件的路径记录到hash中
+3. 如果hash中有该指令路径，但是该指令路径已经转移，即使转移到了PATH路径下，仍然会报错，不存在该文件/目录，此时应清空hash值，重新执行指令
+4. 清空hash值的方法
+    更新（更改）PATH路径：会自动清空hash记录
+    bash: hash -r
+          hash -d <指定路径>
+          hash -l 查看hash表详细数据
+    csh: rehash
+
+```
+- 外部命令
+  - 概述；所谓外部命令，就是没有集成在shell程序中。具体表现为一个独立的可执行文件。所以外部命令都能在磁盘中找到对应文件
+  - 系统查找外部命令的方式：
+    - 在系统中有一个叫PATH的变量，里面保存外部命令存放的路径。具体路径可以通过下面命令查看，当执行一个外部命令时，系统会按PATH中存放的目录路径顺序来查找，一旦在某个目录中找到，就停止继续往下找，并执行此外部命令
+  ```
+  [Sat Oct 14 08:15:25 9] root@rocky9:bin #echo $PATH
+  /root/.local/bin:/root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+  ```
+  - 查看外部命令存放路径
+    - which
+    - whereis：除了命令外，还显示和命令相关的帮助文档等文件路径
+  ```shell
+  [Sat Oct 14 08:21:50 29] root@rocky9:bin #which gcc
+  /usr/bin/gcc
+
+  [Sat Oct 14 08:23:59 30] root@rocky9:bin #whereis gcc
+  gcc: /usr/bin/gcc /usr/lib/gcc /usr/libexec/gcc /usr/share/man/man1/gcc.1.gz /usr/share/info/gcc.info.gz
+  ```
+  - 当第一次执行外部命令后，系统会自动将外部的路径记录到内存缓存区中，下次再执行此外部命令，将会从缓存区中找到路径，直接到对应的磁盘路径找到此命令并执行。通过hash命令可以查看到已执行过的外部命令及路径
+  ```shell
+  [Sat Oct 14 08:24:24 31] root@rocky9:bin #hash
+  hits	command
+   7	  /usr/bin/ls
+   3	  /usr/bin/whereis
+  ```
+  - shell 的 hash 表机制主要用于跟踪和缓存 $PATH 环境变量指定的目录中找到的命令的位置。非$PATH记录的路径下的程序，执行后也不会记录在hash中
+
+  
+- 别名
+  - 概述：所谓别名，就是将一些常用的内部或外部命令，起一个较短的名称，这样每次执行这些常用命令时，就可以用别名替代
+  - 管理和查看别名
+  ```shell
+  # 查看所有别名
+  $ alias
+
+  # 查看指定别名
+  $ alias 别名
+
+  # 定义别名
+  $ alias 别名="命令"
+
+  # 取消别名
+  $ unlias 别名
+  ```
+  - 上述命令都是使别名临时生效，如果要使别名永久生效，需要写入配置文件(.bashrc)中
+    - 仅对当前用户有效，写入 ~/.bashrc
+    - 对所有人有效，写入 /etc/.bashrc
+    - 启用配置文件
+      - `source 文件名` 或 `. 文件名`
+  - 执行和别名相同的命令时，需要 `\别名` 或`'别名'`或`"别名"`或`command 别名`
+
+### 命令的使用帮助
+- Whatis-查看命令简要说明
+  - 概述：Whatis可以快速查看到命令或相关内容的简短功能
+  - 注意：在使用`whatis`之前，需要先使用`mandb`创建数据库
+
+- 内部命令的使用帮助
+  - `help COMMAND`
+
+- 外部命令的使用帮助
+  - `COMMAND --help` | `COMMAND -h`
+
+- man帮助
+  - 大部分命令对应的手册通常存储在/usr/share/man里，几乎每个外部命令都有man手册
+  - man命令的配置文件
+    - `/etc/man_db.conf`
+  - man命令的语法格式
+  ```shell
+  man 命令语法格式；
+  man [section] WORD
+  格式说明：
+  section: 表示1-9的章节数
+  1 - 用户命令
+  2 - 系统调用
+  3 - C库调用
+  4 - 设备文件及特殊文件
+  5 - 配置文件格式
+  6 - 游戏
+  7 - 杂项
+  8 - 管理类命令
+  9 - Linux内核API
+
+  WORD：查看帮助的关键字，如：命令，文件名，函数名
+
+  man -f COMMAND
+  # 如果有多个相同的命令的话，可以使用-f分别进行查看
+  # 比如查看C语言的printf和bash命令的printf
+
+  man -k [keyword]
+  # 查找man手册里的关键词
+  ```
+  - 使用彩色man手册
+  ```shell
+  sudo apt install most # 使用most打开man
+  .bashrc配置文件中，添加
+  export MANPAGER="most -s"
+
+  # 之后执行source ./.bashrc
+  ```
+### Linux目录结构
+- 文件系统的目录结构
+  - bin：给普通用户使用的工具(二进制可执行文件)
+  - boot：开启启动的文件，包含linux内核
+    - linux内核：`vmlinuz-5.14.0-284.11.1.el9_2.x86_64`
+    - grub,开机引导加载程序
+  - dev：硬件设备，比如：硬盘
+  - etc：类似于注册表，核心！各种配置文件
+  - home：用户的数据，各个用户在家目录
+  - root：root用户的家目录
+  - run：运行过程中生成的临时文件
+  - sbin：给管理员使用的工具（二进制可执行文件）
+  - tmp：临时文件
+  - usr：操作系统下自带的文件，大多在usr
+  - var：网页文件，日志等不断会变化的文件
+  - lib/lib64:库文件，很多应用程序共同依赖的库文件
+  - mnt/media：实现外围设备的挂载用的
+  - proc/sys：内存中的数据，虚拟文件系统，内存映射到硬盘的数据
+  - opt：外部下载的一些程序软件，如果不下载的话，一般为空
+  - srv：系统上运行的服务用到的数据
+
+### 文件类型
+- 概述：
+  - 磁盘中存放的每个文件可以分为两个部分
+    - 一部分为文件的内容：即文件的数据部分，此部分内容存放在磁盘中专门的数据空间(data block)中。
+    - 一部分为文件的属性信息，即元数据(meta data)，比如；文件的大小，类型，节点号，权限，时间等，此部门内容存放在磁盘中专门的节点空间(inode block)中
+
+- 普通文件（白色）
+  - 纯文本文件：
+    - `ls -l /etc/issue`
+  - 二进制可执行文件（绿色）：
+    - 概述：二进制可执行文件是有特殊格式的可执行程序，其文件内容表现为不可直接读懂的字符，用cat查看，会出现乱码。在Linux中有很多二进制可执行文件，比如很多的外部命令都是二进制可执行文件
+    - `ls -l /bin/cat`
+  - 数据格式文件
+    - 概述：数据格式文件是一些程序在运行过程中需要读取的存放在某些特定格式的数据文件，比如：图片文件，压缩文件，日志文件。通常需要特定的工具打开
+    - 举例：用户登录时，系统会将登录的信息记录在/var/log.wtmp文件中，这个就是一个数据文件。需要使用`last`命令打开此文件查看内容
+    - `ls -l /var/log/wtmp` -> `last`(直接在/var/log目录下使用last命令)
+
+- 目录文件（蓝色）
+  - 概述：目录文件即文件夹，通过`ls -l`查看文件属性时，第一个属性表现为d
+
+- 链接文件（浅蓝色）
+  - 概述：即将两个文件建立关联关系，这种操作实际上是给系统中已有的某个文件指定另外一个可用于访问它的不同文件名称。
+  - `ls -l`查看文件属性时，第一个属性表现为l
+  - 分类：
+    - 硬链接
+    - 软链接
+    - 关于硬链接和软链接的区别和定义，后面详解
+
+- 管道文件（暗黄色）
+  - 概述：管道pipe文件是一种特殊的文件类型，其本质是一个伪文件（本质是内核缓冲区）。其主要目的是实现进程间通讯的问题。由于管道文件是一个与进程没有“血缘关系”的，真正独立的文件，所以它可以在任意进程之间实现通信。
+  - 局限性：
+    - 自己写的数据不能自己读
+    - 数据一旦被读后，便不在管道中存在，不可反复读取
+    - 管道采用半双工通信方式
+  - `ls -l`查看文件属性时，第一个属性表现为p
+  - FIFO: 队列的数据结构，先进先出
+  - 更多细节后续详解
+
+- 字符设备文件（明黄色）
+  - 通常是一些串行接口设备在用户空间的体现，像键盘、鼠标。字符设备是按字符为单位进行输入输出的，且按一定的顺序进行
+  - `ls -l`查看文件属性时，第一个属性表现为c
+  - 举例；我们登录到Linux主机，系统会提供一个终端文件tty供我们登录。
+
+- 块设备文件（明黄色）
+  - 块文件设备，就是一些以“块为单位”，如：4096个字节，访问数据，提供随机访问的接口设备，例如磁盘、硬盘、U盘
+  - `ls -l`查看文件属性时，第一个属性表现为b
+
+- 套接字文件（粉色）
+  - 概述：数据接口文件，通常被用在基于网络的数据通讯使用。
+  - 当两个进程在同一台主机上，但是像通过网络方式通信，可基于socket方式进行数据通信，可基于全双工方式实现，即可支持同时双向传输数据。
+  - `ls -l`查看文件属性时，第一个属性表现为s
+
+### 文件类型颜色的配置文件
+```shell
+# CentOS
+/etc/DIR_COLORS
+
+# Ubuntu
+Ubuntu 中与颜色设置相关的文件和命令包括：
+
+~/.dircolors 或 ~/.dir_colors:
+
+用户级别的配置文件。如果存在，dircolors 命令会使用这个文件中的配置。如果你想定制自己的颜色配置，可以在你的用户目录中创建这个文件。
+/etc/dircolors:
+
+系统级别的默认配置文件。这个文件可能在某些系统中不存在，或者命名可能有所不同。
+dircolors 命令:
+
+这个命令用于初始化颜色配置。它会检查 ~/.dircolors 或 ~/.dir_colors 文件，如果这些文件不存在，它会使用默认的颜色配置。你通常会在你的 shell 初始化文件中（比如 ~/.bashrc）看到类似于以下的命令：
+test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+
+如果你想要调整 Ubuntu 中 ls 命令输出的颜色，你可以创建或编辑 ~/.dircolors 文件，并在该文件中定义你的颜色配置。然后，确保你的 shell 初始化文件（如 ~/.bashrc）中包含处理 dircolors 的命令。这样，每次你打开一个新的 shell 时，都会应用这些颜色设置。
+```
+
+### 管理目录类文件相关命令
+- 查看当前目录
+  - 命令：`pwd`
+  ```shell
+  pwd -P # 输出真实物理路径
+  pwd -L # 默认，输出链接路径
+  ```
+
+- 基名与文件名
+```Shell
+bashename <dir> #只输出文件名
+# 示例：
+basename `which cat`
+
+dirname <dir>  # 只输出路径
+# 示例：
+dirname `which cat`
+```
+
+- 路径间移动
+  - 命令：`cd`
+  ```shell
+  cd -P  # 移动到真实物理路径
+  # 示例
+  cd -P /bin  # 实际移动到/usr/bin
+
+  cd -L # 默认，移动到链接路径
+
+  cd ~  # 移动到家目录
+  cd ~username  # 移动到指定用户的家目录
+
+  cd -  # 移动到上次所在的目录，之所以能移动到上次所在目录是因为有系统变量记录了这个数据
+  # $OLDPWD 记录上次所在目录；$PWD 记录当前所在目录
+  ```
+
+- 查看目录
+  - 命令: `tree`
+  ```shell
+  # 查看指定目录数的层级
+  tree -L 1 /
+
+  # 每个文件和目录前显示完整的相对路径
+  tree -f
+  [Sun Oct 15 10:08:22 7] root@rocky9:~ #tree -f /Storage/
+  /Storage
+  └── /Storage/test
+      ├── /Storage/test/baidu.html
+      ├── /Storage/test/ps_demo.txt
+      ├── /Storage/test/rename.txt
+      └── /Storage/test/robots.txt
+
+  1 directory, 4 files
+
+  # 每个文件和目录前显示最新更改时间
+  tree -D
+  [Sun Oct 15 10:10:36 11] root@rocky9:~ #tree -D /Storage/
+  /Storage/
+  └── [Oct 14 09:12]  test
+      ├── [Sep 27 12:03]  baidu.html
+      ├── [Oct 13 20:48]  ps_demo.txt
+      ├── [Jan  3  2020]  rename.txt
+      └── [Jan  3  2020]  robots.txt
+
+  1 directory, 4 files
+
+  # 每个文件和目录前显示文件大小
+  tree -s
+  [Sun Oct 15 10:08:30 8] root@rocky9:~ #tree -s /Storage/
+  /Storage/
+  └── [         79]  test
+      ├── [       2381]  baidu.html
+      ├── [        270]  ps_demo.txt
+      ├── [       2814]  rename.txt
+      └── [       2814]  robots.txt
+
+  # 每个文件和目录前显示文件/目录拥有者
+  tree -u
+  [Sun Oct 15 10:09:28 9] root@rocky9:~ #tree -u /Storage/
+  /Storage/
+  └── [root    ]  test
+      ├── [root    ]  baidu.html
+      ├── [root    ]  ps_demo.txt
+      ├── [root    ]  rename.txt
+      └── [root    ]  robots.txt
+
+  # 每个文件和目录前显示权限标示
+  tree -p
+  [Sun Oct 15 10:11:18 12] root@rocky9:~ #tree -p /Storage/
+  /Storage/
+  └── [drwxr-xr-x]  test
+      ├── [-rw-r--r--]  baidu.html
+      ├── [-rw-r--r--]  ps_demo.txt
+      ├── [-rw-r--r--]  rename.txt
+      └── [-rw-r--r--]  robots.txt
+
+  # 使用通配符对tree的目录进行筛选
+  tree -P pattern 这里的pattern不支持正则表达式，仅支持通配符
+  [Sun Oct 15 10:33:09 26] root@rocky9:~ #tree -P 'r*.txt' /Storage/
+  /Storage/
+  └── test
+      ├── rename.txt
+      └── robots.txt
+
+  1 directory, 2 files
+
+  常用通配符:
+  * 匹配任意数量的字符（包括零个）。
+  ? 匹配任意一个字符。
+  [...] 匹配方括号中的任意一个字符。
+  ```
+
+- 创建目录
+  - 命令：`mkdir`
+  ```shell
+  语法格式：mkdir [pv] [-m mode] directory_name...
+
+  # mkdir在指定路径创建目录
+  mkdir /Storage/test   # 在Storage目录下创建一个test目录
+
+  # 默认在当前路径创建目录
+  mkdir dir1    # 在当前目录下创建名为dir1的目录
+
+  # 一次创建多个同级目录，每个目录间用空格隔开
+  mkdir dir1 dir2 dir3
+
+  # 创建多级目录
+  mkdir -p dir1/dir2/dir3
+
+  # -v 会显示创建每个目录的详细信息 
+  [Sun Oct 15 11:12:00 39] root@rocky9:/ #mkdir -pv /Storage/test/dir1/dir2/dir3
+  mkdir: created directory '/Storage/test/dir1'
+  mkdir: created directory '/Storage/test/dir1/dir2'
+  mkdir: created directory '/Storage/test/dir1/dir2/dir3'
+
+  # -m mod 指定创建文件的权限
+  [Sun Oct 15 11:19:39 45] root@rocky9:demo #mkdir -m 644 demo2
+  [Sun Oct 15 11:20:12 46] root@rocky9:demo #ll
+  total 0
+  drwxr-xr-x. 2 root root  6 Oct 15 11:19 demo1
+  drw-r--r--. 2 root root  6 Oct 15 11:20 demo2
+  drwxr-xr-x. 3 root root 18 Oct 15 10:43 dir1
+  ```
+
+- 删除目录
+  - 命令：`rmdir`
+  - 注意：用于删除空目录，此命令要删除的目录内，不能有文件存在
+  ```shell
+  # 删除单一目录，注意：删除目录内不能有文件
+  rmdir <dirctory_name>
+
+  # 同时删除同级多个目录，每个目录用空格隔开
+  rmdir dir1 dir2 dir3
+
+  # -p 删除多级目录
+  rmdir -p dir1/dir2/dir3  # 同时删除dir1及其子目录dir2,dir3
+  ```
+#### 目录的本质
+- 在Unix和类Unix的文件系统中，每个文件或目录都有一个与之关联的inode（索引节点）。
+- 这个inode包含了关于文件的元数据，例如文件的权限、大小、修改时间、拥有者、所用的数据块的位置等，但注意，<font color=tomato>它不包含文件名</font>。
+- 目录中的数据部分，包含了文件名与inode编号的映射关系
+  ```
+  fileA -> inode34
+  fileB -> inode57
+  ```
+- 因此目录下文件的元数据（非文件名的改变）并不会导致目录中数据部分的内容发生改变，因为：文件元数据的改变，会导致inode的数据部分发生变化，但是inode的编号/值不变。这样，文件名和对应的inode编号的映射关系就没有发生变化，所以目录数据内容无变化
+- 目录的大小跟文件大小无关，仅跟目录的数据部门，即目录下文件和inode映射关系的大小有关
+
+#### 创建初始目录的时候，硬链接数初始为2的原因
+- 在UNIX和Linux文件系统中，目录的硬链接数从2开始是有特定的原因的。当你创建一个目录（例如dir1），初始的两个硬链接代表：
+  - 引用该目录的名字：这就是你所创建的目录名，如dir1。自身是一个硬链接
+  - .（点）：每个目录都有一个特殊的名字.，它引用自身。当你进入dir1并列出内容时，你会看到一个.目录，它实际上指向dir1自身。
+  - 当你在dir1内创建子目录时，dir1的硬链接数会增加。这是因为每个子目录都有一个名为..（双点）的特殊目录名，它指向其父目录。因此，每当你在dir1内创建一个子目录，dir1的硬链接数就会增加1。
+
+### 管理文件的相关命令
+- 查看文件列表
+  - 命令：`ls`
+  ```shell
+  语法格式：ls [OPTION]... [FILE]...
+
+  # -a 显示包含隐藏文件在内的所有内容
+  ls -a
+
+  # -i 显示文件索引节点(inode)
+  ls -i 
+  [Sun Oct 15 11:39:16 65] root@rocky9:test #ls -i
+  136601235 baidu.html  137507906 ps_demo.txt  136601225 rename.txt  136601224 robots.txt
+
+  # -l 以长格式显示目录下内容列表
+  # 长格式输出信息：文件名、文件类型、权限、硬链接数、所有者、组、文件大小、修改时间
+  ls -l
+  [Sun Oct 15 11:39:28 67] root@rocky9:test #ls -l
+  total 16
+  -rw-r--r--. 1 root root 2381 Sep 27 12:03 baidu.html
+  -rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+
+  # 用文件目录的更改时间排序
+  ls -t
+  [Sun Oct 15 11:45:06 73] root@rocky9:test #ls -tl
+  total 16
+  -rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
+  -rw-r--r--. 1 root root 2381 Sep 27 12:03 baidu.html
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+
+  # 按文件大小，从大到小排序
+  ls -S
+  mystical@mystical 0101 #ll-Sh  
+  total 60K
+  -rwxrwxr-x 1 mystical mystical  17K Jan  1 23:05 a.out
+  -rw-rw-r-- 1 mystical mystical 1.6K Jan  1 22:29 7.struct.c
+  -rw-rw-r-- 1 mystical mystical  861 Jan  1 21:12 6.ifdef.c
+  -rw-rw-r-- 1 mystical mystical  536 Jan  1 23:05 8.union.c
+  -rw-rw-r-- 1 mystical mystical  529 Jan  1 14:49 2.array.c
+  -rw-rw-r-- 1 mystical mystical  521 Jan  1 10:47 1.demo.c
+  -rw-rw-r-- 1 mystical mystical  445 Jan  1 16:45 3.string.c
+  -rw-rw-r-- 1 mystical mystical  404 Jan  1 17:14 4.pointer.c
+  -rw-rw-r-- 1 mystical mystical  402 Jan  1 20:53 5.ifdef.c
+  -rw-rw-r-- 1 mystical mystical  375 Jan  1 14:55 3.address.c
+  -rw-rw-r-- 1 mystical mystical   44 Jan  2 15:00 website.txt
+
+  # ls后面支持通配符过滤，不加单引号
+  [Sun Oct 15 11:49:26 80] root@rocky9:test #ls -l *.txt
+  -rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+
+  ```
+
+- 文件的时间属性
+  - atime: 记录最后一次的访问时间
+    - atime的更新策略：连续在24小时内访问读取atime,24小时内不会更新atime；但在更改文件内容的时候会顺便更新atime
+  - mtime: 记录最后一次文件数据部分的修改时间
+  - ctime: 记录最后一次文件元数据的修改时间
+  - 注意：mtime的改变一定会引起ctime的改变
+  - <font color=tomato>对于目录这种特殊文件</font>
+    - 其目录文件的数据部分(data block)存放的就是目录中的文件名等信息。所以在目录中创建，删除文件会改变目录的mtime，而目录的mtime的改变一定会引起ctime的改变，但其文件内容的改变，并不会引起目录mtime和ctime的改变
+    - 当你访问一个目录（例如列出其内容）时，目录的 atime（访问时间）会被更新。如果你修改了目录中的一个文件，那么在大多数文件系统配置下，为了访问并修改该文件，你首先需要“访问”该目录，从而导致目录的 atime 被更新。所以修改一个目录下的文件，那么这个目录的atime通常情况下，是会更新的。但是...
+    - 出于性能原因，一些现代的文件系统或挂载选项可能会默认禁用 atime 的更新。这种设置被称为noatime，它可以减少磁盘I/O，特别是在频繁读取文件但不经常修改它们的系统上。因此，如果<font color=tomato>文件系统</font>是以 noatime 选项挂载的，那么访问文件或目录不会更新其 atime。
+  - ls查看文件的3个时间属性
+  ```shell
+  # 默认显示文件的mtime
+  ls -l
+
+  # 显示文件的ctime
+  ls -l --time=ctime
+
+  # 显示文件的atime
+  ls -l --time=atime
+  ```
+  - 关于atime的挂载选项
+    - 'noatime'
+      - 访问文件/目录不会更新atime
+    - 'relatime'
+      - 满足两个条件之一才更新atime
+        - 文件的atime时间超过一天
+        - 文件的mtime比atime更晚
+
+- 查看文件属性信息
+  - 命令：`stat`
+  - 作用：用于显示文件的详细属性
+  ```shell
+  语法格式：stat [文件或目录]
+
+  # 查看文件属性
+  [Sun Oct 15 14:35:09 93] root@rocky9:test #stat rename.txt
+  File: rename.txt
+  Size: 2814      	Blocks: 8          IO Block: 4096   regular file
+  Device: fd00h/64768d	Inode: 136601225   Links: 1
+  Access: (0664/-rw-rw-r--)  Uid: (    0/    root)   Gid: (    0/    root)
+  Context: unconfined_u:object_r:default_t:s0
+  Access: 2023-10-13 20:36:29.807941125 +0800
+  Modify: 2020-01-03 16:33:48.000000000 +0800
+  Change: 2023-10-15 14:34:30.473235676 +0800
+  Birth: 2023-09-27 11:57:14.168869373 +0800
+  ```
+  - 命令：`file`
+  - 作用：使用`file`辨识文件的类型
+  ```shell
+  语法格式：file [OPTION] file_name
+
+  # -i 查看文件的MIME类型
+  [Sun Oct 15 14:46:28 102] root@rocky9:test #file -i test.log
+  test.log: text/plain; charset=us-ascii
+
+  # -b 省略文件名称，直接打印结果
+  mystical@ubuntu2204:~/C_coding/2024/jan/0128$ file 1.for.c
+  1.for.c: C source, Unicode text, UTF-8 text
+
+  mystical@ubuntu2204:~/C_coding/2024/jan/0128$ file -b 1.for.c
+  C source, Unicode text, UTF-8 text
+
+  # -f 从一个文件中，获取数据进行处理
+  mystical@ubuntu2204:~/test$ file -f studyvim.txt
+  /bin:        symbolic link to usr/bin
+  /etc/passwd: ASCII text
+  /home/:      directory
+  ```
+
+- windows与unix格式文本之间的相互转换
+  - Windows和Unix文本差异：
+    - Windows每行末尾是回车符加换行符
+    - Unix的每行末尾只有换行符结束
+  - 相互转换需要使用dos2unix
+  ```Shell
+  sudo apt install dos2unix
+  # Windows文本格式转Unix
+  dos2unix test.txt
+
+  # Unix文本格式转Windows
+  unix2dos test.txt
+  ```
+
+- 创建或刷新文件
+  - 命令：`touch`
+  ```shell
+  # 如果文件存在则刷新时间，如果不存在则创建空文件
+
+  touch -a    # 改变atime, ctime
+  touch -m    # 改变mtime, ctime
+  touch -h    # 刷新链接文件本身，默认刷新目标文件
+  touch -c    # 只刷新已存在的文件，如果文件不存在，也不会创建文件 
+  touch --time=STRING  # 修改指定时间，如：--time=atime
+  touch -r    # 使用某个文件的修改时间作为当前文件的修改时间
+  # 改变atime和mtime并刷新ctime
+  touch -t    # 修改atime,mtime到指定日期时间
+  # 比如01020304，指2024-01-02 03:04:00
+  # 比如0102030405， 指2001-02-03 04:05:00
+
+  # 示例
+  touch `date +%F-%T`.txt
+  2024-01-30-18:08:58.txt 
+  ```
+
+- 复制文件
+  - 命令：`cp`
+  ```shell
+  语法格式：cp [OPTION] SOURCE DEST
+
+  # -b 覆盖已存在的目标前先对其做备份，后缀为~
+  [Sun Oct 15 15:03:16 108] root@rocky9:test #cp -b newtest.txt test.log
+  cp: overwrite 'test.log'? y
+  [Sun Oct 15 15:03:32 109] root@rocky9:test #ls
+  baidu.html  dir1  dir2  dir3  newtest.txt  ps_demo.txt  rename.txt  robots.txt  test.log  test.log~
+
+  # -S 指定备份文件的后缀名
+  [Sun Oct 15 15:10:53 123] root@rocky9:test #cp -S .bak dir1/cptext.txt  cptext.txt 
+  cp: overwrite 'cptext.txt'? y
+  [Sun Oct 15 15:11:10 124] root@rocky9:test #tree .
+  .
+  ├── baidu.html
+  ├── cptext.txt
+  ├── cptext.txt.bak
+  ├── dir1
+  │   └── cptext.txt
+  ├── dir2
+  ├── dir3
+  ├── dir_cp
+  │   └── cptext.txt
+  ├── newtest.txt
+  ├── ps_demo.txt
+  ├── rename.txt
+  ├── robots.txt
+  ├── test.log
+  └── test.log~
+
+  4 directories, 11 files
+
+  # -i 覆盖前会先询问用户（推荐使用）
+  cp -i file cp_file
+
+  # -r 递归处理，将目录及其中的为文件一同复制
+  cp -r dir cp_dir
+
+  # -a 复制特殊文件，使用-a
+  cp -a /dev/zero  /home/mystical 
+  ```
+
+- 移动及重命名文件
+  - 命令：`mv`
+    - 语法：`mv 目标文件 目标路径`
+    - 语法2：`mv -t 目标路径 目标文件`
+    - 语法3：`mv -bi 目标文件 目标路径`
+      - i: 如果会覆盖文件则提示
+      - b: 覆盖文件时会备份被覆盖的文件
+      
+  - 命令：`rename`
+  ```shell
+  关于批量创建和批量修改文件名
+  
+  # 批量创建文件与批量重命名
+  # rename <要改的字段> <改之后的字段> <使用通配符表示改的程度>
+  [Sun Oct 15 15:34:07 129] root@rocky9:py_test #touch pydemo{1..9}.txt
+  [Sun Oct 15 15:34:35 130] root@rocky9:py_test #ls
+  pydemo1.txt  pydemo2.txt  pydemo3.txt  pydemo4.txt  pydemo5.txt  pydemo6.txt  pydemo7.txt  pydemo8.txt  pydemo9.txt
+  [Sun Oct 15 15:34:38 131] root@rocky9:py_test #rename .txt .py *.txt
+  [Sun Oct 15 15:35:23 132] root@rocky9:py_test #ls
+  pydemo1.py  pydemo2.py  pydemo3.py  pydemo4.py  pydemo5.py  pydemo6.py  pydemo7.py  pydemo8.py  pydemo9.py
+  [Sun Oct 15 15:35:25 133] root@rocky9:py_test #rename py python py*
+  [Sun Oct 15 15:35:43 134] root@rocky9:py_test #ls
+  pythondemo1.py  pythondemo2.py  pythondemo3.py  pythondemo4.py  pythondemo5.py  pythondemo6.py  pythondemo7.py  pythondemo8.py  pythondemo9.py
+
+  ```
+
+- 删除文件
+  - 命令：`rm`
+  ```shell
+  语法格式：rm [OPTION]...FILE...
+
+  # -f 强制删除文件，即在删除文件时不提示确认，并自动忽略不存在的文件
+
+  # -i 在删除每个文件之前请求确认
+
+  # -r 递归删除，目标是目录的话，整个目录文件全部删除
+  ```
+  - `rm`是危险命令，建议用以下命令替换
+  ```shell
+  alias rm='dir=/Storage/backup/data`date +%F%T`;mkdir $dir;mv -t $dir'
+  # 将所有要删除的文件，移动到创建的垃圾箱目录中
+  ```
+
+### 文件元数据和节点表结构
+- 作用：df 命令用于显示文件系统的磁盘空间使用情况
+- 查看不同分区的节点编号使用情况
+  - 命令：df -i
+  ```
+  生产案例1：提示空间满NO space left on device，但df可以看到空间很多，为什么
+
+  答：
+  节点编号不足，一个文件能被创建需要同时满足两个前提
+  足够的空间，以及该文件系统下还有剩余的节点编号
+
+  生产案例2：为什么cp /dev/zero /boot/test.img会把/boot的空间撑满
+
+  答：
+  1./dev/zero 是一个特殊的设备文件，它可以生成无限的零字节。当你尝试从它读取数据时，它会持续不断地返回零字节。
+
+  2.cp 命令的作用是复制文件或目录。在这种情况下，它从 /dev/zero 复制数据并尝试写入 /boot/test.img。
+
+  3.因为 /dev/zero 提供了无限的零字节，cp 会持续写入数据到 /boot/test.img，直到 /boot 分区没有更多的空间可用。
+
+  生产案例3：当test.img被访问时，管理员在主服务器删除test.img后，为什么，空间依然是满的
+
+  答：
+  因为当一个文件被使用时，在另一侧删除该文件，该空间并不会被立即释放，只有当这个文件不被使用时，才会释放这个空间
+
+  解决方法：
+  cat /def/null > /boot/test.img; rm -rf /boot/test.img
+  把文件清空后删除即可、
+  echo -n '' > /boot/test.img 结果和上述cat /def/null...相同
+  ```
+
+### 硬链接与软链接
+- 硬链接：
+  - 概述：本质上是多个文件名共用一个inode
+  - 命令：`ln a.txt aa.txt`
+  - 注意：
+    - 因为本质是共用一个inode，所以不能跨分区创建硬链接，因为不同分区有独立的inode表
+    - 同理，为了防止inode循环利用，所以目录也不能创建硬链接，但是在创建目录及其子目录的时候，系统会自动创建.和..这种目录的硬链接
+    - 硬链接数本质上是inode计数器的值
+
+- 软链接：
+  - 概述：也叫符号链接，软链接的本质是创建了一个新文件，该文件的内容是源文件的路径，所以访问软连接文件，实质上系统访问指向了源文件
+  - 命令：`ln -s 目标文件 软链接文件`
+    - 注意：根据软链接的本质，软连接文件中的内容实际上是指向目标文件的路径，因此目标文件的路径如果是相对路径，那么一定是相对软链接的路径 
+    - 注意2：删除软链接的时候，不要加tab键补全，如果软连接文件后跟/,删除的时候，比如rm -rf /Storage/test/test/ 实际上是把原始目录中的内容一起删除
+
+
+## Bash Shell特性
+### 命令历史
+- 概述：
+- 使用bash shell,执行过的命令会记录到history对应的缓存区中。当用户注销时，会将history缓存区中的命令历史追加到`~/.bash_history`文件中。
+- 当下次登录shell时，系统会读取命令历史文件中记录的命令到命令缓存区。
+
+### history命令
+```shell
+# 语法：
+history -c  
+# 清空历史命令，仅清空命令缓存区的命令，不影响.bash_history
+
+history -d offset
+[Tue Oct 17 10:52:59 22] root@rocky9:~ #history | tail -n 10
+ 1011  cat .bash_history 
+ 1012  cat oldfile.txt 
+ 1013  getent passwd root
+ 1014  getent passwd | tail -n 10
+ 1015  getent passwd
+ 1016  history
+ 1017  history -d 999
+ 1018  history | tail -n 20 # 1018
+ 1019  history | tail -n 30
+ 1020  history | tail -n 10
+[Tue Oct 17 10:54:14 23] root@rocky9:~ #history -d 1017
+[Tue Oct 17 10:54:35 24] root@rocky9:~ #history | tail -n 10
+ 1012  cat oldfile.txt 
+ 1013  getent passwd root
+ 1014  getent passwd | tail -n 10
+ 1015  getent passwd
+ 1016  history
+ 1017  history | tail -n 20 # 1017
+ 1018  history | tail -n 30
+ 1019  history | tail -n 10
+ 1020  history -d 1017
+ 1021  history | tail -n 10
+
+# 删除命令缓存区中指定编号的历史命令
+# 删除后，后面的命令编号会依次往前提
+
+history n  # 显示最近的n条命令，等同于history|tail -n <num>
+
+history -a # 立即追加命令缓存区中的命令到历史文件中
+
+history -w # 将命令缓存区的当前内容覆盖到.bash_history文件。
+history -w <new_file> # 将命令缓存区中的内容存储到指定文件中
+
+history -r # 从.bash_history读取命令到命令缓存区，通常在开始新会话时使用。
+history -r <new_file> # 从指定文件中读取命令到缓存区
+
+history -p <指定历史命令> # 将指定的数据显示在标准输出
+# 输出的指令不会执行，也不会出现在历史缓存区中
+[Tue Oct 17 14:13:14 50] root@rocky9:Storage #history
+    1  ls
+    2  touch test2.txt
+    3  echo "hello" >> test2.txt 
+    4  cat test2.txt 
+    5  history
+[Tue Oct 17 14:13:22 51] root@rocky9:Storage #history -p \!-2
+cat test2.txt 
+
+history -s # 将参数作为单独的条目添加到历史列表的末尾。
+# 这允许你将一个或多个命令手动添加到历史记录中。
+history -s "echo hello" # 将echo hello加入历史缓存区，但是不会执行
+
+```
+
+- 详细描述数据在历史缓冲区和.bash_history的过程
+  - 在一个新的bash会话中开始时，.bash_history 文件中的历史命令会被加载到命令缓存区。(假设.bash_history初始没有数据)
+  - 执行了10个bash命令。
+  - 退出bash，这10个命令写入到 .bash_history
+  - 开始一个新的bash会话，这10个命令加载到命令缓存区。
+  - 新的bash会话中，你执行了一个新的命令
+  - 退出bash，命令缓存区中的11个命令会 替换 .bash_history 文件中的内容。
+  - 最终.bash_history中共有11条命令
+
+- 问题2：`history -a`的原理
+  - 纯粹从底层操作角度看，history -a是追加到文件的，不是覆盖。
+  - 当我们在日常使用中考虑整个会话的上下文时，情况会变得复杂。每当开始一个新的bash会话，它都会从.bash_history读取历史记录到命令缓存区。这意味着，命令缓存区现在包含了从.bash_history文件加载的命令加上在当前会话中输入的新命令。
+  - 所以，尽管history -a实际上是追加行为，但在一个常规的bash会话中，由于命令缓存区已经从.bash_history加载了历史，看起来就像是被覆盖了。
+  - 但就底层原理来说：尽管history -a实际上是追加行为，但在一个常规的bash会话中，由于命令缓存区已经从.bash_history加载了历史，看起来就像是被覆盖了(真正的覆盖操作是history -w)。
+
+- 命令历史的快捷方式使用
+  - `!` 历史扩展的开始标识符。
+    - 在配合`history -p`使用时，需要使用`\!`转义
+    - `!!` 重复执行前一个命令
+    - `!:0` 执行前一个不含参数的命令
+    - `!n` 执行缓冲区序号n的命令
+    - `!-n` 执行缓冲区序号倒数第n个命令
+    - `!string` 执行前一个以string开头的命令
+    - `!?string` 执行前一个包含string的命令
+    - `:p`打印命令，不执行
+      - `!string:p`
+      - `!$:p` 打印输出 `!$`(上一个命令的最后一个参数)的内容
+      - `!*:p` 打印输出 `!*`(上一个命令的所有参数)的内容
+    - `^` 删除替换
+      - `^string` 删除上一个命令的第一个string
+      - `^sting1^stirng2` 将上一个命令的string1替换为string2
+      - `!:gs/string1/string2` 将上一个命令的所有string1替换为string2
+  - 调用历史参数
+    - `command !^` 调用上一个命令的第一个参数作为command的参数
+    - `command !$` 调用上一个命令的最后一个参数
+    - `command !*` 调用上一个命令的所有参数
+    - `command !:n` 调用上一个命令的第n个参数
+    - `command !n:^` 调用第n条命令的第一个参数
+    - `command !n:$` 调用第n条命令的最后一个参数
+    - `command !n:m` 调用第n条命令的第m个参数
+    - `command !n:*` 调用第n条命令的第*个参数
+    - `command !string:^` 调用以string开头的命令，获取它的第一个参数
+    - ...
+
+- 历史命令快捷键
+  - `ctrl + R` 进入历史命令搜索模块
+  - `ctrl + G` 退出历史命令搜索
+
+- history命令相关的shell变量
+  - $HISTSIZE：历史缓存区的条数限制，默认1000
+  - $HISTFILE：指定历史文件，默认为~/.bash_history
+  - $HISTFILESIZE：历史文件的条数限制，默认1000
+  - $HISTTIMEFORMAT：显示时间，示例：HISTTIMEFORMAT="%F %T"
+  - $HISTIGNORE：历史缓存区忽略指定命令，多个命令用冒号:分隔
+    - 示例：`export HISTIGNORE = "ls:pwd"`
+  - $HISTCONTROL:控制历史命令记录的方式
+    - 值为ignoredups：默认，忽略重复的命令，连续且相同认为重复
+    - 值为ignorespace：忽略所有以空白开头的命令
+    - 值为ignoreboth：相同于ignoreboth：相当于ignoredunps和ignorespace组合
+    - 值为erasedups：删除重复命令
+
+- 提示：如果要持久保存上述变量，需要将上面指令存放在etc/profile或者~/.bash_profile中
+
+### 命令行展开
+- 所谓命令行展开，即把命令行中给定的特殊符号自动替换为相应字符串的机制。在Bash Shell中有些符号有特殊含义
+  - `~` : 自动替换为用户家目录
+  - `~USERNAME`: 自动替换为指定用户的家目录
+  - `{}`: 可包含一个以逗号分隔的字符串或序列，能够将其展开为多个字符串
+  ```shell
+  a{d,c,b}e  # ade, ace, abe
+  /tmp/{a,b,c}  # /tmp/a, /tmp/b, /tmp/c
+  /tmp/{a,b}/z  # /tmp/a/z, /tmp/b/z
+  {1..6}  # 1,2,3,4,5,6
+  {1..10..2}  # 1,3,5,7,9
+  {a..d}  # a,b,c,d
+  ```
+
+### 标志I/O重定向和管道
+#### 三种I/O设备
+- Linux给程序提供三种I/O设备
+  - 标准输入(STDIN)  -0  默认接受来自终端窗口的输入
+  - 标准输出(STDOUT) -1  默认输出到终端窗口
+  - 标准错误(STDERR) -2  默认输出到终端窗口
+
+- 每创建一个新的会话，/dev/pts下就会创建一个新的伪终端，以数字序号命名，三种I/O设备都会指向这些伪终端
+
+- 数据流向有输入流(称为标准输入)、输出流，默认数据的输入流由键盘实现。默认的输出流是到当前的终端屏幕上，Linux系统里输出流又分为错误输出（称为标准错误输出）和正确的输出（称为标准输出）
+
+- 当一个程序刚启动时，会自动打开三个I/O设备文件：标准输入文件STDIN(STD即standard标准，IN即input输入)，标准输出文件STDOUT，标准错误输出文件STDERR。分别得到文件描述符0，1，2.如果此时打开一个新的文件，它的文件描述符会是3
+
+- 因为0，1，2都指向终端窗口，即
+```shell
+lrwx------. 1 root root 64 Oct 22 21:01 0 -> /dev/pts/3
+lrwx------. 1 root root 64 Oct 22 21:01 1 -> /dev/pts/3
+lrwx------. 1 root root 64 Oct 22 21:01 2 -> /dev/pts/3
+```
+所以输入输出都在终端窗口显示
+
+#### 文件描述符
+- 在Linux中每一个打开的文件，系统都会给这个打开的文件分配一个唯一的文件描述符(本质上是一个软链接)，指向正在打开的文件。
+- 文件描述符是一个非负整数，是内核为了高效管理已被打开的文件所创建的索引。所有执行I/O操作的系统调用都需要文件描述符
+- 因此可以通过查询一个的程序中的文件描述符，来发现这个程序打开了几个文件
+```shell
+cd /proc
+# 在proc中能看到所有的进程pid的目录，进入这个目录
+cd /5005
+# 里面有允许该程序的文件路径和fd目录(即打开的文件描述符目录)
+cd /fd
+# 进入fd目录，就可以发现多个软链接，指向程序打开的文件
+```
+
+- 扩展：
+  - 使用`$$`可以发现当前打开shell的pid
+  - 当打开一个新的会话，，创建一个伪终端，就是进入shell程序，使用`echo $SHELL`可以查询当前使用的shell类型
+
+#### 重定向技术
+- 概述：更改数据流向
+- 标准输出和错误的重定向
+  - STDOUT和STDERR可以被重定向到指定文件，而非默认的当前终端
+  - 格式：
+  ```
+  命令  操作符号  文件名
+  ```
+  - 支持的操作符号包括
+  ```
+  1> 或 >    把STDOUT重定向到文件
+  >|         强制覆盖（允许在set -C的情况下，强制覆盖）
+  2>         把STDERR重定向到文件
+  &>         把所有输出(标准输出和错误输出)重定向到文件
+
+  以上如果文件已经存在，文件内容会被覆盖
+  ```
+  ```shell
+  set -C 禁止将内容覆盖已有文件，但可追加
+  set +C 允许覆盖，默认
+
+  # 该知识点仅作了解
+  ```
+  - 追加：>>可以在原有内容上，追加内容
+  - 合并多个程序进行重定向：
+    - `(CMD1;CMD2...)`合并多个程序的STDOUT
+    - `{CMD1;CMD2;..}`使用花括号，记得结尾加分号；
+
+  - 将标准输出和标准错误同时输出到指定文件
+  ```shell
+  方法1：
+  ls python/ err/ &> all.log
+
+  方法2：
+  1s python/ err/ > all.log 2>&1
+  ```
+  - `&`符号的作用：
+    - 表示要操作的是文件描述符而非文件或命令。
+    - 例如&1这里指的是文件描述符1
+    - 文件描述符的本质是软链接，软链接的本质是指向目标文件的路径，而1指向的是/dev/pts/0即伪终端，因此:`2>&1`的意思就是标准错误输出到描述符1指向的路径中
+
+- 标准输入的重定向
+  - 标准输入符号：`<` 后面各跟文件
+  ```shell
+  bc < file
+  # 将需要计算的内容输入到指定文件中，然后标准输入到bc中
+  ```
+
+- 管道
+  - 管道符：`|`
+  ```shell
+  seq -s+ 1 100 | bc   # 5050 
+  ```
+
+- 单行重定向与多行重定向
+```shell
+单行重定向：
+cat > cat.log
+
+多行重定向：
+cat > cat2.log <<EOF  # EOF是结束符
+
+# 单行重定向在回车启用命令是，就已经创建了文件，然后每输入一行，回车后，内容就流入指定文件
+# 多行重定向是在所有命令都输入完之后，遇到EOF结束时，才一起执行所有命令
+```
+
+#### 支持标准输入的常用命令
+- `seq`
+  - 作用：用于生成某个范围内的整数
+  - 语法：`seq [选项]...[首数][增量][尾数]`
+  - 选项：`-s`, `-f`, `-w`
+  - 示例：
+  ```shell
+  # -f：格式化数据，使用%g表示整数，例如%g aaa%03g。
+  root@ubuntu2004:/Storage$ seq -f "id:%06g" 1 5
+  id:000001
+  id:000002
+  id:000003
+  id:000004
+  id:000005
+
+  # 使所有数据同宽，位数小的前面补零，不能和-f同时使用
+  root@ubuntu2004:/Storage$ seq -w 2 30 140
+  002
+  032
+  062
+  092
+  122
+
+  # -s：指定字符分隔产生的所有数字，默认为\n
+  root@ubuntu2004:/Storage$ seq -s '+' 1 9
+  1+2+3+4+5+6+7+8+9
+
+  ```
+
+- `s-nail`(原mailx)
+  - 配置（与外网邮箱互通 ）
+  - 在家目录下，创建.mailrc配置文件
+  ```shell
+  # .mailrc内容如下
+  set v15-compat
+  set smtp-auth=login
+  set from="昵称<qq号@qq.com>"
+  set mta=smtps://qq号:qq邮箱授权码@smtp.qq.com:465
+  ```
+  - 文件配置好后后，使用s-nail发送到外网的邮件，发件人为配置的qq邮箱
+  - 本机的邮箱默认位置
+  ```
+  /var/spool/mail/
+  ```
+
+- `tr`
+  - 作用：转换和删除字符
+  - 语法`tr [OPTION].. SET1 [SET2]`
+  - 选项：
+  ```
+  -d --delete：删除所有属于第一字符集的字符
+  -s --squeeze-repeats：把连续重复的字符以单独一个字符表示，即去重
+  -t --truncate-set1：将 第一个字符集对应字符转换为第二个字符集对应的字符，如果第一个字符集的字符数量多于第二字符集数量，超出部分忽略
+  -c -C --complement：取字符集的补集
+
+  [:alnum:]：字母和数字
+  [:alpha:]：字母
+  [:digit:]：数字
+  [:lower:]：小写字母
+  [:upper:]：大写字母
+  [:space:]：空白字符
+  [:print:]：可打印字符
+  [:punct:]：标点符号
+  [:graph:]：图形字符
+  [:cntrl:]：控制(非打印)字符
+  [:xdigit:]：十六进制字符
+  ```
+  - 示例：
+  ```bash
+  tr 'a-z' 'A-Z' < /etc/issue
+
+  tr [:lower:] [:upper:] < /etc/issue
+
+  tr -d 'abc'  # 删除字符中的abc
+
+  tr -dc 'abc'  # 只保留字符中的abc，程序完全结束后返回结果
+
+  df|tr -s ' '  # 将df的返回结果中的空格去重
+  ```
+
+- `tee`
+  - 作用：在 Linux 中用于从标准输入读取数据，并将其内容输出到标准输出和一个或多个文件中。这使得你能够查看数据的同时，将其保存到文件中。
+  - 基本用法
+  ```shell
+  command1 | tee file1
+  ```
+  - 示例
+  ```shell
+  ls -l | tee output1.txt
+
+  ls -l | tee -a output1.txt  # 追加内容到output1.txt，而不是覆盖
+
+  ls -l /bin |tee output1.txt|cat -n
+  ```
+#### 重定向与管道案例
+- 案例1
+```shell
+ls /data /err 2>&1 | tr 'a-z' 'A-Z'
+# 同时将标准输入和标准错误通过管道符，输入给tr进行处理
+
+ls /data /err |& tr 'a-z' 'A-Z'  # 相对比较新的写法
+```
+- 案例2
+```bash
+# 设置用户口令
+echo magedu | passwd --stdin wang &> /dev/null
+# --stdin  read new tokens from stdin (root only)
+```
+
+
 ## 用户组和权限管理
+### Linux安全模型
+- 3A资源分派
+  - Authentication：认证，验证用户身份
+    - 常见的通过用户名和口令，来区分验证用户信息
+  - Authorization：授权，不同的用户设置不同的权限
+    - 比如，某个文件，张三有访问权限，而李四没有
+  - Accouting|Auditon：审计
+    - 记录不同用户的操作记录
+
+- 当用户登录成功时，系统会自动分配命令token，包括用户标识和组成员等信息
 ### 用户和组相关文件
 - 用户：Linux中每个用户是通过 User Id(UID)来唯一标识的
   - 管理员：root, UID=0
@@ -79,9 +1518,19 @@
   gdm:*:19529:0:99999:7:::
     ...
   此处省略
-
-  //组成：密码（加密后），时间（以1970年以基准到更改密码的天数），最短有效期（0代表可随时更改）,密码有效期，密码以前几天提醒，再过几天账号锁定
-  //账号有效期
+  
+  // 密码的组成：
+  同时使用三个$符号分隔成3字段。
+  // 第一字段代表加密使用的单向加密算法，使用数字表示，1表示MD5算法，6表示SHA512算法。
+  // 第二字段代表加密算法使用的随机因子，一般称为salt盐，salt和加密算法一起构成了密码最终的加密方式。
+  // 第三字段代表加密后的结果，即密文
+  // 组成：密码（加密后）
+  // 更改/创建口令时间（以1970年以基准到更改密码的天数）
+  // 最短有效期,即有效期内无法更改口令（0代表可随时更改）（该有效期仅针对普通用户，对root用户无效）
+  // 密码有效期，
+  // 密码以前几天提醒，
+  // 超过密码有效期，再过几天账号锁定
+  // 账号有效期
 
   /etc/group    
 
@@ -112,6 +1561,7 @@
   后续省略
 
   //组名，组的口令，管理员账号（管理员可以在组中增删用户）
+  // 附加组成员
   ```
 
 - 用户管理常用命令
@@ -128,10 +1578,14 @@ uid=1001(wilson) gid=1001(wilson) 组=1001(wilson)
 # useradd -s /sbin/nologin  -- 指定shell类型 ‘ -s ’ 
 -- nologin还是给服务使用的，用户一般是使用/bin/bash
 # useradd -g postfix  -- 指定主组 ‘ -g ’;postfix是指定的组名
-# useradd -G mail  -- 指定附加组 ‘ -G ’
+# useradd -G [,GROUP2...]  -- 指定附加组 ‘ -G ’
+-- 注意添加的时候，要保证组存在
+# useradd -N  -- 不创建和用户同名的私用组作为主组
+# useradd -r -- 创建系统用户，CentOS 6：id<500，CentOS7及以上：id<1000
 # useradd -M  -- 不创建家目录 ‘ -M ’
 # useradd -m  -- 创建家目录  ‘ -m ’
 # useradd -u 1088  -- 指定UID ‘ -u ’
+# useradd -c 'COMMENT' -- 新的注释信息
 总结：
 useradd [option...] user_name 
 
@@ -169,18 +1623,113 @@ usermod     修改用户属性
 # usermod -s SHELL  -- 更改shell类型
 # usermod -l login_name   --更改新的用户名
 # usermod -e YYYY-MM-DD   -- 指明用户账号过期日期
+# usermod -f INACTIVE  -- 设置非活动期限，即宽限时间
+# usermod -L -- lock指用户，在/etc/shadow密码栏增加！ 
 
 --------------------------------------------------
 
 chage       修改用户属性
 
 # 
+```
+
+- useradd的默认属性的文件
+```bash
+[Mon Oct 30 16:10:21 104] root@rocky9:spool $ cat /etc/default/useradd 
+# useradd defaults file
+GROUP=100 # 100表示users组的编号
+# 如果使用useradd -N，不创建私用组的话，就用users(GID100)作为主组
+HOME=/home
+INACTIVE=-1  # -1表示其实口令到期也不锁账号，如果是10表示口令到期10天后锁账号
+EXPIRE=  #-- 表示账户有效期
+SHELL=/bin/bash
+SKEL=/etc/skel # /etc/skel目录下的内容表示创建新用户时，家目录自带的文件
+# /etc/skel实际上是新建账号的模板文件夹
+CREATE_MAIL_SPOOL=yes # 默认创建账号邮箱
+```
+
+- 新建用户的相关文件
+```bash
+/etc/default/useradd
+/etc/skel/*
+/etc/login.defs  # 控制账号口令，即shadow后面配置的默认定义
+``` 
+
+- 批量创建用户
+```
+newusers passwd 格式文件
+```
+
+- 批量更改用户口令
+```bash
+cat <格式文件> | chpasswd
+
+格式文件内容：
+user_name : password
+
+示例：
+mystical:12346
+user1:admin123
+
+在ubuntu中，由于Ubuntu不支持--stdin的选项，因此无法像CentOS一样使用如下命令
+echo password | passwd --stdin <user_name>
+
+因此，可以使用如下口令实现非交互式更改口令：
+echo user_name:passwd | chpasswd
+
+```
+
+- 查看用户相关的ID信息
+  - id命令可以查看用户的UID，GID等信息
+  ```bash
+  id [OPTION]... [USER]
+  ```
+  - 常见选项
+  ```bash
+  -u : 显示UID
+  -g : 显示GID
+  -G : 显示用户所属组ID
+  -n : 显示名称，需配合ugG使用，例如：-un;-gn;-Gn
   ```
 
 - 组管理命令
-```sql
-groupadd      新建用户组
-groupdel      删除用户组
+```
+groupadd 新建用户组
+
+格式：groupadd [OPTION]... group_name
+
+常见选项：
+-g GID 指明GID号; [GID_MIN,GIDMAX]
+-r 创建系统组，CentOS6之前：ID<500, CentOS 7以后：ID<1000
+
+注意：
+如果你知道你要创建的是一个系统组，并且你想确保它在系统组的 GID 范围内，那么使用 -r 选项是一个好的实践。如果你只是想创建一个具有特定 GID 的组，不管它是否是系统组，那么只使用 -g 选项就足够了。
+
+添加 -r 选项是为了明确表达你的意图，并确保组被正确地分类为系统组。不过，如果你手动指定了一个在系统组 GID 范围内的 GID，即使没有使用 -r 选项，该组在某种程度上也被视为系统组。
+
+范例：
+groupadd -g 48 -r apache
+```
+```
+groupmod 组属性修改
+
+格式：groupmod [OPTION]... group
+
+常见选项：
+-n <新组名> <原组名>: 新名字
+-g GID : 新的GID
+
+示例：groupmod -n www apache
+```
+```
+groupdel  group_name    删除用户组
+```
+- 关于脚本中写组和用户的创建的示例
+```bash
+getent group apache > /dev/null || groupadd -g 48 -r apache
+getent passwd apache > /dev/null || \
+  useradd -r -u 48 -g apache -s /sbin/nologin -d /var/www -c "Apache" apache
+exit 0
 ```
 
 ### 理解并设置文件权限
@@ -1000,11 +2549,14 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
 ### ICMP协议(Internet Control Message Protocol)
 - 范例：利用ICMP协议判断网络状态
 ```shell
+# 禁止本机被ping的配置文件
+echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_all
+
 ping 10.0.0.8
 ping -f -s <ip地址> -c1
--f 表示泛洪，就是最大功率无限制发送数据包
--s 指定发送包的大小，最大不能超过65507
--c(num) ping的次数
+#-f 表示泛洪，就是最大功率无限制发送数据包
+#-s 指定发送包的大小，最大不能超过65507
+#-c(num) ping的次数
 ```
 
 ### ARP协议(Address Resolution Protocol)
@@ -1313,7 +2865,7 @@ IPv6相比IPv4更加先进和健壮，设计时考虑了未来的扩展性、安
 GRUB_CMDLINE_LINUX="... net.ifnames=0"
 --进入文件，这行最后，添加net.ifnames=0
 
-# grub2 -mkconfig -o /boot/grub2/grub.cfg
+# grub2-mkconfig -o /boot/grub2/grub.cfg
 -- 执行之后重启即可
 
 -- ubuntu的修改和centos7类似
@@ -1321,7 +2873,7 @@ GRUB_CMDLINE_LINUX="... net.ifnames=0"
 GRUB_CMDLINE_LINUX="net.ifnames=0"
 --进入文件，这行最后，添加net.ifnames=0
 
-# grub -mkconfig -o /boot/grub/grub.cfg
+# grub-mkconfig -o /boot/grub/grub.cfg
 -- 执行之后重启即可
 
 ```
@@ -1329,7 +2881,8 @@ GRUB_CMDLINE_LINUX="net.ifnames=0"
 - ip地址修改
 ```sql
 Centos网卡配置文件：
-
+# /etc/sysconfig/network
+-- 更改主机名hostname
 # /etc/sysconfig/network-scripts/
 -- 进入网卡配置目录
 # ifcfg-eth0
@@ -1338,7 +2891,9 @@ Centos网卡配置文件：
 
 文件配置内容：
 
-DEVICE=eth0
+DEVICE=eth0 | HWADDR=00:0c:29:88:37:b8 (MAC地址) 二选一
+-- 两种方式都可以用来表示选择配置哪块网卡
+MACADDR=<mac地址> --(非必选)，可以用来更改mac地址
 NAME=eth0
 BOOTPROTO=dhcp  --动态配置
 
@@ -1347,9 +2902,18 @@ IPADDR=10.0.0.88
 NETMASK=255.255.255.0 或者 PREFIX=24
 GATEWAY=10.0.0.2 --配置网关，根据网络规划写
 -- 查看默认网关，执行ip route 或者 route -n
-DNS1=10.0.0.2
+DNS1=10.0.0.2 
 DNS2=100.76.76.76
+-- 填写DNS服务器地址，网上可以查到一些著名的DNS服务器地址，都可以用
+-- 比如阿里的：223.6.6.6
+-- 百度的：180.76.76.76
+-- 移动的：114.114.114.114
+-- 谷歌的：8.8.8.8 
 -- 验证DNS，查看文件/etc/resolv.conf
+
+DOMAIN=<要修改的后缀名>
+-- 默认ping www 后面自动补充一个域名，该域名是hostname的后缀，如果不想修改hostname后缀，可以在网卡配置文件中加入：
+
 
 ONBOOT=yes  --是否启动这个网卡，默认yes
 
@@ -1357,7 +2921,9 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
 --centos8及之上执行这两条命令
 # nmcli connection reload
-# nmcli connection up eth0
+# nmcli connection up eth0 -- 启用设置好的网卡
+-- 如果是多块网卡同时设置后启用，可以用空格隔开
+-- nmcli connection up eth0 eth1
 
 --centos7执行
 # systemctl restart network
@@ -1385,6 +2951,10 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
 # ifconfig eth0 <新ip地址>
 
+临时清空ip地址
+
+# ifconfig eth0 0.0.0.0/0
+
 保留一个网卡的情况下，增加新地址，实现一个网卡多个ip
 
 # ifconfig eth0:1 <新ip地址>  //网卡别名
@@ -1392,6 +2962,8 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 查看网卡吞吐量和状态
 
 # ifconfig -s
+
+# watch -n1 ifconfig -s
 
 删除网卡别名
 
@@ -1402,6 +2974,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 ```
 
 - 路由route
+  - route: 路由表管理命令
   - 路由表:作用是导航，地图，不仅仅在路由器有，在任何通信的主机都有
   ```
   查看路由表
@@ -1410,7 +2983,9 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   Kernel IP routing table
   Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
   0.0.0.0         192.168.56.2    0.0.0.0         UG    100    0        0 eth0
+  # 默认路由，在通向未知网段，目标路由设为0.0.0.0
   192.168.56.0    0.0.0.0         255.255.255.0   U     100    0        0 eth0
+  # 直连网段的路由会自动生成
   192.168.122.0   0.0.0.0         255.255.255.0   U     0      0        0 virbr0
 
   每一行描述的是一个网络的路径
@@ -1423,12 +2998,23 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
   网关的功能：让主机通过网关访问别的网段的机器，所以网关的接口地址，一定和主机网卡在同一网段
 
-  Metric花费；数值越低，优先级越高，路径越优
+  Metric(费用)；数值越低，优先级越高，路径越优；同一目标地址可能有多条路径，根据Metric的数值，可以看出最优路径
 
   ---------------------------------------------------
 
   给路由表添加信息（静态路由）
+
+  # route add [-net|-host|default] target[netmask Nm] [gw Gw] [[dev] If]
+
+  实例：
+  仅主机路由
+  # route add -host 192.168.1.3 gw 172.16.0.1 dev eth0
+
+  默认路由
+  #route add -net 0.0.0.0 netmask 0.0.0.0 gw 172.16.0.1
+  #route add default gw 172.16.0.1
   
+  网络路由
   # route add -net 179.20.0.0/16 gw 172.18.0.201 dev eth1
 
   查看虚拟机转发功能状态，默认不开启，如果接收到的数据包，目标地址不是该主机，则直接抛弃，不会转发
@@ -1447,7 +3033,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   在最后一行，添加：net.ipv4.ip_forward=1
   保存退出
   # sysctl -p 
-  使文件sysctl.conf 生效
+  使文件sysctl.conf 生效 
 
   使用mtr工具，可以查看主机到目标机器之间经过的路由
 
@@ -1466,6 +3052,9 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   OSPF协议算法：除了路由数量，还会考虑带宽
 
   netstat工具(和ss选项基本一致)
+  netstat和ifconfig都来自于net-tools
+  其中 ifconfig建议使用ip代替；netstat建议使用ss代替
+  ip和ss都来自于iproute
 
   常用选项
   -t：tcp协议相关
@@ -1483,6 +3072,13 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   -uan
   -tnl
   -unl
+
+  显示路由表，类似于route -n
+
+  # netstat -rn
+
+  # netstat -Ieht0 
+  -I和网卡名之间没有空格，作用和ifconfig -s 相同，用于查看网卡吞吐量
 
   ---------------------------------------
 
@@ -1505,6 +3101,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   # ip address    显示网络层相关地址
 
   # ip address add 10.0.0.100/24 dev eth0 label eth0:1
+  建议加label标签，这样可以和ifconfig兼容
   新增网卡ip地址
 
   # ip addr del 1.1.1.1/24 dev eth0   删除ip地址
@@ -1518,6 +3115,16 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
   # ip route del 路由表信息   删除路由网段信息
   ```
+- 回环网卡：lo
+  - 回环网卡的地址不会出现在路由表中
+  - 所有和回环网卡同一网啊的地址，都看作是本机之间的通讯
+  - 回环地址默认不参与网络通信
+  - 但是如果给回环网卡加上路由信息，也能实现网络通讯
+
+- ip地址的三种工作范围
+  - global：全局有效
+  - link：仅该网卡链路有效
+  - host：仅主机有效
 
 - 虚拟机的三种网络连接类型
   - 桥接 (Bridge) - vmnet0:
@@ -1533,8 +3140,542 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
     - 这提供了一种高度的隔离，适用于那些您不希望暴露给网络但仍想在主机上进行交互的虚拟机。
     - 虚拟机会从 VMware 仅主机网络的 DHCP 服务获取 IP 地址。
 
-###
+### 路由相关配置文件
+```
+/etc/sysconfig/network-scripts/route-IFACE
 
+# route-IFACE 默认不存在，需要手工创建,IFACE是网卡名
+
+两种风格：
+(1) TARGET via GW
+如：10.0.0.0/8 via 172.16.0.1
+
+(2) 每三行定义一条路由（#表示数字，不推荐）
+ADDRESS#=TARGET
+NETMASK#=mask
+GATEWAT#=GW
+```
+- 重启网络服务
+  - CentOS 6 ：service network restart
+    - CentOS 6 记得关闭NetworkManager
+  - CentOS 7及以后：systemctl restart netwrok
+
+- 注意：
+  - 网卡别名必须配置静态地址
+
+### 多网卡bonding  
+- 将多块网卡绑定同一IP地址对外提供服务，可以实现高可用或者负载均衡。直接给两块网卡设置同一IP是不可以的。通过bonding，虚拟一块网卡对外提供连接，物理网卡的被修改为相同的MAC地址
+- 共7种模式
+  - Mode0(balance-rr): 轮询(Round-Robin)策略，从头到尾顺序的在每个slave接口上面发送数据包。本模式提供负载均衡和容错能力。
+  - Mode1(active-backup): 活动备份(主备)策略，只有一个slave被激活，当且仅当活动的slave接口失败时才会激活其他slave，为了避免交换机发生混乱，此时绑定的MAC地址只有一个外部端口上可见
+  - Mode3(broadcast): 广播策略，在所有的slave接口上传送所有的报文，提供容错能力 
+
+- 说明：
+  - active-backup、balance-tlb和balance-alb模式不需要交换机的任何特殊配置。其他绑定模式需要配置交换机以便整合链接。如：Cisco交换价需要在模式0、2和3中使用Ether Channel，但在模式4中需要LACP和Ether Channel
+
+- Bonding配置
+```shell
+创建bonding设备的配置文件
+/etc/sysconfig/network-scripts/ifcfg-bond0
+# 其中ifcfg-bond0文件需手工配置，文件名后面必须是bond加数字
+
+TYPE=bond
+DEVICE=bond0
+BOOTPROTO=none
+IPADDR=10.0.0.100
+PREFIX=8
+# miimon指定链路监测时间间隔。如果miimon=100，那么系统每100ms监测一次链路连接状态，如果有一条线路不通就转入另一条线路
+BONDING_OPTS="mode=1 miimon=100"
+
+/etc/sysconfig/network-scripts/ifcfg-eth0
+DEVICE=eth0
+BOOTPROTO=none
+MASTER=bond0
+SLAVE=yes
+ONBOOT=yes
+
+/etc/sysconfig/network-scripts/ifcfg-eth1
+DEVICE=eth1
+BOOTPROTO=none
+MASTER=bond0
+SLAVE=yes
+ONBOOT=yes
+```
+- 查看bond0状态：
+  - `/proc/net/bonding/bond0`
+- 删除bond0
+  - `ifconfig bond0 down`
+  - `rmmod bonding` 
+
+### CentOS7以上版网络配置
+- 概述：CentOS6之前，网络接口使用连续号码命名：eth0、eth1等，当增加或删除网卡时，名称可能会发生变化CentOS7以上版使用基于硬件，设备拓扑和设备类型命名
+- 网卡命名机制
+  - 如果Firmware（固件）或BIOS为主板上集成的设备提供的索引信息可用，且可预测则根据此索引进行命名，如：eno1
+    - 翻译：如果你的计算机主板上有一个内置的网络接口（网卡），系统可以从固件或BIOS中获取一些信息来给它命名。这种命名是基于该网络接口在主板上的位置或其他硬件信息。例如，它可以被命名为“eno1”，其中“eno”表示它是一个嵌入式网络输出，并且“1”是它的编号或索引。
+  - 如果Firmware或BIOS为PCI-E扩展槽所提供的索引信息可用，且可预测，则根据此索引进行命名，如：ens1
+    - 翻译：如果你在计算机上安装了一个额外的网络接口卡（例如，通过一个PCI-E扩展槽），系统也可以从固件或BIOS中获取一些信息来给它命名。这种命名是基于该网络接口卡在扩展槽中的位置或其他硬件信息。例如，它可以被命名为“ens1”，其中“ens”表示它是一个PCI-E网络输出，而“1”是它的编号或索引。
+  - 如果硬件接口的物理位置信息可用，则根据此信息命名，如：enp2s0
+    - 翻译：如果系统能够获取到网络接口在计算机内部的物理位置信息（例如，它连接到第2个PCI总线上的第0个插槽），它就会使用这些信息来给网络接口命名。在这个例子中，“enp2s0”是基于网络接口的物理位置来命名的，其中“p2”表示PCI总线2，而“s0”表示插槽0。
+  - 如果用户显示启动，也可根据MAC地址进行命名，如：enx2387a1dc56
+    - 翻译：如果用户明确要求（通常是通过配置文件设定），系统可以使用网络接口的MAC地址来命名它。MAC地址是一个网络接口的唯一标识符。在这个例子中，“enx2387a1dc56”是基于网络接口的MAC地址来命名的，其中“2387a1dc56”是该接口的MAC地址。
+  - 上述均不可用时，使用传统命名机制
+
+- 网卡组成格式
+  - en：Ethernet 有线局域网
+  - wl：wlan 无线局域网
+  - ww：wwan 无线广域网
+  - o&lt;index&gt;: 集成设备的设备索引号
+  - s&lt;slot&gt;: 扩展槽的索引号
+  - x&lt;MAC&gt;: 基于MAC地址的命名
+  - p&lt;bus&gt;s&lt;slot&gt;: enp2s1
+
+- 更改网卡命名，使用传统命名方式
+  - <a href="#网络配置">更改方法</a>
+
+- 主机名hostname（CentOS7及以上）
+  - 配置文件：`/etc/hostname`
+  - 默认没有此文件，通过DNS反向解析获取主机名，主机名默认为：localhost.localdomain
+  - 设置主机名：`hostnamectl set-hostname centos7.magedu.com`
+  - 删除文件/etc/hostname，恢复主机名localhost.localdomain
+  - 显示主机名
+    - `hostname`
+    - `hostnamectl status`
+
+- 网络配置工具nmcli
+  - 依赖NetworkManager服务，此服务是管理和监控网络设置的守护进程
+  - nmcli命令
+  ```shell
+  nmcli connection  # 查看网卡连接
+
+  # 更改网卡名称(name)
+  nmcli connection modify <旧网卡名> con-name <新网卡名> # 更改后自动生成配置文件
+
+  # 更改网卡配置
+  nmcli connection modify <网卡名> ipv4.addresses <ip地址> ipv4.gateway <网关地址> ipv4.dns <dns地址> ipv4.method manual
+  # 这里ipv4.method manual表示采用静态地址，默认不写是auto，表示动态地址
+  # 示例：
+  nmcli connection modify eth1-home ipv4.addresses 192.168.0.100/24 ipv4.gateway 192.168.0.1 ipv4.dns 233.6.6.6 ipv4.method manual
+
+  配置改好后，重新加载网卡，然后重新启用配置好的网卡
+  nmcli connection reload
+  nmcli connection up eth1-home
+
+  # 删除配置的网卡
+  nmcli connection delete <网卡名>
+
+  -----------------------------------------------------------------
+  使用nmcli实现bonding模式
+
+  nmcli connection add con-name mybond0 ifname bond0 type bond mode active-backup
+  # 添加一个bond类型的虚拟网卡，起名为mybond0,mode定义bond模式
+
+  nmcli connection add con-name mybond0 ifname bond0 type bond mode active-backup ipv4.addresses 10.0.0.100/24 ...
+  # 配置的时候添加ip地址，方式，网关等
+
+  nmcli connection add con-name mybond0-eth1 ifname eth1 type bond-slave master bond0
+  # 将eth1添加到bonding中
+
+  nmcli connection delete <eth1之前的配置文件>
+  # 删掉之前的eth1的配置文件，自动启用新配置的绑定bonding的eth1
+
+  cat /proc/net/bonding/bond0
+  # 查看bond0的绑定情况
+
+  ```
+
+- 网络组 NetWork Teaming
+  - 网络组：是将多个网卡聚合在一起方法，从而实现容错和提高吞吐量，网络组不同于旧版的bonding技术，提供更好的性能和扩展性网络组由内核驱动和teamd守护进程实现
+  - 多种方式 runner
+    - broadcast
+    - roundrobin
+    - activebackup
+    - loadbalance
+    - lacp(implements the 802.3ad Link Aggregation Control Protocol)
+
+  - 创建网络组示例：
+  ```shell
+  # 创建网络组接口
+  nmcli con add type team con-name CNAME ifname INAME [config JSON]
+
+  CNAME 连接名
+  INAME 接口名
+  JSON 指定runner方式，格式：'{"runner":{"name":"METHOD"}}'
+  METHOD 可以是broadcast, roundrobin, activebackup, loadbalance, lacp
+
+  # 创建port接口
+  nmcli con add type team-slave con-name CNAME ifname INAME master TEAM
+
+  CNAME 连接名，连接名若不指定，默认为team-slave-IFACE
+  INAME 网络接口名
+  TEAM 网络组接口名
+
+  # 断开和启动
+  nmcli dev dis INAME
+  nmcli con up CNAME
+
+  ----------------------------------------------------------------
+  网络组示例：
+  nmcli con add type team con-name myteam0 ifname team0 config '{"runner":{"name":"loadbalance"}}' ipv4.addresses 192.168.1.100/24 ipv4.method manual
+
+  nmcli con add con-name team0-eth1 type team-slave ifname eth1 master team0
+
+  nmcli con add con-name team0-eth2 type team-slave ifname eth2 master team0
+
+  nmcli con up myteam0
+  nmcli con up team0-eth1
+  nmcli con up team0-eth2
+
+  查看team状态
+  teamdctl team0 state
+  ``
+
+- 网桥
+  - 作用：网桥的作用是将多个设备串联在一起，实现通讯，隔离冲突域，相当于交换机
+  - 配置实现网桥
+  ```shell
+  # 下载bridge-utils CentOS 8 无此包
+  yum -y install bridge-utils
+
+  # 查看网桥
+  brctl show
+
+  # 查看CAM(content addressable memory 内容可寻址存储器)表
+  brctl showmacs br0
+
+  # 添加和删除网桥
+  brctl addbr | delbr br0
+
+  # 添加和删除网桥中的网卡
+  brctl addif | delif bro eth0
+
+  # 默认br0 是down，必须启用
+  ifconfig br0 up
+
+  # 启用STP协议
+  brctl stp br0 on
+  ```
+  - STP（生成树协议）
+    - 交换机上的协议，用来防止广播风暴(回环)
+
+### TCPdump的使用
+- 概述：
+  - TCPdump,全称dump the traffic on a network，是一个运行在linux平台可以根据使用需求对网络上传输的数据包进行捕获的抓包工具
+- 功能：
+  - 在Linux平台将网络中传输的数据包全部捕获过来进行分析
+  - 支持网络层、传输层协议等协议捕获过滤
+  - 数据发送和接收的主机、网卡和端口等各种过滤捕获数据规则
+  - 提供and、or、not等语句进行逻辑组合捕获数据包或去掉不同的信息
+  - 结合wireshark工具分析捕获的报文
+```shell
+# 不指定任何参数，默认监听第一块网卡经过的数据包。
+tcpdump
+
+# 监听特定网卡
+tcpdump -i eth0
+
+# 监听特定主机，监听主机10.0.0.100的通信包，注意：出入包都会被监听
+tcpdump host 10.0.0.100
+
+# 特定来源、目标地址的通信
+# 特定来源
+tcpdump src host hostname
+# 特定目标
+tcpdump dst host hostname
+# 如果不指定src跟dst，那么来源或者目标是hostname的通信都会被监听
+tcpdump host hostname
+
+# 特定端口
+tcpdump port 3000
+
+# 监听tcp/udp，服务器上不同服务分别用了tcp，udp作为传输层
+tcpdump tpc # 监听tcp协议报文
+
+# 来源主机+端口+tcp，监听来自主机10.0.0.100在端口22上的tcp数据包
+tcpdump tcp port 22 and src host 10.0.0.100
+
+# 监听特定主机之间的通信
+tcpdump ip host 10.0.0.101 and 10.0.0.102
+
+# 10.0.0.101和除了10.0.0.1之外的主机之间的通信
+tcpdump ip host 10.0.0.101 and ! 10.0.0.1
+
+# 将tcpdump的数据包，重定向到一个文件中
+tcpdump -i eth0 -nn port ! 22 -w test.cap
+sz test.cap # 将虚拟机的文件传到本地
+
+```
+
+### curl工具
+- 介绍：curl命令来自于英文词组"Commandline URL"的缩写，其功能是用于在shell终端界面中基于URL规则进行的文件传输工作，curl是一款综合的传输工具，可以上传，也可以下载，支持HTTP，HTTPS，FTP等三十余种常见协议
+
+- 语法：`curl [options] <url>`
+```shell
+curl <url> 
+# 获取指定网站的网页源码，默认GET请求
+
+curl -v <url>
+# 表示输出连接详情 
+
+curl -O <url>
+# 下载指定网站中的文件
+
+curl -o filename <url>
+# 将网页源码保存到指定文件中
+
+curl -I https://www.baidu.com
+# 打印指定网站的HTTP响应头信息
+
+curl -Iv <rul>
+# 同时打印HTTP请求和响应头信息
+
+curl -i -X <Method> <url>
+# 指定请求HTTP方法,并返回响应信息
+```
+
+### wget工具
+- 介绍：Linux下的下载命令
+- 语法：`wget [options] <url>`
+```shell
+wget <url>
+# 将链接文件直接下载到当前路径
+
+wget -O filename <url>
+# 表示output输出为文件，后接文件名参数
+```
+
+### ubuntu网络配置
+- 主机名
+```shell
+# 和CentOS7之后版本的指令，配置文件都一样
+hostnamectl set-hostname ubuntu1804.magedu.org
+# 用这个指令更改主机名后，配置文件hostname里的主机名会自动被更改
+
+cat /etc/hostname
+ubuntu1804.magedu.org
+```
+
+- 网卡名称
+  - 默认ubuntu的网卡名称和CentOS 7类似
+  - 修改网卡名称为传统命名方式：
+  ```shell
+  # 修改配置文件为下面形式
+  vim /etc/default/grub
+  GRUB_GMDLINE_LINUX="net.ifnames=0"
+  # 或者sed修改
+  sed -i.bak '/^GRUB_CMDLINE_LINUX=/s#"$#net.ifnames=0"#' /etc/default/grub
+
+  # 生效新的grub.cfg文件
+  grub-mkconfig -o /boot/grub/grub.cfg # 本质上是修改grub.cfg文件，在上面添加 net.ifnames=0的信息
+
+  # 本质：grub文件相当与一个修改模板，通过grub-mkconfig指令使其调用grub模板去更改grub.cfg文件
+  # 所以，实际上可以只修改grub.cfg文件，讲所有linux开头的行后添加net.ifnames=0，是一样的
+
+  # 或者使用
+  update-grub # 作用等同于grub-mkconfig -o /boot/grub/grub.cfg
+
+  reboot # 最后重启生效
+  ```
+
+- 网卡配置
+  ```shell
+  # ubuntu20.04的网卡配置文件采用yaml格式，要求各级缩进必须严格统一
+
+  # 官方文档参考：https//ubuntu.com/server/docs/network-configuration
+
+  # ubuntu20.04网卡配置文件路径
+  /etc/netplan/01-netcfg.yaml  # 配置文件命名格式：数字-netcfg.yaml
+
+  # 配置文件内容 (严格控制缩进)
+  network:
+    ethernets:
+      ens33:    # 更改网卡名
+        dncp4:true   # 这个就是自动分配，动态网卡地址
+    version:2
+    renderer:networkd   # 选填
+
+  # 配置之后，需要执行命令生效：
+  netplan apply   # NAT模式下生效，桥接模式，需要配置动态地址
+
+  # yaml格斯的常见数据结构：列表和字段
+  # ubuntu20.04静态地址配置
+  network:
+    version: 2  #冒号后面要加空格
+    renderer: networkd
+    ethernets:
+    eth0:
+      addresses: [192.168.8.10/24,10.0.0.10/8] # 或者用下面两行，两种格式不能混用
+      - 192.168.8.10/24 # 横线加空格，也是yaml中列表中元素的一种表现形式
+      - 10.0.0.10/8
+      gateway4: 192.168.8.1
+      nameservers:
+        search: [magedu.com, magedu.org]
+        addresses: [180.76.76.76, 8.8.8.8, 1.1.1.1]
+  ```
+- 查看ip和gateway
+```shell
+ip addr
+route -n
+```
+
+- 查看DNS
+```shell
+# 使用指令来看
+systemd-resolve --status
+```
+
+- 配置多网卡静态ip并添加静态路由
+```shell
+# 编辑配置文件
+vim /etc/netplan/01-eth1cfg.yaml
+
+# 内容
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0: 
+    dhcp4: no
+    dhcp6: no
+    addresses: [10.0.0.18/16]
+    gateways:10.0.0.2
+    nameservers:
+      addresses: [223.6.6.6]
+    eth1:
+      dhcp4: no
+      dhcp6: no
+      addresses: [10.20.0.18/16]
+      routes:
+      - to: 10.30.0.0/16
+        via: 10.20.0.1/16
+      - to: 10.40.0.0/16
+        via: 10.20.0.1/16
+      - to: 10.50.0.0/16
+        via: 10.20.0.1/16
+      - to: 10.60.0.0/16
+        via: 10.20.0.1/16
+
+```
+- 双网卡绑定
+```
+支持多网卡绑定其中模式
+
+第一种模式：mod=0,即：（balance-rr） Round-robin policy（平衡论循环策略）
+特点：传输数据包顺序是依次传输（即：第1个包走eth0，下一个包就走eth1...一直循环下去，知道最后一个传输完毕），此模式提供负载平衡和容错能力
+
+第二种模式：mod=1,即：（active-backup）Active-backup policy（主-备份策略）
+特点：只有一个设备处于活动状态，当一个宕机另一个马上由备份转换为主设备。mac地址是外部可见的，从外面看来，bond的mac地址是唯一的，以避免switch发生混乱。此模式只提供了容错能力；由此可见此算法的优点是提供网络连接的可用性，但是它的资源利用率较低，只有一个接口处于工作状态，在有N个网络接口的情况下，资源利用率为1/N。
+
+第三种模式：mod=2，即：（balance-xor）XOR policy（平衡策略）
+特点：基于指定的传输HASH策略传输数据包。缺省的策略是：（源MAC地址 XOR 目标MAC地址） % salve数量。其他的传输策略可以通过xmit_hash_policy选项指定，此模式提供负载平衡和容错能力
+
+第四种模式：mod=3，即：broadcast（广播策略）
+特点：在每个slave接口上传输每个数据包，此模式提供了容错能力
+
+第五种模式：mod=4，即：（802.3ad）IEEE 802.3ad Dynamic link aggregation (IEEE 802.3ad 动态链接聚合)
+特点：创建一个聚合组，它们共享同样的速率和双工设定。根据802.3ad规范将多个slave工作在同一个激活的聚合体下。
+该模式必要条件：
+条件1：ethtool持获取每个slave的速率和双工设定
+条件2：switch支持IEEE 802.3ad Dynamic link aggregation
+条件3；多数switch需要经过特定配置才能支持802.3ad模式
+
+第六种模式：mod=5，即：（blance-tlb）Adaptive transmit load balancing （适配器传输负载均衡）
+特点：不需要任何特别的switch支持的通道bonding。在每个slave上根据当前的负载（根据速度计算）分配外出流量。如果正在接收数据的slave出故障了，另一个slave接管失败的slave的MAC地址。
+该模式的必要条件：
+ethtool支持获取每个slave的速率
+
+第七种模式：mod=6，即：（balance-alb）Adaption load balancing（适配器适应性负载均衡）
+特点：该模式包含了balance-tlb模式，同时加上了针对IPV4流量的接收负载均衡（receive load balance，rlb），而不需要任何switch的支持
+```
+```shell
+# 在Ubuntu中启用多网卡绑定，需要直接写文件
+vim /etc/netplan/01-netcfg.yaml
+
+# 配置文件内容
+# This file describes the network interfaces available on your system
+# for more information, see netplan(5)
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0:
+      dhcp4: no
+      dhcp6: no
+    eth1:
+      dhcp4: no
+      dhcp6: no
+
+  bonds:
+    bond0:
+      interfaces:
+        - eth0
+        - eth1
+      addresses: [10.0.0.18/16]
+      gateways: 10.0.0.1
+      nameservers:
+        addresses: [223.6.6.6, 223.5.5.5]
+      parameters:
+        mode: active-backup
+        mii-monitor-interval: 100  # 监控间隔
+
+# 使其配置生效
+netplan apply
+```
+```shell
+# 查看生成的bond信息文件
+cat /proc/net/bonding/bond0
+
+``` 
+- 网络测试诊断工具
+
+  - 测试网络连通性
+    - ping
+  - 显示正确的路由表
+    - ip route
+  - 跟踪路由
+    - traceroute
+    - tracepath
+    - mtr
+  - 确定名称服务器使用
+    - nslookup
+    - host
+    - dig
+  - 抓包工具
+    - tcpdump
+    - wireshark
+  - 安全扫描工具
+    - nmap
+    - netcat: 网络界的瑞士军刀
+
+### NAT（Network Address Translation）技术。
+- 前置知识科普
+  - 私网ip：
+    - 私有IP地址，如192.168.x.x、10.x.x.x、172.16.x.x至172.31.x.x
+    - 特点：
+      - 只能在内网/局域网通信，无法和互联网通信
+  - 公网ip
+    - 查询方式
+      - Windows: 打开命令提示符（cmd），然后输入`nslookup myip.opendns.com resolver1.opendns.com`。这将使用OpenDNS的解析器来返回你的公网IP。
+      - Linux/Unix/Mac: 打开终端，然后输入`dig +short myip.opendns.com @resolver1.opendns.com`。
+- 概述：
+  - NAT是一种在IP数据包通过路由器或防火墙时重新映射IP地址的技术。它允许一个内网（通常使用私有IP地址，如192.168.x.x、10.x.x.x、172.16.x.x至172.31.x.x）的多台设备共享一个公网IP地址进行外部通信。这样可以实现资源共享，也为IPv4地址的不足提供了临时解决方案。
+
+- NAT(网络地址转换)的主要类型
+  - 静态NAT
+    - 为内部IP地址提供一个一对一的公网IP地址映射。通常用于需要对外提供服务的设备，如web服务器。
+  - 动态NAT
+    - 从一个可用的公网IP地址池中为内部设备动态分配公网IP地址。
+  - PAT（Port Address Translation）/ NAPT (Network Address Port Translation)
+    - 这是最常见的NAT类型，也经常被称为"端口转发"。在此类型的NAT中，多台内部设备共享单个公网IP地址。区分不同设备的方式是通过不同的源端口号。因此，这种方法不仅会转换IP地址，还会转换端口号。
+    - 端口转发的工作流程
+      - 当内部设备想要与外部世界通信时，它会发送一个数据包到NAT设备（通常是家用路由器）。
+      - NAT设备将内部私有IP地址和端口号更改为公网IP地址和一个新的端口号，然后将数据包发送到外部网络。
+      - 当外部服务器响应时，它会发送数据包回到路由器的公网IP地址和之前分配的端口号。
+      - 路由器使用NAT表查找原始的内部IP地址和端口，然后将响应转发给正确的内部设备。
+  
+- 端口映射的应用场景
+  - 内网服务器对外发布
+  - 内网设备，从外部进行远程管理
+  - 内网监控视频，从外部取流
 
 
 ## 软件管理
@@ -1684,7 +3825,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
 - 第三方组织提供
   - Fedora-EPEL：Extra Packages for Enterprise Linux
-  ```
+  ``` 
   https://fedoraproject.org/wiki/EPEL
   https://mirrors.aliyun.com/epel/
   https://mirrors.cloud.tencent.com/epel/
