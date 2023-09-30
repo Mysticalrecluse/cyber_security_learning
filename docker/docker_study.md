@@ -122,3 +122,5 @@
 - Docker从大版本来说，分为三类：Moby，社区版Docker-CE和企业版Docker-EE
 ### 小版本
 - 从V1.13.1之后，Docker的发布计划发生了变更，每个大版本下都出现了两个小版本Edge月版和Stable季版。不过，现在的官网中一般只能看到Stable版本
+
+select count(table_name)>10 from information_schema.tables where table_schema=database();

@@ -530,7 +530,7 @@ git checkout master      # 切换到master分支
 git merge feature        # 合并feature分支到当前分支 (master)
 
 ```
-## GitHub的使用技巧
+ ## GitHub的使用技巧
 ### 检索技巧：
 - 关键词：用空格分开
 - in：readme：将关键词检索范围扩展到readme文档

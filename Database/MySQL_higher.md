@@ -311,7 +311,7 @@ SELECT * FROM employees WHERE last_name = 'King';
   - 关键字：
   ```sql
   IS NULL           为空运算符
-  IS NOTNULL        不为空运算符
+  IS NOT NULL        不为空运算符
   LEAST             最小值运算符（函数）
   GREATEST          最大值运算符（函数）
   BETWEEN AND       两值之间运算符
@@ -520,7 +520,9 @@ WHERE emp.manager_id = mgr.employee_id;
 
 外连接分类：
 左外连接
+两个表在连接过程中除了返回满足连接条件的行以外，还返回左表中不满足条件的行
 右外连接
+两个表在连接过程中除了返回满足连接条件的行以外，还返回右表中不满足条件的行
 满外连接 
 
 SQL92中的内连接：见上，略
@@ -569,7 +571,7 @@ ON e.department_id = d.department_id;
 UNION的使用
 
 合并查询结果
-利用UNION关键字，可以给出多条SELECT语句，并将它们的结果组合成单个结果集。合并时，两个表对应的列数和数据类型必须相同，并且相互对应。各个SELECT语句之间使用UNION 或UNION ALL关键字分割
+利用UNION关键字，可以给出多条SELECT语句，并将它们的结果组合成单个结果集。<font color=tomato>合并时，两个表对应的列数和数据类型必须相同，并且相互对应。</font>各个SELECT语句之间使用UNION 或UNION ALL关键字分割  
 
 SELECT column, ... FROM table1
 UNION [ALL]
@@ -584,3 +586,795 @@ UNION操作符
 
 ```
 ![Alt text](image.png)
+
+```sql
+七种JOIN的实现
+
+中图：内连接
+SELECT employee_id, department_name
+FROM employees e Join Departments d
+ON e.department_id = d.department_id;
+
+左上图：左外连接
+SELECT employee_id,department_name
+FROM  employees e LEFT JOIN departments d
+ON e.department_id = d.department_id;
+
+右上图：右外连接
+SELECT employee_id,department_name
+FROM  employees e RIGHT JOIN departments d
+ON e.department_id = d.department_id;
+
+左中图：
+SELECT employee_id,department_name
+FROM  employees e LEFT JOIN departments d
+ON e.department_id = d.department_id
+WHERE d.department_id IS NULL;
+
+右中图：
+SELECT employee_id,department_name
+FROM  employees e RIGHT JOIN departments d
+ON e.department_id = d.department_id
+WHERE e.department_id IS NULL;
+
+左下图（满外连接）
+方式一：左上图 UNION ALL 右中图
+SELECT employee_id,department_name
+FROM  employees e LEFT JOIN departments d
+ON e.department_id = d.department_id
+UNION ALL
+SELECT employee_id,department_name
+FROM  employees e RIGHT JOIN departments d
+ON e.department_id = d.department_id
+WHERE e.department_id IS NULL;
+
+方式2：左中图 UNION ALL 右上图
+详情：略
+
+右下图：左中图 UNION ALL 右中图
+详情：略
+```
+
+- 多表查询扩展：SQL99语法新特性
+```sql
+自然连接：NATURAL JOIN
+SQL92：
+SELECT employee_id,last_name,department_name
+FROM employees e JOIN departments d
+ON e.department_id = d.department_id
+AND e.manager_id = d.manager_id;
+
+-- NATURAL JOIN : 它会帮你自动查询两张连接表中所有相同字段，然后进行等值连接
+SQL99语法新特性1:NATURAL JOIN
+SELECT employee_id,last_name,department_name
+FROM employees e NATURAL JOIN departments d;
+
+SQL99语法新特性1:USING
+-- 当匹配字段名称相同的时候使用
+SELECT employee_id,last_name,department_name
+FROM employees e JOIN departments d
+USING (department_id);
+```
+
+### 单行函数
+- 特点：
+  - 操作数据对象
+  - 接收参数返回一个结果
+  - 只对一行进行变换
+  - 每行返回一个结果
+  - 可以嵌套
+  - 参数可以是一列或一个值
+
+#### 数值函数
+- 基本函数
+  - ABS(x) 返回x的绝对值
+  - SIGN(x) 返回x的符号，正数返回1，负数返回-1，0返回0
+  - PI() 返回圆周率的值
+  - CEIL(x),CEILNG(x) 返回大于或等于某个值的最小整数
+  - FLOOR(x) 返回小于或等于某个值的最大整数
+  - LEAST(e1,e2,e3) 返回列表中的最小值
+  - GREATEST(e1,e2,e3) 返回列表中的最大值
+  - MOD(x,y) 返回x除以y的余数
+  - RAND() 返回0~1的随机数
+  - RAND(x) 返回一个随机数，x作为种子或因子，当x的值相同时，随机数产生的值必然相同
+  - ROUND(x) 返回一个对x进行四舍五入后的整数
+  - ROUND(x,y) 返回一个对x进行四舍五入，后保留到小数点后y位的数（y的值可正可负，负值表示向前移位进行判断，比如ROUND(123,-1) 结果为120）
+  - TRUNCATE(x,y) 返回数字x截断为y位小数的结果
+  - SQRT(x) 返回x的平方根，当x的值为负数时，返回NULL
+
+- 角度与弧度的互换
+  - RADIANS(x) 将角度转化为弧度，其中参数x为角度值
+  - DEGREES(x) 将弧度转化为角度，其中参数x为弧度值
+
+- 三角函数
+  - SIN(x)
+  - ASIN(x) 相当于SIN(x)的反函数，返回值为弧度值，建议使用DEGREES转换为角度值，方便阅读
+  - COS(x)
+  - ACOS(x)
+  - TAN(x)
+  - ATAN(x)
+  - COT(x)
+
+- 指数和对数
+  - POW(x,y) 返回x**y的值
+  - POWER(x,y) 同POW(x,y)
+  - EXP(x) 返回一个以e为底，x为n次幂的值，e为2.71828
+  - LN(x) 返回一个以e为底，求x的对数
+  - LOGN(x) 返回一个以N为底，求x的对数，比如LOG10(10) 结果为1
+
+- 进制间转换
+  - BIN(x) 返回x的二进制编码
+  - HEX(x) 返回x的十六进制编码
+  - OCT(x) 返回x的八进制编码
+  - CONV(x,f1,f2) 返回f1进制的数x，转换为f2进制的数，比如CONV(10,2,8) 结果为2，因为：2进制数10，在8进制中，结果是2
+
+#### 字符串函数
+- ASCII(S) 返回字符串S中的第一个字符的ASCII码值
+- CHAR_LENGTH(s) 返回字符串s的字符数。作用与CHARARTER_LENGTH(s)相同
+- LENGTH(s) 返回字符串s的字节数，和字符集有关
+- CONCAT(s1,s2,…,sn) 连接s1,s2……,sn为一个字符串
+- CONCAT_WS(x,s1,s2,…,sn) 同CONCAT()函数，但是每个字符串之间要加上x
+- INSERT(str,idx,len,replacestr) 将字符串str从第idx位置开始，len个字符长的子串替换为字符串replacestr
+  - <font color=tomato> SQL中字符串的索引idx是从1开始的</font>
+- REPLACE(str,a,b)  用字符串b替换字符串str中所有出现的字符串a
+- UPPER(s)或UCASE(s) 将字符串s的所有字母转化为大写字母
+- LOWER(s)或LCASE(s) 将字符串s的所有字母转换成小写字母
+- LEFT(str,n)  返回字符串str最左边的n个字符
+- RIGHT(str,n)  返回字符串str最右边的n个字符
+- LPAD(str,len,pad) 用pad的字符并将字符串str补全到len的长度，左补
+- RPAD(str,len,pad) 用pad的字符并将字符串str补全到len的长度，右补
+- LTRIM(s) 去掉字符串s左侧的空格
+- RTRIM(s) 去掉字符串s右侧的空格
+- TRIM(s) 去掉字符串s两侧的空格
+- TRIM(s1 FROM s) 去掉字符串s开始与结尾的s1
+- TRIM(LEADING s1 FROM s) 去掉字符串开始处的s1
+- TRIM(TRAILING s1 FROM s) 去掉字符串结尾处的s1
+- REPEAT(str,n) 返回str重复n次的结果
+- SPACE(n) 返回n个空格
+- STRCMP(s1,s2) 比较字符串s1,s2的ASCII码值的大小
+  - 返回值1，表示前面的值大，-1表示后面的值大，0表示一样大
+- SUBSTR(s,index,len) 返回从字符串s的index位置其len个字符
+- LOCATE(substr,str) 返回字符串substr在字符串str中首次出现的位置
+  - 未找到，则返回0
+  - 等同于position(substr,str)和INSTR(substr,str)
+- ELT(m,s1,s2,...,sn) 返回指定位置的字符串，如果m=1，则返回s1，如果m=2,则返回s2，以此类推
+- FIELD(s,s1,s2,...,sn) 返回字符串s在字符串列表第一次出现的位置
+- FIND_IN_SET(s1,s2) 返回字符串s1在字符串s2中出现的位置。其中，字符串s2是一个以逗号分隔的字符串
+- REVERSE(s) 返回反转后的字符串
+- NULLIF(value1,value2) 比较两个字符串，如果value1与value2相同，则返回NULL，否则返回value1
+
+#### 日期和时间函数
+- 获取日期、时间
+  - CURDATE(),CURRENT_DATE()
+    - 返回当前日期，只包含年、月、日
+  - CURTIME(),CURRENT_TIME()
+    - 返回当前时间，只包含时、分、秒
+  - NOW()/SYSDATE()/CURRENT_TIMESTAMP()/LOCALTIME()/LOCALTIMESTAMP() 
+    - 返回当前系统时间和日期
+  - UTC_DATE() 返回UTC(时间标准时间)日期
+  - UTC_TIME() 返回UTC(时间标准时间)时间
+
+- 日期与时间戳的转换
+  - UNIX_TIMESTAMP()
+    - 以UNIX时间戳的形式返回当前时间
+  - UNIX_TIMESTAMP(date)
+    - 将时间date以UNIX时间戳的形式返回
+  - FROM_UNIXTIME(timestamp) 
+    - 将UNIX时间戳的时间转换为普通格式的时间
+
+- 获取月份、星期、星期数、天数等函数   
+  - YEAR(date)/MONTH(date)/DAY(date)
+    - 返回具体的日期值
+  - HOUR(time)/MINUTE(time)/SECOND(time)
+    - 返回具体的时间值
+  - MONTHNAME(date)
+    - 返回月份：january...
+  - DAYNAME(date)
+    - 返回星期几：MONDAY，TUESDAY...
+  - WEEKDAY(date)
+    - 返回周几，注意，周一是0，周二是1...
+  - QUARTER(date)
+    - 返回日期对应的季节，范围为1~4
+  - WEEK(date),WEEKOFYEAR(date)
+    - 返回一年中的第几周
+  - DAYOFYEAR(date)
+    - 返回日期是一年中的第几天
+  - DAYOFMONTH(date)
+    - 返回日期位于所在月份的第几天
+  - DAYOFWEEK(date)
+    - 返回周几，注意：周日是1，周一是2...周六是7
+
+- 日期的操作函数
+  - EXTRACT(type FROM date)
+    - 返回指定日期中特定的部分，type指定返回的值
+    - type取值
+      - MICROSECOND 返回毫秒数
+      - SECOND 返回秒数
+      - MINUTE 返回分钟数
+      - HOUR 返回小时数
+      - DAY 返回天数
+      - WEEK 返回日期在一年中的第几个星期
+      - MONTH 返回日期在一年中的第几个月
+      - QUARTER 返回日期在一年中的第几个季度
+      - YEAR 返回日期的年份
+      - 多个参数组合，使用下划线拼接
+        - SECOND_MICROSECOND
+        - HOUR_SECOND
+
+- 时间和秒钟转换的函数
+  - TIME_TO_SEC(time)
+    - 将time转化为秒并返回结果值，转化公式为小时*3600+分钟*60+秒
+  - SEC_TO_TIME(seconds)
+
+- 计算日期和时间的函数（较常用）
+  - DATE_ADD(datetime,INTERVAL expr type),ADDDATE(date,INTERVAL expr type)
+    - 返回与给定日期时间相差INTERVAL时间段的日期时间
+  - DATE_SUB(datetime,INTERVAL expr type),SUBDATE(date,INTERVAL expr type)
+    - 返回与给定日期时间相差INTERVAL时间段的日期时间
+  - ADDTIME(time1,time2)
+    - 返回time1加上time2的时间。当time2为一个数字时，代表的是秒，可以为负数
+  - SUBTIME(time1,time2)
+    - 返回time1减去time2后的时间。当time2为一个数字时，代表的是秒，可以为负数
+  - DATEDIFF(date1,date2)
+    - 返回date1-date2的日期间隔天数
+  - TIMEDIFF(time1,time2)
+    - 返回time1-time2的时间间隔
+  - FROM_DAY(N) 
+    - 返回从0000年1月1日，N天以后的日期
+  - TO_DAYS(date)
+    - 返回日期date距离0000年1月1号的天数
+  - LAST_DAT(date) 
+    - 返回date所在月份的最后一天的日期
+  - MAKEDATE(year,n) 
+    - 针对给定年份与所在年份中的天数返回一个日期
+  - MAKETIME(hour,minute,second)
+    - 将给定的小时，分钟和秒组合成时间并返回
+  - PERIOD_ADD(time,n)
+    - 返回time加上n后的时间
+
+- 日期的格式化与解析
+  - DATE_FORMAT(date,fmt)
+    - 按照字符串fmt格式化日期date值
+    - 例：SELECT DATE_FORMAT(CURDATE(),'%Y-%M-%D')
+  - TIME_FORMAT(time,fmt)
+    - 按照字符串fmt格式化时间time值
+  - GET_FORMAT(date_type,format_type)
+    - 返回日期字符串的显示格式
+  - STR_TO_DATE(str,fmt)
+    - 按照字符串fmt对str进行解析，解析为一个日期
+  - fmt参数的常用格式符
+    - %Y：4位数字表示年份
+    - %y：两位数字表示年份
+    - %M：月名表示月份(January)
+    - %m：两位数字表示月份(01,02,03...)
+    - %b：缩写的月名(Jan,Feb...)
+    - %c：数字表示月份(1,2,3)
+    - %D：英文后缀表示月中的天数(1st,2nd,3rd)
+    - %d：两位数字表示月中的天数(01,02...)
+    - %e：数字形式表示月中的天数(1,2,3,4...)
+    - %H：两位数表示小时，24小时制(01,02...)
+    - %h和%I：两位数表示小时，12小时制(01,02...)
+    - %k:数字形式的小时，24小时制(1,2,3)
+    - %l：数字形式的小时，12小时制(1,2,3,4...)
+    - %i：两位数字表示分钟(00,01,02)
+    - %S和%s：两位数字表示秒(00,01,02...)
+    - %W：一周中的星期名称(Sunday...)
+    - %a：一周中的星期缩写(Sun,Mon,Tues,...)
+    - %w：以数字表示周中的天数(0=Sunday,1=Monday...)
+    - %j：以3位数字表示年中的天数(001,002...)
+    - %U：以数字表示年中的第几周，(1,2,3...)其中Sunday为周中的第一天
+    - %u：以数字表示年中的第几周，(1,2,3...)其中Monday为周中的第一天
+
+
+#### 流程控制函数 
+- IF(value,value1,value2)
+  - 如果value的值为TRUE，返回value1，否则返回value2
+- IFNULL(value1,value2)
+  - 如果value1不为NULL，返回value1,否则返回value2
+- CASE WHEN 条件1 THEN 结果1 WHEN 条件2 THEN 结果2...[ELSE resultn] END
+  - 整理：CASE WHEN...THEN...WHEN...THEN...ELSE...END
+  - 相当于Java的if...elseif...else...
+  - 示例：
+  ```sql
+  SELECT last_name,salary,CASE WHEN salary >= 15000 THEN '白骨精'
+                               WHEN salary >= 10000 THEN '潜力股'
+                               WHEN salary >= 8000 THEN '小屌丝'
+                               ELSE '草根' END "details"
+  FROM employees;
+  ```
+- CASE expr WHEN 常量值1 THEN 值1 WHEN 常量值2 THEN 值2...[ELSE 值n] END
+  - 相当于JAVA的switch... case...
+
+#### 加密与解密函数
+- 概述：加密与解密函数主要用于对数据库中的数据进行加密和解密处理，以防止数据被他人窃取。这些函数在保证数据库安全是非常有用。
+- PASSWORD(str)
+  - 返回字符串str的加密版本，41位长的字符串。加密结果不可逆，常用于用户的密码加密
+  - <font color=tomato>MySQL8.0中弃用</font>
+- MD5(str)
+  - 返回字符串str的MD5加密后的值，也是一种加密方式。若参数为NULL，则会返回NULL
+- SHA(str)
+   - 从原明文密码str计算并返回加密后的密码字符串，当参数为NULL时，返回NULL。SHA加密算法比MD5更加安全
+- ENCODE(value,password_seed)
+  - 返回使用password_seed作为加密密码加密value
+  - <font color=tomato>MySQL8.0中弃用</font>
+- DECODE(value,password_seed)
+  - 返回使用password_seed作为加密密码解密value
+  - <font color=tomato>MySQL8.0中弃用</font>
+
+#### MySQL信息函数
+- VERSION()
+  - 返回当前MYSQL的版本号
+- CONNECTION_ID()
+  - 返回当前MySQL服务器的连接数
+- DATABASE(),SCHEMA()
+  - 返回MySQL命令行当前所在的数据库
+- USER(), CURRENT_USER(), SYSTEM_USER(), SESSION_USER()
+  - 返回当前连接MySQL的用户名，返回结果格式为“主机名@用户名”
+- CHARSET(valuse)
+  - 返回字符串value自变量的字符集
+- COLLATION(value)
+  - 返回字符串value的比较规则
+
+#### 其他函数
+- FORMAT(value,n)
+  - 返回对数字value机型格式化后的结果数据。n表示四舍五入后保留小数点后n位
+  - 如果n的值小于或者等于0，则只保留整数
+- CONV(value,from,to)
+  - 将value的值进行不同进制之间的转换
+- INET_ATON(ipvalue)
+  - 将以点分隔的IP地址转化为一个数字
+- INET_NTON(value)
+  - 将数字形式的IP转化为以点分隔的IP地址
+- BENCHMARK(n,expr)
+  - 将表达式expr重复执行n次。用于测试MySQL处理expr表达式所耗费的时间
+- CONVERT(value USING char_code)
+  - 将value所使用的字符编码修改为char_code
+
+
+### 聚合函数
+- 概述：什么是聚合函数
+  - 作用于一组数据，并对一组数据返回一个值
+    - 比如；一组数据中，在多个数据里选出最大值，就是一个聚合函数
+
+- 常用聚合函数类型
+  - AVG()
+  - SUM()
+  - MAX()
+  - MIN()
+  - COUNT()
+  - 注意：
+    - AVG()和SUM()只适用于数值类型的字段（或变量）
+    - COUNT(*)和COUNT(1)能够查看表中有多少条记录
+    - COUNT(具体字段)不能准确查出，因为COUNT()无法识别NULL
+
+#### GROUP BY的使用
+- 示例：
+  ```sql
+  # 需求：查询各个部门的平均工资，最高工资
+  SELECT department_id,AVG(salary),MAX(salary)
+  FROM employees
+  GROUP BY department_id;
+  ```
+ - 使用多个列分组
+  ```sql
+  # 需求：查询各个department_id,job_id的平均工资
+  SELECT department_id,job_id,AVG(salary)
+  FROM employees
+  GROUP BY department_id,job_id;
+
+  当字段和GROUP BY 的分组不匹配时，MySQL的给出的信息是错误的，Oracle会报错
+  SELECT department_id,job_id,AVG(salary)
+  FROM employees
+  GROUP BY department_id; -- oracle报错
+  ```
+  - 结论1：SELECT中出现的非组函数的字段必须声明在GROUP BY中。反之，Group BY中声明的字段可以不出现在SELECT中。
+  - 结论2：GROUP BY声明在FROM和WHERE后面，ORDER BY和LIMIT的前面
+  - MYSQL中GROUP BY使用WITH ROLLUP
+  ```sql
+  -- 使用WITH ROLLUP关键字之后，在所有查询出的分组记录之后增加一条记录，该记录计算查询出的所有记录的总和(即，按照所有数据，去得出聚合函数的值)，即统计记录数量
+  # MYSQL中GROUP BY使用WITH ROLLUP
+  SELECT department_id,AVG(salary)
+  FROM employees
+  GROUP BY department_id WITH ROLLUP;
+  -- WITH ROLLUP和ORDER BY不能同时使用，否则会报错。 
+  ```
+
+#### HAVING的使用
+- 用来过滤数据的
+```sql
+  # 需求：查询部门最高工资比10000高的部门
+  SELECT department_id,MAX(salary)
+  FROM employees
+  GROUP BY department_id
+  HAVING MAX(salary) > 10000;
+
+  -- 要求1：如果过滤条件中使用了聚合函数，则必须使用HAVING来替换WHERE。否则，报错！！
+  -- 要求2：如果使用了HAVING，HAVING必须声明在GROUP BY的后面
+  -- 要求3：开发中，我们使用HAVING的前提是SQL中使用了GROUP BY
+
+  # 需求：查询部门id为10,20,30,40个部门中最高工资比10000高的部门信息
+  -- 方式一：推荐，执行效率高于方式二
+  SELECT department_id,MAX(salary)
+  FROM employees
+  WHERE department_id IN (10,20,30,40)
+  GROUP BY department_id
+  HAVING MAX(salary > 10000);
+
+  -- 方式二：
+  SELECT department_id,MAX(salary)
+  FROM employees
+  GROUP BY department_id
+  HAVING department_id IN (10,20,30,40) AND MAX(salary) > 10000;
+
+  -- 结论：当过滤条件中有聚合函数时，则此过滤条件必须声明在HAVING中
+  -- 当过滤条件中，没有聚合函数时，则此过滤条件声明在where中或HAVING中都可以，但是建议声明在WHERE中
+
+  /*
+    WHERE 与 HAVING 的对比
+    1.HAVING的适用范围更广
+    2.如果过滤条件是非聚合函数，这种情况下，WHERE的执行效率要高于HAVING
+
+  */
+```
+
+#### SQL底层执行原理
+- SELECT语句的完整结构
+```sql
+# SQL92语法：
+SELECT ...,...,...(存在聚合函数)
+FROM ...,...
+WHERE 多表的连接条件 AND 不包含聚合函数的过滤条件
+GROUP BY ...,...
+HAVING 包含聚合函数的过滤条件
+ORDER BY ...,...(ASC/DESC)
+LIMIT ...,...
+
+#SQL99语法：
+SELECT ...,...,...(存在聚合函数)
+FROM ...(LEFT/RIGHT/INNER)JOIN...ON... 多表连接条件
+JOIN...ON...
+WHERE 不包含聚合函数的过滤条件
+GROUP BY ...,...
+HAVING 包含聚合函数的过滤条件
+ORDER BY ...,...(ASC/DESC)
+LIMIT ...,...
+
+# SQL语句的执行过程
+1. FROM <left_table>
+2. ON <join_condition>
+3. <join_type> JOIN <right_table>
+4. WHERE <where_condition>
+5. GROUP BY <group_by_list>
+6. HAVING <having_condition>
+7. SELECT
+8. DISTINCT <select_list>
+9. ORDER BY <order_by_condition>
+10. LIMIT <limit_number>
+
+```
+
+### 子查询
+- 概述： 
+  - 子查询指一个查询语句嵌套在另一个查询语句内部的查询，这个特性从MYSQL4.1开始引入
+  - SQL中子查询的使用大大增强了SELECT查询的能力，因为很多时候查询需要从结果集中获取数据，或者需要从同一个表中先计算得出一个数据结果，然后与这个数据结果（可能是某个标量，也可能是某个集合）进行比较
+#### 需求分析与问题解决
+- 实际问题 
+  - 问：谁的工资比Abel的高？
+    - 问题拆解：先求出Abel的工资，然后查询比Abel工资高的员工
+```sql
+-- 方式1：
+SELECT salary
+FROM employees
+WHERE last_name = 'Abel' -- 查询到：Abel的工资是11000
+
+SELECT last_name,salary
+FROM employees
+WHERE salary > 11000;  -- 得出超过Abel工资的员工
+
+-- 方式2（自连接）：
+SELECT last_name,salary
+FROM employees e1,employees e2
+WHERE e2.salary > e1.salary AND e1.last_name = 'Abel';
+
+-- 方式3（子查询）：
+SELECT last_name,salary
+FROM employees
+WHERE salary > (
+  SELECT salary
+  FROM employees
+  WHERE last_name = 'Abel'
+);
+
+```
+
+#### 称谓的规范
+- 外查询和内查询
+  - 外查询：也叫主查询
+  - 内查询：也叫子查询
+    - 子查询在主查询之前一次执行完成
+    - 子查询的结果被主查询(外查询)使用。
+
+- 注意：
+  - 子查询要包含在括号内
+  - 将子查询放在比较条件的右侧
+  - 单行操作符对应单行子查询，多行操作符对应多行子查询
+
+- 子查询分类
+  - 角度1：内查询返回的结果的条目数
+    - 单行子查询
+    - 多行子查询
+  - 角度2：内查询是否被执行多次
+    - 相关子查询
+    - 不相关子查询
+
+```sql
+-- 相关子查询；
+-- 查询工资大于本部门平均工资的员工信息
+-- 内查询的平均工资，和外查询的员工部门有关联性
+
+
+-- 不相关子查询
+-- 查询工资大于本公司平均工资的员工信息
+-- 不相关原因：无论查询哪个员工的工资，本公司的平均工资恒定
+```
+
+#### 单行子查询
+- 单行操作符
+  - `=`      equal to
+  - `！=`    not equal to
+  - `>`      greater than
+  - `<`      less than
+  - `>=`     greater than or equal to
+  - `<=`     less than or equal to
+  - `<>`     not equal to
+
+- 子查询编写技巧
+  - 从里往外写
+  - 从外往里写
+
+```sql
+-- 题目：查询与141号员工的manager_id和department_id相同的其他员工的employee_id, manager_id,department_id
+-- 方式1
+SELECT employee_id,manager_id,department_id
+FROM employees
+WHERE manager_id = (
+      SELECT manager_id
+      FROM employees
+      WHERE employee_id = 141
+)
+AND department_id = (
+      SELECT department_id
+      FROM employees
+      WHERE employee_id = 141
+)
+AND employee_id <> 141;
+
+-- 方式2
+-- 方式1中，查询的表格和过滤条件都一样，仅有查询字段不同，可以同时将两个字段一起查询
+SELECT employee_id,manager_id,department_id
+FROM employees
+WHERE (manager_id,department_id) = (
+      SELECT manager_id,department_id
+      FROM employees
+      WHERE employee_id = 141
+)
+AND employee_id <> 141;
+```
+
+- HAVING中的子查询
+  - 首先执行子查询
+  - 向主查询中的HAVING子句返回结果 
+
+```sql
+-- 题目：查询最低工资大于50号部门最低工资的部门id和其最低工资
+SELECT department_id,MIN(salary)
+FROM employees
+WHERE department_id IS NOT NULL 
+GROUP BY department_id
+HAVING MIN(salary) > (
+        SELECT MIN(salary)
+        FROM employees
+        WHERE department_id = 50
+);
+
+-- 题目：显示员工的employee_id,last_name和location
+-- 其中，如果员工department_id与location_id为1800的department_id相同，则location为'Canada'，其余则为'USA'
+SELECT employee_id,last_name,CASE department_id WHEN (
+        SELECT department_id
+        FROM departments
+        WHERE location_id = 1800
+) THEN 'Canada'
+ELSE 'USA' END "location"
+FROM employees;
+
+```
+
+#### 多行子查询
+- 特点：
+  - 内查询返回多行
+  - 使用多行比较操作符
+
+- 多行比较操作符
+<table>
+  <thead>
+    <th style="background-color:darkred;color:white">操作符</th>
+    <th style="background-color:darkred;color:white">含义</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>IN</td>
+      <td>等于列表中的任意一个</td>
+    </tr>
+    <tr>
+      <td>ANY</td>
+      <td>需要和单行比较操作符一起使用，和子查询返回的某一个值比较</td>
+    </tr>
+    <tr>
+      <td>ALL</td>
+      <td>需要和单行比较操作符一起使用给，和子查询返回的所有值比较</td>
+    </tr>
+    <tr>
+      <td>SOME</td>
+      <td>实际上是ANY别名，作用相同，一般使用ANY</td>
+    </tr>
+  </tbody>
+</table>
+
+```sql
+-- IN 举例:
+SELECT employee_id, last_name
+FROM employees
+WHERE salary IN (
+        SELECT MIN(salary)
+        FROM employees
+        GROUP BY department_id
+);
+
+-- ANY/ALL
+-- 题目：返回其他job_id中比job_id为'IT_PROG'部门任一工资低的员工的员工号，姓名，job_id以及salary
+SELECT employee_id,last_name,job_id,salary
+FROM employees
+WHERE job_id <> 'IT_PROG'
+AND salary < ANY (
+        SELECT salary
+        FROM employees
+        WHERE job_id = 'IT_PROG'
+);
+
+-- 题目：返回其他job_id中比job_id为'IT_PROG'部门所有工资低的员工的员工号，姓名，job_id以及salary
+SELECT employee_id,last_name,job_id,salary
+FROM employees
+WHERE job_id <> 'IT_PROG'
+AND salary < ALL (
+        SELECT salary
+        FROM employees
+        WHERE job_id = 'IT_PROG'
+);
+
+-- 题目：查询平均工资最低的部门id
+-- 方法1：
+SELECT department_id
+FROM employees
+GROUP BY department_id
+ORDER BY AVG(salary) ASC
+LIMIT 0,1
+
+-- 单行函数可以嵌套，聚合函数不支持嵌套
+
+-- 方法2：
+SELECT department_id
+FROM employees
+GROUP BY department_id
+HAVING AVG(salary) = (
+	SELECT MIN(avg_sal) 
+  -- 聚合函数不支持嵌套，但是可以将结果作为一张新表，然后再用聚合函数计算
+  FROM(
+        SELECT AVG(salary) avg_sal,department_id
+        FROM employees
+        GROUP BY department_id
+      )dept_avg_sal
+);
+
+-- 方式3：
+
+SELECT department_id
+FROM employees
+GROUP BY department_id
+HAVING AVG(salary) <= ALL(
+	SELECT AVG(salary) avg_sal
+	FROM employees
+	GROUP BY department_id
+); 
+```
+
+#### 相关子查询
+- 相关子查询执行流程：
+  - 如果子查询的执行依赖于外部查询，通常情况下都是因为子查询中的表用到了外部的表，并进行了条件关联，因此每执行一次外部查询，子查询都要重新计算一次，这样的子查询就称之为关联子查询
+  - 步骤：
+    - GET：从主查询中获取候选列
+    - EXECUTE：子查询使用主查询的数据
+    - USE：如果满足子查询的条件则返回该行
+
+```sql
+-- 题目：查询员工中工资大于本部门平均工资的员工的last_name,salary和其department_id
+-- 方式1：
+SELECT last_name,salary,department_id
+FROM employees e1
+WHERE salary > (
+        SELECT AVG(salary)
+        FROM employees e2
+        WHERE e2.department_id = e1.department_id
+);
+
+-- 方式2：在FROM中声明子查询
+SELECT e.last_name,e.salary,e.department_id
+FROM employees e,(
+        SELECT department_id,AVG(salary) avg_sal
+        FROM employees
+        GROUP BY department_id
+) t_dept_avg_sal
+WHERE e.department_id = t_dept_avg_sal.department_id
+AND e.salary > t_dept_avg_sal.avg_sal;
+
+-- 在ORDER BY中使用子查询
+-- 题目：查询员工的id，salary，按照department_name排序
+SELECT employee_id,salary
+FROM employees e
+ORDER BY  (
+  SELECT department_name
+  FROM departments d
+  WHERE e.department_id = d.department_id
+);
+
+```
+
+- EXISTS与NOT EXISTS关键字
+  - 概述：关联查询通常也会和EXISTS操作符一起使用给，用来检查在子查询中是否存在满足条件的行
+  - 如果在子查询中不存在满足条件的行
+    - 条件返回FALSE
+    - 继续在子查询中查找
+  - 如果在子查询中存在满足条件的行
+    - 不在子查询中继续查找
+    - 条件返回TRUE
+
+```sql
+-- 题目：查询公司管理者的employee_id,last_name,job_id,department_id信息
+-- 方式1：
+SELECT DISTINCT mgr.employee_id,mgr.last_name,mgr.job_id,mgr.department_id
+FROM employees emp JOIN employees mgr
+ON emp.manager_id = mgr.employee_id
+
+-- 方式2：子查询
+SELECT employee_id,last_name,job_id,department_id
+FROM employees
+WHERE employee_id IN (
+          SELECT DISTINCT manager_id
+          FROM employees
+);
+
+-- 方式3：使用EXISTS
+SELECT employee_id,last_name,job_id,department_id
+FROM employees
+WHERE EXISTS (
+          SELECT *
+          FROM employees e2
+          WHERE e1.employee_id = e2.manager_id  
+)
+
+-- 题目：查询departments表中，不存在于employees表中的部门的department_id和department_name
+-- 方式1：
+SELECT d.department_id,d.department_name
+FROM demployees e RIGHT JOIN departments d
+ON e.department_id = d.department_id
+WHERE e.department_id IS NULL
+
+-- 方式2：使用NOT EXISTS
+SELECT department_id,department_name
+FROM departments d
+WHERE NOT EXISTS (
+          SELECT *
+          FROM employees e
+          WHERE e.department_id = d.department_id
+);
+```
+ 

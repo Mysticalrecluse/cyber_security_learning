@@ -1000,11 +1000,14 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
 ### ICMP协议(Internet Control Message Protocol)
 - 范例：利用ICMP协议判断网络状态
 ```shell
+# 禁止本机被ping的配置文件
+echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_all
+
 ping 10.0.0.8
 ping -f -s <ip地址> -c1
--f 表示泛洪，就是最大功率无限制发送数据包
--s 指定发送包的大小，最大不能超过65507
--c(num) ping的次数
+#-f 表示泛洪，就是最大功率无限制发送数据包
+#-s 指定发送包的大小，最大不能超过65507
+#-c(num) ping的次数
 ```
 
 ### ARP协议(Address Resolution Protocol)
@@ -1313,7 +1316,7 @@ IPv6相比IPv4更加先进和健壮，设计时考虑了未来的扩展性、安
 GRUB_CMDLINE_LINUX="... net.ifnames=0"
 --进入文件，这行最后，添加net.ifnames=0
 
-# grub2 -mkconfig -o /boot/grub2/grub.cfg
+# grub2-mkconfig -o /boot/grub2/grub.cfg
 -- 执行之后重启即可
 
 -- ubuntu的修改和centos7类似
@@ -1321,7 +1324,7 @@ GRUB_CMDLINE_LINUX="... net.ifnames=0"
 GRUB_CMDLINE_LINUX="net.ifnames=0"
 --进入文件，这行最后，添加net.ifnames=0
 
-# grub -mkconfig -o /boot/grub/grub.cfg
+# grub-mkconfig -o /boot/grub/grub.cfg
 -- 执行之后重启即可
 
 ```
@@ -1329,7 +1332,8 @@ GRUB_CMDLINE_LINUX="net.ifnames=0"
 - ip地址修改
 ```sql
 Centos网卡配置文件：
-
+# /etc/sysconfig/network
+-- 更改主机名hostname
 # /etc/sysconfig/network-scripts/
 -- 进入网卡配置目录
 # ifcfg-eth0
@@ -1338,7 +1342,9 @@ Centos网卡配置文件：
 
 文件配置内容：
 
-DEVICE=eth0
+DEVICE=eth0 | HWADDR=00:0c:29:88:37:b8 (MAC地址) 二选一
+-- 两种方式都可以用来表示选择配置哪块网卡
+MACADDR=<mac地址> --(非必选)，可以用来更改mac地址
 NAME=eth0
 BOOTPROTO=dhcp  --动态配置
 
@@ -1347,9 +1353,18 @@ IPADDR=10.0.0.88
 NETMASK=255.255.255.0 或者 PREFIX=24
 GATEWAY=10.0.0.2 --配置网关，根据网络规划写
 -- 查看默认网关，执行ip route 或者 route -n
-DNS1=10.0.0.2
+DNS1=10.0.0.2 
 DNS2=100.76.76.76
+-- 填写DNS服务器地址，网上可以查到一些著名的DNS服务器地址，都可以用
+-- 比如阿里的：223.6.6.6
+-- 百度的：180.76.76.76
+-- 移动的：114.114.114.114
+-- 谷歌的：8.8.8.8 
 -- 验证DNS，查看文件/etc/resolv.conf
+
+DOMAIN=<要修改的后缀名>
+-- 默认ping www 后面自动补充一个域名，该域名是hostname的后缀，如果不想修改hostname后缀，可以在网卡配置文件中加入：
+
 
 ONBOOT=yes  --是否启动这个网卡，默认yes
 
@@ -1357,7 +1372,9 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
 --centos8及之上执行这两条命令
 # nmcli connection reload
-# nmcli connection up eth0
+# nmcli connection up eth0 -- 启用设置好的网卡
+-- 如果是多块网卡同时设置后启用，可以用空格隔开
+-- nmcli connection up eth0 eth1
 
 --centos7执行
 # systemctl restart network
@@ -1385,6 +1402,10 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
 # ifconfig eth0 <新ip地址>
 
+临时清空ip地址
+
+# ifconfig eth0 0.0.0.0/0
+
 保留一个网卡的情况下，增加新地址，实现一个网卡多个ip
 
 # ifconfig eth0:1 <新ip地址>  //网卡别名
@@ -1392,6 +1413,8 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 查看网卡吞吐量和状态
 
 # ifconfig -s
+
+# watch -n1 ifconfig -s
 
 删除网卡别名
 
@@ -1402,6 +1425,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 ```
 
 - 路由route
+  - route: 路由表管理命令
   - 路由表:作用是导航，地图，不仅仅在路由器有，在任何通信的主机都有
   ```
   查看路由表
@@ -1410,7 +1434,9 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   Kernel IP routing table
   Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
   0.0.0.0         192.168.56.2    0.0.0.0         UG    100    0        0 eth0
+  # 默认路由，在通向未知网段，目标路由设为0.0.0.0
   192.168.56.0    0.0.0.0         255.255.255.0   U     100    0        0 eth0
+  # 直连网段的路由会自动生成
   192.168.122.0   0.0.0.0         255.255.255.0   U     0      0        0 virbr0
 
   每一行描述的是一个网络的路径
@@ -1423,12 +1449,23 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
   网关的功能：让主机通过网关访问别的网段的机器，所以网关的接口地址，一定和主机网卡在同一网段
 
-  Metric花费；数值越低，优先级越高，路径越优
+  Metric(费用)；数值越低，优先级越高，路径越优；同一目标地址可能有多条路径，根据Metric的数值，可以看出最优路径
 
   ---------------------------------------------------
 
   给路由表添加信息（静态路由）
+
+  # route add [-net|-host|default] target[netmask Nm] [gw Gw] [[dev] If]
+
+  实例：
+  仅主机路由
+  # route add -host 192.168.1.3 gw 172.16.0.1 dev eth0
+
+  默认路由
+  #route add -net 0.0.0.0 netmask 0.0.0.0 gw 172.16.0.1
+  #route add default gw 172.16.0.1
   
+  网络路由
   # route add -net 179.20.0.0/16 gw 172.18.0.201 dev eth1
 
   查看虚拟机转发功能状态，默认不开启，如果接收到的数据包，目标地址不是该主机，则直接抛弃，不会转发
@@ -1447,7 +1484,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   在最后一行，添加：net.ipv4.ip_forward=1
   保存退出
   # sysctl -p 
-  使文件sysctl.conf 生效
+  使文件sysctl.conf 生效 
 
   使用mtr工具，可以查看主机到目标机器之间经过的路由
 
@@ -1466,6 +1503,9 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   OSPF协议算法：除了路由数量，还会考虑带宽
 
   netstat工具(和ss选项基本一致)
+  netstat和ifconfig都来自于net-tools
+  其中 ifconfig建议使用ip代替；netstat建议使用ss代替
+  ip和ss都来自于iproute
 
   常用选项
   -t：tcp协议相关
@@ -1483,6 +1523,13 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   -uan
   -tnl
   -unl
+
+  显示路由表，类似于route -n
+
+  # netstat -rn
+
+  # netstat -Ieht0 
+  -I和网卡名之间没有空格，作用和ifconfig -s 相同，用于查看网卡吞吐量
 
   ---------------------------------------
 
@@ -1505,6 +1552,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   # ip address    显示网络层相关地址
 
   # ip address add 10.0.0.100/24 dev eth0 label eth0:1
+  建议加label标签，这样可以和ifconfig兼容
   新增网卡ip地址
 
   # ip addr del 1.1.1.1/24 dev eth0   删除ip地址
@@ -1518,6 +1566,16 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
   # ip route del 路由表信息   删除路由网段信息
   ```
+- 回环网卡：lo
+  - 回环网卡的地址不会出现在路由表中
+  - 所有和回环网卡同一网啊的地址，都看作是本机之间的通讯
+  - 回环地址默认不参与网络通信
+  - 但是如果给回环网卡加上路由信息，也能实现网络通讯
+
+- ip地址的三种工作范围
+  - global：全局有效
+  - link：仅该网卡链路有效
+  - host：仅主机有效
 
 - 虚拟机的三种网络连接类型
   - 桥接 (Bridge) - vmnet0:
@@ -1533,8 +1591,542 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
     - 这提供了一种高度的隔离，适用于那些您不希望暴露给网络但仍想在主机上进行交互的虚拟机。
     - 虚拟机会从 VMware 仅主机网络的 DHCP 服务获取 IP 地址。
 
-###
+### 路由相关配置文件
+```
+/etc/sysconfig/network-scripts/route-IFACE
 
+# route-IFACE 默认不存在，需要手工创建,IFACE是网卡名
+
+两种风格：
+(1) TARGET via GW
+如：10.0.0.0/8 via 172.16.0.1
+
+(2) 每三行定义一条路由（#表示数字，不推荐）
+ADDRESS#=TARGET
+NETMASK#=mask
+GATEWAT#=GW
+```
+- 重启网络服务
+  - CentOS 6 ：service network restart
+    - CentOS 6 记得关闭NetworkManager
+  - CentOS 7及以后：systemctl restart netwrok
+
+- 注意：
+  - 网卡别名必须配置静态地址
+
+### 多网卡bonding  
+- 将多块网卡绑定同一IP地址对外提供服务，可以实现高可用或者负载均衡。直接给两块网卡设置同一IP是不可以的。通过bonding，虚拟一块网卡对外提供连接，物理网卡的被修改为相同的MAC地址
+- 共7种模式
+  - Mode0(balance-rr): 轮询(Round-Robin)策略，从头到尾顺序的在每个slave接口上面发送数据包。本模式提供负载均衡和容错能力。
+  - Mode1(active-backup): 活动备份(主备)策略，只有一个slave被激活，当且仅当活动的slave接口失败时才会激活其他slave，为了避免交换机发生混乱，此时绑定的MAC地址只有一个外部端口上可见
+  - Mode3(broadcast): 广播策略，在所有的slave接口上传送所有的报文，提供容错能力 
+
+- 说明：
+  - active-backup、balance-tlb和balance-alb模式不需要交换机的任何特殊配置。其他绑定模式需要配置交换机以便整合链接。如：Cisco交换价需要在模式0、2和3中使用Ether Channel，但在模式4中需要LACP和Ether Channel
+
+- Bonding配置
+```shell
+创建bonding设备的配置文件
+/etc/sysconfig/network-scripts/ifcfg-bond0
+# 其中ifcfg-bond0文件需手工配置，文件名后面必须是bond加数字
+
+TYPE=bond
+DEVICE=bond0
+BOOTPROTO=none
+IPADDR=10.0.0.100
+PREFIX=8
+# miimon指定链路监测时间间隔。如果miimon=100，那么系统每100ms监测一次链路连接状态，如果有一条线路不通就转入另一条线路
+BONDING_OPTS="mode=1 miimon=100"
+
+/etc/sysconfig/network-scripts/ifcfg-eth0
+DEVICE=eth0
+BOOTPROTO=none
+MASTER=bond0
+SLAVE=yes
+ONBOOT=yes
+
+/etc/sysconfig/network-scripts/ifcfg-eth1
+DEVICE=eth1
+BOOTPROTO=none
+MASTER=bond0
+SLAVE=yes
+ONBOOT=yes
+```
+- 查看bond0状态：
+  - `/proc/net/bonding/bond0`
+- 删除bond0
+  - `ifconfig bond0 down`
+  - `rmmod bonding` 
+
+### CentOS7以上版网络配置
+- 概述：CentOS6之前，网络接口使用连续号码命名：eth0、eth1等，当增加或删除网卡时，名称可能会发生变化CentOS7以上版使用基于硬件，设备拓扑和设备类型命名
+- 网卡命名机制
+  - 如果Firmware（固件）或BIOS为主板上集成的设备提供的索引信息可用，且可预测则根据此索引进行命名，如：eno1
+    - 翻译：如果你的计算机主板上有一个内置的网络接口（网卡），系统可以从固件或BIOS中获取一些信息来给它命名。这种命名是基于该网络接口在主板上的位置或其他硬件信息。例如，它可以被命名为“eno1”，其中“eno”表示它是一个嵌入式网络输出，并且“1”是它的编号或索引。
+  - 如果Firmware或BIOS为PCI-E扩展槽所提供的索引信息可用，且可预测，则根据此索引进行命名，如：ens1
+    - 翻译：如果你在计算机上安装了一个额外的网络接口卡（例如，通过一个PCI-E扩展槽），系统也可以从固件或BIOS中获取一些信息来给它命名。这种命名是基于该网络接口卡在扩展槽中的位置或其他硬件信息。例如，它可以被命名为“ens1”，其中“ens”表示它是一个PCI-E网络输出，而“1”是它的编号或索引。
+  - 如果硬件接口的物理位置信息可用，则根据此信息命名，如：enp2s0
+    - 翻译：如果系统能够获取到网络接口在计算机内部的物理位置信息（例如，它连接到第2个PCI总线上的第0个插槽），它就会使用这些信息来给网络接口命名。在这个例子中，“enp2s0”是基于网络接口的物理位置来命名的，其中“p2”表示PCI总线2，而“s0”表示插槽0。
+  - 如果用户显示启动，也可根据MAC地址进行命名，如：enx2387a1dc56
+    - 翻译：如果用户明确要求（通常是通过配置文件设定），系统可以使用网络接口的MAC地址来命名它。MAC地址是一个网络接口的唯一标识符。在这个例子中，“enx2387a1dc56”是基于网络接口的MAC地址来命名的，其中“2387a1dc56”是该接口的MAC地址。
+  - 上述均不可用时，使用传统命名机制
+
+- 网卡组成格式
+  - en：Ethernet 有线局域网
+  - wl：wlan 无线局域网
+  - ww：wwan 无线广域网
+  - o&lt;index&gt;: 集成设备的设备索引号
+  - s&lt;slot&gt;: 扩展槽的索引号
+  - x&lt;MAC&gt;: 基于MAC地址的命名
+  - p&lt;bus&gt;s&lt;slot&gt;: enp2s1
+
+- 更改网卡命名，使用传统命名方式
+  - <a href="#网络配置">更改方法</a>
+
+- 主机名hostname（CentOS7及以上）
+  - 配置文件：`/etc/hostname`
+  - 默认没有此文件，通过DNS反向解析获取主机名，主机名默认为：localhost.localdomain
+  - 设置主机名：`hostnamectl set-hostname centos7.magedu.com`
+  - 删除文件/etc/hostname，恢复主机名localhost.localdomain
+  - 显示主机名
+    - `hostname`
+    - `hostnamectl status`
+
+- 网络配置工具nmcli
+  - 依赖NetworkManager服务，此服务是管理和监控网络设置的守护进程
+  - nmcli命令
+  ```shell
+  nmcli connection  # 查看网卡连接
+
+  # 更改网卡名称(name)
+  nmcli connection modify <旧网卡名> con-name <新网卡名> # 更改后自动生成配置文件
+
+  # 更改网卡配置
+  nmcli connection modify <网卡名> ipv4.addresses <ip地址> ipv4.gateway <网关地址> ipv4.dns <dns地址> ipv4.method manual
+  # 这里ipv4.method manual表示采用静态地址，默认不写是auto，表示动态地址
+  # 示例：
+  nmcli connection modify eth1-home ipv4.addresses 192.168.0.100/24 ipv4.gateway 192.168.0.1 ipv4.dns 233.6.6.6 ipv4.method manual
+
+  配置改好后，重新加载网卡，然后重新启用配置好的网卡
+  nmcli connection reload
+  nmcli connection up eth1-home
+
+  # 删除配置的网卡
+  nmcli connection delete <网卡名>
+
+  -----------------------------------------------------------------
+  使用nmcli实现bonding模式
+
+  nmcli connection add con-name mybond0 ifname bond0 type bond mode active-backup
+  # 添加一个bond类型的虚拟网卡，起名为mybond0,mode定义bond模式
+
+  nmcli connection add con-name mybond0 ifname bond0 type bond mode active-backup ipv4.addresses 10.0.0.100/24 ...
+  # 配置的时候添加ip地址，方式，网关等
+
+  nmcli connection add con-name mybond0-eth1 ifname eth1 type bond-slave master bond0
+  # 将eth1添加到bonding中
+
+  nmcli connection delete <eth1之前的配置文件>
+  # 删掉之前的eth1的配置文件，自动启用新配置的绑定bonding的eth1
+
+  cat /proc/net/bonding/bond0
+  # 查看bond0的绑定情况
+
+  ```
+
+- 网络组 NetWork Teaming
+  - 网络组：是将多个网卡聚合在一起方法，从而实现容错和提高吞吐量，网络组不同于旧版的bonding技术，提供更好的性能和扩展性网络组由内核驱动和teamd守护进程实现
+  - 多种方式 runner
+    - broadcast
+    - roundrobin
+    - activebackup
+    - loadbalance
+    - lacp(implements the 802.3ad Link Aggregation Control Protocol)
+
+  - 创建网络组示例：
+  ```shell
+  # 创建网络组接口
+  nmcli con add type team con-name CNAME ifname INAME [config JSON]
+
+  CNAME 连接名
+  INAME 接口名
+  JSON 指定runner方式，格式：'{"runner":{"name":"METHOD"}}'
+  METHOD 可以是broadcast, roundrobin, activebackup, loadbalance, lacp
+
+  # 创建port接口
+  nmcli con add type team-slave con-name CNAME ifname INAME master TEAM
+
+  CNAME 连接名，连接名若不指定，默认为team-slave-IFACE
+  INAME 网络接口名
+  TEAM 网络组接口名
+
+  # 断开和启动
+  nmcli dev dis INAME
+  nmcli con up CNAME
+
+  ----------------------------------------------------------------
+  网络组示例：
+  nmcli con add type team con-name myteam0 ifname team0 config '{"runner":{"name":"loadbalance"}}' ipv4.addresses 192.168.1.100/24 ipv4.method manual
+
+  nmcli con add con-name team0-eth1 type team-slave ifname eth1 master team0
+
+  nmcli con add con-name team0-eth2 type team-slave ifname eth2 master team0
+
+  nmcli con up myteam0
+  nmcli con up team0-eth1
+  nmcli con up team0-eth2
+
+  查看team状态
+  teamdctl team0 state
+  ``
+
+- 网桥
+  - 作用：网桥的作用是将多个设备串联在一起，实现通讯，隔离冲突域，相当于交换机
+  - 配置实现网桥
+  ```shell
+  # 下载bridge-utils CentOS 8 无此包
+  yum -y install bridge-utils
+
+  # 查看网桥
+  brctl show
+
+  # 查看CAM(content addressable memory 内容可寻址存储器)表
+  brctl showmacs br0
+
+  # 添加和删除网桥
+  brctl addbr | delbr br0
+
+  # 添加和删除网桥中的网卡
+  brctl addif | delif bro eth0
+
+  # 默认br0 是down，必须启用
+  ifconfig br0 up
+
+  # 启用STP协议
+  brctl stp br0 on
+  ```
+  - STP（生成树协议）
+    - 交换机上的协议，用来防止广播风暴(回环)
+
+### TCPdump的使用
+- 概述：
+  - TCPdump,全称dump the traffic on a network，是一个运行在linux平台可以根据使用需求对网络上传输的数据包进行捕获的抓包工具
+- 功能：
+  - 在Linux平台将网络中传输的数据包全部捕获过来进行分析
+  - 支持网络层、传输层协议等协议捕获过滤
+  - 数据发送和接收的主机、网卡和端口等各种过滤捕获数据规则
+  - 提供and、or、not等语句进行逻辑组合捕获数据包或去掉不同的信息
+  - 结合wireshark工具分析捕获的报文
+```shell
+# 不指定任何参数，默认监听第一块网卡经过的数据包。
+tcpdump
+
+# 监听特定网卡
+tcpdump -i eth0
+
+# 监听特定主机，监听主机10.0.0.100的通信包，注意：出入包都会被监听
+tcpdump host 10.0.0.100
+
+# 特定来源、目标地址的通信
+# 特定来源
+tcpdump src host hostname
+# 特定目标
+tcpdump dst host hostname
+# 如果不指定src跟dst，那么来源或者目标是hostname的通信都会被监听
+tcpdump host hostname
+
+# 特定端口
+tcpdump port 3000
+
+# 监听tcp/udp，服务器上不同服务分别用了tcp，udp作为传输层
+tcpdump tpc # 监听tcp协议报文
+
+# 来源主机+端口+tcp，监听来自主机10.0.0.100在端口22上的tcp数据包
+tcpdump tcp port 22 and src host 10.0.0.100
+
+# 监听特定主机之间的通信
+tcpdump ip host 10.0.0.101 and 10.0.0.102
+
+# 10.0.0.101和除了10.0.0.1之外的主机之间的通信
+tcpdump ip host 10.0.0.101 and ! 10.0.0.1
+
+# 将tcpdump的数据包，重定向到一个文件中
+tcpdump -i eth0 -nn port ! 22 -w test.cap
+sz test.cap # 将虚拟机的文件传到本地
+
+```
+
+### curl工具
+- 介绍：curl命令来自于英文词组"Commandline URL"的缩写，其功能是用于在shell终端界面中基于URL规则进行的文件传输工作，curl是一款综合的传输工具，可以上传，也可以下载，支持HTTP，HTTPS，FTP等三十余种常见协议
+
+- 语法：`curl [options] <url>`
+```shell
+curl <url> 
+# 获取指定网站的网页源码，默认GET请求
+
+curl -v <url>
+# 表示输出连接详情 
+
+curl -O <url>
+# 下载指定网站中的文件
+
+curl -o filename <url>
+# 将网页源码保存到指定文件中
+
+curl -I https://www.baidu.com
+# 打印指定网站的HTTP响应头信息
+
+curl -Iv <rul>
+# 同时打印HTTP请求和响应头信息
+
+curl -i -X <Method> <url>
+# 指定请求HTTP方法,并返回响应信息
+```
+
+### wget工具
+- 介绍：Linux下的下载命令
+- 语法：`wget [options] <url>`
+```shell
+wget <url>
+# 将链接文件直接下载到当前路径
+
+wget -O filename <url>
+# 表示output输出为文件，后接文件名参数
+```
+
+### ubuntu网络配置
+- 主机名
+```shell
+# 和CentOS7之后版本的指令，配置文件都一样
+hostnamectl set-hostname ubuntu1804.magedu.org
+# 用这个指令更改主机名后，配置文件hostname里的主机名会自动被更改
+
+cat /etc/hostname
+ubuntu1804.magedu.org
+```
+
+- 网卡名称
+  - 默认ubuntu的网卡名称和CentOS 7类似
+  - 修改网卡名称为传统命名方式：
+  ```shell
+  # 修改配置文件为下面形式
+  vim /etc/default/grub
+  GRUB_GMDLINE_LINUX="net.ifnames=0"
+  # 或者sed修改
+  sed -i.bak '/^GRUB_CMDLINE_LINUX=/s#"$#net.ifnames=0"#' /etc/default/grub
+
+  # 生效新的grub.cfg文件
+  grub-mkconfig -o /boot/grub/grub.cfg # 本质上是修改grub.cfg文件，在上面添加 net.ifnames=0的信息
+
+  # 本质：grub文件相当与一个修改模板，通过grub-mkconfig指令使其调用grub模板去更改grub.cfg文件
+  # 所以，实际上可以只修改grub.cfg文件，讲所有linux开头的行后添加net.ifnames=0，是一样的
+
+  # 或者使用
+  update-grub # 作用等同于grub-mkconfig -o /boot/grub/grub.cfg
+
+  reboot # 最后重启生效
+  ```
+
+- 网卡配置
+  ```shell
+  # ubuntu20.04的网卡配置文件采用yaml格式，要求各级缩进必须严格统一
+
+  # 官方文档参考：https//ubuntu.com/server/docs/network-configuration
+
+  # ubuntu20.04网卡配置文件路径
+  /etc/netplan/01-netcfg.yaml  # 配置文件命名格式：数字-netcfg.yaml
+
+  # 配置文件内容 (严格控制缩进)
+  network:
+    ethernets:
+      ens33:    # 更改网卡名
+        dncp4:true   # 这个就是自动分配，动态网卡地址
+    version:2
+    renderer:networkd   # 选填
+
+  # 配置之后，需要执行命令生效：
+  netplan apply   # NAT模式下生效，桥接模式，需要配置动态地址
+
+  # yaml格斯的常见数据结构：列表和字段
+  # ubuntu20.04静态地址配置
+  network:
+    version: 2  #冒号后面要加空格
+    renderer: networkd
+    ethernets:
+    eth0:
+      addresses: [192.168.8.10/24,10.0.0.10/8] # 或者用下面两行，两种格式不能混用
+      - 192.168.8.10/24 # 横线加空格，也是yaml中列表中元素的一种表现形式
+      - 10.0.0.10/8
+      gateway4: 192.168.8.1
+      nameservers:
+        search: [magedu.com, magedu.org]
+        addresses: [180.76.76.76, 8.8.8.8, 1.1.1.1]
+  ```
+- 查看ip和gateway
+```shell
+ip addr
+route -n
+```
+
+- 查看DNS
+```shell
+# 使用指令来看
+systemd-resolve --status
+```
+
+- 配置多网卡静态ip并添加静态路由
+```shell
+# 编辑配置文件
+vim /etc/netplan/01-eth1cfg.yaml
+
+# 内容
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0: 
+    dhcp4: no
+    dhcp6: no
+    addresses: [10.0.0.18/16]
+    gateways:10.0.0.2
+    nameservers:
+      addresses: [223.6.6.6]
+    eth1:
+      dhcp4: no
+      dhcp6: no
+      addresses: [10.20.0.18/16]
+      routes:
+      - to: 10.30.0.0/16
+        via: 10.20.0.1/16
+      - to: 10.40.0.0/16
+        via: 10.20.0.1/16
+      - to: 10.50.0.0/16
+        via: 10.20.0.1/16
+      - to: 10.60.0.0/16
+        via: 10.20.0.1/16
+
+```
+- 双网卡绑定
+```
+支持多网卡绑定其中模式
+
+第一种模式：mod=0,即：（balance-rr） Round-robin policy（平衡论循环策略）
+特点：传输数据包顺序是依次传输（即：第1个包走eth0，下一个包就走eth1...一直循环下去，知道最后一个传输完毕），此模式提供负载平衡和容错能力
+
+第二种模式：mod=1,即：（active-backup）Active-backup policy（主-备份策略）
+特点：只有一个设备处于活动状态，当一个宕机另一个马上由备份转换为主设备。mac地址是外部可见的，从外面看来，bond的mac地址是唯一的，以避免switch发生混乱。此模式只提供了容错能力；由此可见此算法的优点是提供网络连接的可用性，但是它的资源利用率较低，只有一个接口处于工作状态，在有N个网络接口的情况下，资源利用率为1/N。
+
+第三种模式：mod=2，即：（balance-xor）XOR policy（平衡策略）
+特点：基于指定的传输HASH策略传输数据包。缺省的策略是：（源MAC地址 XOR 目标MAC地址） % salve数量。其他的传输策略可以通过xmit_hash_policy选项指定，此模式提供负载平衡和容错能力
+
+第四种模式：mod=3，即：broadcast（广播策略）
+特点：在每个slave接口上传输每个数据包，此模式提供了容错能力
+
+第五种模式：mod=4，即：（802.3ad）IEEE 802.3ad Dynamic link aggregation (IEEE 802.3ad 动态链接聚合)
+特点：创建一个聚合组，它们共享同样的速率和双工设定。根据802.3ad规范将多个slave工作在同一个激活的聚合体下。
+该模式必要条件：
+条件1：ethtool持获取每个slave的速率和双工设定
+条件2：switch支持IEEE 802.3ad Dynamic link aggregation
+条件3；多数switch需要经过特定配置才能支持802.3ad模式
+
+第六种模式：mod=5，即：（blance-tlb）Adaptive transmit load balancing （适配器传输负载均衡）
+特点：不需要任何特别的switch支持的通道bonding。在每个slave上根据当前的负载（根据速度计算）分配外出流量。如果正在接收数据的slave出故障了，另一个slave接管失败的slave的MAC地址。
+该模式的必要条件：
+ethtool支持获取每个slave的速率
+
+第七种模式：mod=6，即：（balance-alb）Adaption load balancing（适配器适应性负载均衡）
+特点：该模式包含了balance-tlb模式，同时加上了针对IPV4流量的接收负载均衡（receive load balance，rlb），而不需要任何switch的支持
+```
+```shell
+# 在Ubuntu中启用多网卡绑定，需要直接写文件
+vim /etc/netplan/01-netcfg.yaml
+
+# 配置文件内容
+# This file describes the network interfaces available on your system
+# for more information, see netplan(5)
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0:
+      dhcp4: no
+      dhcp6: no
+    eth1:
+      dhcp4: no
+      dhcp6: no
+
+  bonds:
+    bond0:
+      interfaces:
+        - eth0
+        - eth1
+      addresses: [10.0.0.18/16]
+      gateways: 10.0.0.1
+      nameservers:
+        addresses: [223.6.6.6, 223.5.5.5]
+      parameters:
+        mode: active-backup
+        mii-monitor-interval: 100  # 监控间隔
+
+# 使其配置生效
+netplan apply
+```
+```shell
+# 查看生成的bond信息文件
+cat /proc/net/bonding/bond0
+
+``` 
+- 网络测试诊断工具
+
+  - 测试网络连通性
+    - ping
+  - 显示正确的路由表
+    - ip route
+  - 跟踪路由
+    - traceroute
+    - tracepath
+    - mtr
+  - 确定名称服务器使用
+    - nslookup
+    - host
+    - dig
+  - 抓包工具
+    - tcpdump
+    - wireshark
+  - 安全扫描工具
+    - nmap
+    - netcat: 网络界的瑞士军刀
+
+### NAT（Network Address Translation）技术。
+- 前置知识科普
+  - 私网ip：
+    - 私有IP地址，如192.168.x.x、10.x.x.x、172.16.x.x至172.31.x.x
+    - 特点：
+      - 只能在内网/局域网通信，无法和互联网通信
+  - 公网ip
+    - 查询方式
+      - Windows: 打开命令提示符（cmd），然后输入`nslookup myip.opendns.com resolver1.opendns.com`。这将使用OpenDNS的解析器来返回你的公网IP。
+      - Linux/Unix/Mac: 打开终端，然后输入`dig +short myip.opendns.com @resolver1.opendns.com`。
+- 概述：
+  - NAT是一种在IP数据包通过路由器或防火墙时重新映射IP地址的技术。它允许一个内网（通常使用私有IP地址，如192.168.x.x、10.x.x.x、172.16.x.x至172.31.x.x）的多台设备共享一个公网IP地址进行外部通信。这样可以实现资源共享，也为IPv4地址的不足提供了临时解决方案。
+
+- NAT(网络地址转换)的主要类型
+  - 静态NAT
+    - 为内部IP地址提供一个一对一的公网IP地址映射。通常用于需要对外提供服务的设备，如web服务器。
+  - 动态NAT
+    - 从一个可用的公网IP地址池中为内部设备动态分配公网IP地址。
+  - PAT（Port Address Translation）/ NAPT (Network Address Port Translation)
+    - 这是最常见的NAT类型，也经常被称为"端口转发"。在此类型的NAT中，多台内部设备共享单个公网IP地址。区分不同设备的方式是通过不同的源端口号。因此，这种方法不仅会转换IP地址，还会转换端口号。
+    - 端口转发的工作流程
+      - 当内部设备想要与外部世界通信时，它会发送一个数据包到NAT设备（通常是家用路由器）。
+      - NAT设备将内部私有IP地址和端口号更改为公网IP地址和一个新的端口号，然后将数据包发送到外部网络。
+      - 当外部服务器响应时，它会发送数据包回到路由器的公网IP地址和之前分配的端口号。
+      - 路由器使用NAT表查找原始的内部IP地址和端口，然后将响应转发给正确的内部设备。
+  
+- 端口映射的应用场景
+  - 内网服务器对外发布
+  - 内网设备，从外部进行远程管理
+  - 内网监控视频，从外部取流
 
 
 ## 软件管理
@@ -1684,7 +2276,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
 - 第三方组织提供
   - Fedora-EPEL：Extra Packages for Enterprise Linux
-  ```
+  ``` 
   https://fedoraproject.org/wiki/EPEL
   https://mirrors.aliyun.com/epel/
   https://mirrors.cloud.tencent.com/epel/
