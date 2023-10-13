@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        th {
+            background-color: darkcyan;
+            font-weight: 700;
+            color:white;
+        }
+        table {
+            border-collapse: collapse;
+            border: 2px solid black;
+            width: 500px;
+            margin: 0 auto;           
+        }
+        td {
+            border: 1px solid black;
+            text-align: center;
+        }
+        input[type="checkbox"]:checked {
+            width: 15px;
+            height: 15px;
+        }
+    </style>
+</head>
+<body>
+    <table>
+        <thead>
+            <th>全选
+                <input type="checkbox" id="allChecked">
+            </th>
+            <th>商品</th>
+            <th>商家</th>
+            <th>价格</th>
+        </thead>
+        <tbody>
+            <tr>
+                <td><input type="checkbox" class="cks"></td>
+                <td>iphoneX</td>
+                <td>苹果</td>
+                <td>5000</td>
+            </tr>
+            <tr>
+                <td><input type="checkbox" class="cks"></td>
+                <td>iphone12</td>
+                <td>苹果</td>
+                <td>8000</td>
+            </tr>
+            <tr>
+                <td><input type="checkbox" class="cks"></td>
+                <td>iphone15</td>
+                <td>苹果</td>
+                <td>9700</td>
+            </tr>
+        </tbody>
+    </table>
+    <script>
+        let allChecked = document.querySelector('#allChecked');
+        let inputs = document.querySelectorAll('.cks');
+        allChecked.addEventListener('click', function() {
+            for (let i = 0; i < inputs.length; i++) {
+                inputs[i].checked = this.checked;
+            }
+        })
+
+        // 小复选框控制大复选框
+        for (let i = 0; i < inputs.length; i++) {
+            inputs[i].addEventListener('click', function() {
+                if (document.querySelectorAll('.cks:checked').length === inputs.length) {
+                    allChecked.checked = true;
+                } else {
+                    allChecked.checked = false;
+                }
+            })
+        }
+
+
+        
+    </script>
+</body>
+</html>

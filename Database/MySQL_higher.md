@@ -161,6 +161,17 @@ SELECT version();
   <br>用于定义数据库、表、字段、用户的访问权限和安全级别。
   <br>主要的语句关键字包括<font color=tomato>GRANT、REVOKE、COMMIT、ROLLBACK、SAVEPOINT</font>等。
 
+```sql
+DDL: 数据定义语言
+CREATE \ ALTER \ DROP \ RENAME \ TRUNCATE
+
+DML: 数据操作语言
+INSERT \ DELETE \ UPDATE \ SELECT (重中之重)
+
+DCL: 数据控制语言
+COMMIT \ ROLLBACK \ SAVEPOINT \ GRANT \ REVOKE +
+```
+
 ### SQL语言的规则与规范
 - 基本规则
   - SQL可以写在一行或者多行。为了提高可读性，各子句分行写，必要时使用缩进
@@ -1377,4 +1388,581 @@ WHERE NOT EXISTS (
           WHERE e.department_id = d.department_id
 );
 ```
+
+## 创建和管理表
+### 基础知识
+- 一条数据存储的过程（4步）：
+  - 创建数据库
+  - 确认字段
+  - 创建数据表
+  - 插入数据
  
+- 标识符命名规则
+  - 数据库名、表名不得超过30各字符，变量名限制为29个
+  - 必须只能包含A-Z、a-z、0-9、_，共63个字符
+  - 数据库名、表名、字段名等对象名中间不要包含空格
+  - 同一个MySQL软件中
+    - 数据库不能同名；
+    - 同一个库中，表不能重名；
+    - 同一个表中字段不能重名
+  - 必须保证你的字段没有和保留字、数据库系统或常用方法冲突。如果坚持使用，请在SQL语句中使用" ` "(着重号)引起来
+  - 保持字段名和类型的一致性：
+    - 在命名字段并为其指定数据类型的时候一定要保证一致性，假如数据类型在一个表里是整数，那在另一个表里可就别变成字符型了
+
+- 数据类型
+
+### 创建和管理数据库
+- 创建数据库
+```sql
+# 方式1：创建数据库
+CREATE DATABASE 数据库名;
+
+# 方式2：创建数据库并指定字符集
+CREATE DATABASE 数据库名 CHARACTER SET 字符集;
+
+-- 查看数据库管理系统字符集信息
+SHOW variables like 'character_%';
+
+# 方式3：判断数据库是否已经存在，不存在则创建数据库（推荐）
+CREATE DATABASE IF NOT EXISTS 数据库名;
+-- 如果MySQL中已经存在相关数据库，则忽略创建语句，不再创建数据库
+
+SQL5.7及以前版本建议将字符集改为utf8,默认：ai_ci(拉丁)
+CREATE DATABASE IF NOT EXISTS 数据库名 CHARACTER SET 'utf8';
+
+-- 注意：
+-- DATABASE不能改名。一些可视化工具可以改名
+-- 原理：创建一个新库 -> 把所有表复制到新库 -> 再删掉就库
+-- 本质上依然没有实现真正的直接改名
+
+# 查看创建数据库的结构
+SHOW CREATE DATABASE 数据库名;
+```
+
+- 管理数据库
+```sql
+# 查看当前所有的数据库
+SHOW DATABASES;
+
+# 查看当前正在使用的数据库
+SELECT database();
+
+# 指名/切换数据库
+USE 数据库名；
+
+# 查看当前数据库中保存的数据表
+SHOW TABLES;
+
+# 查看指定数据库下保存的数据表
+SHOW TABLES FROM 数据库名;
+```
+
+- 修改数据库
+```sql
+# 更改数据库字符集
+ALTER DATABASE 数据库名 CHARACTER set 字符集; -- 比如：gbk、utf8等
+```
+
+- 删除数据库
+```sql
+# 方式1：删除指定的数据库
+DROP DATABASE 数据库名；
+
+# 方式2：删除指定数据库名(推荐)
+DROP DATABASE IF EXISTS 数据库名;
+```
+### 数据类型简述
+<table>
+<thead>
+  <th style="background-color:darkred;color:white">类型</th>
+  <th style="background-color:darkred;color:white">类型举例</th>
+</thead>
+<tbody>
+  <tr>
+    <td>整数类型</td>
+    <td>TINYINT、SMALLINT、MEDIUMINT、<span style="font-weight:700;color:red">INT(或INTEGER)</span>、BIGINT</td>
+  </tr>
+  <tr>
+    <td>浮点类型</td>
+    <td>FLOAT、DOUBLE</td>
+  </tr>
+  <tr>
+    <td>定点数类型</td>
+    <td><span style="font-weight:700;color:red">DECIMAL</span></td>
+  </tr>
+  <tr>
+    <td>位类型</td>
+    <td>BIT</td>
+  </tr>
+  <tr>
+    <td>日期时间类型</td>
+    <td>YEAR、TIME、<span style="font-weight:700;color:red">DATE</span>、DATETIME、TIMESTAMP</td>
+  </tr>
+  <tr>
+    <td>文本字符串类型</td>
+    <td>CHAR、<span style="font-weight:700;color:red">VARCHAR</span>、TINYTEXT、TEXT、MEDIUMTEXT、LONGTEXT</td>
+  </tr>
+  <tr>
+    <td>枚举类型</td>
+    <td>ENUM</td>
+  </tr>
+  <tr>
+    <td>集合类型</td>
+    <td>SET</td>
+  </tr>
+  <tr>
+    <td>二进制字符串类型</td>
+    <td>BINARY、VARBINARY、TINYBLOB、BLOB、MEDIUMBLOB、LONGBLOB</td>
+  </tr>
+  <tr>
+    <td>JSON类型</td>
+    <td>JSON对象、JSON数组</td>
+  </tr>
+  <tr>
+    <td>空间数据类型</td>
+    <td>单值：GEOMETRY、POINT、LINESTRING、POLYGON;</br>集合：MULTIPOINT、MULTILINESTRING、MULTIPOLYGON、GEOMETRYCOLLECTION</td>
+  </tr>
+</tbody>
+</table>
+
+### 数据类型精讲
+- 字符集
+  - 属性：character set name
+  - 代码示例
+  ```sql
+  # 创建数据库时指明字符集
+  CREATE DATABASE IF NOT EXISTS dbtest12 CHARACTER SET 'utf8';
+
+  # 创建表的时候，指明表的字符集
+  CREATE TABLE temp (
+    id INT
+  ) CHARACTER SET 'utf8';
+
+  # 创建表，指明表中的字段时，可以指定字段的字符集
+  CREATE TABLE temp1 (
+    id INT,
+    `name` VARCHAR(15) CHARACTER SET 'gbk'
+  );
+  ```
+
+#### 整数数据类型
+- 以MYSQL5.7为主，进行测试
+<table>
+  <thead>
+    <th style="background:darkred;color:white;">整数类型</th>
+    <th style="background:darkred;color:white;">字节</th>
+    <th style="background:darkred;color:white;">有符号数取值范围</th>
+    <th style="background:darkred;color:white;">无符号数取值范围</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>TINYINT</td>
+      <td>1</td>
+      <td>-128~127</td>
+      <td>0~255</td>
+    </tr>
+    <tr>
+      <td>SMALLINT</td>
+      <td>2</td>
+      <td>-32768~32767</td>
+      <td>0~65535</td>
+    </tr>
+    <tr>
+      <td>MEDIUMINT</td>
+      <td>3</td>
+      <td>-8388608~8388607</td>
+      <td>0~16777215</td>
+    </tr>
+    <tr>
+      <td>INT(INTEGER)</td>
+      <td>4</td>
+      <td>-2147483648~2147483647</td>
+      <td>0~4294967295</td>
+    </tr>
+    <tr>
+      <td>BIGINT</td>
+      <td>8</td>
+      <td>-2^63~2^63-1</td>
+      <td>0~2^64</td>
+    </tr>
+  </tbody>
+</table>
+
+```sql
+USE dbtest12;
+
+CREATE TABLE test_int1 (
+  fl TINYINT,
+  f2 SMALLINT,
+  f3 MEDIUMINT,
+  f4 INTEGER,
+  f5 BIGINT
+);
+
+-- Out of range value for column 'f1' at row 1
+INSERT INTO test_int1(f1)
+VALUES(128); // 超出范围，报错
+
+DESC test_int1;
+-- 5.7版本中，type的类型后面会有(num),eg: tinyint(4), 这里4指的是显示宽度
+-- 因为tinyint共占1个字节，无符号数范围是0~256,正好是4位
+-- 8.0版本不显示数字
+
+# (M)和ZEROFILL参数
+
+CREATE TABLE test_int2 (
+  f1 INT,
+  f2 INT(5), -- 括号里的数字表示显示宽度，但是单独一个参数，并没有意义，还是以数据本身范围为依据
+  f3 INT(5) ZEROFILL
+  -- 配合ZEROFILL，表示不足(M)位，其余位数用0填充，超出位数，正常显示
+  -- 使用ZEROFILL的时候，默认是unsigned无符号数字
+)
+
+INSERT INTO test_int2(f1,f2)
+VALUES (123,123),(123456,123456);
+
+CREATE TABLE test_int3(
+  f1 INT UNSIGNED // 如果数据不包含负数，建议使用UNSIGNED
+)
+```
+
+#### 浮点类型
+- 分类：
+  - FLOAT(M,D) // 非标准语法，标准语法仅是FLOAT
+  - DOUBLE(M,D)
+    - M：精度= 整数位+小数位
+    - D：标度= 小数位
+```sql
+CREATE TABLE test_double1(
+  f1 FLOAT,
+  f2 FLOAT(5,2),
+  f3 DOUBLE,
+  f4 DOUBLE(5,2)
+);
+
+-- 浮点是数不准确的，所以我们要避免使用‘=’来判断两个浮点数是否相等
+```
+
+#### 定点数
+- DECIMAL
+- 数据类型：
+  - DECIMAL(M,D) | DEC | NUMERIC
+    - M：精度：0 <= M <= 65
+    - D: 标度：0 <= D <= 30
+    - D < M
+  - 字节数：M+2字节
+  - 有效范围：由M和D决定
+- 定点数在MySQL内部是以`字符串`的形式进行存储的，这就决定了它一定是精准的
+- 当DECIMAL类型不指定精度和标度时，默认为DECIMAL(10,0)。当数据的精度超出了定点数类型的范围时，MySQL同样会进行四舍五入
+
+- 浮点数和定点数的使用场景：
+  - 如果对于精度的要求极高，建议使用定点数
+  - 浮点数相对于定点数的优点是在长度一定的情况下，浮点数的取值范围大，但不精确，适用于需要取值范围大，又可以容忍微小误差的科学计算场景（比如计算化学，分子建模，流体力学等）
+
+
+#### 位类型：BIT(M)
+- BIT类型中存储的是二进制值，类似010110
+- BIT类型，如果没有指定(M)，默认是1位。这个1位，表示只能存1位二进制数。这里(M)表示二进制的位数，位数最小为1，最大为64
+- 占用空间：约为(M+7)/8个字节
+```sql
+CREATE TABLE test_bit1(
+  f1 BIT,
+  f2 BIT(5),
+  f3 BIT(64)
+);
+
+INSERT INTO test_bit1 (f1)
+VALUES(2);
+
+INSERT INTO test_bit1 (f2)
+VALUES(31);
+
+SELECT BIT(f1),BIT(f2),HEX(f1),HEX(f2)
+FROM test_bit1;
+
+-- 此时+0以后，数据可以以十进制显示
+SELECT f1 + 0,f2 + 0
+FROM test_bit1;
+
+```
+
+#### 日期与时间类型
+- 数据类型：
+  - YEAR类型，通常用来表示年
+    - 字节：1
+    - 日期格式：YYYY或YY
+    - 最小值1901，最大值2155，受限于只有1个字节，所以只能表示256年
+  - DATE类型，通常用来表示年、月、日
+    - 字节：3
+    - 日期格式：YYYY-MM-DD（推荐） | YY-MM-DD
+    - 最小值：1000-01-01；最大值：9999-12-03
+  - TIME类型，通常用来表示时、分、秒
+    - 字节：3
+    - 日期格式：HH:MM:SS
+    - 最小值：-838:59:59；最大值：838:59:59
+  - DATETIME类型，通常用来表示，年、月、日、时、分、秒
+    - 字节：8
+  - TIMESTMAP类型，通常用来表示带时区的年、月、日、时、分、秒
+    - 字节：4
+
+```sql
+CREATE TABLE test_year(
+  f1 YEAR,
+  f2 YEAR(4)
+);
+
+INSERT INTO test_year(f1)
+VALUES('2021'),(2022); -- 建议加单引号使用 
+-- 建议写4位，不写2位
+
+CREATE TABLE test_date1(
+  f1 DATE
+);
+
+INSERT INTO test_data1
+VALUES('2020-10-01'),('20201001'),(20201001); -- 三种结果相同，推荐第一种
+
+INSERT INTO test_data1
+VALUES(CURDATE()),(CURRENT_DATE()),(NOW()); -- 记录当前时间
+
+CREATE TABLE test_time1(
+  f1 TIME
+);
+
+INSERT INTO test_time1
+VALUES('2 12:30:29'),('12:35:29'),('12:40'),('2 12:40'),('1 05'),('45');
+-- D HH:MM:SS ; HH:MM:SS ; HH:MM ; D HH:MM ; D HH ; SS
+```
+
+### 创建数据表
+```sql
+# 方式1
+CREATE TABLE [IF NOT EXISTS] 表名 (
+        字段1 数据类型 [约束条件] [默认值],
+        字段1 数据类型 [约束条件] [默认值],
+        字段1 数据类型 [约束条件] [默认值],
+        ...
+        [约束条件]
+);  -- 需要用户具备创建表的权限
+
+-- 必须指定：表名、列名（或字段名）、数据类型、长度
+-- 可选指定：约束条件、默认值
+
+# 查看表结构
+DESC 表名；
+SHOW CREATE TABLE 表名；
+-- 如果创建表时没有指明使用的字符集，则默认使用所在数据库的字符集
+
+# 查看表数据
+SELECT * FROM 表名;
+
+--------------------------------------------------------------------------
+
+# 方式2：基于现有的表
+CREATE TABLE mytest2
+AS
+SELECT employee_id,last_name,salary
+FROM employees;
+
+
+-- 说明1：查询语句中字段的别名，可以作为新创建的表的字段名。
+-- 说明2：此时的查询语句可以结构比较丰富，使用前面章节讲过的个各种SELECT
+
+# 练习1：创建一个表employees_copy,实现对employees表的复制，包括表数据
+CREATE TABLE employees_copy
+AS
+SELECT * 
+FROM atguigudb.employees;
+
+# 练习2：创建一个表employees_col,实现对employees表的复制，不包括表数据
+CREATE TABLE employees_col
+AS
+SELECT * 
+FROM atguigudb.employees
+WHERE employee_id = NULL;
+-- WHERE 1 = 2; 
+```
+
+### 修改数据表
+```sql
+-- 修改表 --> ALTER TABLE
+# 添加一个字段
+ALTER TABLE 表名 ADD [column] 字段名 字段类型 [FIRST|AFTER 字段名];
+
+ALTER TABLE mytest
+ADD salary DOUBLE(10,2); -- 整数位有8位，小数位有2位，一共10位
+
+ALTER TABLE mytest
+ADD phone_number VARCHAR(20) FIRST;
+
+ALTER TABLE mytest
+ADD email VARCHAR(50) AFTER emp_name;
+
+# 修改一个字段
+ALTER TABLE mytest
+MODIFY emp_name VARCHAR(25);
+
+# 重命名一个字段
+ALTER TABLE mytest
+CHANGE salary monthly_salary DOUBLE(10,2);
+-- 改名的同时，也可以同时更改数据类型及长度
+
+# 删除一个字段
+ALTER TABLE mytest
+DROP COLUMN phone_number;
+
+# 重命名表
+# 方式1：使用RENAME
+RENAME TABLE emp
+TO myemp
+
+# 方式2：使用ALTER
+ALTER TABLE emp
+RENAME [TO] myemp; -- [T0]可以省略
+
+# 删除表
+DROP TABLE [IF EXISTS] 表名;
+-- 删除表这个操作不能回滚（撤销）
+
+# 清空表
+TRUNCATE TABLE 表名：
+-- 删除表中的所有数据
+-- 释放表的存储空间
+```
+
+### DCL中的COMMIT和ROLLBACK
+- COMMIT
+  - 作用：提交数据，一旦执行COMMIT，则数据就被永久保存在数据库中，不能回滚
+
+- ROLLBACK
+  - 作用：一旦执行ROLLBACK，可以实现数据回滚，回滚到最近的一次COMMIT之后
+
+- 对比 TRUNCATE TABLE 和 DELECT FROM
+  - 相同点：都可以实现对表中所有数据的删除，同时保留表结构
+  - 不同点：
+    - TRUNCATE TABLE：一旦执行此操作，表数据全部清除，且数据不可回滚
+    - DELECT FROM：一旦执行此操作，表数据可以全部清除，同时数据可以实现回滚
+
+- DDL 和 DML 的说明
+  - DDL的操作：一旦执行，不可回滚
+    - 原理：DDL操作不能回滚的原因是：在执行DDL操作之后，一定会自动执行一次COMMIT，同时这次COMMIT不受`SET autocommit = FALSE` 影响
+    - 操作DDL的时候，一定要慎重
+  - DML的操作：默认情况下，一旦执行，不可回滚。
+    - 但是，如果在执行DML之前，执行了`SET autocommit = FALSE`，则可以实现归滚
+
+- 演示：DELECT FROM
+```sql
+COMMIT; --先提交一下，COMMIT就相当于存档
+
+SET autocommit = FALSE;
+-- 执行autocommit = FALSE
+
+DELETE FROM employees_copy; -- 清除表中数据
+
+SELECT * FROM employees_copy;
+
+ROLLBACK; -- 数据回滚
+```
+
+### MySQL8.0新特性：DDL原子化
+- DDL原子化：
+  - 要么执行成功，要么回滚
+
+- 演示：
+```sql
+CREATE DATABASE mytest;
+
+USE mytest;
+
+CREATE TABLE book1(
+  book_id INT,
+  book_name VARCHAR(255)
+);
+
+SHOW TABLES;
+
+DROP TABLE book1,book2;
+
+-- 在mysql5.7中，执行此操作，由于mytest数据库中没有表book2,因此会报错
+-- 但是，在报错的同时，表book1仍然会被删除
+
+-- 在mysql8.0中，执行此操作，依然会报错，但是book1不会删除，即原子化
+-- 原子化：要么成功，要么回滚
+```
+
+### DML（数据处理之增删改）
+- 添加数据
+  - 方式1：一条一条添加
+  - 代码示例
+  ```sql
+  # 方式1: 没有指名添加字段
+  INSERT INTO emp1
+  VALUES (1,'Tom','2020-12-21',3500); -- 按声明的字段的先后顺序添加
+
+  # 方式2：指名添加字段
+  INSERT INTO emp1 (id,hire_date,salary,`name`)
+  VALUES (2,'1999-09-09',4000,'Jerry');
+
+  # 方式3：同时插入多条数据 (推荐)
+  INSERT INTO table_name (column1,column2...columnn)
+  VALUE
+  (value1 [,value2,..., valuen]),
+  (value1 [,value2,..., value n]),
+  ...
+  (value1 [,value2,..., valuen]);
+  ```
+  - 方式2：将查询结果插入表中
+  - 代码演示
+  ```sql
+  INSERT INTO emp1(id,`name`,salary,hire_date)
+  SELECT employee_id,last_name,salary,hire_date -- 查询语句
+  -- 查询的字段一定要与添加到表的字段一一对应
+  FROM employees
+  WHERE department_id IN (70,60);
+
+  -- 说明：emp1表中添加的数据的范围不能低于employees表中查询的字段长度 
+  ```
+
+- 更新数据（或修改数据）
+  - UPDATE ... SEST ... WHERE...
+  - 代码示例
+  ```sql
+  UPDATE emp1
+  SET hire_date = CURDATE()
+  WHERE id = 5;
+
+  # 同时修改一条数据的多个字段
+  UPDATE emp1
+  SET hire_date = CURDATE(),salary = 6000
+  WHERE id = 4;
+  ```
+
+- 删除数据
+  - DELETE FROM ... WHERE ...
+  - 代码示例
+  ```sql
+  DELETE FROM emp1
+  WHERE id = 1;
+  ```
+
+- 小结：
+  - DML操作默认情况下，执行完以后都会自动提交数据
+  - 如果希望执行完成以后，不自动提交数据，则需要使用`SET autocommit = FALSE`
+
+- MySQL8新特性：计算列
+  - 概念：某一列的值是通过别的列计算得来的
+  - MySQL8.0中，CREATE TABLE和ALTER TABLE都支持增加计算列
+  - 代码演示
+  ```sql
+  CREATE TABLE test1 (
+    a INT
+    b INT
+    C INT GENERATED ALWAYS AS (a + b) VIRTUAL  -- c即为计算列
+  )
+
+  INSERT INTO test1 (a,b)
+  VALUES (10,20);
+  ```
+
+
+### 数据类型（详解）
