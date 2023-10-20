@@ -1,4 +1,772 @@
 # LINUX 基础
+## Linux文件基本操作
+### Prompt提示符
+```shell
+# 格式如下：
+PS1="提示符格式命令"
+
+# 格式命令如下：
+\[  <提示符样式>  \]  # 这个提示符样式外的\[ \] 可以省略
+
+# 提示符样式如下：
+\e[ 样式 + 内容 \e[0m # 以 \e[ 开始，\e[0m 表示关闭设置
+
+# 样式分3部分
+格式：F;B;Sm
+F: 表示前景色
+30 黑色，31 红色，32 绿色，33 黄色，34 蓝色，35 紫色，36 青色，37 白色
+
+B：表示背景色，背景色数值 = F + 10
+
+S：显示的样式如下
+0：表示关闭颜色设置
+1：表示粗体
+4：表示加下划线
+5：表示闪烁
+7：表示前景色，背景色互换
+8：表示隐藏
+
+# 内容：
+\u: 表示当前用户
+\h: 表示主机名简称
+\W: 表示当前工作目录基名
+\$: 表示提示符(普通用户$ root用户#) 实测在rocky9不好用
+\H: 表示完整主机名
+\w: 表示完整工作路径
+\t: 表示24小时时间格式为：时：分：秒
+\A: 表示24小时时间格式为：时：分
+\#: 表示开机命令历史数
+\d: 表示日期，格式为：星期 月 日
+\v: 表示BASH的版本信息
+```
+```shell
+示例：
+PS1="PS1="\e[32;40;1m[\d \t \e[31;40;1m\#] \e[33;40;1m\u@\h:\W \$\e[0m""
+注意：
+实测\$不好用，可以直接在root的目录下的.bashrc文件中改为#
+```
+### 查看用户登录信息
+- whoami命令：显示当前登录有效用户
+- who命令：显示当前所有的登录会话
+- w：显示系统当前所有的登录会话及其所做的操作
+```shell
+[Fri Oct 13 22:16:15 59] root@rocky9:/ #w
+ 22:20:10 up 1 day,  4:39,  2 users,  load average: 0.00, 0.00, 0.00
+USER     TTY        LOGIN@   IDLE   JCPU   PCPU WHAT
+root     pts/0     21:40    0.00s  0.07s  0.00s w
+root     pts/1     21:56    7:22   0.03s  0.01s vim ps_demo.txt
+
+```
+### 显示字符echo
+- 说明：echo会将字符串显示在标准输出即屏幕上。
+- 语法：echo [SHORT-OPTION] [STRING]
+- SHORT-OPTION说明：
+  - -n: 不自动附加换行符；即都在一行显示
+  - -e: 启用转义符，能使用转义符\
+- 注意：echo后面的字符串建议用单引号括住
+```shell
+echo -e hello\nworld   # 显示hellonworld
+echo -e 'hello\nworld' # 此时转义符生效，符合预期
+```
+
+### 命令分类
+- 判断命令的类别
+```shell
+# 使用type命令
+
+[Sat Oct 14 08:04:11 4] root@rocky9:~ #type type
+type is a shell builtin 
+# 出现这个提示，即可判断该命令是内部命令，type本身也是一个内部命令
+
+[Sat Oct 14 08:04:21 5] root@rocky9:~ #type hostname
+hostname is /usr/bin/hostname
+# 上述提示，即可判断hostname是外部命令
+
+
+
+```
+- 内部命令
+  - 概述：指集成在特定shell中的命令，当用户登陆时，会自动启用shell，而对应的shell程序中包含一些常见工具。默认的/bin/bash shell中就集成了很多内部命令，可以通过enable命令查看所有内部命令
+  ```shell
+  # 通过enable命令查看所有内部命令
+  [Sat Oct 14 08:07:33 8] root@rocky9:bin #enable
+  enable .
+  enable :
+  enable [
+  enable alias
+  enable bg
+  enable bind
+  enable break
+  enable builtin
+  enable caller
+  enable cd
+  enable command
+  enable compgen
+  enable complete
+  enable compopt
+  enable continue
+  enable declare
+  enable dirs
+  enable disown
+  enable echo
+  enable enable
+  enable eval
+  enable exec
+  enable exit
+  enable export
+  enable false
+  enable fc
+  enable fg
+  enable getopts
+  enable hash
+  enable help
+  enable history
+  enable jobs
+  ...
+  ```
+- 外部命令
+  - 概述；所谓外部命令，就是没有集成在shell程序中。具体表现为一个独立的可执行文件。所以外部命令都能在磁盘中找到对应文件
+  - 系统查找外部命令的方式：
+    - 在系统中有一个叫PATH的变量，里面保存外部命令存放的路径。具体路径可以通过下面命令查看，当执行一个外部命令时，系统会按PATH中存放的目录路径顺序来查找，一旦在某个目录中找到，就停止继续往下找，并执行此外部命令
+  ```
+  [Sat Oct 14 08:15:25 9] root@rocky9:bin #echo $PATH
+  /root/.local/bin:/root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+  ```
+  - 查看外部命令存放路径
+    - which
+    - whereis：除了命令外，还显示和命令相关的帮助文档等文件路径
+  ```shell
+  [Sat Oct 14 08:21:50 29] root@rocky9:bin #which gcc
+  /usr/bin/gcc
+
+  [Sat Oct 14 08:23:59 30] root@rocky9:bin #whereis gcc
+  gcc: /usr/bin/gcc /usr/lib/gcc /usr/libexec/gcc /usr/share/man/man1/gcc.1.gz /usr/share/info/gcc.info.gz
+  ```
+  - 当第一次执行外部命令后，系统会自动将外部的路径记录到内存缓存区中，下次再执行此外部命令，将会从缓存区中找到路径，直接到对应的磁盘路径找到此命令并执行。通过hash命令可以查看到已执行过的外部命令及路径
+  ```shell
+  [Sat Oct 14 08:24:24 31] root@rocky9:bin #hash
+  hits	command
+   7	  /usr/bin/ls
+   3	  /usr/bin/whereis
+  ```
+- 别名
+  - 概述：所谓别名，就是将一些常用的内部或外部命令，起一个较短的名称，这样每次执行这些常用命令时，就可以用别名替代
+  - 管理和查看别名
+  ```shell
+  # 查看所有别名
+  $ alias
+
+  # 查看指定别名
+  $ alias 别名
+
+  # 定义别名
+  $ alias 别名="命令"
+
+  # 取消别名
+  $ unlias 别名
+  ```
+  - 上述命令都是使别名临时生效，如果要使别名永久生效，需要写入配置文件(.bashrc)中
+    - 仅对当前用户有效，写入 ~/.bashrc
+    - 对所有人有效，写入 /etc/.bashrc
+    - 启用配置文件
+      - `source 文件名` 或 `. 文件名`
+  - 执行和别名相同的命令时，需要 `\别名` 或`'别名'`
+
+### 命令的使用帮助
+- Whatis-查看命令简要说明
+  - 概述：Whatis可以快速查看到命令或相关内容的简短功能
+  - 注意：在使用`whatis`之前，需要先使用`mandb`创建数据库
+
+- 内部命令的使用帮助
+  - `help COMMAND`
+
+- 外部命令的使用帮助
+  - `COMMAND --help` | `COMMAND -h`
+
+- man帮助
+  - 大部分命令对应的手册通常存储在/usr/share/man里，几乎每个外部命令都有man手册
+  - man命令的配置文件
+    - `/etc/man_db.conf`
+  - man命令的语法格式
+  ```shell
+  man 命令语法格式；
+  man [section] WORD
+  格式说明：
+  section: 表示1-9的章节数
+  1 - 用户命令
+  2 - 系统调用
+  3 - C库调用
+  4 - 设备文件及特殊文件
+  5 - 配置文件格式
+  6 - 游戏
+  7 - 杂项
+  8 - 管理类命令
+  9 - Linux内核API
+
+  WORD：查看帮助的关键字，如：命令，文件名，函数名
+  ```
+### Linux目录结构
+- 文件系统的目录结构
+  - bin：给普通用户使用的工具
+  - boot：开启启动的文件，包含linux内核
+    - linux内核：`vmlinuz-5.14.0-284.11.1.el9_2.x86_64`
+  - dev：硬件设备，比如：硬盘
+  - etc：类似于注册表，核心！各种配置文件
+  - home：用户的数据，各个用户在家目录
+  - root：root用户的家目录
+  - run：运行过程中生成的临时文件
+  - sbin：给管理员使用的工具
+  - tmp：临时文件
+  - usr：操作系统下自带的文件，大多在usr
+  - var：网页文件，日志等不断会变化的文件
+  - lib/lib64:库文件，很多应用程序共同依赖的库文件
+  - mnt/media：实现外围设备的挂载用的
+  - proc/sys：内存中的数据
+  - opt/srv：外部下载的一些程序软件，如果不下载的话，一般为空
+
+### 文件类型
+- 概述：
+  - 磁盘中存放的每个文件可以分为两个部分
+    - 一部分为文件的内容：即文件的数据部分，此部分内容存放在磁盘中专门的数据空间(data block)中。
+    - 一部分为文件的属性信息，即元数据(meta data)，比如；文件的大小，类型，节点号，权限，时间等，此部门内容存放在磁盘中专门的节点空间(inode block)中
+
+- 普通文件（白色）
+  - 纯文本文件：
+    - `ls -l /etc/issue`
+  - 二进制可执行文件（绿色）：
+    - 概述：二进制可执行文件是有特殊格式的可执行程序，其文件内容表现为不可直接读懂的字符，用cat查看，会出现乱码。在Linux中有很多二进制可执行文件，比如很多的外部命令都是二进制可执行文件
+    - `ls -l /bin/cat`
+  - 数据格式文件
+    - 概述：数据格式文件是一些程序在运行过程中需要读取的存放在某些特定格式的数据文件，比如：图片文件，压缩文件，日志文件。通常需要特定的工具打开
+    - 举例：用户登录时，系统会将登录的信息记录在/var/log.wtmp文件中，这个就是一个数据文件。需要使用`last`命令打开此文件查看内容
+    - `ls -l /var/log/wtmp` -> `last`(直接在/var/log目录下使用last命令)
+
+- 目录文件（蓝色）
+  - 概述：目录文件即文件夹，通过`ls -l`查看文件属性时，第一个属性表现为d
+
+- 链接文件（浅蓝色）
+  - 概述：即将两个文件建立关联关系，这种操作实际上是给系统中已有的某个文件指定另外一个可用于访问它的不同文件名称。
+  - `ls -l`查看文件属性时，第一个属性表现为l
+  - 分类：
+    - 硬链接
+    - 软链接
+    - 关于硬链接和软链接的区别和定义，后面详解
+
+- 管道文件（暗黄色）
+  - 概述：管道pipe文件是一种特殊的文件类型，其本质是一个伪文件（本质是内核缓冲区）。其主要目的是实现进程间通讯的问题。由于管道文件是一个与进程没有“血缘关系”的，真正独立的文件，所以它可以在任意进程之间实现通信。
+  - 局限性：
+    - 自己写的数据不能自己读
+    - 数据一旦被读后，便不在管道中存在，不可反复读取
+    - 管道采用半双工通信方式
+  - `ls -l`查看文件属性时，第一个属性表现为p
+  - 更多细节后续详解
+
+- 字符设备文件（明黄色）
+  - 通常是一些串行接口设备在用户空间的体现，像键盘、鼠标。字符设备是按字符为单位进行输入输出的，且按一定的顺序进行
+  - `ls -l`查看文件属性时，第一个属性表现为c
+  - 举例；我们登录到Linux主机，系统会提供一个终端文件tty供我们登录。
+
+- 块设备文件（明黄色）
+  - 块文件设备，就是一些以“块为单位”，如：4096个字节，访问数据，提供随机访问的接口设备，例如磁盘、硬盘、U盘
+  - `ls -l`查看文件属性时，第一个属性表现为b
+
+- 套接字文件（粉色）
+  - 概述：数据接口文件，通常被用在基于网络的数据通讯使用。
+  - 当两个进程在同一台主机上，但是像通过网络方式通信，可基于socket方式进行数据通信，可基于全双工方式实现，即可支持同时双向传输数据。
+  - `ls -l`查看文件属性时，第一个属性表现为s
+
+### 管理目录类文件相关命令
+- 查看目录
+  - 命令: `tree`
+  ```shell
+  # 查看指定目录数的层级
+  tree -L 1 /
+
+  # 每个文件和目录前显示完整的相对路径
+  tree -f
+  [Sun Oct 15 10:08:22 7] root@rocky9:~ #tree -f /Storage/
+  /Storage
+  └── /Storage/test
+      ├── /Storage/test/baidu.html
+      ├── /Storage/test/ps_demo.txt
+      ├── /Storage/test/rename.txt
+      └── /Storage/test/robots.txt
+
+  1 directory, 4 files
+
+  # 每个文件和目录前显示最新更改时间
+  tree -D
+  [Sun Oct 15 10:10:36 11] root@rocky9:~ #tree -D /Storage/
+  /Storage/
+  └── [Oct 14 09:12]  test
+      ├── [Sep 27 12:03]  baidu.html
+      ├── [Oct 13 20:48]  ps_demo.txt
+      ├── [Jan  3  2020]  rename.txt
+      └── [Jan  3  2020]  robots.txt
+
+  1 directory, 4 files
+
+  # 每个文件和目录前显示文件大小
+  tree -s
+  [Sun Oct 15 10:08:30 8] root@rocky9:~ #tree -s /Storage/
+  /Storage/
+  └── [         79]  test
+      ├── [       2381]  baidu.html
+      ├── [        270]  ps_demo.txt
+      ├── [       2814]  rename.txt
+      └── [       2814]  robots.txt
+
+  # 每个文件和目录前显示文件/目录拥有者
+  tree -u
+  [Sun Oct 15 10:09:28 9] root@rocky9:~ #tree -u /Storage/
+  /Storage/
+  └── [root    ]  test
+      ├── [root    ]  baidu.html
+      ├── [root    ]  ps_demo.txt
+      ├── [root    ]  rename.txt
+      └── [root    ]  robots.txt
+
+  # 每个文件和目录前显示权限标示
+  tree -p
+  [Sun Oct 15 10:11:18 12] root@rocky9:~ #tree -p /Storage/
+  /Storage/
+  └── [drwxr-xr-x]  test
+      ├── [-rw-r--r--]  baidu.html
+      ├── [-rw-r--r--]  ps_demo.txt
+      ├── [-rw-r--r--]  rename.txt
+      └── [-rw-r--r--]  robots.txt
+
+  # 使用通配符对tree的目录进行筛选
+  tree -P pattern 这里的pattern不支持正则表达式，仅支持通配符
+  [Sun Oct 15 10:33:09 26] root@rocky9:~ #tree -P 'r*.txt' /Storage/
+  /Storage/
+  └── test
+      ├── rename.txt
+      └── robots.txt
+
+  1 directory, 2 files
+
+  常用通配符:
+  * 匹配任意数量的字符（包括零个）。
+  ? 匹配任意一个字符。
+  [...] 匹配方括号中的任意一个字符。
+  ```
+
+- 创建目录
+  - 命令：`mkdir`
+  ```shell
+  语法格式：mkdir [pv] [-m mode] directory_name...
+
+  # mkdir在指定路径创建目录
+  mkdir /Storage/test   # 在Storage目录下创建一个test目录
+
+  # 默认在当前路径创建目录
+  mkdir dir1    # 在当前目录下创建名为dir1的目录
+
+  # 一次创建多个同级目录，每个目录间用空格隔开
+  mkdir dir1 dir2 dir3
+
+  # 创建多级目录
+  mkdir -p dir1/dir2/dir3
+
+  # -v 会显示创建每个目录的详细信息 
+  [Sun Oct 15 11:12:00 39] root@rocky9:/ #mkdir -pv /Storage/test/dir1/dir2/dir3
+  mkdir: created directory '/Storage/test/dir1'
+  mkdir: created directory '/Storage/test/dir1/dir2'
+  mkdir: created directory '/Storage/test/dir1/dir2/dir3'
+
+  # -m mod 指定创建文件的权限
+  [Sun Oct 15 11:19:39 45] root@rocky9:demo #mkdir -m 644 demo2
+  [Sun Oct 15 11:20:12 46] root@rocky9:demo #ll
+  total 0
+  drwxr-xr-x. 2 root root  6 Oct 15 11:19 demo1
+  drw-r--r--. 2 root root  6 Oct 15 11:20 demo2
+  drwxr-xr-x. 3 root root 18 Oct 15 10:43 dir1
+  ```
+
+- 删除目录
+  - 命令：`rmdir`
+  - 注意：用于删除空目录，此命令要删除的目录内，不能有文件存在
+  ```shell
+  # 删除单一目录，注意：删除目录内不能有文件
+  rmdir <dirctory_name>
+
+  # 同时删除同级多个目录，每个目录用空格隔开
+  rmdir dir1 dir2 dir3
+
+  # -p 删除多级目录
+  rmdir -p dir1/dir2/dir3  # 同时删除dir1及其子目录dir2,dir3
+  ```
+#### 目录的本质
+- 在Unix和类Unix的文件系统中，每个文件或目录都有一个与之关联的inode（索引节点）。
+- 这个inode包含了关于文件的元数据，例如文件的权限、大小、修改时间、拥有者、所用的数据块的位置等，但注意，<font color=tomato>它不包含文件名</font>。
+- 目录中的数据部分，包含了文件名与inode编号的映射关系
+  ```
+  fileA -> inode34
+  fileB -> inode57
+  ```
+- 因此目录下文件的元数据（非文件名的改变）并不会导致目录中数据部分的内容发生改变，因为：文件元数据的改变，会导致inode的数据部分发生变化，但是inode的编号/值不变。这样，文件名和对应的inode编号的映射关系就没有发生变化，所以目录数据内容无变化
+- 目录的大小跟文件大小无关，仅跟目录的数据部门，即目录下文件和inode映射关系的大小有关
+
+#### 创建初始目录的时候，硬链接数初始为2的原因
+- 在UNIX和Linux文件系统中，目录的硬链接数从2开始是有特定的原因的。当你创建一个目录（例如dir1），初始的两个硬链接代表：
+  - 引用该目录的名字：这就是你所创建的目录名，如dir1。自身是一个硬链接
+  - .（点）：每个目录都有一个特殊的名字.，它引用自身。当你进入dir1并列出内容时，你会看到一个.目录，它实际上指向dir1自身。
+  - 当你在dir1内创建子目录时，dir1的硬链接数会增加。这是因为每个子目录都有一个名为..（双点）的特殊目录名，它指向其父目录。因此，每当你在dir1内创建一个子目录，dir1的硬链接数就会增加1。
+
+### 管理文件的相关命令
+- 查看文件列表
+  - 命令：`ls`
+  ```shell
+  语法格式：ls [OPTION]... [FILE]...
+
+  # -a 显示包含隐藏文件在内的所有内容
+  ls -a
+
+  # -i 显示文件索引节点(inode)
+  ls -i 
+  [Sun Oct 15 11:39:16 65] root@rocky9:test #ls -i
+  136601235 baidu.html  137507906 ps_demo.txt  136601225 rename.txt  136601224 robots.txt
+
+  # -l 以长格式显示目录下内容列表
+  # 长格式输出信息：文件名、文件类型、权限、硬链接数、所有者、组、文件大小、修改时间
+  ls -l
+  [Sun Oct 15 11:39:28 67] root@rocky9:test #ls -l
+  total 16
+  -rw-r--r--. 1 root root 2381 Sep 27 12:03 baidu.html
+  -rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+
+  # 用文件目录的更改时间排序
+  ls -t
+  [Sun Oct 15 11:45:06 73] root@rocky9:test #ls -tl
+  total 16
+  -rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
+  -rw-r--r--. 1 root root 2381 Sep 27 12:03 baidu.html
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+
+  # ls后面支持通配符过滤，不加单引号
+  [Sun Oct 15 11:49:26 80] root@rocky9:test #ls -l *.txt
+  -rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
+  -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+
+  ```
+
+- 文件的时间属性
+  - atime: 记录最后一次的访问时间
+  - mtime: 记录最后一次文件数据部分的修改时间
+  - ctime: 记录最后一次文件元数据的修改时间
+  - 注意：mtime的改变一定会引起ctime的改变
+  - <font color=tomato>对于目录这种特殊文件</font>
+    - 其目录文件的数据部分(data block)存放的就是目录中的文件名等信息。所以在目录中创建，删除文件会改变目录的mtime，而目录的mtime的改变一定会引起ctime的改变，但其文件内容的改变，并不会引起目录mtime和ctime的改变
+    - 当你访问一个目录（例如列出其内容）时，目录的 atime（访问时间）会被更新。如果你修改了目录中的一个文件，那么在大多数文件系统配置下，为了访问并修改该文件，你首先需要“访问”该目录，从而导致目录的 atime 被更新。所以修改一个目录下的文件，那么这个目录的atime通常情况下，是会更新的。但是...
+    - 出于性能原因，一些现代的文件系统或挂载选项可能会默认禁用 atime 的更新。这种设置被称为noatime，它可以减少磁盘I/O，特别是在频繁读取文件但不经常修改它们的系统上。因此，如果<font color=tomato>文件系统</font>是以 noatime 选项挂载的，那么访问文件或目录不会更新其 atime。
+  - ls查看文件的3个时间属性
+  ```shell
+  # 默认显示文件的mtime
+  ls -l
+
+  # 显示文件的ctime
+  ls -l --time=ctime
+
+  # 显示文件的atime
+  ls -l --time=atime
+  ```
+  - 关于atime的挂载选项
+    - 'noatime'
+      - 访问文件/目录不会更新atime
+    - 'relatime'
+      - 满足两个条件之一才更新atime
+        - 文件的atime时间超过一天
+        - 文件的mtime比atime更晚
+
+- 查看文件属性信息
+  - 命令：`stat`
+  - 作用：用于显示文件的详细属性
+  ```shell
+  语法格式：stat [文件或目录]
+
+  # 查看文件属性
+  [Sun Oct 15 14:35:09 93] root@rocky9:test #stat rename.txt
+  File: rename.txt
+  Size: 2814      	Blocks: 8          IO Block: 4096   regular file
+  Device: fd00h/64768d	Inode: 136601225   Links: 1
+  Access: (0664/-rw-rw-r--)  Uid: (    0/    root)   Gid: (    0/    root)
+  Context: unconfined_u:object_r:default_t:s0
+  Access: 2023-10-13 20:36:29.807941125 +0800
+  Modify: 2020-01-03 16:33:48.000000000 +0800
+  Change: 2023-10-15 14:34:30.473235676 +0800
+  Birth: 2023-09-27 11:57:14.168869373 +0800
+  ```
+  - 命令：`file`
+  - 作用：使用`file`辨识文件的类型
+  ```shell
+  语法格式：file [OPTION] file_name
+
+  # -i 查看文件的MIME类型
+  [Sun Oct 15 14:46:28 102] root@rocky9:test #file -i test.log
+  test.log: text/plain; charset=us-ascii
+
+  ```
+
+- 创建文件
+  - 命令：`touch`
+
+- 复制文件
+  - 命令：`cp`
+  ```shell
+  语法格式：cp [OPTION] SOURCE DEST
+
+  # -b 覆盖已存在的目标前先对其做备份，后缀为~
+  [Sun Oct 15 15:03:16 108] root@rocky9:test #cp -b newtest.txt test.log
+  cp: overwrite 'test.log'? y
+  [Sun Oct 15 15:03:32 109] root@rocky9:test #ls
+  baidu.html  dir1  dir2  dir3  newtest.txt  ps_demo.txt  rename.txt  robots.txt  test.log  test.log~
+
+  # -S 指定备份文件的后缀名
+  [Sun Oct 15 15:10:53 123] root@rocky9:test #cp -S .bak dir1/cptext.txt  cptext.txt 
+  cp: overwrite 'cptext.txt'? y
+  [Sun Oct 15 15:11:10 124] root@rocky9:test #tree .
+  .
+  ├── baidu.html
+  ├── cptext.txt
+  ├── cptext.txt.bak
+  ├── dir1
+  │   └── cptext.txt
+  ├── dir2
+  ├── dir3
+  ├── dir_cp
+  │   └── cptext.txt
+  ├── newtest.txt
+  ├── ps_demo.txt
+  ├── rename.txt
+  ├── robots.txt
+  ├── test.log
+  └── test.log~
+
+  4 directories, 11 files
+
+  # -i 覆盖前会先询问用户（推荐使用）
+  cp -i file cp_file
+
+  # -r 递归处理，将目录及其中的为文件一同复制
+  cp -r dir cp_dir
+
+  ```
+
+- 移动及重命名文件
+  - 命令：`mv`
+  - 命令：`rename`
+  ```shell
+  关于批量创建和批量修改文件名
+  
+  # 批量创建文件与批量重命名
+  # rename <要改的字段> <改之后的字段> <使用通配符表示改的程度>
+  [Sun Oct 15 15:34:07 129] root@rocky9:py_test #touch pydemo{1..9}.txt
+  [Sun Oct 15 15:34:35 130] root@rocky9:py_test #ls
+  pydemo1.txt  pydemo2.txt  pydemo3.txt  pydemo4.txt  pydemo5.txt  pydemo6.txt  pydemo7.txt  pydemo8.txt  pydemo9.txt
+  [Sun Oct 15 15:34:38 131] root@rocky9:py_test #rename .txt .py *.txt
+  [Sun Oct 15 15:35:23 132] root@rocky9:py_test #ls
+  pydemo1.py  pydemo2.py  pydemo3.py  pydemo4.py  pydemo5.py  pydemo6.py  pydemo7.py  pydemo8.py  pydemo9.py
+  [Sun Oct 15 15:35:25 133] root@rocky9:py_test #rename py python py*
+  [Sun Oct 15 15:35:43 134] root@rocky9:py_test #ls
+  pythondemo1.py  pythondemo2.py  pythondemo3.py  pythondemo4.py  pythondemo5.py  pythondemo6.py  pythondemo7.py  pythondemo8.py  pythondemo9.py
+
+  ```
+
+- 删除文件
+  - 命令：`rm`
+  ```shell
+  语法格式：rm [OPTION]...FILE...
+
+  # -f 强制删除文件，即在删除文件时不提示确认，并自动忽略不存在的文件
+
+  # -i 在删除每个文件之前请求确认
+
+  # -r 递归删除，目标是目录的话，整个目录文件全部删除
+  ```
+
+### 文件元数据和节点表结构
+- 查看不同分区的节点编号使用情况
+  - 命令：df -i
+  ```
+  生产案例1：提示空间满NO space left on device，但df可以看到空间很多，为什么
+
+  答：
+  节点编号不足，一个文件能被创建需要同时满足两个前提
+  足够的空间，以及该文件系统下还有剩余的节点编号
+
+  生产案例2：为什么cp /dev/zero /boot/test.img会把/boot的空间撑满
+
+  答：
+  1./dev/zero 是一个特殊的设备文件，它可以生成无限的零字节。当你尝试从它读取数据时，它会持续不断地返回零字节。
+
+  2.cp 命令的作用是复制文件或目录。在这种情况下，它从 /dev/zero 复制数据并尝试写入 /boot/test.img。
+
+  3.因为 /dev/zero 提供了无限的零字节，cp 会持续写入数据到 /boot/test.img，直到 /boot 分区没有更多的空间可用。
+
+  生产案例3：当test.img被访问时，管理员在主服务器删除test.img后，为什么，空间依然是满的
+
+  答：
+  因为当一个文件被使用时，在另一侧删除该文件，该空间并不会被立即释放，只有当这个文件不被使用时，才会释放这个空间
+
+  解决方法：
+  cat /def/null > /boot/test.img; rm -rf /boot/test.img
+  把文件清空后删除即可、
+  echo -n '' > /boot/test.img 结果和上述cat /def/null...相同
+  ```
+
+### 硬链接与软链接
+- 硬链接：
+  - 概述：本质上是多个文件名共用一个inode
+  - 命令：`ln a.txt aa.txt`
+  - 注意：
+    - 因为本质是共用一个inode，所以不能跨分区创建硬链接，因为不同分区有独立的inode表
+    - 同理，为了防止inode循环利用，所以目录也不能创建硬链接，但是在创建目录及其子目录的时候，系统会自动创建.和..这种目录的硬链接
+    - 硬链接数本质上是inode计数器的值
+
+- 软链接：
+  - 概述：也叫符号链接，软链接的本质是创建了一个新文件，该文件的内容是源文件的路径，所以访问软连接文件，实质上系统访问指向了源文件
+  - 命令：`ln -s 目标文件 软链接文件`
+    - 注意：根据软链接的本质，软连接文件中的内容实际上是指向目标文件的路径，因此目标文件的路径如果是相对路径，那么一定是相对软链接的路径 
+    - 注意2：删除软链接的时候，不要加tab键补全，如果软连接文件后跟/,删除的时候，比如rm -rf /Storage/test/test/ 实际上是把原始目录中的内容一起删除
+
+
+## Bash Shell特性
+### 命令历史
+- 概述：
+- 使用bash shell,执行过的命令会记录到history对应的缓存区中。当用户注销时，会将history缓存区中的命令历史追加到`~/.bash_history`文件中。
+- 当下次登录shell时，系统会读取命令历史文件中记录的命令到命令缓存区。
+
+### history命令
+```shell
+# 语法：
+history -c  
+# 清空历史命令，仅清空命令缓存区的命令，不影响.bash_history
+
+history -d offset
+[Tue Oct 17 10:52:59 22] root@rocky9:~ #history | tail -n 10
+ 1011  cat .bash_history 
+ 1012  cat oldfile.txt 
+ 1013  getent passwd root
+ 1014  getent passwd | tail -n 10
+ 1015  getent passwd
+ 1016  history
+ 1017  history -d 999
+ 1018  history | tail -n 20 # 1018
+ 1019  history | tail -n 30
+ 1020  history | tail -n 10
+[Tue Oct 17 10:54:14 23] root@rocky9:~ #history -d 1017
+[Tue Oct 17 10:54:35 24] root@rocky9:~ #history | tail -n 10
+ 1012  cat oldfile.txt 
+ 1013  getent passwd root
+ 1014  getent passwd | tail -n 10
+ 1015  getent passwd
+ 1016  history
+ 1017  history | tail -n 20 # 1017
+ 1018  history | tail -n 30
+ 1019  history | tail -n 10
+ 1020  history -d 1017
+ 1021  history | tail -n 10
+
+# 删除命令缓存区中指定编号的历史命令
+# 删除后，后面的命令编号会依次往前提
+
+history n  # 显示最近的n条命令，等同于history|tail -n <num>
+
+history -a # 立即追加命令缓存区中的命令到历史文件中
+
+history -w # 将命令缓存区的当前内容覆盖到.bash_history文件。
+history -w <new_file> # 将命令缓存区中的内容存储到指定文件中
+
+history -r # 从.bash_history读取命令到命令缓存区，通常在开始新会话时使用。
+history -r <new_file> # 从指定文件中读取命令到缓存区
+
+history -p <指定历史命令> # 将指定的数据显示在标准输出
+# 输出的指令不会执行，也不会出现在历史缓存区中
+[Tue Oct 17 14:13:14 50] root@rocky9:Storage #history
+    1  ls
+    2  touch test2.txt
+    3  echo "hello" >> test2.txt 
+    4  cat test2.txt 
+    5  history
+[Tue Oct 17 14:13:22 51] root@rocky9:Storage #history -p \!-2
+cat test2.txt 
+
+history -s # 将参数作为单独的条目添加到历史列表的末尾。
+# 这允许你将一个或多个命令手动添加到历史记录中。
+history -s "echo hello" # 将echo hello加入历史缓存区，但是不会执行
+
+```
+
+- 详细描述数据在历史缓冲区和.bash_history的过程
+  - 在一个新的bash会话中开始时，.bash_history 文件中的历史命令会被加载到命令缓存区。(假设.bash_history初始没有数据)
+  - 执行了10个bash命令。
+  - 退出bash，这10个命令写入到 .bash_history
+  - 开始一个新的bash会话，这10个命令加载到命令缓存区。
+  - 新的bash会话中，你执行了一个新的命令
+  - 退出bash，命令缓存区中的11个命令会 替换 .bash_history 文件中的内容。
+  - 最终.bash_history中共有11条命令
+
+- 问题2：`history -a`的原理
+  - 纯粹从底层操作角度看，history -a是追加到文件的，不是覆盖。
+  - 当我们在日常使用中考虑整个会话的上下文时，情况会变得复杂。每当开始一个新的bash会话，它都会从.bash_history读取历史记录到命令缓存区。这意味着，命令缓存区现在包含了从.bash_history文件加载的命令加上在当前会话中输入的新命令。
+  - 所以，尽管history -a实际上是追加行为，但在一个常规的bash会话中，由于命令缓存区已经从.bash_history加载了历史，看起来就像是被覆盖了。
+  - 但就底层原理来说：尽管history -a实际上是追加行为，但在一个常规的bash会话中，由于命令缓存区已经从.bash_history加载了历史，看起来就像是被覆盖了(真正的覆盖操作是history -w)。
+
+- 命令历史的快捷方式使用
+  - `!` 历史扩展的开始标识符。
+    - 在配合`history -p`使用时，需要使用`\!`转义
+    - `!!` 重复执行前一个命令
+    - `!:0` 执行前一个不含参数的命令
+    - `!n` 执行缓冲区序号n的命令
+    - `!-n` 执行缓冲区序号倒数第n个命令
+    - `!string` 执行前一个以string开头的命令
+    - `!?string` 执行前一个包含string的命令
+    - `:p`打印命令，不执行
+      - `!string:p`
+      - `!$:p` 打印输出 `!$`(上一个命令的最后一个参数)的内容
+      - `!*:p` 打印输出 `!*`(上一个命令的所有参数)的内容
+    - `^` 删除替换
+      - `^string` 删除上一个命令的第一个string
+      - `^sting1^stirng2` 将上一个命令的string1替换为string2
+      - `!:gs/string1/string2` 将上一个命令的所有string1替换为string2
+  - 调用历史参数
+    - `command !^` 调用上一个命令的第一个参数作为command的参数
+    - `command !$` 调用上一个命令的最后一个参数
+    - `command !*` 调用上一个命令的所有参数
+    - `command !:n` 调用上一个命令的第n个参数
+    - `command !n:^` 调用第n条命令的第一个参数
+    - `command !n:$` 调用第n条命令的最后一个参数
+    - `command !n:m` 调用第n条命令的第m个参数
+    - `command !n:*` 调用第n条命令的第*个参数
+    - `command !string:^` 调用以string开头的命令，获取它的第一个参数
+    - ...
+
+- 历史命令快捷键
+  - `ctrl + R` 进入历史命令搜索模块
+  - `ctrl + G` 退出历史命令搜索
+
+- history命令相关的shell变量
+  - $HISTSIZE：历史缓存区的条数限制，默认1000
+  - $HISTFILE：指定历史文件，默认为~/.bash_history
+  - $HISTFILESIZE：历史文件的条数限制，默认1000
+  - $HISTTIMEFORMAT：显示时间，示例：HISTTIMEFORMAT="%F %T"
+  - $HISTIGNORE：历史缓存区忽略指定命令，多个命令用冒号:分隔
+    - 示例：`export HISTIGNORE = "ls:pwd"`
+  - $HISTCONTROL:控制历史命令记录的方式
+    - 值为ignoredups：默认，忽略重复的命令，连续且相同认为重复
+    - 值为ignorespace：忽略所有以空白开头的命令
+    - 值为ignoreboth：相同于ignoreboth：相当于ignoredunps和ignorespace组合
+    - 值为erasedups：删除重复命令
+
+- 提示：如果要持久保存上述变量，需要将上面指令存放在etc/profile或者~/.bash_profile中
+
+
+
 ## 用户组和权限管理
 ### 用户和组相关文件
 - 用户：Linux中每个用户是通过 User Id(UID)来唯一标识的

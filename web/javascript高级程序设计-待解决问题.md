@@ -41,6 +41,10 @@ function hd(){
     - 分配新的内存空间：对于基本数据类型，JavaScript 会在内存中为新值分配新的空间。
     - 保存新值：新的值会被保存在这块新的内存空间中。
     - 更新变量的引用：变量不再引用旧值的内存空间，而是直接指向新值的内存空间。对于基本数据类型，变量实际上保存了这个值本身，而不是一个地址。
+  ```js
+  let x = 10;  // 分配内存，并存储值10
+  x = 20;      // 重新为x分配内存，并存储新的值20
+  ```
 
 - var的作用域
   - var和let对于window的影响是不同的
@@ -330,6 +334,199 @@ console.log(data.getTime());
 cost timestamp = date.valueOf();
 // 时间戳转换为ISO时间格式
 console.log(new Date(timestamp));
+```
+- 封装日期的格式化函数
+```js
+const date = new Date("1992-2-12 10:22:18");
+console.log(date);
+console.log(date.getFullYear()); //获得年份 1992
+console.log(date.getMonth() + 1); // 获得月份，从0开始，所以要+1 1
+console.log(date.getDate());  // 获得日 12
+console.log(date.getHours()); // 获得小时 10
+console.log(date.getMinutes()); // 获得分钟 22
+console.log(date.getSeconds()); // 获得秒 18
 
+const = `${date.getFullYear()}年${date.getMonth()+1}月`
+
+function dateFormat(date, format="YYYY-MM-DD HH:mm:ss") {
+    const config = {
+        YYYY:date.getFullYear(),
+        MM:date.getMonth() + 1,
+        DD:date.getDate(),
+        HH:date.getHours(),
+        mm:date.getMinutes(), 
+        ss:date.getSeconds()
+    }
+    for (const key in config) {
+        format = format.replace(key, config[key]);
+    }
+}
+
+console.log(dateFormat(date, "YYYY年MM日DD日，HH时mm分ss秒"));
+```
+
+## 数组
+
+### 数组的查看方式
+```js
+const hd = [1,2,3,4];
+console.log(hd);
+console.table(hd); // 以表格的方式更清晰的展示数组
+```
+### 数组的方法
+```js
+// 获取数组长度
+let array = [1,2,3,4];
+console.log(array.length);
+
+// 数组创建，如果只有一个值
+let cms = new Array(6); // 6个空元素
+console.log(cms.length); // 6
+
+// 为了避免这种情况，新版js推出了Array.of
+let arr = Array.of(6); // [6]
+console.log(arr.length); // 1
+
+// 判断一个对象是否是数组
+console.log(Array.isArray(23)); // false
+console.log(Array.isArray([1,2,3])); // true
+
+// 数组转换成字符串
+// js的数组在其他语言是不通用的，但是转换成字符串，就可以通用，方便数据传递
+let hd = String([1,2,3]); // 1,2,3
+let hd = [1,2,3].toString(); // 1,2,3
+let hd = [1,2,3].join('-'); // 1-2-3
+
+// 字符串转换成数组
+let str = "hdcms";
+console.log(str.split('')); // ['h','d','c','m','s']
+let str2 = "hdcms,houdunren"
+console.log(str2.split(",")); // ["hdcms","houdunren"]
+
+console.log(Array.from(str)); // ['h','d','c','m','s']
+// 一般来说，只要有length属性，就能使用Array.from()转换成数组
+let obj = {
+    0: "hdcms",
+    1: "houdunren"
+};
+console.log(Array.from(obj)) // [] 并不能转换成数组
+
+let obj = {
+    0: "hdcms",
+    1: "houdunren",
+    length: 2
+};
+console.log(Array.from(obj)) // ["hdcms","houdunren"]，成功转换成数组  
+
+// Array.from(非数组,函数(用来对数组里的元素进行遍历操作))
+// 作用：将有length属性的对象转换为数组，并对其元素进行二次处理
+let divs = document.querySelectorAll("div");
+console.log(
+    Array.from(divs,function(item) {
+        item.style.backgroundColor="red";
+        return item;
+    })
+);
+```
+
+### 展开语法
+```js
+let arr = ["hdcmd","houdunren"];
+let hd = ["js","css"];
+arr = [...arr, ...hd]; // ["hdcmd","houdunren","js","css"] 
+
+function sum(...args) {
+    console.log(args);
+    return args.reduce((s,v) => {
+        return (s += v);
+    },0);
+
+}
+
+console.log(sum(1,2)); // [1,2]  3
+
+// 展开语法也能将伪数组转换成数组
+const div = document.querySelectorAll('div');
+[...div].map((item) => {
+    item.addEventListener('click',function() {
+        this.classList.toggle("hide");
+    })
+})
+```
+
+### 解构语法
+- 将数组里的值批量的赋值给变量
+```js
+let arr = ['后盾人,2010'];
+let name = arr[0];
+let year = arr[1];
+console.log(name,year);
+
+// 解构赋值
+let [name,year] = arr // 等同于：let name = arr[0]; let year = arr[1];
+
+function get() {
+    return ["后盾人", 2010];
+}
+let [name,year] = get();
+```
+
+### 数组中添加元素的多种技巧
+```js
+// 添加元素方法1
+let array = [1,2,3,4];
+array[array.length] = 5; // [1, 2, 3, 4, 5]
+array[array.length] = 6; // [1, 2, 3, 4, 5, 6]
+
+// 合并多个数组
+let array1 = [1,2,3];
+let array2 = [4,5,6];
+let array3 = [7,8,9];
+let arraySum = [...array1,...array2,...array3];
+console.log(arraySum)
+
+// 使用push合并数组，push会自动返回总长度
+length = array1.push[...array2,array3];
+console.log(array1);
+console.log(length);
+```
+- 添加和删除总结：
+  - 添加：push, unshift (都返回长度)
+  - 删除：pop, shift (都返回值)
+
+- 数组的填充
+```js
+console.log(Array(5)) // emypt*5
+console.log(Array(5).fill(1)) // [1,1,1,1,1]
+console.log(Array(5).fill(1,1,2))
+```
+
+- 数组的截取
+```js
+// 场景1：slice
+let arr = [1,2,3,4,5];
+let hd = arr.slice(1,2); // [2]
+console.log(arr) // [1,2,3,4,5]
+
+// 场景2：splice
+let arr = [1,2,3,4,5];
+let hd = arr.splice(1,3);
+console.log(hd); [2,3,4]
+console.log(arr); [1,5]
+
+// splice实现从中间添加元素
+let arr = [1,2,3,4,5];
+let hd = arr.splice(1,3,'a'); 
+// 第三个带后面的参数是在删除的地方填充指定元素
+
+// 使用splice实现在数组中间添加元素
+let arr = [1,2,3,4,5];
+let hd = arr.splice(1,0,'a','b','c');
+console.log(hd) [] // splice是返回一个数组，元素是删除的数组元素
+console.log(arr) [1, 'a', 'b', 'c', 2, 3, 4, 5]
+总结：
+slice是提取指定子数组，对原数组无影响
+splice是截取指定子数组，指定的子数组会从源数组中删除
 
 ```
+
