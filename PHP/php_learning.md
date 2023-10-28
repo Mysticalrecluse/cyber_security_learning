@@ -193,6 +193,17 @@ $a = 9;
 echo $b; // 9
 echo $a; // 9
 ```
+```php
+$arr1 = Array(1,2,3);
+$arr2 = &$arr1;
+$arr2[0] = 4;
+echo '<hr/>';
+print_r($arr1);
+echo '<hr/>';
+print_r($arr2);
+// 和js不同的是，数组的赋值并不是指向地址，也是开启一个新的内存空间
+// 如果要将新变量指向同一个地址，和基本类型一样，也要使用&
+```
 
 ### 可变变量与变量作用域
 - 可变变量
@@ -325,4 +336,132 @@ function show() {
   echo make();
   echo make();
   echo make();
+  ```
+
+## 数据类型
+### 整型-进制转换
+- 整型
+```php
+// 八进制 -> 十进制
+$num = 777;
+echo octdec($num);
+
+// 十六进制 -> 十进制
+echo hexdec($num);
+```
+
+### 布尔型
+- 对象无论是否为空，都为真
+- 空数组是假，null值为假
+- 同Javascript
+
+### php手册
+- php.net 在线手册
+
+### 字符串
+- 双引号可以加变量
+```php
+$string = "houdunren.com";
+echo "后盾人的网址 {$string}";
+// echo "后盾人的网址$string"; 效果相同
+// 双引号内可以直接引用变量
+// 单引号不行
+
+```
+- 如果出现乱码，可以加header响应头解决编码问题
+```php
+header('Content-type:text/html;charset=utf-8');
+```
+
+- 字符串定界符
+```php
+$str = <<<php  
+<h1 style="color:red;">mystical-recluse</h1>
+php;
+// php 可以替换为其他字符
+echo $str;
+```
+
+- 字符串连接
+```php
+$str1 = "mystical";
+$str2 = "recluse";
+echo $str1.'-'.$str2;
+```
+
+- 字符串的函数
+
+  - 获取字符串长度
+  ```php
+  // 获取字符串的长度
+  $string = "mysticalrecluse" //15
+  echo strlen($string);
+  echo strlen('神秘隐士'); // 12 宽字节一个汉字占3个字节
+
+  // 显示汉字(宽字节)的数量
+  echo mb_strlen('神秘隐士','utf8');
+
+  //
+  ```
+  - 删除左右字符数据
+  ```php
+  // trim(); 默认删除字符串两边的空格
+  $string = ' mysticalrecluse '; // 15
+  echo strlen($string);
+  echo strlen(trim($string)); // 13
+  echo strlen(trim($string,' esum'));  
+  // 这里第二个参数表示左右删除的指定字符，以单个字符进行判定
+
+  $str = " mysticalrecluse ";
+  $str1 = trim($str,' emysr');
+  echo $str.'<hr/>'; // mysticalrecluse
+  echo $str1; // ticalreclu
+
+  // 只删除左边的指定字符ltrim()
+
+  // 只删除右边的指定字符rtrim()
+  ```
+  - 转大小写
+  ```php
+  $str = "HelloWorld";
+  strtolower(); // 指定字符转换为小写
+  echo strtolower($str);
+
+  strtoupper(); // 指定字符转换为大写
+  echo strtoupper($str);
+
+  ucfirst() // 指定字符首字母大写
+
+  ucwords() // 每个单词首字母大写，默认空格是分隔符
+  // ucwords(字符串，分隔符)
+  echo ucwords('hello,world',',');
+  ```
+  - md5加密（hash为一个32位的字符）
+  ```php
+  $passwd = "mystical";
+  echo md5($passwd);
+  ```
+  - 字符串拆分
+  ```php
+  // explode(分隔符,字符串)
+  // 生成数组
+  print_r(explode('-','mystical-recluse')); 
+  // Array ( [0] => mystical [1] => recluse ) 
+  // 相当于Javascript中的split()
+  ```
+  - 字符串的合并
+  ```php
+  // implode(分隔符，数组)
+  $arr = ['email','3140394153@qq.com'];
+  echo implode(':',$arr);
+  // 相当于JavaScript中的join()
+  ```
+  - 字符串截断
+  ```php
+  // substr(字符串，起始位置(索引), 终止到第几个字符);
+  $str = "mystical";
+  echo substr($str,0,3); // mys
+
+  $ad = "大家好"
+  echo mb_substr($ad,0,1,'utf-8')
   ```

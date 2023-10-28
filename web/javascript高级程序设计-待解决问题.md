@@ -137,6 +137,22 @@ for (const value of houdunren) {
     // hdcms;
     // houdunren.com 
 }
+
+let arr = [1,2,3];
+for (let value of arr) {
+    value += 10;
+}
+console.log(arr);
+
+// 当数组的元素是值得时候，for...of...对元素得修改不影响原数组
+
+let arr = [{name:1},{name:2},{name:3}];
+for (let value of arr) {
+    value.name += 10;
+}
+console.log(arr);
+
+// 当数组的元素是对象，即引用类型时，对元素的修改会影响原数组的值
 ```
 
 ## 字符串 
@@ -183,26 +199,23 @@ for (const value of houdunren) {
         {title: "GRID 栅格系统", author: "顾老师"}
         ];
 
+    function template(){
+        return `<ul>
+            ${lessons.map((item)=>
+                link`<li>作者:${item.author}, 课程:${item.title}</li>`
+            ).join('')}
+        </ul>
+         `
+    };
 
+    function link(strings,...values){
+        return strings.map((str,key)=>{
+            return str+(values[key]?values[key].replace('后盾人','<a href="#">后盾人</a>'):'')
+        }).join('')
 
-        function template(){
-            return `<ul>
-                ${lessons.map((item)=>
-                    link`<li>作者:${item.author}, 课程:${item.title}</li>`
-                ).join('')}
-            </ul>
-            `
-        };
-
-        function link(strings,...values){
-            return strings.map((str,key)=>{
-                return str+(values[key]?values[key].replace('后盾人','<a href="#">后盾人</a>'):'')
-            }).join('')
-
-            }
+        }
         
-
-        document.body.innerHTML += template();
+    document.body.innerHTML += template();
     ```
 
 ### 字符串函数
@@ -233,7 +246,7 @@ hd.indexOf("t") // -1，找不到的情况下，返回-1
 // includes()
 console.log(hd.includes("h",num)); // true
 // includes()方法，返回布尔值，存在true，不存在false
-// 参数2：表示从第几个字符开始查找
+// 参数2：表示从第几个字符开始查找，这里的几是索引值
 
 // startsWith()
 console.log(hd.startsWith("h")); // 判断字符串是否是以h开头，返回布尔值
@@ -360,6 +373,7 @@ function dateFormat(date, format="YYYY-MM-DD HH:mm:ss") {
     for (const key in config) {
         format = format.replace(key, config[key]);
     }
+    return format;
 }
 
 console.log(dateFormat(date, "YYYY年MM日DD日，HH时mm分ss秒"));
@@ -492,13 +506,14 @@ console.log(length);
 ```
 - 添加和删除总结：
   - 添加：push, unshift (都返回长度)
-  - 删除：pop, shift (都返回值)
+  - 删除：pop, shift (都返回值)，pop和shift不接受任何参数
 
 - 数组的填充
 ```js
 console.log(Array(5)) // emypt*5
 console.log(Array(5).fill(1)) // [1,1,1,1,1]
-console.log(Array(5).fill(1,1,2))
+console.log(Array(5).fill(1,1,3)) // [empty,1,1,empty*2]
+// 参数1：填充的值，参数2，从索引几开始填充，参数3：填充到第几个
 ```
 
 - 数组的截取
@@ -511,12 +526,12 @@ console.log(arr) // [1,2,3,4,5]
 // 场景2：splice
 let arr = [1,2,3,4,5];
 let hd = arr.splice(1,3);
-console.log(hd); [2,3,4]
-console.log(arr); [1,5]
+console.log(hd); // [2,3,4]
+console.log(arr); // [1,5]
 
 // splice实现从中间添加元素
 let arr = [1,2,3,4,5];
-let hd = arr.splice(1,3,'a'); 
+let hd = arr.splice(1,3,'a');  
 // 第三个带后面的参数是在删除的地方填充指定元素
 
 // 使用splice实现在数组中间添加元素
@@ -527,6 +542,196 @@ console.log(arr) [1, 'a', 'b', 'c', 2, 3, 4, 5]
 总结：
 slice是提取指定子数组，对原数组无影响
 splice是截取指定子数组，指定的子数组会从源数组中删除
+```
+
+### 数组元素移动的函数案例
+```js
+function move(array,from,to) {
+    if (from < 0 | to >= array.length) {
+        console.error("参数错误")
+        return;
+    }
+    const newArray = [...array];
+    let item = newArray.splice(from,1);
+    newArray.splice(to,0,...item);
+    return newArray;
+}
+
+let array = [1,2,3,4];
+console..table(move(array,1,3)) // [1,3,4,2]
+
+```
+
+### 清空数组的多种方式
+```js
+let hd = [1,2,3,4,5];
+let arr = hd;
+hd = [];
+// 此时相当于开辟一个新的空间，存放空数组，然后将hd指向新的空间，但是arr的数组不变
+console.log(arr) // [1,2,3,4,5]
+console.log(hd) // []
+
+let hd = [1,2,3,4,5];
+let arr = hd;
+hd.length = 0;
+// 此时相当于将原数组的值清空，arr和hd都变成了空数组
+console.log(arr); //[]
+console.log(hd); //[]
+```
+
+### 数组的拆分和合并
+```js
+// 拆分
+let str = "mystical";
+console.log(str.split('')); // ['m','y','s','t','i','c','a','l']
+let str2 = "mystical,recluse";
+console.log(str.split(',')); // ['mystical','recluse']
+
+// 合并
+let str = "mystical,recluse";
+let hd = str.split(',');
+console.log(hd.join('-')); // mystical-recluse
+
+let arr = ["mystical","recluse"];
+let hd = [1,2,3,4];
+let cms = ["shop","cms"];
+arr = arr.concat(hd,cms);
+arr = [...arr,...hd,...cms];
+
+// 将数组的指定元素复制到指定位置
+let hd = [1,2,3,4,5,6];
+console.log(hd.copyWithin(3,1,3)); // [1,2,3,2,3,6]
+// 参数1：复制到的位置（索引值）
+// 参数2：从第几个元素开始复制（索引值）
+// 参数3：复制到第几个（元素个数）
+```
+
+### 查找元素基本使用
+```js
+// indexOf() 和 lastIndexOf()
+// 两个参数，第一个参数是查找的元素，第二个参数是查找的起始点
+let arr = [1,2,3,4,2];
+console.log(arr.indexOf(2)) // 1
+console.log(arr.lastIndexOf(2)) // 4
+console.log(arr.indexOf(-9))  // 查询不到的都返回-1
+console.log(arr.indexOf(2,2)) // 4
+
+// includes()
+console.log(arr.includes(2)); // true 返回布尔类型
+// includes()不适用于引用数据类型
+```
+
+### includes的实现原理
+```js
+let arr = [1,2,3,4,5];
+function includes(array,find) {
+    for (const value of array) if (value===find) return true;
+    return false;
+}
+console.log(includes(arr,99)); // false
+```
+
+### find与findIndex新增方法
+```js
+let arr = [1,2,3,4,5];
+let res = arr.find(function(item){
+    return item ==200;
+})
+console.log(res); // undefined
+
+// find()函数返回的是值，
+
+// find()可以查询引用数据类型是否在列表中，includes不行
+let lessons = [{name:"js"},{name:"css"},{name:"mysql"}];
+let status = lessons.find(function(item){
+    return item.name == "css";
+});
+console.log(status); // 返回{name:"css"}
+
+// findIndex()返回索引值
+
+let index = lessons.findIndex(function(item){
+    return item.name=="mysqll";
+});
+console.log(index); // 2
+```
+
+### find函数的实现方法
+```js
+function find(array,callback){
+    for(const value of array) {
+        if (callback(value)) return value;
+    }
+    return undefined;
+}
+```
+- 箭头函数有一个特点：如果函数体只有一条语句，而且没有使用大括号 {} 包裹，那么这条语句的执行结果会被自动返回。这就是所谓的 "implicit return"（隐式返回）
+
+### 数组排序技巧
+```js
+let arr = [1,4,6,2,3];
+arr = arr.sort(function(a,b)) {
+    // a-b为负数，从小到大
+    // a-b为正数，从大到小
+    return a - b; // 从小到大排序
+    return b - a; // 从大到小排序
+}
+console.log(arr);
+
+// 对象排序示例
+let cart = [
+    {name:"iphone",price:12000},
+    {name:"imac",price:18000},
+    {name:"ipad",price:3200}
+];
+cart = cart.sort(function(a,b) {
+    return a.price - b.price;
+});
+console.log(cart); // 按价格升序排列
+```
+
+### sort排序算法原理实现
+```js
+let arr = [1,5,3,9,7];
+
+function sort(array,callback) {
+    for (const n in array) {
+        for (const m in array) {
+            if (callback(array[n],array[m]) < 0) {
+                const temp array[n];
+                array[n] = array[m];
+                array[m] = temp;
+            }
+        }
+    }
+    return array;
+}
+arr = sort(arr,function(a,b) {
+    return a - b;
+});
+console.log(arr);
+```
+- 正常冒泡排序的用法
+```js
+function sort(array, callback) {
+    for (let i = 0; i < array.length - 1; i++) {        // 外部循环，对应于每一轮的“冒泡”
+        for (let j = 0; j < array.length - 1 - i; j++) {    // 内部循环，对应于每一对相邻元素的比较
+            if (callback(array[j], array[j + 1]) > 0) { 
+                // 使用回调函数比较元素，如果array[j] > array[j+1]，则返回值为正数
+                const temp = array[j];
+                array[j] = array[j + 1];
+                array[j + 1] = temp;  // 交换元素位置
+            }
+        }
+    }
+    return array;
+}
+
+let arr = [5, 1, 4, 2, 8];
+arr = sort(arr, function(a, b) {
+    return a - b;  // 对于升序排列
+});
+console.log(arr);  // 输出：[1, 2, 4, 5, 8]
 
 ```
 

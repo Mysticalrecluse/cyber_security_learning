@@ -1692,6 +1692,12 @@ FROM test_bit1;
     - 字节：1
     - 日期格式：YYYY或YY
     - 最小值1901，最大值2155，受限于只有1个字节，所以只能表示256年
+    - 推荐用4位表示
+    - 注意：2位表示时
+      - 当取值01到69，表示2001到2069；
+      - 当取值70到99，表示1970到1999；
+      - 当取值整数的0或00添加的话，那么是0000年
+      - 当取值是日期/字符串的'0'添加的话，是2000年
   - DATE类型，通常用来表示年、月、日
     - 字节：3
     - 日期格式：YYYY-MM-DD（推荐） | YY-MM-DD
@@ -1700,15 +1706,33 @@ FROM test_bit1;
     - 字节：3
     - 日期格式：HH:MM:SS
     - 最小值：-838:59:59；最大值：838:59:59
+    - 注意：为什么时间类型TIME的取值范围不是-23:59:59到23:59:59?
+      - 原因是MySQL设计的TIME类型，不光表示一天之内的时间，而且可以用来表示一个时间间隔，这个时间间隔可以超过24小时
   - DATETIME类型，通常用来表示，年、月、日、时、分、秒
     - 字节：8
+    - 日期格式：YYYY-MM-DD HH:MM:SS
+    - 范围：1000-01-01 00:00:00；到 9999-12-31 23:59:59
   - TIMESTMAP类型，通常用来表示带时区的年、月、日、时、分、秒
     - 字节：4
+    - 日期格式：YYYY-MM-DD HH:MM:SS
+    - 范围：1970-10-10 00:00:00UTC; 到2038-10-19 03:14:07UTC
+    - 修改当前时区`SET time_zone = '+9:00';`
+
+- 开发中经验
+  - 在实际项目中，尽量用DATETIME类型。因为这个数据类型包括了完整的日期和时间信息，取值范围也最大，使用起来比较方便。
+  - 一般存注册时间，商品发布时间等，不建议使用DATETIME存储，而是使用时间戳，因为DATETIME虽然直观，但不便于计算
+  ```sql
+  SELECT UNIX_TIMESTAMP();
+  -- 用数字类型存储，比如BIGINT
+
+  SELECT FROM_UNIXTIME(`TIMESTAMP`);
+  -- FROM_UNIXTIME()将时间戳转换为时间格式
+  ```
 
 ```sql
 CREATE TABLE test_year(
   f1 YEAR,
-  f2 YEAR(4)
+  f2 YEAR(4) -- 不推荐后面加(4)，因为默认位4位
 );
 
 INSERT INTO test_year(f1)
@@ -1733,6 +1757,182 @@ INSERT INTO test_time1
 VALUES('2 12:30:29'),('12:35:29'),('12:40'),('2 12:40'),('1 05'),('45');
 -- D HH:MM:SS ; HH:MM:SS ; HH:MM ; D HH:MM ; D HH ; SS
 ```
+
+#### 文本字符串类型
+- MYSQL中，文本字符串总体上分为CHAR、VARCHAR、TINYTEXT、TEXT、LONGTEXT、ENUM、SET等类型
+
+<table>
+  <thead>
+    <th style="background-color:darkred;color:white;">文本字符串类型</th>
+    <th style="background-color:darkred;color:white;">值的长度</th>
+    <th style="background-color:darkred;color:white;">长度范围</th>
+    <th style="background-color:darkred;color:white;">占用的存储空间</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>CHAR(M)</td>
+      <td>M</td>
+      <td>0<=M<=255</td>
+      <td>M个字节</td>
+    </tr>
+    <tr>
+      <td>VARCHAR(M)</td>
+      <td>M</td>
+      <td>0<=M<=65535</td>
+      <td>M+1个字节</td>
+    </tr>
+    <tr>
+      <td>TINYTEXT</td>
+      <td>L</td>
+      <td>0<=L<=255</td>
+      <td>L+2个字节</td>
+    </tr>
+    <tr>
+      <td>TEXT</td>
+      <td>L</td>
+      <td>0<=L<=65535</td>
+      <td>L+2个字节</td>
+    </tr>
+    <tr>
+      <td>MEDIUMTEXT</td>
+      <td>L</td>
+      <td>0<=L<=16777215</td>
+      <td>L+3个字节</td>
+    </tr>
+    <tr>
+      <td>LONGTEXT</td>
+      <td>L</td>
+      <td>0<=L<=4294967295</td>
+      <td>L+4个字节</td>
+    </tr>
+    <tr>
+      <td>ENUM枚举</td>
+      <td>L</td>
+      <td>1<=L<=65535</td>
+      <td>1或2个字节</td>
+    </tr>
+    <tr>
+      <td>SET</td>
+      <td>L</td>
+      <td>0<=L<=64</td>
+      <td>1,2,3,4或8个字节</td>
+    </tr>
+  </tbody>
+</table>
+
+- char(M)类型
+  - 没有指名M的情况下，默认一个字符
+  - 固定长度
+  - 如果保存时，数据的实际长度比CHAR类型声明的长度小，则会在右侧填充空格以达到指定的长度。当MySQL检索CHAR类型的数据时，CHAR类型的字段会去除尾部的空格
+
+- VARCHAR(M)类型
+  - VARCHAR(M)定义时，必须指定长度M，否则报错
+  - MySQL4.0版本以下，varchar(20): 指的是20字节。如果存放UTF8汉字时，只能存6个(每个汉字3字节)
+  - MySQL5.0版本以上，varchar(20): 指的是20字符
+  - 检索VARCHAR类型的字段数据时，会保留数据尾部的空格。VARCHAR类型的字段所占用的存储空间为字符串实际长度加1个字节
+
+- CHAR或VARCHAR如何选择
+  - 情况1：存储很短的信息，比如门牌号码101，102等，这样很短的信息应该用char，因为varchar还要占个byte用于存储信息长度，得不偿失
+  - 情况2：固定长度的。比如uuid作为主键，那用char更合适
+  - 情况3：十分频繁更改column。因为varchar每次存储都要有额外的计算，得到长度等工作，如果一个非常频繁改变的，那就要有很多精力用于计算，而这些对char来说是不需要的
+  - 情况4：具有存储引擎的情况
+    - MyISAM(MySQL5.5之前的)数据存储引擎和数据列：MyISAM数据表，最好使用固定长度(CHAR)的数据列代替可变长度(VARCHAR)的数据列。这样使得整个表静态化，从而使数据检索更快，用空间换时间。
+    - MEMORY(内存的)存储引擎和数据列：MEMORY数据表目前都使用固定长度的数据行存储，因此无论使用CHAR或VARCHAR列都没有关系，两者都有作为CHAR类型处理的
+    - InnoDB(MySQL5.5之后版本)存储引擎，建议使用VARCHAR类型。因为对于InnoDB数据表，内部的行存储格式并没有区分固定长度和可变长度(所有数据行都是用指向数据列值的头指针)，而且<font color=tomato>主要影响性能的因素是数据行使用的存储总量</font>，由于char平均占用的空间多于varchar，所以除了简短并固定长度的，其他考虑varchar。这样节省空间，对磁盘I/O和数据存储总量比较好。
+
+- TEXT类型
+  - MySQL不允许用TEXT类型做主键
+  - 开发经验：TEXT文本类型，可以存比较大的文本段，搜索速度稍慢，因此如果不是特别大的内容，建议使用CHAR、VARCHAR来代替。
+  - 而且TEXT和BLOB类型的数据删除后容易导致“空洞”，使得文件碎片比较多，所以频繁使用的表不建议包含TEXT类型字段，建议单独分出去，单独用一个表
+
+- ENUM类型（枚举）
+  - 当ENUM类型包含1~255个成员时，需要1个字节的存储空间；
+  - 当ENUM类型包含256~65535个成员时，需要2个字节的存储空间
+  - ENUM类型的成员个数上限是65535
+  - ENUM的值忽略大小写
+  - 也可以直接使用索引还调用枚举元素
+  ```sql
+  CREATE TABLE test_enum (
+    season ENUM('春','夏','秋','冬','unknow')
+  );
+
+  INSERT INTO test_enum
+  VALUE (1),(3) --  春，秋 可以直接用索引调用枚举元素
+
+  INSERT INTO test_enum
+  VALUE ('UNKNOW') -- unknow 不区分大小写
+
+  INSERT INTO test_enum
+  VALUE (NULL); -- 没有限制非空的情况下，可以添加null
+  ```
+
+- SET类型
+  - SET表示一个字符串对象，可以包含0个或多个成员，但成员个数的上限为64.设置字段值时，可以取取值范围内的0个或多个值
+  ```sql
+  CREATE TABLE test_set(
+    s SET ('A','B','C')
+  );
+
+  INSERT INTO test_set (s) VALUES ('A'), ('A,B');
+
+  INSERT INTO test_set (s) VALUES ('A,B,C,A');
+  -- MySQL会自动删除重复的成员
+  ```
+
+#### 二进制字符类型
+- BINARY类型和VARBINARY类型 （实际生产中用的很少）
+  - 代码演示
+  ```sql
+  CREATE TABLE test_binary1(
+    f1 BINARY, -- 不指明长度，默认为1
+    f2 BINARY(3),
+    -- f3 VARBINARY, VARBINARY后面必须指定长度
+    f4 VARBINARY(10)
+  );
+  ```
+
+- BLOB类型
+  - BLOB是一个二进制大对象，可以容纳可变数量的数据
+  - MySQL中的BLOB类型包括TINYBLOB、BLOB、MEDIUMBLOB和lONGBLOB 4种类型，它们可以容纳的最大长度不同。可以存储一个二进制的大对象，比如图片，音频和视频等
+  - 需要注意的是，在实际工作中，往往不会在MySQL数据库中使用BLOB类型存储大对象数据，通常会将图片，音频和视频文件存储到服务器的磁盘上，并将图片、音频和视频的访问路径存储到MySQL中
+
+#### JSON类型 
+- JSON(JavaScript Object Notation)是一种轻量级的数据交换格式。简洁和清晰的层次结构使得JSON称为理想的数据交换语言。它易于人阅读和编写，同时也易于机器解析和生成，并有效地提升网络传输的效率。
+  - <font color=tomato>JSON可以将JavaScript对象中表示的一组数据转换为字符串，然后就可以在网络或者程序之间轻松的传递这个字符串，并在需要的时候将它还原为各编程语言所支持的数据格式。</font>
+  - 在MySQL5.7中，就已经支持JSON数据类型。在MySQL8.x版本中，JSON类型提供了可以自动验证的JSON文档和优化的存储结构，使得在MySQL中存储和读取JSON类型的数据更加方便和高效
+  ```sql
+  CREATE TABLE test_json(
+    js json
+  );
+
+  INSERT INTO test_json (js)
+  VALUES ('{"name":"zhangYF","age":18,"address":{"province":"HeiLongjiang","city":"Harbin"}}');
+  ```
+  - 提取JSON中的值
+  ```sql
+  SELECT js -> '$.name' AS NAME,
+  js -> '$.age' AS age,
+  js -> '$.address.province' AS province,
+  js -> '$.address.city' AS city
+  FROM test_json;
+  ```
+
+#### 空间类型
+- 暂略
+
+#### 小结及选择建议
+- 在定义数据类型时
+  - 如果确定是整数，就用INT
+  - 如果确定是小数，就用DECIMAL(M,D)
+  - 如果是日期与时间，就用DATETIME
+
+- <font color=tomato>阿里巴巴《Java开发手册》之MySQL数据库：</font>
+  - 任何字段如果为非负数，必须是UNSIGNED
+  - 【强制】小数类型为DECIMAL，禁止使用FLOAT和DOUBLE
+    - 说明：在存储的时候，FLOAT和DOUBLE都存在精度损失的问题，很可能在比较值的时候，得到不正确的结果。如果存储的数据范围超过DECIMAL的范围，建议将数据拆成整数和小数分开存储
+  - 【强制】如果存储的字符串长度几乎相同，使用CHAR定长字符串类型
+  - 【强制】VARCHAR是可变长字符串，不预先分配存储空间，长度不要超过5000.如果存储长度大于此值，定义字段类型为TEXT，独立出来一张表，用主键来对应，避免影响其他字段索引效率
+
 
 ### 创建数据表
 ```sql
@@ -1965,4 +2165,501 @@ DROP TABLE book1,book2;
   ```
 
 
-### 数据类型（详解）
+## 数据完整性与约束
+- 约束(constraint)概述
+  - 为什么需要约束
+    - 数据完整性(Data Integrity)是指数据的精确性(Accuracy)和可靠性(Reliability)。它是防止数据库中存在不符合语义规定的数据和防止因错误信息的输入输出造成无效操作或错误信息而提出的
+    - 为了保证数据的完整性，SQL规范以约束的方式对<font color=red>表数据进行额外的条件限制</font>。从以下四个方面考虑：
+      - <font color=tomato>实体完整性(Entity Integrity)</font>: 例如，同一个表中，不能存在两条完全相同无法区分的记录
+      - <font color=tomato>域完整性(Domain Integrity)</font>: 例如：年龄范围0-120，性别范围“男/女”
+      - <font color=tomato>引用完整性(Referential Integrity)</font>: 例如：员工所在部门，在部门表中要能找到这个部门
+      - <font color=tomato>用户自定义完整性(User-defined Integrity)</font>: 例如：用户名唯一，密码不能为空等，本部门经理的工资不得高于本部门职工的平均工资的5倍
+
+- 什么是约束
+  - 约束是表级的强制规定
+  - 可以在创建表时规定约束 (<font color=red>通过CREATE TABLE语句</font>)，或者在表创建之后通过<font color=red>ALTER TABLE</font>语句规定约束
+
+### 约束的分类
+- 角度1：约束的字段个数
+  - 单列约束
+  - 多列约束
+
+- 角度2：约束的作用范围
+  - 列级约束
+    - 将此约束声明在字段后面
+  - 表级约束
+    - 在表中所有字段都声明完之后，在所有字段的后面声明的约束
+
+- 角度3：约束的作用
+  - `not null`  非空约束
+  - `unique`  唯一性约束
+  - `primary key`  主键约束
+  - `foreign key`  外键约束
+  - `check`  检查约束
+  - `default`  默认值约束
+
+- 如何查看表中的约束
+```sql
+SELECT * FROM information_schema.table_constraints
+WHERE table_name='表名称';
+```
+
+### 非空约束
+- 作用：限定某个字段/某列的值不允许为空
+
+- 关键字：`NOT NULL`
+
+- 特点：
+  -  默认，所有的类型的值都可以是NULL，包括INT、FLOAT等数据类型
+  -  非空约束只能出现在表对象的列上，只能某个列单独限定非空，不能组合非空
+  -  一个表可以有很多列都分别限制非空
+  -  空字符''不等于NULL，0也不等于NULL
+
+- 添加非空约束
+  - 建表时
+  ```sql
+  CREATE TABLE 表名称(
+    字段名 数据类型,
+    字段名 数据类型 NOT NULL,
+    字段名 数据类型 NOT NULL
+  );
+  ```
+  - 示例
+  ```sql
+  CREATE DATABASE dbtest;
+  USE dbtest;
+
+  CREATE TABLE test1(
+    id INT NOT NULL,
+    last_name VARCHAR(15) NOT NULL,
+    email VARCHAR(25),
+    salary DECIMAL(10,2)
+  )
+
+  INSERT INTO test1
+  VALUES(1,'Tom','tom@123.com',3400);
+
+  INSERT INTO test1(id,email,salary)
+  VALUES(2,'tom@123.com',3400); -- 因为last_name未填值，默认为NULL
+  -- 又因为在创建表单的时候添加了非空约束，因此报错
+  ```
+  - 在ALTER TABLE时添加非空约束
+  ```sql
+  ALTER TABLE test1
+  Modify salary DECIMAL(10,2) NOT NULL;
+  ```
+
+### 唯一性约束
+- 作用：用来限制某个字段/某列的值不能重复
+
+- 关键字：`UNIQUE`
+
+- 特点：
+  - 同一个表可以有多个唯一约束
+  - 唯一约束可以是某一个列的值唯一，也可以多个列组合的值唯一
+  - 唯一性约束允许列值为空
+  - 在创建唯一约束的时候，如果不给唯一约束命名，就默认和列名相同
+  - <font color=red>MySQL会给唯一约束的列上默认创建一个唯一索引</font>
+
+- 添加唯一性约束
+  - 建表时
+  ```sql
+  CREATE TABLE test2(
+    id INT UNIQUE, -- 列级约束
+    last_name VARCHAR(15),
+    email VARCHAR(25) UNIQUE,
+    salary DECIMAL(10,2)
+  );
+
+  CREATE TABLE test2(
+    id INT, 
+    last_name VARCHAR(15),
+    email VARCHAR(25),
+    salary DECIMAL(10,2),
+
+    -- 表级约束
+    CONSTRAINT uk_test2_email UNIQUE(email)
+    -- 给email字段添加UNIQUE约束，约束名为uk_test2_email
+    UNIQUE(id)
+    -- 也可以不加约束名，直接给字段添加唯一约束，约束名默认和字段名相同
+  );
+  ```
+  - 建表后指定唯一约束
+  ```sql
+  -- 方式1：
+  -- 可以创建多字段，复合唯一，即多个字段的组合是唯一的
+  ALTER TABLE 表名称 ADD UNIQUE KEY(字段列表);
+  ```
+  ```sql
+  -- 方式2：
+  ALTER TABLE 表名称 MODIFY 字段名 UNIQUE;
+  ```
+
+  - 删除唯一性约束
+    - 添加唯一性约束的列上也会自动创建唯一索引
+    - 删除唯一约束只能通过删除唯一索引的方式删除
+    - 删除时需要指定唯一索引名，唯一索引名和唯一约束名相同
+    - 如果创建唯一约束时未指定名称，如果是单列，就默认和列名相同；如果是组合列，那么默认和()中排在第一个的列名相同。也可以自定义唯一性约束名
+  - 删除唯一索引示例：
+  ```sql
+  -- 如何删除唯一性索引
+  ALTER TABLE test2
+  DROP INDEX last_name; -- INDEX后面接唯一约束名
+  ```
+
+### 主键约束(PRIMARY KEY)
+- 作用：用来唯一标识表中的一行记录
+
+- 关键字：`PRIMARY KEY`
+
+- 特点：
+  - 主键约束相当于唯一约束+非空约束的组合，主键约束列不允许重复，也不允许出现空值
+  - <font color=tomato>一个表最多只能有一个主键约束</font>，建立主键约束可以在列级别创建，也可以在表级别上创建
+  - 主键约束对应着表中的一列或者多列（复合主键）
+  - 如果是多列组合的复合主键约束，那么这些列都不允许为空值，并且组合的值不允许重复
+  - <font color=tomato>MySQL主键名总是PRIMARY，就算自己命名了主键约束名也没用</font>
+  - 当创建主键约束时，系统默认会在所在的列或列组合上建立对应的主键索引（能够根据主键查询的，就根据主键查询，效率更高）。如果删除主键约束了，主键约束对应的索引就自动删除了
+  - 需要注意的一点是，不要修改主键字段的值。因为主键是数据记录的唯一标识，如果修改了主键的值，就有可能会破环数据的完整性。
+
+- 添加主键约束
+  - 在CREATE TABLE时添加约束
+  ```sql
+  CREATE TABLE test3(
+    id INT PRIMARY KEY,  -- 列级约束
+    last_name VARCHAR(15),
+    salary DECIMAL(10,2),
+    email VARCHAR(25)
+  );
+
+   CREATE TABLE test3(
+    id INT,
+    last_name VARCHAR(15),
+    salary DECIMAL(10,2),
+    email VARCHAR(25),
+
+    PRIMARY KEY(id)  -- 表级约束，没有必要起名字 
+  );
+  ```
+  ```sql
+  -- 创建复合主键
+  CREATE TABLE user1(
+    id INT,
+    `name` VARCHAR(15),
+    `password` VARCHAR(25),
+
+    PRIMARY KEY(`name`,`password`)
+  );
+  ```
+  - 在ALTER TABLE时添加约束
+  ```sql
+  CREATE TABLE test6(
+    id INT,
+    last_name VARCHAR(15),
+    salary DECIMAL(10,2),
+    email VARCHAR(25)
+  );
+
+  ALTER TABLE test6
+  ADD PRIMARY KEY(id);
+  ```
+  - 删除主键约束
+  ```sql
+  ALTER TABLE 表名称 DROP PRIMARY KEY;
+  ```
+  - <font color=tomato>在实际开发中，不会去删除表中的主键约束</font>
+
+
+### 自增列：AUTO_INCREMENT
+- 作用：某个字段的值自增
+
+- 关键字：`AUTO_INCREMENT`
+
+- 特点和要求
+  - <font color=tomato>一个表最多只能有一个自增长列</font>
+  - 当需要产生唯一标识符或顺序值时，可设置自增长
+  - 自增长列约束的列必须是键列(主键列，唯一键列)
+  - 自增约束的列的数据类型必须是整数类型
+  - 如果自增长列指定了0和null，会在当前最大值的基础上自增；如果自增列手动指定了具体值，直接赋值为具体值
+
+- 创建自增长列
+  - 在CREATE TABLE时添加
+  ```sql
+  CREATE TABLE test7(
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    last_name VARCHAR(15)
+  );
+  -- 开发中，通常将自增长列添加到主键约束上
+  ```
+  - 在ALTER TABLE时添加
+  ```sql
+  ALTER TABLE test7
+  MODIFY id INT AUTO_INCREMENT;
+  ```
+
+- 在ALTER TABLE时删除
+```sql
+ALTER TABLE test7
+MODIFY id INT; -- 修改时不添加，则自动删除自增长
+```
+
+- MySQL8.0新特性-自增变量的持久化
+  - MYSQL5.7演示
+  ```sql
+  CREATE TABLE test9(
+    id INT PRIMARY KEY AUTO_INCREMENT
+  );
+
+  INSERT INTO test9
+  VALUES(0),(0),(0),(0);
+
+  SELECT * FROM test9; -- id的列值为1，2，3，4
+
+  DELETE FROM test9
+  WHERE id = 4;
+
+  INSERT INTO test9
+  VALUES(0); -- id的值为1，2，3，5
+
+  DELETE FROM test9
+  WHERE id = 5;
+
+  重启MySQL
+
+  SELECT * FROM test9;  -- 此时id的值为1,2,3
+
+  INSERT INTO test9
+  VALUES(0);  -- id的值为1，2，3，4
+
+  原理：重启后，内存中的数据不在了，id依然从3开始自增
+  ```
+  - MySQL8.0演示
+  ```sql
+  CREATE TABLE test9(
+    id INT PRIMARY KEY AUTO_INCREMENT
+  );
+
+  INSERT INTO test9
+  VALUES(0),(0),(0),(0);
+
+  SELECT * FROM test9; -- id的列值为1，2，3，4
+
+  DELETE FROM test9
+  WHERE id = 4;
+
+  INSERT INTO test9
+  VALUES(0); -- id的值为1，2，3，5
+
+  DELETE FROM test9
+  WHERE id = 5;
+
+  重启MySQL
+
+  SELECT * FROM test9;  -- 此时id的值为1,2,3
+
+  INSERT INTO test9
+  VALUES(0);  -- id的值为1，2，3，6
+  ```
+  - MySQL8.0持久化自增原理
+    -  原理：MySQL8.0将自增主键计数器持久化到重做日志中，每次计数器发生变化，都会将其写入重做日志中。如果 数据库重启，InnoDB会根据重做日志的信息来初始化计算器的内存值
+
+
+### 外键约束-FOREIGN KEY
+- 作用：
+  - 限定某个表的某个字段的引用完整性
+  - 比如：员工表的员工所在部门的选择，必须在部门表能找到对应的部分
+
+- 关键字：`FOREIGN KEY`
+
+- 主表和从表/父表和子表
+  - 主表(父表)：被引用的表，被参考的表
+  - 从表(子表)：引用别人的表，参考别人的表
+  - 例如：员工表的员工所在部门这个字段的值要参考部门表：部门表是主表，员工表是从表
+
+- 特点：
+  1. 从表的外键列，必须引用/参考主表的键主键或唯一约束的列
+    - 为什么：因为被依赖/被参考的值必须唯一
+  2. 在创建外键约束时，如果不给外键约束命名，默认不是列名，而是自动产生一个外键名(例如:student_ibfk_1;)，也可以指定外键约束名
+  3. 创建(CREATE)表时就指定外键的话，先创建主表，再创建从表
+  4. 删表时，先删从表(或先删除外键约束)，再删主表
+  5. 当主表的记录被从表参照时，主表的记录将不允许删除，如果要删除数据，需要先删除从表中依赖该记录的数据，然后才可以删除主表的数据
+  6. 在“从表”中指定外键约束，并且一个表可以建立多个外键约束
+  7. 从表的外键与主表被参照的列名称可以不相同，但是数据类型必须一样，逻辑意义一致。如果类型不一样，创建子表时，就会出现报错
+  8. 当创建外键约束时，系统默认会在所在的列上建立对应的普通索引。但是索引名是列名，不是外键的约束名（根据外键查询效率很高）
+  9. 删除外键约束后，必须手动删除对应的索引
+
+- 添加外键约束
+  - 在CREATE TABLE时添加
+  ```sql
+  -- 主表和从表；父表和子表
+  -- 先创建主表
+  CREATE TABLE dept1(
+    dept_id INT,
+    dept_name VARCHAR(15)
+  );
+
+  -- 再创建从表
+  CREATE TABLE emp1(
+    emp_id INT PRIMARY KEY AUTO_INCREMENT,
+    emp_name VARCHAR(15),
+    department_id INT,
+
+    -- 表级约束
+    CONSTRAINT fk_emp1_dept_id FOREIGN kEY (department_id) REFERENCES dept1(dept_id)
+  )
+  -- 上述操作报错，因为主表中的dept_id上没有主键约束或唯一性约束
+  添加
+  ALTER TABLE dept1
+  ADD PRIMARY KEY(dept_id);
+
+  -- 重新创建从表
+  CREATE TABLE emp1(
+    emp_id INT PRIMARY KEY AUTO_INCREMENT,
+    emp_name VARCHAR(15),
+    department_id INT,
+
+    -- 表级约束
+    CONSTRAINT fk_emp1_dept_id FOREIGN kEY (department_id) 
+    REFERENCES dept1(dept_id)
+  )
+  ```
+  - 演示外键效果
+  ```sql
+  INSERT INTO emp1
+  VALUES (1001,'TOM',10);
+  -- 出现报错
+  -- 因为主表中的department_id还没有数据，因此从表添加失败
+
+  INSERT INTO dept1
+  VALUES(10,'IT');
+  INSERT INTO emp1
+  VALUES(1001,'TOM',10);
+
+  -- 删除失败
+  DELETE FROM dept1
+  WHERE dept_id = 10;
+
+  -- 更新失败
+  UPDATE dept1
+  SET dept_id = 20
+  WHERE dept_id = 10;
+
+  -- 在从表的外键数据还在使用主表的数据时，主表的数据不能删除或更新，否则报错
+  ```
+  - ALTER TABLE时添加外键约束
+  ```sql
+  CREATE TABLE dept2(
+    dept_id INT PRIMARY KEY,
+    dept_name VARCHAR(15)
+  );
+
+  ALTER TABLE emp2
+  ADD CONSTRAINT fk_emp2_dept_id FOREIGN KEY(department_id)
+  REFERENCES dept2(dept_id);
+  ```
+
+- 约束等级
+  - <font color=tomato>Cascade方式</font>：在父表上update/delete记录时，同步update/delete掉子表的匹配记录
+  - <font color=tomato>Set null方式</font>：在父表上update/delete记录时，将子表上匹配记录的列设为null，但要注意子表的外键列表不能为NOT NULL
+  - <font color=tomato>No action方式</font>：如果子表中有匹配的记录，则不允许对父表对应候选键进行udpate/delete操作
+  - <font color=tomato>Restrict方式</font>：同no action，都是立即检查外键约束
+  - <font color=tomato> Set default方式</font>：（在可视化工具SQLyog中可能显示空白）：父表有变更时，子表将外键设置成一个默认的值，但Innodb不能识别
+  - 如果没有指定等级，就相当于Restrict方式
+  - 对于外键约束，最好是采用：ON UPDATE CASCADE ON DELETE RESTRICT的方式
+  - 演示
+  ```sql
+  CREATE TABLE dept(
+    did INT PRIMARY KEY,
+    dname VARCHAR(50)
+  );
+
+  CREATE TABLE emp(
+    eid INT PRIMARY KEY,
+    ename VARCHAR(5),
+    deptid INT,
+    FOREIGN KEY(deptid) REFERENCES dept(did)
+    ON UPDATE CASCADE ON DELETE SET NULL -- 添加约束等级
+  )
+  ```
+  - 推荐使用：`ON UPDATE CASCADE ON DELETE RESTRICT`
+
+
+- 删除外键约束
+  - 删除流程
+  ```sql
+  -- 第一步：先查看约束名和删除外键约束
+  SELECT * FROM information_schema.table_constraints
+  WHERE table_name = '表名称' -- 查看某个表的约束名
+
+  ALTER TABLE 从表名 DROP FOREIGN KEY 赛健约束名;
+
+  -- 第二步：查看索引名和删除索引，（注意只能手动删除）
+  SHOW INDEX FROM 表名称;   -- 查看某个表的索引名
+  ALTER TBALE 从表名 DROP INDEX 索引名;
+  ```
+
+- 开发场景：
+  - 问题1：建和不建外键约束有什么区别？
+  ```
+  答：
+  建外键约束，你的操作（创建表、删除表、添加、修改、删除）会受到限制，从语法层面受到限制。例如：在员工表中不可能添加一个员工信息，它的部门的值在部门表中找不到
+
+  不建外键约束，你的操作（创建表、删除表、添加、修改、删除）不受限制，要保证数据的引用完整性，只能依靠程序员的自觉，或者是在Java程序中进行限定。例如：在员工表中，可以添加一个员工的信息，它的部门指定为一个完全不存在的部门
+  ```
+  - 问题2：建和不建外键约束和查询有没有关系
+  ```
+  答：没有
+  在MySQL里，外键约束是有成本的，需要消耗系统资源。对于大并发的SQL操作，有可能不适合。比如大型网站的中央数据库，可能会因为外键约束的系统开销而变得非常慢。所以，MySQL允许你不使用系统自带的外键约束，在应用层面完成检查数据一致性的逻辑。也就是说，即使你不用外键约束，也要有办法通过应用层面的附加逻辑，来实现外键约束的功能，确保数据的一致性
+  ```
+
+- 阿里开发规范
+  - 【强制】不得使用外键与级联，一切外键概念必须在应用层解决
+    - 说明：(概念解释)学生表中的student_id是主键，那么成绩表中的student_id则为外键。如果更新学生表中的student_id,同时触发成绩表中的student_id更新，即为级联更新。外键与级联更新更适用于单机低并发，不适合分布式，高并发集群；级联更新是强阻塞，存在数据库更新风暴的风险；外键影响数据库的插入速度
+
+### CHECK约束
+- 作用：检查某个字段的值是否符合xxx要求，一般指值的范围
+
+- 关键字：`CHECK`
+
+- 说明：MySQL5.7不支持
+  - MySQL5.7可以使用check约束，但check约束对数据验证没有任何作用。添加数据时，没有任何错误和警告
+  - <font color=tomato>但是MySQL8.0中可以使用check约束了</font>
+  ```sql
+  CREATE TABLE employee(
+    eid INT PRIMARY KEY,
+    ename VARCHAR(5),
+    gender CHAR CHECK('男'or'女')
+  );
+
+  CREATE TABLE test10(
+    id INT,
+    last_name VARCHAR(15),
+    salary DECIMAL(10,2) CHECK(salary > 2000)
+  );
+  ```
+
+### DEFAULT约束
+- 作用：给某个字段/某列指定默认值，一旦设置默认值，在插入数据时，如果此字段没有显示赋值，则赋值为默认值
+
+- 关键字：`DEFAULT`
+
+- 给字段加默认值
+  - CREATE TABLE时添加约束
+  ```sql
+  CREATE TABLE test11(
+    id INT,
+    last_name VARCHAR(15),
+    salary DECIMAL(10,2) DEFAULT 2000
+  );
+  ```
+  - ALTER TABLE时添加约束
+  ```sql
+  ALTER TABLE test
+  MODIFY salary DECIMAL(10,2) DEFAULT 2500;
+  ```
+
+- 删除默认值约束
+```sql
+ALTER TABLE test
+MODIFY salary DECIMAL(10,2);
+-- 不加DEFAULT，表示删除默认值 
+```
