@@ -269,6 +269,10 @@ hostname is /usr/bin/hostname
   9 - Linux内核API
 
   WORD：查看帮助的关键字，如：命令，文件名，函数名
+
+  man -f COMMAND
+  # 如果有多个相同的命令的话，可以使用-f分别进行查看
+  # 比如查看C语言的printf和bash命令的printf
   ```
 ### Linux目录结构
 - 文件系统的目录结构
@@ -995,6 +999,10 @@ cat > cat2.log <<EOF  # EOF是结束符
   set mta=smtps://qq号:qq邮箱授权码@smtp.qq.com:465
   ```
   - 文件配置好后后，使用s-nail发送到外网的邮件，发件人为配置的qq邮箱
+  - 本机的邮箱默认位置
+  ```
+  /var/spool/mail/
+  ```
 
 - `tr`
   - 作用：转换和删除字符
@@ -1062,6 +1070,16 @@ echo magedu | passwd --stdin wang &> /dev/null
 
 
 ## 用户组和权限管理
+### Linux安全模型
+- 3A资源分派
+  - Authentication：认证，验证用户身份
+    - 常见的通过用户名和口令，来区分验证用户信息
+  - Authorization：授权，不同的用户设置不同的权限
+    - 比如，某个文件，张三有访问权限，而李四没有
+  - Accouting|Auditon：审计
+    - 记录不同用户的操作记录
+
+- 当用户登录成功时，系统会自动分配命令token，包括用户标识和组成员等信息
 ### 用户和组相关文件
 - 用户：Linux中每个用户是通过 User Id(UID)来唯一标识的
   - 管理员：root, UID=0
@@ -1141,9 +1159,19 @@ echo magedu | passwd --stdin wang &> /dev/null
   gdm:*:19529:0:99999:7:::
     ...
   此处省略
-
-  //组成：密码（加密后），时间（以1970年以基准到更改密码的天数），最短有效期（0代表可随时更改）,密码有效期，密码以前几天提醒，再过几天账号锁定
-  //账号有效期
+  
+  // 密码的组成：
+  同时使用三个$符号分隔成3字段。
+  // 第一字段代表加密使用的单向加密算法，使用数字表示，1表示MD5算法，6表示SHA512算法。
+  // 第二字段代表加密算法使用的随机因子，一般称为salt盐，salt和加密算法一起构成了密码最终的加密方式。
+  // 第三字段代表加密后的结果，即密文
+  // 组成：密码（加密后）
+  // 更改/创建口令时间（以1970年以基准到更改密码的天数）
+  // 最短有效期,即有效期内无法更改口令（0代表可随时更改）（该有效期仅针对普通用户，对root用户无效）
+  // 密码有效期，
+  // 密码以前几天提醒，
+  // 超过密码有效期，再过几天账号锁定
+  // 账号有效期
 
   /etc/group    
 
@@ -1174,6 +1202,7 @@ echo magedu | passwd --stdin wang &> /dev/null
   后续省略
 
   //组名，组的口令，管理员账号（管理员可以在组中增删用户）
+  // 附加组成员
   ```
 
 - 用户管理常用命令
@@ -1190,10 +1219,14 @@ uid=1001(wilson) gid=1001(wilson) 组=1001(wilson)
 # useradd -s /sbin/nologin  -- 指定shell类型 ‘ -s ’ 
 -- nologin还是给服务使用的，用户一般是使用/bin/bash
 # useradd -g postfix  -- 指定主组 ‘ -g ’;postfix是指定的组名
-# useradd -G mail  -- 指定附加组 ‘ -G ’
+# useradd -G [,GROUP2...]  -- 指定附加组 ‘ -G ’
+-- 注意添加的时候，要保证组存在
+# useradd -N  -- 不创建和用户同名的私用组作为主组
+# useradd -r -- 创建系统用户，CentOS 6：id<500，CentOS7及以上：id<1000
 # useradd -M  -- 不创建家目录 ‘ -M ’
 # useradd -m  -- 创建家目录  ‘ -m ’
 # useradd -u 1088  -- 指定UID ‘ -u ’
+# useradd -c 'COMMENT' -- 新的注释信息
 总结：
 useradd [option...] user_name 
 
@@ -1231,18 +1264,113 @@ usermod     修改用户属性
 # usermod -s SHELL  -- 更改shell类型
 # usermod -l login_name   --更改新的用户名
 # usermod -e YYYY-MM-DD   -- 指明用户账号过期日期
+# usermod -f INACTIVE  -- 设置非活动期限，即宽限时间
+# usermod -L -- lock指用户，在/etc/shadow密码栏增加！ 
 
 --------------------------------------------------
 
 chage       修改用户属性
 
 # 
+```
+
+- useradd的默认属性的文件
+```bash
+[Mon Oct 30 16:10:21 104] root@rocky9:spool $ cat /etc/default/useradd 
+# useradd defaults file
+GROUP=100 # 100表示users组的编号
+# 如果使用useradd -N，不创建私用组的话，就用users(GID100)作为主组
+HOME=/home
+INACTIVE=-1  # -1表示其实口令到期也不锁账号，如果是10表示口令到期10天后锁账号
+EXPIRE=  #-- 表示账户有效期
+SHELL=/bin/bash
+SKEL=/etc/skel # /etc/skel目录下的内容表示创建新用户时，家目录自带的文件
+# /etc/skel实际上是新建账号的模板文件夹
+CREATE_MAIL_SPOOL=yes # 默认创建账号邮箱
+```
+
+- 新建用户的相关文件
+```bash
+/etc/default/useradd
+/etc/skel/*
+/etc/login.defs  # 控制账号口令，即shadow后面配置的默认定义
+``` 
+
+- 批量创建用户
+```
+newusers passwd 格式文件
+```
+
+- 批量更改用户口令
+```bash
+cat <格式文件> | chpasswd
+
+格式文件内容：
+user_name : password
+
+示例：
+mystical:12346
+user1:admin123
+
+在ubuntu中，由于Ubuntu不支持--stdin的选项，因此无法像CentOS一样使用如下命令
+echo password | passwd --stdin <user_name>
+
+因此，可以使用如下口令实现非交互式更改口令：
+echo user_name:passwd | chpasswd
+
+```
+
+- 查看用户相关的ID信息
+  - id命令可以查看用户的UID，GID等信息
+  ```bash
+  id [OPTION]... [USER]
+  ```
+  - 常见选项
+  ```bash
+  -u : 显示UID
+  -g : 显示GID
+  -G : 显示用户所属组ID
+  -n : 显示名称，需配合ugG使用，例如：-un;-gn;-Gn
   ```
 
 - 组管理命令
-```sql
-groupadd      新建用户组
-groupdel      删除用户组
+```
+groupadd 新建用户组
+
+格式：groupadd [OPTION]... group_name
+
+常见选项：
+-g GID 指明GID号; [GID_MIN,GIDMAX]
+-r 创建系统组，CentOS6之前：ID<500, CentOS 7以后：ID<1000
+
+注意：
+如果你知道你要创建的是一个系统组，并且你想确保它在系统组的 GID 范围内，那么使用 -r 选项是一个好的实践。如果你只是想创建一个具有特定 GID 的组，不管它是否是系统组，那么只使用 -g 选项就足够了。
+
+添加 -r 选项是为了明确表达你的意图，并确保组被正确地分类为系统组。不过，如果你手动指定了一个在系统组 GID 范围内的 GID，即使没有使用 -r 选项，该组在某种程度上也被视为系统组。
+
+范例：
+groupadd -g 48 -r apache
+```
+```
+groupmod 组属性修改
+
+格式：groupmod [OPTION]... group
+
+常见选项：
+-n <新组名> <原组名>: 新名字
+-g GID : 新的GID
+
+示例：groupmod -n www apache
+```
+```
+groupdel  group_name    删除用户组
+```
+- 关于脚本中写组和用户的创建的示例
+```bash
+getent group apache > /dev/null || groupadd -g 48 -r apache
+getent passwd apache > /dev/null || \
+  useradd -r -u 48 -g apache -s /sbin/nologin -d /var/www -c "Apache" apache
+exit 0
 ```
 
 ### 理解并设置文件权限

@@ -1306,6 +1306,8 @@ HAVING AVG(salary) <= ALL(
     - EXECUTE：子查询使用主查询的数据
     - USE：如果满足子查询的条件则返回该行
 
+- 总结：类似于编程中的for循环嵌套
+
 ```sql
 -- 题目：查询员工中工资大于本部门平均工资的员工的last_name,salary和其department_id
 -- 方式1：
@@ -2627,8 +2629,9 @@ MODIFY id INT; -- 修改时不添加，则自动删除自增长
   CREATE TABLE employee(
     eid INT PRIMARY KEY,
     ename VARCHAR(5),
-    gender CHAR CHECK('男'or'女')
+    gender CHAR CHECK(gender = '男' OR gender = '女')
   );
+  -- check后面的选值必须落实到具体的字段
 
   CREATE TABLE test10(
     id INT,
@@ -2636,6 +2639,24 @@ MODIFY id INT; -- 修改时不添加，则自动删除自增长
     salary DECIMAL(10,2) CHECK(salary > 2000)
   );
   ```
+
+- 如果要修改或删除检查约束所约束的字段时，需要先修改或删除检查约束
+
+- 删除检查约束
+```sql
+ALTER TABLE table_name DROP CONSTRAINT constraint_name;
+```
+
+- 查看检查约束名constraint_name
+```sql
+SHOW CREATE TABLE table_name;
+```
+
+- 修改检查约束
+```sql
+ALTER TABLE table_name DROP CONSTRAINT constraint_name;
+ALTER TABLE table_name ADD CONSTRAINT new_constraint_name CHECK (condition);
+```
 
 ### DEFAULT约束
 - 作用：给某个字段/某列指定默认值，一旦设置默认值，在插入数据时，如果此字段没有显示赋值，则赋值为默认值
