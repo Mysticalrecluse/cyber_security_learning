@@ -15,9 +15,20 @@ python3 -V
 
 版本切换(全局切换)
 alternatives --config python3
+
+如果Python 版本未被 alternatives 管理，你需要手动添加它
+示例：
+sudo alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 2
+
 ```
 
 #### virtualenv虚拟环境
+- 虚拟环境的意义
+```
+每个环境之间相互隔离，互不干扰，可以轻松实现多版本管理开发
+建议：
+每个不同的项目，单独配一个虚拟环境，并为该虚拟环境指定特定的python版本
+```
 - 安装
 ```
 安装虚拟环境
@@ -50,6 +61,9 @@ trusted-host=mirrors.aliyun.com
 
 用命令更改pip3的下载源
 pip3 config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+
+直接执行上述命令可能会报错：ERROR: unknown command "config"
+解决方法：升级pip，pip的config命令用于管理本地和全局配置文件，但它是在较新版本的pip中引入的。
 ```
 - 新建一个普通用户
 ```
@@ -68,16 +82,21 @@ mkdir venvs
 
 cd venvs
 
-virtualenv 命令 # 默认当前版本创建虚拟环境
+virtualenv <dir> # 默认当前版本创建虚拟环境
 
 virtualenv -p 指定python版本，默认当前版本
 示例：
 virtualenv -p /usr/bin/python3.6 venvs36
 # 执行后，创建一个目录在当前目录下
 
-virtualenv <环境名称>
+virtualenv <环境名称(dir)>
+示例：
+virtualenv vcmdb
 
-. ~/venvs/v36/bin/activate  # 激活虚拟环境
+创建好虚拟环境目录后回到项目目录
+cd ~/projects/cmdb/
+
+source ~/venvs/v36/bin/activate  # 激活虚拟环境
 # 在项目目录下，使用虚拟环境
 ```
 
@@ -86,6 +105,7 @@ virtualenv <环境名称>
 
 - 快捷安装：https://github.com/pyenv/pyenv#the-automatic-installer
 ```bash
+# 适用于CentOS 7,8
 # yum install git curl
 
 python编译依赖如下
@@ -100,6 +120,45 @@ python编译依赖如下
 $ curl -L https://github.com/pyenv/pyenv-installer/raw/master/bin/pyenv-installer | bash
 
 也可以使用项目源码文件，直接bash运行
+
+# CentOS 9以上版本安装pyenv
+
+pyenv 需要一些依赖来编译 Python 版本。打开一个终端并执行以下命令来安装所需的依赖：
+
+sudo dnf update -y
+sudo dnf install -y @development zlib-devel bzip2 bzip2-devel readline-devel sqlite \
+sqlite-devel openssl-devel xz xz-devel libffi-devel findutils
+
+从 GitHub 克隆 pyenv 仓库到 ~/.pyenv 目录：
+git clone https://github.com/pyenv/pyenv.git ~/.pyenv
+
+如果出现如下报错：
+Cloning into '/home/python/.pyenv'...
+fatal: unable to access 'https://github.com/pyenv/pyenv.git/': OpenSSL SSL_read: Connection reset by peer, errno 104
+
+使用以下命令绕过SLL证书验证
+git -c http.sslVerify=false clone https://github.com/pyenv/pyenv.git ~/.pyenv
+
+
+-----------------------------------------------------------
+在~/.bash_profile文件的开头添加
+export PYENV_ROOT="$HOME/.pyenv"
+export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init --path)"
+-----------------------------------------------------------
+在~/.basrc的末尾添加：
+export PATH="$HOME/.pyenv/bin:$PATH"
+eval "$(pyenv init --path)"
+eval "$(pyenv virtualenv-init -)"
+-----------------------------------------------------------
+重启你的终端或者加载配置文件：
+source .bashrc
+
+如果出现提示：pyenv: no such command `virtualenv-init'
+
+使用如下命令下载插件：
+git -c http.sslVerify=false clone https://github.com/pyenv/pyenv-virtualenv.git $(pyenv root)/plugins/pyenv-virtualenv
+如果下载失败，请多次尝试
 
 以后更新pyenv使用
 $ pyenv update
@@ -128,14 +187,21 @@ pyenv virtualenv <python版本号> <虚拟环境目录名称>
 可以在使用pyenv versions查看当前创建的所有虚拟环境版本之后
 使用pyevn local 进行切换
 
-如果前面没有出现（v3816）类似这种设置好的自定义虚拟环境名称
-在.bash_profile的文件中，添加下列内容
-export PATH="$HOME/.pyenv/bin:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv virtualenv-init -)"
-
 ```
-
+#### 使用pycharm连接linux
+```
+和在linux上一样，
+先连接虚拟机上的interface，(提示：existing)
+1. 在virtualenv中，
+interface在virtualenv -p /usr/bin/python3.6 venvs36
+在venvs36目录下
+2. 在pyenv中
+interface在.pyenv/versions创建的虚拟环境下
+虚拟环境的创建：
+pyenv virtualenv 版本号 切换昵称
+示例： pyenv virtualenv 3.8.16 v3816(本质是创建一个软链接)
+然后再远程同步工程目录：tools -> Deployment -> configuration
+```
 #### 总结
 - 重点掌握使用虚拟环境进行多版本隔离
   - 在使用virtualenv的命令
@@ -147,6 +213,10 @@ eval "$(pyenv virtualenv-init -)"
     - 在setting中进行设置，原理和Linux中相同
   - 多版本管理工具：pyenv
     - 可以更方便的进行多版本的管理和多项目的隔离
+
+- 核心思想
+  - 项目和环境分开，每个项目单独配一个环境目录
+  - 在pycharm远程连接时，先环境interface连接，然后项目目录同步，
 
 - 轻量级练习，建议使用jupyter
   - 安装：`pip install jupyter`
@@ -362,7 +432,7 @@ a += 100 # 赋值即定义
   - `*=`
   - `/=`
   - `%=`
-  - `//`
+  - `//` 整除
 
 #### 成员运算符
 - in、not in，用来判断是否是容器的元素，返回布尔值
@@ -396,7 +466,7 @@ type(str) # 返回：type
 ```python
 语法：isinstance(1,str) # 是谁的实例吗？
 # 这句化的意思是1是str的实例吗
-# 返回：True
+# 返回：False
 
 isinstance(False, (str,int,bool))
 # 返回：True
@@ -416,4 +486,154 @@ print(2)
 # 示例：
 x = input('>>>')
 print(1,100,sep=x or '/t')
+```
+
+### 程序控制
+#### 分支语句
+- if 语句
+```python
+# 搭框架阶段，在没想好if后面些什么的时候可以用pass占位且不报错
+# 用使用注释标注好将来要完成的功能
+# 单分支
+if True:
+    pass #TODO
+
+# 双分支
+if True:
+    pass
+else:
+    pass
+
+# 双分支特殊写法（不推荐）
+pass1 if True else pass2
+
+#示例：
+a = int(input('请给我一个整数: '))
+print('a小于等于5') if a <= 5 else print('a大于5')
+
+# 多分支
+if True:
+    pass
+elif True:
+    pass
+elif True:
+    pass
+else:
+    pass
+```
+- 示例
+```python
+a = 5
+if a > 0:
+    print(a,'positive')
+elif a == 0:
+    print('zero')
+else:
+    print('negative')
+```
+
+- match 语句（仅支持3.10以上版本）
+```python
+match http_response_status:
+    case 400:
+      print("Bad request")
+    case 404:
+      print("No found")
+    case 418:
+      print("i'm a teapot")
+    case _:
+      print("Something's wrong with the internet") 
+      #变量名“_”为通用匹配符，确保match必定被匹配成功。
+
+# match语句组合模式
+match http_response_status:
+    case 400|403|404: #可以使用“|”在一个模式中组合多个字面值
+      print("4XX error")
+    case 500|501|503:
+      print("5XX error")
+    case _:
+      print("strange wrong")
+```
+
+#### 循环语句
+- While 
+```python
+while True: # 进入循环体
+    pass
+```
+- 示例：
+```python
+'''模拟cat命令'''
+while True:
+    x = input('~ #') # 输入命令后，进入，退出，未知
+    match x:
+        case 'cat': # 进入程序后，启动程序
+            a = input('>>>')
+            while a != 'exit':
+                print(a)
+                a = input('>>>')
+        case 'quit':
+            print('shotdown')
+            break
+        case _:
+            print("not found command")
+```
+
+- for 循环
+```python
+for i in ['可迭代对象']: # 遍历
+
+# 示例：
+for i in range(10): # 运行10次
+    print('hello')
+
+# range(开始，结束，步长)
+for i in range(1,10,2): 
+    print(i) # 1,3,5,7,9
+
+# 奇数判断：使用位运算
+for i in range(10):
+    if i & 1: # 位运算
+        print(i)
+
+for i in range(8,-3,-1):
+    if i: # 忽略0
+        print(i)
+```
+#### 扩展1：字典遍历
+```python
+
+friends = ['tim','brown','gess']
+for friend in friends:
+	print(friend.capitalize())#名字首字母大写
+
+movie = {'name':'friend','language':'En',"other name":'Six of one'}
+for title in movie.keys: #keys可以换成values来遍历值
+	print
+
+for title,value in movie.items():#遍历字典键值对
+	print(title,value)
+	print(title)
+	print(value)
+
+for i in enumerage(movie.items()) #enumerage()返回值是一个枚举类型，（enumerage,at,0x104b85d00）
+	print(i)
+	>>>
+	(0,('name','Friend'))
+	(1,('language','En'))
+	(2,('other name','Six of one'))
+#返回带排列序号的元组
+```
+
+#### 扩展2：for循环实现推导式
+- 作用：从一个序列构造另一个序列
+```python
+list1 = [i for i in (1,2,3,4)] # 列表推导式
+list2 = [i*i for i in (1,2,3,4)] # 列表推导式
+list3 = [i*i for i in (1,2,3,4)if i < 3] #输出>>>[1,4]
+
+# 示例2：
+list = [1,2,3,4]
+list2 = [i*i for i in list]
+print(list2) #[1, 4, 9, 16]
 ```
