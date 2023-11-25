@@ -2024,7 +2024,7 @@ printf ("%d\n", a) // 5
       int a = 123;
       printf("a = %d\n", a); // 123
       add_once(&a);
-      printf("a = %d\n", a); // 123
+      printf("a = %d\n", a); // 124
 
       return 0;
   }
@@ -2564,4 +2564,1631 @@ int main() {
   ```
   - typedef使用技巧
     - 先定义一个该类型的变量，再在最前面加typedef，该变量名就变成了这个类型的类型名
+
+
+### 指针项目实战-qsort实现
+#### qsort函数介绍
+- qsort函数
+  - 头文件：stdlib.h
+  - 原型：void qsort(void *arr, size_t count, size_t size, int(*comp)(const void*, const void*))
+    - arr：待排序数组的起始位置（要排序的存储区的首地址）
+    - count：排序元素数量（存储区中元素的数量）
+    - size：每个元素的所占字节数（帮助qsort函数识别每个元素首地址的起始位置）
+    - comp：比较规则函数
+
+- 代码示例：
+```C
+#include<stdio.h>
+#include<stdlib.h>
+#include<time.h>
+
+int *getRandData(int n) {
+    int *arr = (int *)malloc(sizeof(int) * n);
+    for (int i = 0; i < n; i++) arr[i] = rand() % 100;
+    return arr;
+}
+
+void output(int *arr, int n) {
+    int len = 0;
+    // line1
+    for (int i = 0; i < n; i++) {
+        len += printf("%3d", i);
+    }
+    printf("\n");
+    // line2
+    for (int i = 0; i < len; i++) printf("-");
+    printf("\n");
+    // line3
+    for (int i = 0; i < n; i++) {
+        printf("%3d", arr[i]);
+    }
+    printf{"\n\n"};
+    return ;
+}
+
+int comp(const void *p1, const void *p2) {
+    const int *a = (const int *)p1;
+    const int *b = (const int *)p2;
+    if (*a < *b) return -1;
+    if (*a == *b) return 0;
+    return 1; 
+    // 从小到大排序
+}
+
+int comp2(const void *p1, const void *p2) {
+    return *((const int *)p1) - *((const int *)p2);
+    // 从小到大排序，简写方法
+    //这里(const int *)p1是强制类型转换，将const void 转换为const int的类型
+}
+
+int comp3(const void *p1, const void *p2) {
+    return *((const int *)p2) - *((const int *)p1);
+    // 从大到小排序，简写方法
+}
+
+int main() {
+    srand(time(0));
+    int *arr = getRandData(10); // 包含10个元素的随机整数数组
+    output(arr, 10);
+    qsort(arr, 10, sizeof(int), comp);
+    return 0;
+}
+```
+
+#### 回调函数
+- 概述：就是一个被作为参数传递的函数
+```C
+#include<stdio.h>
+#include<math.h>
+
+typedef double (*FUNC_T)(double);
+
+double f1(double x) {
+    return x * x;
+}
+
+double f2(double x) {
+    return 3 * x * x + 3 * x - 5;
+}
+
+double f3(double x) {
+    return pow(1.2, x);
+}
+
+double binary_search(FUNC_T func, double y) {
+    double l = 0, r = 1000, mid;
+    while (r - l >= 0.0000001) {
+        mid = (l + r) / 2.0;
+        if (func(mid) < y) l = mid;
+        else r = mid;
+    }
+    return l;
+}
+
+
+int main() {
+    double y;
+    while (scanf("%lf", &y) != EOF) {
+        double x1 = binary_search(f1, y);
+        double x2 = binary_search(f2, y);
+        double x3 = binary_search(f3, y);
+        printf("x1 = %lf, f1(%lf) = %lf\n", x1, x1, f1(x1));
+        printf("x2 = %lf, f2(%lf) = %lf\n", x2, x2, f2(x2));
+        printf("x3 = %lf, f3(%lf) = %lf\n", x3, x3, f3(x3));
+    }
+    return 0;
+}
+```
+
+- 示例2：（已知税后工资，算税前工资）
+```C
+#include<stdio.h>
+
+typedef double (*FUNC_T)(double);
+
+double min(double a, double b) {
+    return a < b ? a : b;
+}
+
+double f(double x) {
+    double y = 0;
+    y += min(x, 3000) * 0.03;
+    if (x > 3000) y += (min(x, 12000) - 3000) * 0.1;
+    if (x > 12000) y += (min(x, 25000) - 12000) * 0.2;
+    if (x > 25000) y += (min(x, 35000) - 25000) * 0.25;
+    if (x > 35000) y += (min(x, 55000) - 35000) * 0.3;
+    if (x > 55000) y += (min(x, 80000) - 55000) * 0.35;
+    if (x > 80000) y += (x - 80000) * 0.45;
+    return x - y;
+
+}
+
+double binary_search(FUNC_T func, double y) {
+    double l = 0, r = 2 * y, mid;
+    while(r - l > 1e-6) {
+        mid = (l + r) / 2.0;
+        if (func(mid) < y) l = mid;
+        else r = mid;
+    }
+    return l;
+}
+
+int main() {
+    double y;
+    while (scanf("%lf", &y) != EOF) {
+        printf("f(%0.2lf) = %lf\n", binary_search(f, y), y);
+    }
+    return 0;
+}
+```
+
+#### 拓展：快速排序算法
+```C
+#include<stdio.h>
+#include<stdlib.h>
+#include "0.sort_test.h"
+
+void quick_sort(int *arr, int l, int r) {
+    if (r - l <= 2) {
+        if (r - l <= 1) return ;
+        if (arr[l] > arr[l + 1]) swap(arr[l], arr[l + 1]);
+        return ;
+    }
+    // partition
+    int x = l, y = r - 1, z = arr[l];
+    while (x < y) {
+        while (x < y && z <= arr[y]) --y;
+        if (x < y) arr[x++] = arr[y];
+        while(x < y && arr[x] <= z) ++x;
+        if (x < y) arr[y--] = arr[x];
+    }
+    arr[x] = z;
+    quick_sort(arr, l, x);
+    quick sort(arr, x+1, r);
+    return ;
+}
+
+int main() {
+    int *arr_s = getRandData(SMALL_DATA_N);
+    int *arr_b = getRandData(BIG_DATA_N);
+    TEST(quick_sort, arr_s, SMALL_DATA_N);
+    TEST(quick_sort, arr_b, BIG_DATA_N);
+    free(arr_s);
+    free(arr_b);
+
+    return 0;
+}
+```
+
+## 预处理命令与结构体
+### 预处理命令
+- 编译阶段
+```
+gcc -c 7.test.c  ->  生成7.test.o（对象文件）
+``` 
+
+- 编译阶段作用：
+  - 检查程序是否有语法错误
+  - 示例：
+  ```C
+  #include<stdio.h>
+
+  int add(int ,int);
+
+  int main() {
+      printf("hello world\n")  // 缺失分号; 报错，编译阶段错误
+      // 括号匹配
+      // 关键词拼写错误等
+
+      int a = 123, b0 = 456;
+      printf("%d\n", a + bo);
+      // 将b0写称bo，报错：使用未声明的标识符，也是编译阶段错误
+
+      printf("add(%d, %d) = %d\n", a, b, add(a, b));
+      // 没有语法错误，即可通过编译阶段，编译阶段无报错
+      // 但是由于没有写add函数的实现过程，因此会在链接阶段报错
+      return 0;
+  }
+  ```
+  - 查看对象文件
+  ```
+  nm -C test3.o
+
+                   U _GLOBAL_OFFSET_TABLE_
+  0000000000000000 T main
+                   U puts
+
+  标T的函数表示，相应函数定义是存储在当前对象文件中的
+  标U的表示：在链接阶段的时候，需要到外部查找相关函数定义
+  ```
+
+- 链接阶段
+```
+gcc -o 7.test.o  ->  7.test.exe (由对象文件生成可执行程序)
+```
+
+- 链接阶段作用：
+  - 检查是否有定义缺失或冲突
+  ```C
+  #include<stdio.h>
+
+  int add(int a, int b) {
+      printf("[other.c] this is add function : ");
+      return a + b;
+  }
+  // 在创建一个other.c文件，在里面写入add()函数
+  // 然后gcc -c other.c 进行编译，生成other.o文件
+  // 使用gcc other.o 7.test.o -o 7.test.exe 链接两个对象文件
+  // 成功！！不会发生只链接7.test.o的时候出现的函数定义缺失问题 
+  ```
+  - 或者创建一个makefile文件
+  ```
+  // 使用vim makefile创建一个makefile文件
+  test1: 7.test.c other.c
+    gcc -c 7.test.c
+    gcc -c other.c
+    gcc 7.test.c other.c -o 7.test.exe
+
+  // 直接执行make指令
+  ```
+
+### 声明和定义
+- 概述：编译的过程即为声明（declare）的过程；链接的过程即为定义(define)的过程
+
+#### 函数的声明和定义
+- 代码示例
+```C
+#include<stdio.h>
+
+int add(int, int); // 函数声明
+
+int main() {
+
+  return 0;
+}
+
+int add(int a, int b) {
+  return a + b;
+} // 函数的实现过程，即为定义
+```
+
+#### 变量的声明和定义
+- 代码示例
+```C
+#include <stdio.h>
+
+extern int c, d;  //声明变量，需要extern关键字
+
+int main() {
+  int a = 1, b = 2;  // 已经定义了两个变量（之前所有的变量相关的代码，都是定义变量）
+  printf("%d\n", a + b + c + d);
+  // 此时没有语法错误，但是由于c,d只声明，未定义，则存在链接阶段的错误
+
+  return 0;
+}
+```
+
+### 预处理命令家族（#）
+- 用于在编译之前的预处理阶段
+- 源代码 ->(通过预处理) 变成待编译源码 ->(通过编译) 生成对象文件  ->(通过链接) 生成可执行文件
   
+![Alt text](images/image04.png)
+
+- 执行预处理阶段
+```
+gcc -E test.c > output.c生成待编译源码
+```
+- 源代码
+```C
+#include<stdio.h>
+
+int main() {
+    printf("Hello Wrold\n");
+    return 0;
+}
+```
+- 待编译源码
+```C
+# 1 "8.test.c"
+# 1 "<built-in>"
+# 1 "<command-line>"
+# 31 "<command-line>"
+# 1 "/usr/include/stdc-predef.h" 1 3 4
+# 32 "<command-line>" 2
+# 1 "8.test.c"
+
+# 1 "/usr/include/stdio.h" 1 3 4
+# 27 "/usr/include/stdio.h" 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/libc-header-start.h" 1 3 4
+# 33 "/usr/include/x86_64-linux-gnu/bits/libc-header-start.h" 3 4
+# 1 "/usr/include/features.h" 1 3 4
+# 461 "/usr/include/features.h" 3 4
+# 1 "/usr/include/x86_64-linux-gnu/sys/cdefs.h" 1 3 4
+# 452 "/usr/include/x86_64-linux-gnu/sys/cdefs.h" 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/wordsize.h" 1 3 4
+# 453 "/usr/include/x86_64-linux-gnu/sys/cdefs.h" 2 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/long-double.h" 1 3 4
+# 454 "/usr/include/x86_64-linux-gnu/sys/cdefs.h" 2 3 4
+# 462 "/usr/include/features.h" 2 3 4
+# 485 "/usr/include/features.h" 3 4
+# 1 "/usr/include/x86_64-linux-gnu/gnu/stubs.h" 1 3 4
+# 10 "/usr/include/x86_64-linux-gnu/gnu/stubs.h" 3 4
+# 1 "/usr/include/x86_64-linux-gnu/gnu/stubs-64.h" 1 3 4
+# 11 "/usr/include/x86_64-linux-gnu/gnu/stubs.h" 2 3 4
+# 486 "/usr/include/features.h" 2 3 4
+# 34 "/usr/include/x86_64-linux-gnu/bits/libc-header-start.h" 2 3 4
+# 28 "/usr/include/stdio.h" 2 3 4
+
+# 1 "/usr/lib/gcc/x86_64-linux-gnu/9/include/stddef.h" 1 3 4
+# 209 "/usr/lib/gcc/x86_64-linux-gnu/9/include/stddef.h" 3 4
+
+# 209 "/usr/lib/gcc/x86_64-linux-gnu/9/include/stddef.h" 3 4
+typedef long unsigned int size_t;
+# 34 "/usr/include/stdio.h" 2 3 4
+
+# 1 "/usr/lib/gcc/x86_64-linux-gnu/9/include/stdarg.h" 1 3 4
+# 40 "/usr/lib/gcc/x86_64-linux-gnu/9/include/stdarg.h" 3 4
+typedef __builtin_va_list __gnuc_va_list;
+# 37 "/usr/include/stdio.h" 2 3 4
+
+# 1 "/usr/include/x86_64-linux-gnu/bits/types.h" 1 3 4
+# 27 "/usr/include/x86_64-linux-gnu/bits/types.h" 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/wordsize.h" 1 3 4
+# 28 "/usr/include/x86_64-linux-gnu/bits/types.h" 2 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/timesize.h" 1 3 4
+# 29 "/usr/include/x86_64-linux-gnu/bits/types.h" 2 3 4
+
+typedef unsigned char __u_char;
+typedef unsigned short int __u_short;
+typedef unsigned int __u_int;
+typedef unsigned long int __u_long;
+
+typedef signed char __int8_t;
+typedef unsigned char __uint8_t;
+typedef signed short int __int16_t;
+typedef unsigned short int __uint16_t;
+typedef signed int __int32_t;
+typedef unsigned int __uint32_t;
+
+typedef signed long int __int64_t;
+typedef unsigned long int __uint64_t;
+
+typedef __int8_t __int_least8_t;
+typedef __uint8_t __uint_least8_t;
+typedef __int16_t __int_least16_t;
+typedef __uint16_t __uint_least16_t;
+typedef __int32_t __int_least32_t;
+typedef __uint32_t __uint_least32_t;
+typedef __int64_t __int_least64_t;
+typedef __uint64_t __uint_least64_t;
+
+typedef long int __quad_t;
+typedef unsigned long int __u_quad_t;
+
+typedef long int __intmax_t;
+typedef unsigned long int __uintmax_t;
+# 141 "/usr/include/x86_64-linux-gnu/bits/types.h" 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/typesizes.h" 1 3 4
+# 142 "/usr/include/x86_64-linux-gnu/bits/types.h" 2 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/time64.h" 1 3 4
+# 143 "/usr/include/x86_64-linux-gnu/bits/types.h" 2 3 4
+
+typedef unsigned long int __dev_t;
+typedef unsigned int __uid_t;
+typedef unsigned int __gid_t;
+typedef unsigned long int __ino_t;
+typedef unsigned long int __ino64_t;
+typedef unsigned int __mode_t;
+typedef unsigned long int __nlink_t;
+typedef long int __off_t;
+typedef long int __off64_t;
+typedef int __pid_t;
+typedef struct { int __val[2]; } __fsid_t;
+typedef long int __clock_t;
+typedef unsigned long int __rlim_t;
+typedef unsigned long int __rlim64_t;
+typedef unsigned int __id_t;
+typedef long int __time_t;
+typedef unsigned int __useconds_t;
+typedef long int __suseconds_t;
+
+typedef int __daddr_t;
+typedef int __key_t;
+
+typedef int __clockid_t;
+
+typedef void * __timer_t;
+
+typedef long int __blksize_t;
+
+typedef long int __blkcnt_t;
+typedef long int __blkcnt64_t;
+
+typedef unsigned long int __fsblkcnt_t;
+typedef unsigned long int __fsblkcnt64_t;
+
+typedef unsigned long int __fsfilcnt_t;
+typedef unsigned long int __fsfilcnt64_t;
+
+typedef long int __fsword_t;
+
+typedef long int __ssize_t;
+
+typedef long int __syscall_slong_t;
+
+typedef unsigned long int __syscall_ulong_t;
+
+typedef __off64_t __loff_t;
+typedef char *__caddr_t;
+
+typedef long int __intptr_t;
+
+typedef unsigned int __socklen_t;
+
+typedef int __sig_atomic_t;
+# 39 "/usr/include/stdio.h" 2 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h" 1 3 4
+
+# 1 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 1 3 4
+# 13 "/usr/include/x86_64-linux-gnu/bits/types/__mbstate_t.h" 3 4
+typedef struct
+{
+  int __count;
+  union
+  {
+    unsigned int __wch;
+    char __wchb[4];
+  } __value;
+} __mbstate_t;
+# 6 "/usr/include/x86_64-linux-gnu/bits/types/__fpos_t.h" 2 3 4
+
+typedef struct _G_fpos_t
+{
+  __off_t __pos;
+  __mbstate_t __state;
+} __fpos_t;
+# 40 "/usr/include/stdio.h" 2 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h" 1 3 4
+# 10 "/usr/include/x86_64-linux-gnu/bits/types/__fpos64_t.h" 3 4
+typedef struct _G_fpos64_t
+{
+  __off64_t __pos;
+  __mbstate_t __state;
+} __fpos64_t;
+# 41 "/usr/include/stdio.h" 2 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/types/__FILE.h" 1 3 4
+
+struct _IO_FILE;
+typedef struct _IO_FILE __FILE;
+# 42 "/usr/include/stdio.h" 2 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/types/FILE.h" 1 3 4
+
+struct _IO_FILE;
+
+typedef struct _IO_FILE FILE;
+# 43 "/usr/include/stdio.h" 2 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h" 1 3 4
+# 35 "/usr/include/x86_64-linux-gnu/bits/types/struct_FILE.h" 3 4
+struct _IO_FILE;
+struct _IO_marker;
+struct _IO_codecvt;
+struct _IO_wide_data;
+
+typedef void _IO_lock_t;
+
+struct _IO_FILE
+{
+  int _flags;
+
+  char *_IO_read_ptr;
+  char *_IO_read_end;
+  char *_IO_read_base;
+  char *_IO_write_base;
+  char *_IO_write_ptr;
+  char *_IO_write_end;
+  char *_IO_buf_base;
+  char *_IO_buf_end;
+
+  char *_IO_save_base;
+  char *_IO_backup_base;
+  char *_IO_save_end;
+
+  struct _IO_marker *_markers;
+
+  struct _IO_FILE *_chain;
+
+  int _fileno;
+  int _flags2;
+  __off_t _old_offset;
+
+  unsigned short _cur_column;
+  signed char _vtable_offset;
+  char _shortbuf[1];
+
+  _IO_lock_t *_lock;
+
+  __off64_t _offset;
+
+  struct _IO_codecvt *_codecvt;
+  struct _IO_wide_data *_wide_data;
+  struct _IO_FILE *_freeres_list;
+  void *_freeres_buf;
+  size_t __pad5;
+  int _mode;
+
+  char _unused2[15 * sizeof (int) - 4 * sizeof (void *) - sizeof (size_t)];
+};
+# 44 "/usr/include/stdio.h" 2 3 4
+# 52 "/usr/include/stdio.h" 3 4
+typedef __gnuc_va_list va_list;
+# 63 "/usr/include/stdio.h" 3 4
+typedef __off_t off_t;
+# 77 "/usr/include/stdio.h" 3 4
+typedef __ssize_t ssize_t;
+
+typedef __fpos_t fpos_t;
+# 133 "/usr/include/stdio.h" 3 4
+# 1 "/usr/include/x86_64-linux-gnu/bits/stdio_lim.h" 1 3 4
+# 134 "/usr/include/stdio.h" 2 3 4
+
+extern FILE *stdin;
+extern FILE *stdout;
+extern FILE *stderr;
+
+extern int remove (const char *__filename) __attribute__ ((__nothrow__ , __leaf__));
+
+extern int rename (const char *__old, const char *__new) __attribute__ ((__nothrow__ , __leaf__));
+
+extern int renameat (int __oldfd, const char *__old, int __newfd,
+       const char *__new) __attribute__ ((__nothrow__ , __leaf__));
+# 173 "/usr/include/stdio.h" 3 4
+extern FILE *tmpfile (void) ;
+# 187 "/usr/include/stdio.h" 3 4
+extern char *tmpnam (char *__s) __attribute__ ((__nothrow__ , __leaf__)) ;
+
+extern char *tmpnam_r (char *__s) __attribute__ ((__nothrow__ , __leaf__)) ;
+# 204 "/usr/include/stdio.h" 3 4
+extern char *tempnam (const char *__dir, const char *__pfx)
+     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__malloc__)) ;
+
+extern int fclose (FILE *__stream);
+
+extern int fflush (FILE *__stream);
+# 227 "/usr/include/stdio.h" 3 4
+extern int fflush_unlocked (FILE *__stream);
+# 246 "/usr/include/stdio.h" 3 4
+extern FILE *fopen (const char *__restrict __filename,
+      const char *__restrict __modes) ;
+
+extern FILE *freopen (const char *__restrict __filename,
+        const char *__restrict __modes,
+        FILE *__restrict __stream) ;
+# 279 "/usr/include/stdio.h" 3 4
+extern FILE *fdopen (int __fd, const char *__modes) __attribute__ ((__nothrow__ , __leaf__)) ;
+# 292 "/usr/include/stdio.h" 3 4
+extern FILE *fmemopen (void *__s, size_t __len, const char *__modes)
+  __attribute__ ((__nothrow__ , __leaf__)) ;
+
+extern FILE *open_memstream (char **__bufloc, size_t *__sizeloc) __attribute__ ((__nothrow__ , __leaf__)) ;
+
+extern void setbuf (FILE *__restrict __stream, char *__restrict __buf) __attribute__ ((__nothrow__ , __leaf__));
+
+extern int setvbuf (FILE *__restrict __stream, char *__restrict __buf,
+      int __modes, size_t __n) __attribute__ ((__nothrow__ , __leaf__));
+
+extern void setbuffer (FILE *__restrict __stream, char *__restrict __buf,
+         size_t __size) __attribute__ ((__nothrow__ , __leaf__));
+
+extern void setlinebuf (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
+
+extern int fprintf (FILE *__restrict __stream,
+      const char *__restrict __format, ...);
+
+extern int printf (const char *__restrict __format, ...);
+
+extern int sprintf (char *__restrict __s,
+      const char *__restrict __format, ...) __attribute__ ((__nothrow__));
+
+extern int vfprintf (FILE *__restrict __s, const char *__restrict __format,
+       __gnuc_va_list __arg);
+
+extern int vprintf (const char *__restrict __format, __gnuc_va_list __arg);
+
+extern int vsprintf (char *__restrict __s, const char *__restrict __format,
+       __gnuc_va_list __arg) __attribute__ ((__nothrow__));
+
+extern int snprintf (char *__restrict __s, size_t __maxlen,
+       const char *__restrict __format, ...)
+     __attribute__ ((__nothrow__)) __attribute__ ((__format__ (__printf__, 3, 4)));
+
+extern int vsnprintf (char *__restrict __s, size_t __maxlen,
+        const char *__restrict __format, __gnuc_va_list __arg)
+     __attribute__ ((__nothrow__)) __attribute__ ((__format__ (__printf__, 3, 0)));
+# 379 "/usr/include/stdio.h" 3 4
+extern int vdprintf (int __fd, const char *__restrict __fmt,
+       __gnuc_va_list __arg)
+     __attribute__ ((__format__ (__printf__, 2, 0)));
+extern int dprintf (int __fd, const char *__restrict __fmt, ...)
+     __attribute__ ((__format__ (__printf__, 2, 3)));
+
+extern int fscanf (FILE *__restrict __stream,
+     const char *__restrict __format, ...) ;
+
+extern int scanf (const char *__restrict __format, ...) ;
+
+extern int sscanf (const char *__restrict __s,
+     const char *__restrict __format, ...) __attribute__ ((__nothrow__ , __leaf__));
+
+extern int fscanf (FILE *__restrict __stream, const char *__restrict __format, ...) __asm__ ("" "__isoc99_fscanf")
+
+                               ;
+extern int scanf (const char *__restrict __format, ...) __asm__ ("" "__isoc99_scanf")
+                              ;
+extern int sscanf (const char *__restrict __s, const char *__restrict __format, ...) __asm__ ("" "__isoc99_sscanf") __attribute__ ((__nothrow__ , __leaf__))
+
+                      ;
+# 432 "/usr/include/stdio.h" 3 4
+extern int vfscanf (FILE *__restrict __s, const char *__restrict __format,
+      __gnuc_va_list __arg)
+     __attribute__ ((__format__ (__scanf__, 2, 0))) ;
+
+extern int vscanf (const char *__restrict __format, __gnuc_va_list __arg)
+     __attribute__ ((__format__ (__scanf__, 1, 0))) ;
+
+extern int vsscanf (const char *__restrict __s,
+      const char *__restrict __format, __gnuc_va_list __arg)
+     __attribute__ ((__nothrow__ , __leaf__)) __attribute__ ((__format__ (__scanf__, 2, 0)));
+
+extern int vfscanf (FILE *__restrict __s, const char *__restrict __format, __gnuc_va_list __arg) __asm__ ("" "__isoc99_vfscanf")
+
+     __attribute__ ((__format__ (__scanf__, 2, 0))) ;
+extern int vscanf (const char *__restrict __format, __gnuc_va_list __arg) __asm__ ("" "__isoc99_vscanf")
+
+     __attribute__ ((__format__ (__scanf__, 1, 0))) ;
+extern int vsscanf (const char *__restrict __s, const char *__restrict __format, __gnuc_va_list __arg) __asm__ ("" "__isoc99_vsscanf") __attribute__ ((__nothrow__ , __leaf__))
+
+     __attribute__ ((__format__ (__scanf__, 2, 0)));
+# 485 "/usr/include/stdio.h" 3 4
+extern int fgetc (FILE *__stream);
+extern int getc (FILE *__stream);
+
+extern int getchar (void);
+
+extern int getc_unlocked (FILE *__stream);
+extern int getchar_unlocked (void);
+# 510 "/usr/include/stdio.h" 3 4
+extern int fgetc_unlocked (FILE *__stream);
+# 521 "/usr/include/stdio.h" 3 4
+extern int fputc (int __c, FILE *__stream);
+extern int putc (int __c, FILE *__stream);
+
+extern int putchar (int __c);
+# 537 "/usr/include/stdio.h" 3 4
+extern int fputc_unlocked (int __c, FILE *__stream);
+
+extern int putc_unlocked (int __c, FILE *__stream);
+extern int putchar_unlocked (int __c);
+
+extern int getw (FILE *__stream);
+
+extern int putw (int __w, FILE *__stream);
+
+extern char *fgets (char *__restrict __s, int __n, FILE *__restrict __stream)
+     ;
+# 603 "/usr/include/stdio.h" 3 4
+extern __ssize_t __getdelim (char **__restrict __lineptr,
+                             size_t *__restrict __n, int __delimiter,
+                             FILE *__restrict __stream) ;
+extern __ssize_t getdelim (char **__restrict __lineptr,
+                           size_t *__restrict __n, int __delimiter,
+                           FILE *__restrict __stream) ;
+
+extern __ssize_t getline (char **__restrict __lineptr,
+                          size_t *__restrict __n,
+                          FILE *__restrict __stream) ;
+
+extern int fputs (const char *__restrict __s, FILE *__restrict __stream);
+
+extern int puts (const char *__s);
+
+extern int ungetc (int __c, FILE *__stream);
+
+extern size_t fread (void *__restrict __ptr, size_t __size,
+       size_t __n, FILE *__restrict __stream) ;
+
+extern size_t fwrite (const void *__restrict __ptr, size_t __size,
+        size_t __n, FILE *__restrict __s);
+# 673 "/usr/include/stdio.h" 3 4
+extern size_t fread_unlocked (void *__restrict __ptr, size_t __size,
+         size_t __n, FILE *__restrict __stream) ;
+extern size_t fwrite_unlocked (const void *__restrict __ptr, size_t __size,
+          size_t __n, FILE *__restrict __stream);
+
+extern int fseek (FILE *__stream, long int __off, int __whence);
+
+extern long int ftell (FILE *__stream) ;
+
+extern void rewind (FILE *__stream);
+# 707 "/usr/include/stdio.h" 3 4
+extern int fseeko (FILE *__stream, __off_t __off, int __whence);
+
+extern __off_t ftello (FILE *__stream) ;
+# 731 "/usr/include/stdio.h" 3 4
+extern int fgetpos (FILE *__restrict __stream, fpos_t *__restrict __pos);
+
+extern int fsetpos (FILE *__stream, const fpos_t *__pos);
+# 757 "/usr/include/stdio.h" 3 4
+extern void clearerr (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
+
+extern int feof (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
+
+extern int ferror (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
+
+extern void clearerr_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
+extern int feof_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
+extern int ferror_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
+
+extern void perror (const char *__s);
+
+# 1 "/usr/include/x86_64-linux-gnu/bits/sys_errlist.h" 1 3 4
+# 26 "/usr/include/x86_64-linux-gnu/bits/sys_errlist.h" 3 4
+extern int sys_nerr;
+extern const char *const sys_errlist[];
+# 782 "/usr/include/stdio.h" 2 3 4
+
+extern int fileno (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
+
+extern int fileno_unlocked (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
+# 800 "/usr/include/stdio.h" 3 4
+extern FILE *popen (const char *__command, const char *__modes) ;
+
+extern int pclose (FILE *__stream);
+
+extern char *ctermid (char *__s) __attribute__ ((__nothrow__ , __leaf__));
+# 840 "/usr/include/stdio.h" 3 4
+extern void flockfile (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
+
+extern int ftrylockfile (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__)) ;
+
+extern void funlockfile (FILE *__stream) __attribute__ ((__nothrow__ , __leaf__));
+# 858 "/usr/include/stdio.h" 3 4
+extern int __uflow (FILE *);
+extern int __overflow (FILE *, int);
+# 873 "/usr/include/stdio.h" 3 4
+
+# 9 "8.test.c" 2
+
+# 10 "8.test.c"
+int main() {
+    printf("Hello Wrold\n");
+    return 0;
+}
+```
+
+#### #include命令
+- 简介#include命令的功能：
+  - 粘贴复制
+
+- 代码示例（test.c）
+```C
+#include <stdio.h>
+#include "def_a_b.c"
+// 将def_a_b.c的文件内容粘贴至此处
+// <>和""的区别
+// 在编译器中，有默认的include文件的查找路劲，在默认查找路径查找的文件使用<>
+// 如果在当前文件夹下查找，使用""双引号
+// gcc -I ./ test.c (gcc -I <路径> 的功能就是添加默认查找路径)
+// include后面可以添加的文件类型：任意文件
+// 无论在linux中还是c语言编译环境中，文件后缀名没有任何作用
+
+int main() {
+    printf("a + b = %d\n", a + b);
+    // 此时a ,b未定义，正常来说会在链接阶段报错
+    // 使用#include将a，b变量的定义从其他文件粘贴过来，可以正常运行
+}
+```
+- 代码示例（def_a_b.c）
+```C
+int a = 123, b = 567;
+```
+
+#### 宏定义（#define）
+- 简介#define功能
+  - #define做的事情就是“替换”
+
+- 代码示例
+```C
+// 定义符号常量
+#define PI 3.1415926
+#define MAX_N 10000
+
+// 定义傻瓜表达式：
+#define MAX(a, b) (a) > (b) ? (a) : (b)
+#define S(a, b) a * b
+
+// 定义代码段
+#define P(a) { \
+    printf("%d\n", a); \
+}
+```
+- 代码示例
+```C
+#define PI 3.1415926
+#define S(a, b) a * b
+#define P(a) {  \
+    printf("define P : %d\n", a);  \
+}
+// 定义多行宏的时候，每行结尾要加续航符 
+// 宏只占一行，所以使用多行时，结尾要加续航符
+
+int main() {
+    printf("PI = %lf\n", PI);
+    printf("S(3, 4) = %d\n", S(3, 4)); // 12
+    printf("S(3 + 7, 4) = %d\n", S(3 + 7, 4));
+    // 简单替换：3 + 7 * 4， 先计算4 * 7，然后加3
+    // 31
+    S(int, p); // 相当于创建一个指针p,int *p; 
+    int n = 123;
+    p = &n;
+    P(*p); 
+    return 0;
+}
+```
+
+#### 内置宏
+<table>
+  <thead>
+    <th style="background: darkred; color: white;">宏</th>
+    <th style="background: darkred; color: white;">说明</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>__DATE__</td>
+      <td>日期：Mmm dd yyyy</td>
+    </tr>
+    <tr>
+      <td>__TIME__</td>
+      <td>时间：hh:mm:ss</td>
+    </tr>
+    <tr>
+      <td>__LINE__</td>
+      <td>行号</td>
+    </tr>
+    <tr>
+      <td>__FILE__</td>
+      <td>文件名</td>
+    </tr>
+    <tr>
+      <td>__func__</td>
+      <td>函数名/<font color=tomato>非标准</font></td>
+    </tr>
+    <tr>
+      <td>__FUNC__</td>
+      <td>函数名/<font color=tomato>非标准</font></td>
+    </tr>
+    <tr>
+      <td>__PRETTY_FUNCIONT__</td>
+      <td>更详细的函数信息/<font color=tomato>非标准</font></td>
+    </tr>
+  </tbody>
+</table>
+
+- 代码示例
+```C
+#include <stdio.h>
+
+int main() {
+    printf("__DATE__ = %s\n", __DATE__);
+    printf("__TIME__ = %s\n", __TIME__);
+    printf("__LINE__ = %d\n", __LINE__);
+    printf("__FILE__ = %s\n", __FILE__);
+    printf("__func__ = %s\n", __func__); // 所在函数名
+    printf("__PRETTY_FUCTION__ = %s\n", __PRETTY__FUNCTION__); // 更详细的所在函数名
+
+    return 0;
+}
+```
+
+#### 宏定义中#和##的作用
+- `#`:
+  - 作用：将传入的宏的参数字符串化
+  ```C
+  #define STR(n) #n  // 表示n当中内容的字符串化
+  #define RUN(func) { \
+      func; \
+      printf("%s done\n", #func); \
+  }
+
+  void test1() {
+      printf("this is test1\n");
+      return ;
+  }
+
+  void test2(int a,int b) {
+      printf("this is test2: %d, %d\n", a, b);
+      return ;
+  }
+
+  int main() {
+      printf("%s\n", STR(hello));
+      RUN(test1());
+      RUN(test2(2, 3));
+      return 0;
+  }
+  ```
+
+- `##`
+  - 作用：连接运算符
+  ```C
+  #define CAT(a, b) a##b
+
+  int main() {
+    int n10 = 123, n11 = 456;
+    CAT(n, 10) = 789;
+    printf("n10 = %d, n11 = %d\n", n10, n11);
+    return 0;
+  }
+  ```
+
+- 实战应用代码示例
+```C
+#include<stdio.h>
+
+#define P(func) { \
+    printf("%s = %d\n", #func, func); \
+}
+
+#define MAX(a, b) ({ \
+    int __a = (a), __b = (b); \
+    __a > __b ? __a : __b; \
+}) // 外部用()包起来，表示里面的代码段是具有返回值的代码段，返回值为最后一行表达式的值
+
+int main() {
+  int a = 7;
+  P(MAX(a++, 6));
+  return 0;
+}
+```
+
+#### 条件编译
+- `#if`
+  - 作用：做的事情就是选择，也叫代码剪裁
+
+<table>
+  <thead>
+    <th style="background: darkred; color: white;">函数</th>
+    <th style="background: darkred; color: white;">说明</th>
+  </thead>
+  <tbody>
+    <tr>
+      <td>#ifdef DEBUG</td>
+      <td>是否定义了 DEBUG 宏</td>
+    </tr>
+    <tr>
+      <td>#ifndef DEBUG</td>
+      <td>是否没定义 DEBUG 宏</td>
+    </tr>
+    <tr>
+      <td>#if MAX_N == 5</td>
+      <td>宏 MAX_N 是否等于5</td>
+    </tr>
+    <tr>
+      <td>#elif MAX_N == 4</td>
+      <td>否则宏 MAX_N是否等于4</td>
+    </tr>
+    <tr>
+      <td>#else</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>#endif</td>
+      <td>条件编译的编写，一定以#endif结尾</td>
+    </tr>
+  </tbody>
+</table>
+
+- 代码示例
+```C
+#include<stdio.h>
+
+#ifdef DEBUG // 判断是否定义了DEBUG宏
+// 定义DEBUG宏的两种方式
+// 1. 直接#define DEBUG
+// 2. 在gcc编译的时候使用-D选项：gcc -DDEBUG 11.ifdef.c
+int a = 1;
+#else
+int a = 2;
+#endif // 以endif结尾
+
+int main() {
+  printf("a = %d\n", a); // 2, 因为没有定义DEBUG宏
+  return 0;
+}
+```
+
+#### 宏定义实战练习
+- 带等级的日志打印功能
+```C
+#include <stdio.h>
+#include "define_test.h"
+
+#define LOG_LEVEL DEBUG
+
+int main() {
+    int a = 123;
+    printf("hello world\n")
+    printf("a = %d\n", a);
+    LOG(DEBUG)("hello world, DEBUG\n");
+    LOG(ERROR)("hello world, ERROR\n");
+    LOG(FATEL)("hello world, FATEL\n");
+    LOG(DEBUG)("a = %d, DEBUG\n", a);
+    LOG(ERROR)("a = %d, ERROR\n", a);
+    LOG(FATEL)("a = %d, FATEL\n", a);
+    return 0;
+}
+```
+
+```C
+#ifndef _DEFINE_TEST_H
+#define _DEFINE_TEST_H
+
+#define DEBUG 1
+#define ERROR 2
+#define FATEL 3
+#define NO_LOG 4
+#define LOG_LEVEL DEBUG // 这个可以不写
+// 使用gcc -DLOG_LEVEL=DEBUG|ERROR|FATEL 4.test.c，在编译时进行指定
+#define LOG(level) \
+if (level >= LOG_LEVEL) \
+    printf("[%s : %d]", __FILE__, __LINE__), \
+    printf
+
+#endif
+```
+
+- 统计函数运行时间的time宏
+```C
+#include <stdio.h>
+#include <time.h>
+
+#define TIME(func) {
+    long long b = clock(); // 记录时间戳的函数clock(),头文件time.h
+    func;
+    long long e = clock();
+    printf("%s run %lldms\n", #func, 1000 * (e - b) / CLOCKS_PRE_SEC);
+}
+
+void test(int n) {
+    long long sum = 0;
+    for (itn i = 0; i < n; i++) sum += i;
+    printf("sum = %lld\n", sum);
+    return ;
+}
+
+int main() {
+    TIME(test(100000));
+
+    return 0;
+}
+```
+- 关于clock()的知识补充
+```
+CLOCKS_PER_SEC 是一个在 <time.h> 头文件中定义的宏，表示每秒中的时钟滴答数。它用于与 clock() 函数一起使用，以确定程序运行的时间。
+
+使用 CLOCKS_PER_SEC
+clock() 函数返回程序启动以来的时钟滴答数（clock ticks）。为了将这个数值转换成秒，您需要用它除以 CLOCKS_PER_SEC。这样，您可以得到程序运行时间的秒数。
+
+CLOCKS_PER_SEC 的值依赖于系统和编译器，但通常被定义为每秒 1000000 个时钟滴答。
+clock() 函数测量的是程序占用 CPU 的时间，而不是实际墙钟时间。这意味着它测量的是程序执行计算的时间，不包括程序在等待外部事件（如用户输入或文件IO）时消耗的时间。
+使用 CLOCKS_PER_SEC 和 clock() 是评估程序性能的一种简单方法，特别是对于计算密集型的代码段。
+
+```
+
+- 让C语言支持默认参数的函数
+```C
+#include <stdio.h>
+
+#define D_VAL(a, val) (#a[0] ? a : val)
+#define test_func(a, b, c) \ 
+__test_func(D_VAL(a, 97), D_VAL(b, 111), D_VAL(c, 12.3))
+void __test_func(int a, int b, double c) {
+    printf("a = %d, b = %d, c = %lf\n", a, b, c);
+    return ;
+}
+
+int main() {
+    test_func(,,);
+    test_func(1,,);
+    test_func(,2,);
+    test_func(1,2,2.5);
+    return 0;
+}
+```
+
+### 结构体
+- 结构体作用：
+  - 基于原有的类型，构造一个更复杂的类型
+
+- 代码演示
+```C
+#include <stdio.h>
+
+/*
+typedef struct person {
+    char name[20];  // 姓名
+    int age;  // 年龄
+    char gender;  // 性别
+    float height;  // 身高
+} person;  // 定义一个结构体类型别名
+
+person su = {"Su", 49, 'M', 2.12}; 
+
+*/
+struct person {
+    char name[20];  // 姓名
+    int age;  // 年龄
+    char gender;  // 性别
+    float height;  // 身高
+} su = {"Su", 49, 'M', 2.12};  // 直接初始化结构体的数据,注意分号
+
+void output(struct person *p) {
+    printf("use pointer p : (%s, %d, %c, %f)\n",
+        p->name, // 通过指针，访问结构体中的数据（间接访问）
+        p->age,
+        p->gender,
+        p->height
+    );
+    return ;
+}
+
+void set_buff(char *buff, void *head, void *begin, void *end, char ch) {
+    while (begin != end) {
+        buff[begin - head] = ch;
+        begin += 1;
+    }
+    return ;
+}
+
+void output_person() {
+    int n = sizeof(struct person), len = 0;
+    char buff[n];
+    for (int i = 0; i < n; i++) buff[i] = ".";
+    for (int i = 0; i < n; i++) {
+        printf("%3d", i);
+    }
+    printf("\n")
+    for (int i = 0; i < len; i++) printf("-");
+    printf("\n");
+    struct person hug;
+    set_buff(buff, hug.name, &hug.name, 20 + (void*)&hug.name, 'n');
+    set_buff(buff, hug.name, &hug.age, 4 + (void*)&hug.age, 'a');
+    set_buff(buff, hug.name, &hug.gender, 1 + (void*)&hug.gender, 'g');
+    set_buff(buff, hug.name, &hug.height, 4 + (void*)&hug.height, 'h');
+    for (int i = 0; i < n; i++) {
+        printf("%3c", buff[i]);
+    }
+    printf("\n");
+    return ;
+}
+
+int main() {
+    struct person hug = {"Mytical", 18, 'm', 1.81};
+    printf("(%s, %d, %c, %f)\n", 
+        hug.name, 
+        hug.age, 
+        hug.gender, 
+        hug.height
+    );
+    output(&hug);
+    output(&su);
+    // 访问结构体中的数据（直接访问）
+    return 0;
+}
+```
+
+#### 结构体的对齐补齐规则
+- 解决问题：
+  - 如何确定结构体变量的大小
+  - 如何确定变量在结构体中的分布位置
+
+- 结构体的对齐补齐规则
+  - 类型都有一个对齐值， 内建类型的对齐值等于其自身大小
+  - 结构体的对齐值，等于其成员中的最大对齐值
+  - 成员被存储在其整数倍的对齐值位置上
+  - 可以通过`#pragma pack`限制对齐值的最大值
+  ```C
+  #pragma pack(1)
+  struct C {
+    char a;
+    short b;
+    int c;
+  }
+  sizeof(struct C) // 7
+  ```
+
+- 分析结构体大小的过程
+  - 先确定对齐值的大小（在确定对齐值的时候，只看类型不看数组）
+    - 即`char name[20]`的对齐值为1，因为char的对齐值是1
+  - 结构体的对齐值为成员中的最大对齐值
+    - 所以`struct person`的对齐值是4
+  - 成员被存储在其整数倍的对齐值位置上
+  - 示例
+  ```C
+  struct A {
+    char a;
+    short b;
+  }; 
+
+  struct B {
+    struct A a;
+    struct { // 注意：此时这段并不是数据字段
+    // 仅仅是结构体内又定义了一个结构体类型，因此不算这里的对齐值
+      char b;
+      double c;
+    }; 
+    struct {
+      char b;
+      double c;
+    } d; // 这种就是定义了结构体字段，因此算此处对齐值 
+    int d;
+  }
+  ```
+
+- 原因：结构体在存储数据的时候，每次申请一个对齐值大小的存储空间，因此最终结构体的大小一定是对齐值的整数倍
+
+- 练习
+```C
+struct A {
+    char a;
+    int b;
+    short c;
+}
+// a . . . b b b b c c . .
+
+struct B {
+    char a;
+    short b;
+    int c;
+}
+// a . b b c c c c
+
+#pragma pack(1)
+struct C {
+    char a;
+    short b;
+    int c;
+}
+// a b b c c c c
+```
+
+### 联合体
+- 联合体的定义方式
+```C
+union register{
+    struct {
+        unsigned char byte1;
+        unsigned char byte2;
+        unsigned char byte3;
+        unsigned char byte4;
+    } bytes;
+    unsigned int number
+};
+// 联合体中每个数据字段共用存储空间
+// 联合体所占空间大小，等于联合体中数据字段中最大的数据类型所占的空间
+```
+- 示例：
+```C
+#include<stdio.h>
+
+union A {
+    struct {
+        unsigned char byte1;
+        unsigned char byte2;
+        unsigned char byte3;
+        unsigned char byte4;
+    } bytes;
+    unsigned int number;
+};
+
+#define P(a, format) { \
+    printf("%s = " format "\n", #a, a); \
+}
+
+int main() {
+    union A a;
+    a.number = 0x61626364;
+    P(a.number, "%x");
+    P(a.bytes.byte1, "%x");
+    P(a.bytes.byte2, "%x");
+    P(a.bytes.byte3, "%x");
+    P(a.bytes.byte4, "%x");
+
+    return 0;
+}
+// a.number = 61626364
+// a.bytes.byte1 = 64
+// a.bytes.byte2 = 63
+// a.bytes.byte3 = 62
+// a.bytes.byte4 = 61
+```
+
+### 枚举类型
+- 枚举类型定义方式
+```C
+enum Number {
+    zero, // 第一项默认为0
+    one, // 往下依次加1
+    two,
+    three,
+    four,
+    Max_Number
+};
+```
+
+- 枚举类型的基本用法
+```C
+#include<stdio.h>
+
+#define P(a, format) { \
+    printf("%s = " format "\n", #a, a); \
+}
+
+enum Number {
+    zero,
+    one,
+    two,
+    three,
+    four
+};
+
+int main() {
+    enum Number a;
+    a = zero;
+    P(a, "%d");
+    a = one;
+    P(a, "%d");
+    a = two;
+    P(a, "%d");
+    a = three;
+    P(a, "%d");
+    a = four;
+    P(a, "%d");
+
+    return 0;
+}
+```
+
+- 枚举用法2
+```C
+#include<stdio.h>
+
+#define P(a, format) { \
+    printf("%s = " format "\n", #a, a); \
+}
+
+enum Number {
+    zero,
+    one,
+    two = 10, // 向后依次加1
+    three,
+    four
+};
+
+int main() {
+    enum Number a;
+    a = zero;
+    P(a, "%d");
+    a = one;
+    P(a, "%d");
+    a = two;
+    P(a, "%d");
+    a = three;
+    P(a, "%d");
+    a = four;
+    P(a, "%d");
+
+    return 0;
+}
+/*
+a = 0
+a = 1
+a = 10
+a = 11
+a = 12
+*/
+```
+
+- 枚举类型在工程开发中的作用
+  - 实现数组的自动扩容
+  ```C
+  #include<stdio.h>
+
+  #define P(a, format) { \
+      printf("%s = " format "\n", #a, a); \
+  }
+
+  enum Number {
+      zero,
+      one,
+      two = 10, // 向后依次加1
+      three,
+      four
+  };
+
+  enum FUNC_DATA {
+  #ifdef TEST1
+      FUNC_test1,
+  #endif
+  #ifdef TEST2
+      FUNC_test2,
+  #endif
+  #ifdef TEST3
+      FUNC_test3,
+  #endif
+  #ifdef TEST4
+      FUNC_test4,
+  #endif
+      FUNC_MAX 
+      // 通过在枚举类型最后添加FUNC_MAX来实现数组的自动扩容
+  };
+
+  #define DEFINE_FUNC(name) \
+  void name() { \
+      printf("this is function: %s\n", #name); \
+  }
+
+  DEFINE_FUNC(test1)
+  DEFINE_FUNC(test2)
+  DEFINE_FUNC(test3)
+  DEFINE_FUNC(test4)
+
+  void (*func_arr[FUNC_MAX])() = {
+  #ifdef TEST1
+      test1,
+  #endif
+  #ifdef TEST2
+      test2,
+  #endif
+  #ifdef TEST3
+      test3,
+  #endif
+  #ifdef TEST4
+      test4,
+  #endif
+  };
+
+
+  int main() {
+      for (int i = 0; i < FUNC_MAX; i++) {
+          func_arr[i]();        
+      }
+      enum Number a;
+      a = zero;
+      P(a, "%d");
+      a = one;
+      P(a, "%d");
+      a = two;
+      P(a, "%d");
+      a = three;
+      P(a, "%d");
+      a = four;
+      P(a, "%d");
+
+      return 0;
+  }
+  ```
+  - 辅助做程序设计
+  ```C
+  // printf()输出彩色文字
+  \033[ A1;A2;A3...An m  <文字>  \033[0m
+  ```
+  - 封装彩色文字输出工具
+  ```C
+  /***  两种方法  ***/
+  #include<stdio.h>
+
+  #ifdef PlAN_A
+
+  #define COLOR(msg, code) "\033[1;" #code "m" msg "\033[0m" "\n"
+  #define RED(msg)    COLOR(msg, 31)
+  #define GREEN(msg)  COLOR(msg, 32)
+  #define YELLOW(msg) COLOR(msg, 33)
+  #define BLUE(msg)   COLOR(msg, 34)
+
+  int main() {
+      printf(RED("hello color"));
+      printf(GREEN("hello color"));
+      printf(YELLOW("hello color"));
+      printf(BLUE("hello color"));
+      return 0;
+  }
+
+  #else
+
+  enum COLOR_CODE {
+      RED = 31,
+      GREEN,
+      YELLOW,
+      BLUE
+  };
+
+  #define COLOR_SET "\033[1;%dm"
+  #define COLOR_END "\033[0m"
+
+  int main() {
+      printf(COLOR_SET "hello color  plan b\n" COLOR_END, RED);
+      printf(COLOR_SET "hello color  plan b\n" COLOR_END, GREEN);
+      printf(COLOR_SET "hello color  plan b\n" COLOR_END, YELLOW);
+      printf(COLOR_SET "hello color  plan b\n" COLOR_END, BLUE);
+      printf(
+          COLOR_SET "hello"
+          COLOR_SET " color"
+          COLOR_SET " plan"
+          COLOR_SET " b\n"
+          COLOR_END,
+          RED, GREEN, YELLOW, BLUE
+          );
+      return 0;
+  }
+
+  #endif
+  ```
+
+### 位域的概念与使用
+```C
+#include<stdio.h>
+
+#define P(a, format) { \
+    printf("%s = " format "\n", #a, a); \
+}
+
+struct A {
+    unsigned int a : 1; // 表示a变量只用1bit存储
+    unsigned int b : 2;
+    unsigned int c : 3;
+};
+
+int main() {
+    P(sizeof(struct A), "%lu");
+    // sizeof(struct A) = 4
+    // 因为结构体的对齐值为4
+    struct A object;
+    object.a = 15;
+    object.b = 15;
+    object.c = 15;
+    P(obj.a, "%d"); // 1
+    // 因为15的二进制是1111,而a, b, c都不足4位
+    // 因此溢出，值保留结尾的1，11，111
+    P(obj.b, "%d"); // 3
+    P(obj.c, "%d"); // 7
+
+    return 0;  
+}
+```
+- 实战练习- 使用位域的相关技巧，实现整型数字的16进制表示
+```C
+#include<stdio.h>
+
+union INT_NUMBER {
+    struct {
+        unsigned char b1 : 4;
+        unsigned char b2 : 4;
+    } bytes[4];
+    unsigned int number;
+};
+
+char code(unsigned int x) {
+    if (x < 10) return '0' + x;
+    return x - 10 + 'A';
+}
+
+int main() {
+    union INT_NUMBER n;
+    n.number = 0x6a6b6c6d;
+    for (int i = 3; i >= 0; i--) {
+        printf("%c%c", code(n.bytes[i].b2), code(n.bytes[i].b1));
+    }
+    printf("\n");
+    return 0;
+}
+```

@@ -37,14 +37,11 @@ function hd(){
 ```
 
 - 关于基本数据类型的变量赋值的底层逻辑：
-  - 当你为一个基本数据类型的变量赋一个新值时，以下是实际发生的情况：
-    - 分配新的内存空间：对于基本数据类型，JavaScript 会在内存中为新值分配新的空间。
-    - 保存新值：新的值会被保存在这块新的内存空间中。
-    - 更新变量的引用：变量不再引用旧值的内存空间，而是直接指向新值的内存空间。对于基本数据类型，变量实际上保存了这个值本身，而不是一个地址。
   ```js
-  let x = 10;  // 分配内存，并存储值10
-  x = 20;      // 重新为x分配内存，并存储新的值20
+  let n = 10;  // 分配内存，并存储值10
+  n = 20;      // 重新为n分配内存，并存储新的值20
   ```
+  - 在这个例子中，变量 n 最初存储了数字 10。当我们将 n 重新赋值为 20 时，存储在 n 中的值从 10 改变为 20。这个过程中，改变的是 a 所存储的值，而非 n 所指向的内存地址。变量 n 依然指向同一个内存位置，但是该位置的内容已经更新。
 
 - var的作用域
   - var和let对于window的影响是不同的
@@ -483,6 +480,14 @@ function get() {
     return ["后盾人", 2010];
 }
 let [name,year] = get();
+
+let [name, ...args] = ['mystical', 1,2,3,4];
+console.log(name); // mystical
+console.log(args); // [1,2,3,4]
+
+// 设置解构的默认值
+let [name, year = 2000] = ['mystical'];
+console.log(year) // 2000
 ```
 
 ### 数组中添加元素的多种技巧
@@ -734,4 +739,311 @@ arr = sort(arr, function(a, b) {
 console.log(arr);  // 输出：[1, 2, 4, 5, 8]
 
 ```
+
+### 数组的迭代
+- 数组遍历操作时，元素是值类型或引用类型的区别
+```js
+let arr = [1,2,3,4];
+for (let i of arr) {
+    i += 10;
+}
+console.log(arr); // [1,2,3,4]
+// 当数组元素是值类型的时候，对于数组元素的遍历改变，不会影响数组
+// 底层原理是值类型的赋值改变，是另开辟一块内存空间存储更改后的值，
+// 而不是在直接更改原数组空间内的数据
+
+let arr2 = [{n:1}, {n:2}, {n:3}]
+for (let j of arr2) {
+    j.n += 10;
+}
+console.log(arr2); // [{n:11}, {n:12}, {n:13}]
+// 如果是引用类型，则会更改数组中的值
+
+```
+```js
+let arr = [1,2,3,4];
+keys = arr.keys()
+console.log(keys) // Array Iterator {}
+// 生成一个可迭代对象
+
+while(({value, done} = keys.next()) && !done) {
+    console.log(value, done)
+}
+// 遍历keys.next中的value和done的值
+// 0 false
+// 1 false
+// 2 false
+// 3 false
+
+entries = arr.entries()
+console.log(entries) // Array Iterator {}
+// 生成一个可迭代对象
+
+while(({value, done} = entries.next()) && !done) {
+    console.log(value, done)
+}
+// 遍历keys.next中的value和done的值
+// [0,1] false
+// [1,2] false
+// [2,3] false
+// [3,4] false
+
+for(let e of entries){
+    console.log(e) // [0,1] [1,2] [2,3] [3,4]
+}
+```
+### 高效处理数组方法
+```js
+// every方法
+const user = [
+    {name: "李四"， js: 89},
+    {name: "王五"， js: 99},
+    {name: "张三"， js: 55}
+];
+const res = user.every(function(item) {
+    console.log(item);
+    // 为保证性能，只要遇到一个假，后面就不在遍历
+    return item.js >= 60
+});
+// every方法的遍历中，有一个为假，则返回结果为false
+console.log(res ? "全部同学都及格" : "有同学没及格");
+
+// some方法
+const user = [
+    {name: "李四"， js: 89},
+    {name: "王五"， js: 99},
+    {name: "张三"， js: 55}
+];
+const res = user.some(function(item) {
+    console.log(item);
+    // 为保证性能，只要遇到一个真，后面就不在遍历
+    return item.js >= 60
+});
+// some方法的遍历中，有一个为真，则返回结果为真
+console.log(res ? "有同学及格了" : "所有同学都没及格");
+
+```
+- some方法的实战案例(判断敏感词)
+```html
+<body>
+    <input type="text", name="title"><span></span>
+    <script>
+        keywords = ["php", "js"];
+        title = document.querySelector("input[name=title]");
+        title.addEventListener("keyup", function() {
+            const res = keywords.some(keyword => {
+                return title.value.indexOf(keyword) !== -1;
+            });
+            document.querySelector("span").innerHTML = res ? "有敏感词" : "没有敏感词";
+            })
+    </script>
+</body>
+```
+- filter方法基本结构
+```js
+let arr = ['hdcms', 'houdunren.com'];
+let newArray = arr.filter(function(value, index, arr){
+    return true;
+});
+// 如果返回结果为真，则将该值返回到新数组中
+```
+- filter实战案例（课程检索）
+```js
+let lessons = [
+    {title: "媒体查询响应式布局", category: "css"},
+    {title: "FLEX 弹性盒模型", category: "css"},
+    {title: "MYSQL多表查询随意操作", category: "mysql"}
+];
+const cssLessons = lessons.filter(function(lesson){
+    return lesson.category == 'css'
+})
+console.table(cssLessons);
+```
+- 自定义模拟filter()函数的过程
+```js
+hd = [1,2,3,4];
+function filter(array, callback) {
+    let newArray = [];
+    for (const value of array) {
+        if (callback(value) === true) {
+            newArray.push(value);
+        }
+    }
+    return new Array;
+}
+console.log(
+    fileter(hd, function(value){
+        return value > 2;
+    })
+)
+```
+
+- reduce()
+```js
+let arr = [1,2,3,4,5];
+arr.reduce(function(pre,value,index,array){
+    console.log(pre,value);
+})
+// 1  2
+// undefined  3
+// undefined  4
+// undefined  5
+// 第一次遍历，pre是数组的第一个元素，value是第二个元素
+// 后面pre是function的返回值，而value是下一个元素
+
+arr.reduce(function(pre,value,index,array){
+    console.log(pre,value);
+    return 99
+}， 0) // 这里第二个参数0是pre的初始返回值，这样value就是第一个元素
+// 0 1
+// 99 2
+// 99 3
+// 99 4
+// 99 5
+```
+
+- 实战示例 - 统计数组中元素出现次数
+```js
+let arr = [1,2,3,1,1];
+function arrayCount(array, item) {
+    array.reduce(function(total, cur) {
+        total += item == cur ? 1 : 0;
+        return total;
+    }, 0)
+}
+console.log(arrayCount(arr, 1))
+```
+
+- 实战示例2 - 统计数组中的最大值
+```js
+let arr = [1,2,3,5,3,66];
+function arrayMax(array){
+    return array.reduce(function(pre,cur){
+        return pre > cur ? pre : cur;
+    })
+}
+console.log(arrayMax(arr));
+```
+- 实战示例3 - 购物车汇总与获取最贵商品
+```js
+let cart = [
+    {name: "iphone", price: 12000},
+    {name: "imac", price: 25000},
+    {name: "ipad", price: 3600}
+];
+function maxPrice(goods){
+    return goods.reduce(function(pre, cur){
+        return pre.price > cur.price ? pre : cur;
+    })
+}
+console.log(maxPrice(cart));
+function sum(goods){
+    return goods.reduce(function(pre, cur){
+        return pre + cur.price;
+    }, 0)
+}
+console.log(sum(cart));
+function betterOneWan(goods){
+    return goods.filter(function(item){
+        return item.price > 10000
+    })
+}
+console.log(betterOneWan(cart));
+
+function getNameByPrice(goods, price) {
+    return goods.reduce(function(arr, cur){
+        if (cur.price > price) arr.push(cur);
+        return arr
+    },[]).map((item) => item.name)
+}
+console.log(getNameByPrice(cart));
+```
+
+- 实战示例4 - 数组去重
+```js
+let arr = [1,2,2,1,2,4,5,3,5,7];
+let newArray = arr.reduce(function(pre, cur){
+    if (pre.includes(cur) === false) pre.push(cur);
+    return pre;
+},[]);
+console.log(newArray);
+```
+- reduce()最终实战-炫酷Logo
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        *{
+            padding: 0; margin: 0;
+        }
+
+        body{
+            display: flex;
+            width: 100vh;
+            height: 100vh;
+            justify-content: center;
+            align-items: center;
+            background-color: rgb(120, 123, 125);
+        }
+
+        div{
+            font-size:5em;
+            font-weight: bold;
+            text-transform: uppercase;
+            color:blueviolet
+        }
+
+        div > span {
+            position: relative;
+            display: inline-block;
+        }
+
+        .color {
+            animation-name: color;
+            animation-duration: 1s;
+            animation-iteration-count: 2;
+            animation-timing-function: linear;
+            animation-direction: alternate;
+        }
+        @keyframes color {
+            50%{
+                color: #f1c40f;
+                transform: scale(2);
+            }
+            to{
+                color: #e74c3c
+                transform: scale(0.5);
+            }
+        }
+
+        .color2 {
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+    <div>hello,Mystical</div>
+    <script>
+        let div = document.querySelector('div');
+        [...div.textContent].reduce(function(pre, cur, index){
+            pre == index && (div.innerHTML = "");
+            let span = document.createElement('span');
+            span.innerHTML = cur;
+            div.appendChild(span);
+            span.addEventListener("mouseover", function(){
+                this.classList.add("color");
+            })
+            span.addEventListener("animationend", function(){
+                this.classList.remove("color");
+            })
+        }, 0)
+    </script>
+</body>
+</html>
+```
+
 

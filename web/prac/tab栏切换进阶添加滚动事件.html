@@ -120,6 +120,7 @@
         let ul = document.querySelector('.tab-nav ul');
         let div = document.querySelectorAll('.tab-content div');
         ul.addEventListener('mouseover', function(e) {
+            console.log(e.target.nodeName);
             if(e.target.nodeName === 'A') {
                 document.querySelector('.a_active').classList.remove('a_active');
                 e.target.classList.add('a_active');

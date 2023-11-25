@@ -26,14 +26,16 @@
         const father = document.querySelector('.father')
         const son = document.querySelector('.son')
 
-        document.addEventListener('click', function() {
+        document.addEventListener('click', function(e) {
             alert(`i'm grandfather`)
+            e.stopPropagation()
         }, true)
         father.addEventListener('click', function() {
             alert(`i'm father`)
         }, true)
         son.addEventListener('click', function() {
             alert(`i'm son`)
+            
         }, true)
     </script>
 </body>
