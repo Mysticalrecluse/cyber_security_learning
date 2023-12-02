@@ -2243,7 +2243,8 @@ int *p[10] = arr2;
 
 - 函数指针
 ```C
-int (*add) {int ,int}; // 指向函数的指针
+int (*add) (int ,int); // 指向函数的指针
+int *add(int ,int); // 表示add是有着两个整型参数的函数，并返回值为int*指针
 ```
 - 代码演示
 ```C
@@ -4189,6 +4190,302 @@ int main() {
         printf("%c%c", code(n.bytes[i].b2), code(n.bytes[i].b1));
     }
     printf("\n");
+    return 0;
+}
+```
+## 重学输入输出
+### 程序中的标准流
+- 代码示例
+```C
+#include<stdio.h>
+
+int main() {
+    printf("hello world\n"); // stdout
+    int n;
+    scanf("%d", &n); //stdin
+    perror("out of ranges\n"); //stderror
+
+    return 0;
+}
+```
+- 标准输出流 (stdout)
+  - 标准输出流缓冲区：当printf()函数接受到"hello world"的数据之后，不会直接将数据输出到终端，而是先进入标准输出流缓冲区
+  ```C
+  #include<stdio.h>
+
+  int main() {
+      printf("sjaf234lj243kk2j4l");
+      *((int *)(0)) = 5; // 程序在这一行崩溃
+      return 0;
+  }
+  // 崩溃后并没有输出数据
+  // 由于printf函数执行后，先将数据传入输出缓冲区，还没有从缓冲区进入终端，程序就崩溃了，因此，执行这段程序，终端上并没有出现打印字符
+  ```
+  - 程序从缓冲区到终端的情况；
+    - 当输出换行符的时候，就会触发程序将缓冲区内容发送到终端
+    ```C
+    #include<stdio.h>
+
+    int main() {
+        printf("sjaf234lj243kk2j4l\n"); // 添加了换行符
+        *((int *)(0)) = 5;
+        return 0;
+    }
+    // 输出结果
+    //sjaf234lj243kk2j4l
+    // [1]    381643 segmentation fault (core dumped)  ./a.out
+    ```
+    - 借用fflush()，将文件内容冲刷到终端，缓冲区在这里也可以看作是一个文件
+    ```C
+    #include<stdio.h>
+
+    int main() {
+        printf("sjaf234lj243kk2j4l");
+        fflush(stdout);
+        *((int *)(0)) = 5;
+        return 0;
+    }
+    // 输出 ：sjaf234lj243kk2j4l[1]    382770 segmentation fault (core dumped)  ./a.out
+    ```
+  
+- 标准输入流 (stdin)
+  - 输入缓冲区：
+    - 当敲下到回车后，输入的内容才会被转移到输入缓冲区中
+    - scanf实际就是在输入缓冲区中进行数据读入的
+
+
+- 标准错误输出流（stderr）
+  - 标准错误缓冲区，主要靠perror("")进行输出
+
+- 所有的标准流都有一个缓冲区，无论是输出数据还是输入数据，都不是直接从可执行程序到终端，而是先进缓冲区，然后再处理
+
+#### 窥探标准流的工具
+- fscanf和fprintf
+```C
+#include<stdio.h>
+
+int main() {
+    fprintf(stdout, "hello world\n");
+    int n;
+    fscanf(stdin, "%d", &n);
+    fprintf(stderr, "n = %d\n", n);
+    return 0;
+}
+```
+
+#### 标准流的重定向
+- freopen()重定向
+```C
+#include<stdio.h>
+
+int main() {
+    freopen("output.txt", "w", stdout); // r 读文件 w 写文件
+    printf("hello freopen stdout\n");
+    freopen("input.txt", "r", stdin);
+    char s[1000];
+    while (scanf("%[^\n]", s) != EOF) { // 当scanf读到文件结尾时，就会返回一个EOF的文件标识符
+        getchar();
+        printf("%s | hello world\n", s);
+    }
+
+    return 0;
+}
+```
+
+### 重学scanf
+- scanf函数的读入缓冲区
+```
+scanf("%d%d", &a, &b);  // 执行该指令
+在终端输入：123 456\n
+123 456\n 这段信息进入读入缓冲区
+scanf从读入缓冲区中寻找数据进行处理
+处理过程：
+scanf先处理第一个%d
+先找到第一个合法字符，比如%d%d,这里1是第一个合法字符，所以从1开始处理
+一直处理到第一个非法字符（空格）结束
+此时scanf就会把全面处理过的字符转化为整型123赋值给a变量，
+
+scanf开始处理第二个%d
+scanf跳过空白字符，找到第一个合法字符4，并从4开始处理
+一直处理到第一个非法字符（\n）结束
+然后把处理的字符转化为整型赋值给变量b
+
+此时读入缓冲区还有一个换行符
+```
+
+- 重新理解：scanf读入%c
+- %c是读取缓冲区中的当前字符
+```C
+#include<stdio.h>
+
+int main() {
+    char c1, c2;
+    int a, b;
+    scanf("%d", &a);
+    scanf("%c%c", &c1, &c2);
+    scanf("%d", &b);
+    printf("a = %d, b = %d\n", a, b);
+    printf("c1 = %d, c2 = %d\n", c1, c2);
+
+    return 0;
+}
+// 输入
+// 123 456\n
+// 程序输出
+// a = 123, b = 56
+// c1 = 32（空格）, c2 = 52（'4'的ascii码 ）
+```
+
+- 处理scanf读入残值的技巧
+  - getchar()
+    - 作用：吞掉一个字符
+  - fflush()
+    - 作用：将缓冲区中的所有值冲洗掉
+
+- 代码示例
+```C
+#include<stdio.h>
+
+#ifdef GETCHAR
+
+int main() {
+    int a, b;
+    scanf("%d%d", &a, &b);
+    getchar();
+    char c = 'x';
+    scanf("%c", &c);
+    printf("a = %d, b = %d, c = %c\n", a, b, c);
+
+    return 0;
+}
+
+#endif
+#ifdef FFLUSH
+
+int main() {
+    int a, b;
+    scanf("%d%d", &a, &b);
+    //getchar();
+    fflush(stdin); // 冲刷输入缓冲区
+    char c = 'x';
+    scanf("%c", &c);
+    printf("a = %d, b = %d, c = %c\n", a, b, c);
+    while (scanf("%c", &c) != EOF) {
+        printf("%c", c);
+    }
+    printf("\n");
+    return 0;
+}
+
+#endif
+```
+- 详细解析
+```
+fflush(stdin)。但这里有个重要的点：按照 C 语言标准，fflush 只适用于输出流。对于输入流（如 stdin），其行为是未定义的。在一些实现中，fflush(stdin) 可能清空输入缓冲区，但这不是标准行为，因此在不同的系统和编译器中可能表现不同。
+
+如果 fflush(stdin) 在你的系统中不起作用（这是最可能的情况），换行符仍然会留在输入流中。因此，当执行 scanf("%c", &c) 时，它会立即读取这个换行符，而不是等待新的输入。
+
+getchar() 是一种可靠的方法，用于从输入流中读取并消耗一个字符，通常用于移除留在流中的换行符。
+
+fflush(stdin) 的行为是未定义的，因为 C 标准并不保证它会清空输入流。它在不同的平台和编译器上可能有不同的表现，因此并不是处理输入流的可靠方法。
+在处理类似情况时，推荐使用 getchar() 或其他方法（如读取整行字符串然后解析）来确保跨平台的一致和预期行为。
+```
+
+### 实现printf函数
+- 前置知识：putchar()
+  - 概述：putchar() 函数是 C 语言标准库中的一个函数，用于向标准输出（通常是屏幕）写入一个字符。这个函数的定义在 <stdio.h> 头文件中。
+  - 作用：putchar() 的作用是输出单个字符。它是 printf() 函数的简化版，专门用于输出单个字符。由于其简洁性，putchar() 在需要输出单个字符时比使用 printf() 更有效率。
+  - 用法：putchar() 的基本语法如下
+  ```C
+  int putchar(int char);
+
+  // 参数：putchar() 接受一个整数作为参数，但通常传递的是一个字符。
+  // 在 C 中，字符实际上以其 ASCII 值（一个整数）的形式存储和处理。
+  // 返回值：函数成功时返回写入的字符，失败时返回 EOF（End Of File）。
+  ```
+
+- 实战代码：
+```C
+#include<stdio.h>
+#include<stdarg.h>
+#include<inttypes.h>
+
+#define TEST(format, args...) { \
+    int n1, n2; \
+    n1 = printf(format, ##args); \
+    n2 = my_printf(format, ##args); \
+    printf("n1 = %d, n2 = %d\n", n1, n2); \
+}
+
+char base_16_code(int x) {
+    if (x < 10) return x + '0';
+    return x - 10 + 'a';
+}
+
+int my_printf(const char *format, ...) {
+    #define PUTC(c) putchar(c), cnt += 1
+    va_list args;
+    va_start(args, format);
+    int cnt = 0;
+    for (int i = 0; format[i]; i++) {
+        switch (format[i]) {
+            case '%': {
+                switch (format[i + 1]) {
+                    case '%': {
+                        PUTC('%');
+                        i += 1;
+                    } break;
+                    case 's': {
+                        const char *s = va_arg(args, const char *);
+                        for (int j = 0; s[j]; j++) PUTC(s[j]);
+                        i += 1;
+                    } break;
+                    case 'd': {
+                        int num = va_arg(args, int);
+                        int8_t arr[20], len = 0, flag = (num < 0);
+                        do {
+                            arr[len++] = num % 10;
+                            num /= 10;
+                        } while (num);
+                        if (flag) PUTC('-');
+                        for (int j = len - 1; j >= 0; j--) {
+                            if (flag) PUTC(-arr[j] + '0');
+                            else PUTC(arr[j] + '0');
+                        }
+                        i += 1;
+                    } break;
+                    case 'x': {
+                        unsigned int num = va_arg(args, unsigned int);
+                        int8_t arr[20], len = 0;
+                        do {
+                            arr[len++] = num % 16;
+                            num /= 16;
+                        } while (num);
+                        for (int j = len - 1; j >= 0; j--) {
+                            PUTC(base_16_code(arr[j]));
+                        }
+                        i += 1;
+                    } break;
+                }
+            } break;
+            default : PUTC(format[i]); break;
+        }
+    }
+    #undef PUTC
+    return cnt;
+}
+
+int main() {
+    char str[100] = "Mystical"; 
+    int n1, n2;
+    TEST("hello world\n");
+    TEST("100%%\n");
+    TEST("%s\n", str);
+    TEST("INT32_MAX = %d\n", INT32_MAX);
+    TEST("INT32_MIN = %d\n", INT32_MIN);
+    TEST("ZERO = %d\n", 0);
+    TEST("%s is %d\n", "this", 10);
+    TEST("123 = %x, -1 = %x, INT32_MIN = %x\n", 123, -1, INT32_MIN);
     return 0;
 }
 ```
