@@ -139,6 +139,184 @@ int main() {
 }
 ```
 
+#### 链表：结构定义
+- 结构定义：
+  - 链表是由若干个节点（逻辑结构上）串联在一起的
+  - 逻辑结构串联的实现：
+    - 每个节点存储两个信息，一个是数据，一个是下一个节点的地址（指针）
+
+#### 两种链表
+- 无头链表
+  - 头部不存储信息，仅存储第一个节点的地址
+
+- 有头链表
+  - 头部有存储数据的区域，但是不使用，仅使用部分空间存储节点地址
+
+#### 虚拟头节点
+- 定义：
+  - 一般有头链表的头节点，称为虚拟头节点（重要编程技巧）
+
+#### 链表的操作
+- 链表的插入操作：
+  - 假设一个链表中有4个节点，将node节点插入到第2个节点的位置
+    - 第一步：创建一个指针p，指向待插入位置的前一个节点
+    - 第二步：node节点上的地址信息，指向原2号节点
+    - 第三步：指针p指向的节点的地址信息，指向node节点
+    - 完成链表的插入操作
+  - 易错点：
+    - 如果先将指针p指向的节点地址指向node节点
+    - 此时整个链表失去了指向原2号节点的地址信息，因为原二号节点的地址信息记录在1号节点（也就是p指向的节点上，现在它改变了），从而造成了内存泄漏
+
+#### 链表代码演示
+```C
+#include <stdio.h>
+#include <time.h>
+#include <stdlib.h>
+
+#define DL 3
+#define STR(n) #n
+#define DIGIT_LEN_STR(n) "%" STR(n) "d"
+
+// 链表结构定义
+typedef struct Node {
+    int data;
+    struct Node *next;
+} Node;
+
+// 结构操作
+// 初始化链表
+Node *getNewNode(int val) {
+    Node *p = (Node *)malloc(sizeof(Node));
+    p->data = val;
+    p->next = NULL;
+    return p;
+}
+
+// 链表插入
+// 无头链表在插入过程中，首地址可能发生改变，因此返回值是新链表的首地址
+Node *insert(Node *head, int pos, int val) {
+    // 如果插入位置是头地址的话，整个链表的首地址发生改变
+    if (pos == 0) {
+        Node *p = getNewNode(val);
+        p->next = head;
+        return p;
+    }
+    // 如果插入的不是头地址，则需要先找到待插入位置的前一个元素
+    Node *p = head;
+    for (int i = 1; i < pos; i++) p = p->next;
+    Node *node = getNewNode(val);
+    node->next = p->next;
+    p->next = node;
+    return head;
+}
+
+
+// 销毁链表
+void clear(Node *head) {
+    if (head == NULL) return ;
+    for (Node *p = head, *q; p; p = q) {
+        q = p->next;
+        free(p);
+    }
+    return ;
+}
+
+// 输出链表操作
+void output_linklist(Node *head, int flag) {
+    int n = 0;
+    for (Node *p = head; p; p = p->next) n += 1;
+    for (int i = 0; i < n; i++) {
+        printf(DIGIT_LEN_STR(DL), i);
+        printf("  "); // 留出小箭头的位置
+    }
+    printf("\n");
+    for (Node *p = head; p; p = p->next) {
+        printf(DIGIT_LEN_STR(DL), p->data);
+        printf("->");
+    }
+    printf("\n");
+    if (flag == 0) printf("\n\n");
+    return ;
+}
+
+// 链表的查找
+int find(Node *head, int val) {
+    Node *p = head;
+    int n = 0;
+    while (p) {
+        if (p->data == val) {
+            output_linklist(head, 1);
+            int len = n * (DL + 2) + 2;
+            for (int i = 0; i < len; i++) printf(" ");
+            printf("^\n");
+            for (int i = 0; i < len; i++) printf(" ");
+            printf("|\n");
+            return 1;
+        };
+        n += 1;
+        p = p->next;
+    }
+    return 0;
+}
+
+int main() {
+    srand(time(0));
+    #define MAX_OP 20
+    Node *head = NULL;
+    for (int i = 0; i < MAX_OP; i++) {
+        int pos = rand() % (i + 1), val = rand() % 100, ret;
+        printf("insert %d at %d to linklist\n", val, pos);
+        head = insert(head, pos, val);
+        output_linklist(head, 0);
+    }
+    int val;
+    while(~scanf("%d", &val)) { // ~是按位取反的意思
+        if (!find(head,val)) {
+            printf("not found\n");
+        }
+    }
+    clear(head);
+    /*
+        关于while(~scanf("%d", &val)) 的详细解析
+        当 scanf 成功读取一个整数并将其存储在 val 中时，它返回 1。按位取反 ~1 产生的结果不是 0（因为所有位都被取反了），所以循环继续。
+        当 scanf 到达文件末尾（例如，用户输入了 EOF 字符，通常是 Ctrl+D 或 Ctrl+Z），它返回 EOF（即 -1）。由于在大多数系统中 -1 的二进制表示是全 1，因此按位取反后变成全 0，即 0。这使得 while 循环的条件变为 false，循环终止。
+        因此，while(~scanf("%d", &val)) 实际上是一种检测输入结束的方式。只要用户不输入 EOF 字符，循环就会继续。这是一种在 C 语言中常见的用于从标准输入读取值的模式。
+
+        因此：while(~scanf("%d", &val))等价于while(scanf("%d", &val) != EOF)
+    */
+
+    return 0;
+}
+```
+
+#### 有头链表精简插入模块
+```C
+Node *insert(Node *head, int pos, int val) {
+    // 定义一个虚拟头节点
+    // 有头链表的优势：同时整合了插入的两种情况
+    Node new_head, *p = &new_head, *node = getNewNode(val);
+    new_head.next = head;
+    for (int i = 0; i < pos; i++) p = p->next;
+    node->next = p->next;
+    p->next = node;   
+    return new_head.next;
+}
+```
+
+#### 循环链表和双向链表
+- 单向循环链表：
+  - 最后一个节点指向第一个节点
+  - 注意：
+    - 头指针指向最后一个节点（将最后一个节点，看作是有头链表的虚拟节点）
+
+- 双向链表：
+  - 链表的结构定义中，多加一个p->pre,指向前一个节点
+  ![Alt text](images\image05.png)
+  - 第一个节点的pre和最后一个节点的next都指向null
+
+
+
+
 
 
 ## 算法

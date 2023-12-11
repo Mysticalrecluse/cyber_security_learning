@@ -279,6 +279,7 @@ function show() {
     echo $GLOBALS['name']; //也能在函数内部直接调用函数外部的变量
 }
 // 这里$GLOBALS[]无法调用函数内部的声明
+// $GLOBALS[] 超全局数组;
 ```
 
 - 变量检测
@@ -465,3 +466,834 @@ echo $str1.'-'.$str2;
   $ad = "大家好"
   echo mb_substr($ad,0,1,'utf-8')
   ```
+
+### php常量
+- define()定义常量
+```php
+<?php>
+define('NAME', 'mystical');
+define('NAME', 'mystical', true);
+// 第3个参数表示常量标识符是否区分大小写
+// true不区分， false严格区分
+define('NAME', 'mystical', false);
+echo name; // 报错
+``` 
+
+- const定义常量
+```php
+//...
+const URL = "mystical.com"
+```
+
+- 常量不受访问限制
+```php
+const NAME = 'mytical';
+function show() {
+  echo NAME;
+}
+show(); // mystical
+// 变量的话，函数内部无法访问函数外部
+// 函数外部依然无法访问函数内部的常量
+```
+
+- 常量的检测
+```php
+define('URL', 'hd.cms');
+var_dump(defined('URL'));  // true
+var_dump(defined('URL_NAME'));  // false
+```
+
+- 系统常量
+```php
+echo PHP_VERSION // 打印php版本
+echo PHP_OS // 打印服务器操作系统
+
+class Demo{
+    public function show(){
+        echo __CLASS__; // 打印当前类名, 系统常量
+        echo __METHOD__; // 打印当前方法名
+    }
+}
+
+(new Demo())->show();
+// Demo::show
+
+echo __FILE__; // 打印当前文件路
+```
+- 查询源代码中，用户自定义的所有常量
+```php
+define('NAME', 'mystical');
+const URL = 'hd.cms';
+print_r(get_defined_constants(true)['user']);
+// true参数的作用是分组显示，如何不填写，会比较凌乱
+```
+
+### 逻辑运算
+```php
+$a = 0;
+$b = false;
+var_dump($a == $b); // 会转换类型后比较：true
+var_dump($a === $b); // 不转换类型：false
+var_dump($a != $b); // false
+var_dump($a !== $b); // true
+```
+
+### 三元表达式
+```php
+// ? :
+
+// ??
+$name = 0;
+echo $name ? 'YES' : 'NO'; // NO
+echo $name?:"NO"; // NO
+// 如果 : 前面没值，若为真，则返回变量原本的值
+echo $name ?? 'NO'; // 0
+// ??前的变量存在且不为空，则在输入原值，如果为空或不存在输入??后的值
+
+@(20/0) 忽略掉，屏蔽报错
+echo 1; // 后面的echo正常执行
+```
+
+## 流程控制
+### if语句
+```php
+if(true) {
+  echo 'YES';
+} 
+else {
+  echo 'NO';
+}
+// C语言风格可以正常识别
+
+$status = false;
+if($status):
+    echo 'YES';
+else:
+    echo 'NO';
+endif;
+// 使用场景：
+<?php
+$status = false;
+if ($status):
+?>
+<h1>hello, mystical</h>
+<?php
+else:
+?>
+<h1>please input a number</h1>
+<?php
+endif;
+?>
+// 当分支语句中，穿插html的时候，不用花括号会简洁一些
+// 现在已很少使用·
+
+// 多条件
+$age = 10;
+if ($age < 15) {
+    echo 'child';
+}
+else if ($age < 30) {
+    echo 'tee';
+}
+else if ($age < 50) {
+    echo 'mid';
+}
+else {
+    echo 'old';
+}
+```
+
+### switch语句
+```php
+// 可以用C语言风格
+$a = 98;
+switch ($a % 3) {
+    case 0: {
+        echo "a % 3 = 0";
+    }; break;
+    case 1: {
+        echo "a % 3 = 1";
+    }; break;
+    case 2: {
+        echo "a % 3 = 2";
+    }; break;
+}
+
+// 也可以使用php自己的风格，都差不多
+
+switch ($a % 3) {
+    case 0:
+        echo "a % 3 = 0";
+        break;
+    case 1:
+        echo "a % 3 = 1";
+        break;
+    case 2:
+        echo "a % 3 = 2";
+        break;
+    default:
+        // TODO
+}
+
+// 也可以用endswitch替代花括号
+switch ($a % 3) :
+    case 0:
+        echo "a % 3 = 0";
+        break;
+    case 1:
+        echo "a % 3 = 1";
+        break;
+    case 2:
+        echo "a % 3 = 2";
+        break;
+    default:
+        // TODO
+endswitch;
+```
+
+### while循环
+```php
+$n = 5;
+while ($n--) {
+    echo 11;
+}
+
+// 这里的花括号可以变为endwhile
+while ($n--):
+    echo 11;
+endwhile
+
+echo "<hr/>"
+do {
+    echo 11;
+} while ($n--)
+// 这段代码是死循环，因为经过第一个while语句，$n的值已经为0
+// 后面再进行$n--,n的值变为-1,任何非0值都为true，因此是死循环
+
+do {
+    if(!isset($num)) {
+        $num = 10;
+    } 
+    echo ($num--)."<hr/>";
+} while ($num--);
+```
+
+### for循环
+```php
+for ($num = 0; $num < 10; $num++) {
+    echo $num;
+} // 0123456789
+```
+
+## 文件引入
+### include
+```php
+$name = 'mystical'
+include '1.html'; 
+// 作用相当于C语言中的#include
+// 如果引用文件不存在，可以用@抑制警告，正常往下执行
+
+if (!@include 'index.html') {
+    include 'default.html';
+}
+```
+
+### require强加载
+```php
+$name = 'mystical'
+require ('index.html'); // 如果文件不存在，报错，致命错误
+// 程序不会再往下执行
+echo 333;
+```
+
+### include_once
+```php
+/**** 场景1：****/
+include '2.php';
+include "function.php";
+echo show();
+// 如果2.php和function.php中都含有show()，
+// 则会因为重复定义相同函数导致报错
+
+include_once '2.php';
+include_once "function.php";
+echo show();
+// 如果重复则只加载一次
+// 默认加载第一次，后面有重复的调用的，不再加载
+```
+
+### require_once
+```
+拥有require特性的include_once，重复调用，只加载第一次
+// 有其他方法可以实现这个*_once特性
+如果文件不存在，报致命错误
+```
+
+## 函数
+### 函数定义
+```php
+function user() {
+    //DOTO
+}
+user();
+// 函数一定有返回值，在不适用return指定返回值的时候，系统默认返回NULL
+```
+
+### 简述命名空间
+- 后面详解
+```php
+namespace User;
+function make() {
+    echo 'user';
+} // user.php
+```
+```php
+namespace model;
+function make() {
+    echo "model";  
+} // model.php
+```
+```php
+include 'user.php';
+include 'model.php';
+// 正常会报错，因为定义show()函数，但是可以用命名空间解决这个问题
+/*
+命名空间：
+作用：将函数分组，不同组的同名函数可以一起使用
+*/
+User\make();
+Model\make();
+```
+
+### 函数的参数传值
+```php
+function mobile($tel) {
+    return substr($tel, 0, -4)."****";
+}
+echo mobile('13613600362');
+
+/* 优化后 */
+function mobile($tel, $num = 4, $fix = '*') {
+    return substr($tel, 0, $num * -1).str_repeat($fix, $num);
+}
+echo mobile('13613600363', 4, '#');
+```
+
+### 函数的参数传址
+```php
+function show(&$var) {
+    $var++;
+    echo $var;
+}
+$var = 1;
+show(&$var);
+echo "<hr/>";
+echo $var;
+```
+
+### 不定长参数-点语法
+```php
+function sum(...$var) {
+    print_r($var);
+}
+sum(12,3,4,54,5); // 打印数组
+```
+
+### 函数参数的类型约束
+```php
+function show(int $num) {
+  return $num
+}
+var_dump(show('2')); // int 2; 返回的是数字类型的2
+// 如果传入的是字母，则报错，必须类型为int
+// 在普通模式下，传递'2'会自动转换，不会报错
+// 严格模式下会报错
+
+declare(strict_types = 1);
+function show(int $num) {
+  return $num
+}
+var_dump(show('2')); // 报错
+```
+
+### 函数返回值约束
+```php
+function sum(): int
+{
+    return 'mystical'; //报错，上面要求返回值约束，必须是int
+}
+sum(); // 报错
+
+function sum(): ?string
+{
+    return 'mystical'; 
+    // 返回空值的话，必须指明null,eg: return null;
+}
+sum(); // ?string表示返回值可以是空值或字符串，
+
+function sum(): void
+{
+    // void表示可以无返回值
+}
+```
+```php
+function sum(int ...$nums): int
+{
+    static $sum = 0;
+    return $sum += array_sum($nums);
+}
+echo sum(1,2,3); // 6
+echo "<hr/>";
+echo sum(1,2,3); //12
+```
+
+### 变量函数
+```php
+function sum() {
+    return 'function sum';
+}
+$callback = 'sum';
+echo $callback();
+```
+```php
+$file = "hdcms.jpg";
+$type = trim(strrchr($file, '.'), '.');
+$action = strtolower($type);
+echo $type;
+
+function jpg() {
+    return 'jpg function';
+}
+
+function png() {
+    return 'png function';
+}
+if (function_exists($action)):
+    echo $action($file);
+else :
+  echo "NO";
+endif;
+```
+
+## 数组
+### 数组的声明
+```php
+$arr = array(
+  1,2,3
+);
+print_r($arr);
+
+$arr = [1,2,3]; // 推荐方法
+```
+
+### 数组分类
+```php
+/* 索引数组 */
+$arr = [1,2,3];
+// Array ( [0] => 1 [1] => 2 [2] => 3 )
+
+/* 关联数组 */ // 类似字典
+$article = [
+    'title' => 'Visual Studio Code',
+    'create_at' => "2020-2-22"
+];
+
+/* 同时使用 */
+$lessons = [
+    ['title' => 'Visual Studio Code', 'create_at' => '2030-2-22'],
+    ['title' => 'Laravel 5.6', 'create_at' => '2030-12-12']
+];
+echo $lessons[0]['title']
+```
+
+### 通过指针读取数组元素
+```php
+$arr = ['xiaoming'];
+$arr[] = 'lisi';
+$arr[] = 'xiangjun';
+$arr[] = 'xiaoli';
+// 索引自动递增
+```
+```php
+/* key */
+// 获取数组第一个的下标/键
+$arr = ['mystical', 'hdcms'];
+echo key($arr); // 0
+
+/* current */
+// 获取数组第一个值 
+echo current($arr); // mystical
+
+/* next */
+// 指针向下移动一位，并返回当前元素
+echo next($arr); 
+
+/* prev */
+// 指针向上移动一位，并返回当前值
+echo prev($arr);
+// 如果指针向下或向上移动后，没有值，则返回false
+```
+- 练习代码
+```php
+$users = [
+  ['name' => 'mystical', "age" => '16'],
+  ['name' => 'curry', "age" => '19'],
+  ['name' => 'kobe', "age" => '23'],
+  ['name' => 'jamse', "age" => '16']
+];
+<table border="1">
+    <tr>
+        <th>编号</th>
+        <th>姓名</th>
+        <th>年龄</th>
+    </tr>
+    <?php while($user = current($users)):?>
+    <tr>
+        <td><?php echo key($users) + 1;?></td>
+        <td><?php echo $user['name'];?></td>
+        <td><?php echo $user['age'];?></td>
+    </tr>
+    <?php next($users); endwhile;?>
+</table>
+```
+
+### 数组遍历
+- list
+```php
+$arr = ['mystical', 'hdcms'];
+list($a, $b); = $arr;
+
+$user = ['name'=>'mystical', 'age'=>33];
+list('name'=>$name, 'age'=>$age) = $user;
+echo $age;// 33
+
+/* 只取数组的某一个值 */
+$arr = ['mystical', 'kobe', 'curry'];
+list(,,$web) = $arr;
+echo $web; // curry
+
+/* 遍历数组 */
+$users = [
+  ['name' => 'mystical', "age" => '16'],
+  ['name' => 'curry', "age" => '19'],
+  ['name' => 'kobe', "age" => '23'],
+  ['name' => 'jamse', "age" => '16']
+];
+while(list('name'=>$name, 'age'=>$age) = current($users)):
+    echo "name:{$name}, age:{$age} <br/>";
+    next($users);
+endwhile;
+```
+
+- foreach
+```php
+/* 遍历索引数组 */
+foreach($users as $user){
+    printf($user);
+}
+
+/* 遍历关联数组 */
+foreach($users as $key=>$user){
+    $user['age'] += 50;
+}
+echo $users
+//仅遍历，对函数外部的数据无影响 
+
+/* 传值，数据二次处理 */
+foreach($users as $key=>&$user){
+  //$users[$key]['age'] += 50;
+    $user['age'] += 50;
+}
+echo $users
+```
+
+### 数组函数
+```php
+$users = ['mystical', 'curry'];
+/* arr_push() */
+// 在结尾增加一个值，改变原数组，$user传的是地址
+array_push($users, 'lisi');
+
+/* array_pop() */
+// 从结尾弹出一个值，改变原数组，返回值是弹出的值
+$user = array_pop($users);
+
+/* array_unshift() */
+// 在开头添加一个值， 改变原数组
+array_unshift($users, 'kobe');
+
+/* array_shift() */
+// 弹出开头的值，并返回
+$start = array_shift($users);
+print_r($users);
+echo $start;
+
+/* count() */
+// 返回数组元素个数
+echo count($users);
+
+/* array_key_exists() */
+// 检测数组的键名是否存在
+$allowImageType = ['jpeg'=>20000, 'jpg'=>20000, 'png'=>2000];
+$file = 'hdcms.txt';
+$ext = strtolower(substr(strrchr($file, '.'), 1));
+echo $ext; 
+if (!array_key_exists($ext, $allowImageType)) {
+    echo 'wrong';
+} else {
+    echo 'success';
+}
+
+/* in_array() */
+// 检测数组的值是否在数组中
+$allowImageType = ['jpeg', 'jpg', 'png'];
+$file = 'hdcms.txt';
+$ext = strtolower(substr(strrchr($file,'.'), 1));
+if(!in_array($ext, $allowImageType)) {
+    echo "error";
+} else {
+    echo "success";
+}
+
+/* array_keys()*/
+// 将数组中的所有键组成一个新数组
+$allowImageType = ['jpeg'=>20000, 'jpg'=>20000, 'png'=>20000];
+$file = 'hdcms.txt';
+$ext = strtolower(substr(strrchr($file,'.'), 1));
+if(!in_array($ext, array_keys($allowImageType))) {
+    echo "error";
+} else {
+    echo "success";
+}
+
+/* array_filter() */
+// 数组筛选
+$users = [
+  ['name' => 'mystical', "age" => '16'],
+  ['name' => 'curry', "age" => '19'],
+  ['name' => 'kobe', "age" => '23'],
+  ['name' => 'jamse', "age" => '16']
+];
+$filterUsers = array_filter($users, function($user) {
+    return $user['age'] > 20;
+});
+print_r($filterUsers);
+
+/* arraymap */
+// 对数组中每个元素进行操作后，返回新数组
+$mapUsers = array_map(function($user){
+    unset($user['age']);
+    return $user;
+},$users);
+print_r($mpaUsers);
+
+/* array_values */
+// 去元素的值，生成新的数组
+$stringUsers = array_map(function($user){
+    return implode('-', array_values($user));
+}, $users)
+
+/* array_merge() */
+// 数组的合并，有相同值，会被覆盖
+$arr = ['host'=>'localhost', 'port'=>3306, 'user'=>'root'];
+print_r(
+    array_merge($arr, ['passwd'=>'admin123'])
+);
+
+/* array_change_key_case() */
+// 将数组的键名全部更改大小写，CASE_UPPER: 1,CASE_LOWER: 0 
+$database = include 'config/database.php';
+$database = array_change_key_case($database, 1);
+print_r($database);
+
+// 使用递归改变多层数组键名
+$database = include '../49/config/database.php'
+function hd_array_change_key_case(array $data,int $type=CASE_UPPER):array{
+    foreach ($data as $key=>$value):
+      $action = $type==CASE_UPPER?'strtoupper':'strtolower';
+      unset($data[$key]);
+      $data[$action($key)] = is_array($value)?hd_array_change_key_case($value, $type):$value;
+    endforeach;
+    return $data;
+}
+```
+
+###  超高效的数组值多维操作
+```php
+/* array_walk_recursive() */
+// 操作数组中的键值（能深入到子数组）
+// array_walk_recursive 只对数组的值进行操作，不改变键
+$database = include 'database.php';
+function array_change_value(array &$data, int $type=CASE_UPPER):array{
+    array_walk_recursive($data, function(&$value, $key, $type) {
+        $action = $type == CASE_UPPER ? 'strtoupper' : 'strtolower';
+        $value = $action($value);
+    }, $type);
+    return $data;
+}
+array_change_value($database, CASE_UPPER);
+print_r($database);
+```
+
+### var_export()
+- 作用：将数组转换为合法的php语法格式的字符串
+```php
+$database = include 'database.php';
+$config = var_export($database, true);
+// true表示有返回值，返回值为合法的字符串
+file_put_contents('database.php', '<?php return'.$config);
+// var_export()的作用是生成的php语法的字符串，在别的文件中，依然可以被php环境引用执行
+```
+
+### 序列化与反序列化
+```php
+/* serialize() */
+// 序列化
+$database = include 'database.php';
+$cache =  serialize($database);
+// 将php语法的数组，序列化转换为所有语言都能识别的字符串
+
+/* unserialize() */
+// 反序列化
+$database = include 'database.php';
+$cache = serialize($database);
+print_r(unserialize($cache));
+```
+
+### 序列化与反序列化的实际应用
+```php
+// 缓存
+function cache(string $name, array $data=null) {
+    $file = 'cache'.DIRECTORY_SEPARATOR.md5($name).'.php';
+    // DIRECTORY_SEPARATOR是表示php中目录分隔符/的常量
+    if(is_null($data)) {
+        // 取缓存
+        $content = is_file($file)?file_get_contents($file):null;
+        return unserialize($content)?:null;
+    } else {
+        return file_put_content($file, serialize($data));
+        // 存缓存
+    }
+}
+$config = include "database.php";
+cache('database', $config);
+```
+
+## 日期与时间
+### 时区
+```php
+// PRC Asia/chongqing  Asiz/shanghai Asia/urumqi
+/* 修改默认时区 */
+date_default_timezone_set('Asia/shanghai');
+
+/* 查看当前时间 */
+echo dete('Y-m-d H:i:s'); // 如果不修改默认时区，则默认伦敦时间
+echo dete('Y年m月d日 H时i分s秒');
+
+/* 指定时间*/
+echo date('Y年m月d日 H时i分s秒', time()-3600*24)
+// 第二个参数通过设置时间戳数值，来修改到指定时间
+
+// 实际工作中，上述函数基本用不到，因为都是框架开发，直接改配置文件
+```
+
+### 时间戳
+```php
+// 从1970-1-1 0：0：0开始，到现在的秒数
+data_default_timezone_set('Asia/shanghai');
+
+echo time(); // 输出时间戳
+
+echo microtime(true); // 返回微秒
+/* 一般用来计算程序执行时间 */
+function runtime($start = null, $end = null) {
+    static $cache=[];
+    if (is_null($start)) {
+        return $cache;
+    } elseif (is_null($end)) {
+        return $chache[$start] = microtime(true);
+    } else {
+        $end = $cache[$end]??microtime(true);
+        return round($end - $cache[$start]);
+    }  
+}
+```
+
+- getdate()
+```php
+print_r(getdate());
+// getdate()得到一个数值，可以通过遍历数组和取数组的值，来获得时间元素
+/*
+
+Array
+(
+    [seconds] => 59
+    [minutes] => 39
+    [hours] => 11
+    [mday] => 6
+    [wday] => 3
+    [mon] => 12
+    [year] => 2023
+    [yday] => 339
+    [weekday] => Wednesday
+    [month] => December
+    [0] => 1701862799
+)
+
+*/
+
+```
+
+- iso字符串和时间戳的转换
+```php
+// iso -> 时间戳
+strtotime(1995-04-08);
+
+echo strtotime("now"), "\n";
+echo strtotime("10 September 2000"), "\n";
+echo strtotime("+1 day"), "\n";
+echo strtotime("+1 week"), "\n";
+echo strtotime("+1 week 2 days 4 hours 2 seconds"), "\n";
+echo strtotime("next Thursday"), "\n";
+echo strtotime("last Monday"), "\n";
+
+// 综合实例
+echo date("Y-m-d", strtotime("+7 day"));
+```
+
+### 日期相关类
+```php
+// DataTime, DataInterval, DataTimezone
+$prc = new DateTimezone('PRC');
+$dateTime = new DateTime(); // 由类得到实例对象
+print_r($dateTime);
+$dateTime->setTimezone($prc);
+$dateTime->setDate(2019, 2, 12);
+$dateTime->setTime(12, 22, 12);
+echo "<br/>";
+echo $dateTime->format('Y-m-d H:i:s');
+echo "<br/>";
+echo $dateTime->setTimestamp(time());
+
+/* 计算两个日期相差的差值 */
+$dateTime1 = new DateTime();
+$dateTime2 = new DateTIme("2024-3-1");
+$interval = $dateTime1->diff($dateTime2);
+$format = '距离结课还有<span style="color:red">%m个月%d天</span>, 共有%a天';
+echo $interval->format($format);
+
+/* 增加时间 */
+$dateTime = new DateTime();
+$interval = new DateInterval('P2DT2H5M');
+// 参数以P开头，日期和时间用T分隔
+echo $dateTime->format('Y-m-d H:i:s');
+echo "<br/>";
+$dateTime->add($interval);// 增加
+echo $dateTime->format('Y-m-d H:i:s');
+$dateTime = sub($interval);// 减少
+echo "<br/>";
+echo $dateTime->format('Y-m-d H:i:s');
+
+```
+
+

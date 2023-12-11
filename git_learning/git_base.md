@@ -535,3 +535,17 @@ git merge feature        # 合并feature分支到当前分支 (master)
 - 关键词：用空格分开
 - in：readme：将关键词检索范围扩展到readme文档
 - star:>1000 查询大于1000星的优质项目仓库
+
+
+### 更新github仓库至本地
+```shell
+git branch --set-upstream-to=github/master master
+# 将分支指向上游
+
+git pull # 本地更新
+```
+
+### 查看本地目录指向的github的哪个仓库
+```shell
+git remote -v
+```
