@@ -1296,4 +1296,1645 @@ echo $dateTime->format('Y-m-d H:i:s');
 
 ```
 
+## 正则表达式
+### 边界符和元字符
+```php
+/* 定界符 */
+$status = preg_match('/a/', 'dkjkda');
+// 根据匹配结果返回布尔值
+var_dump($status);
+// #,@,/都可以作为定界符
+//$status = preg_match('@a@', 'dkjkda');
+//$status = preg_match('#a#', 'dkjkda');
 
+/* 元字符 */
+// \d 表示 0-9   \D 非数字
+// \w 表示a-z A-Z 0-9 _  \W 除了a-z A-Z 0-9 _
+// \s 表示空白符   \S 非空白符
+```
+
+### 原子表
+```php
+// [abc]
+$status = preg_match('/[abc]/', 'a'); 
+var_dump($status);// true
+// 原子表中其1匹配即可
+// [0-9] [a-z] [A-Z]
+// .(点)可以匹配除换行符之外的所有字符
+// 取反 [^123] 除了123，^在[]在原子表中就是取反
+
+/* 拆分 */
+$str = '1.jpg@2.jpg#3.jpg';
+$files = preg_split('/[@#]/', $str); 
+// 根据正则的符号拆分字符串为数组
+print_r($files);
+//Array([0] => 1.jpg, [1] => 2.jpg, [2] => 3.jpg)
+```
+
+### 原子组
+```php
+// 原子组()
+preg_match('/[12]/', 1); // true
+preg_match('/(12))/', 12); // 必须含12才能使true
+
+// 原子组示例
+$str = "hundunren.com, mystical.com, baidu.com";
+$preg = "/(./)(com)/";
+echo preg_replace($preg, '\1<span style="color:red">\2</span>', $str);
+// \1表示第一个括号的内容, \2表示第二个，\0表示全部
+
+// 边界限定
+// ^开头  $结尾
+
+```
+
+### 选择修饰符
+```php
+$str = 'http://www.baidu.com百度 http://www.sina.com 新浪网';
+$preg = "/\.(baidu|sina)/";
+$replace = '.houdunren'
+echo preg_replace($preg, $replace, $str)
+
+// 示例2
+$str = '后盾人 houdunren.com 后盾网 houdunwang.com';
+$preg = '/(houdunren|houdunwang)(\.com)/';
+$replace = '<a href="http://www.\1\2">\0</a>';
+echo preg_replace($preg, $replace, $str);
+```
+
+### 重复匹配
+```php
+// *(星号) 匹配0或多个字符
+// + 1到无限，至少有1个
+// ？ 0或1个
+// {} 指定具体数量，如：{2}表示2个
+// {2,} 数量：2到无限
+// {2, 6}  数量：2-6个
+$str = '<h1>hello houdunren</h1>';
+$replace = "<h1><a href='https://www.houdunren.com'>\\1</a></h1>";
+// 这里双引号里的\要使用转义\\
+echo grep_replace('@<h1>(.+)</h1>@', $replace, $str);
+```
+
+### 禁止贪婪匹配
+```php
+// 默认贪婪，非贪婪：量词后面加?
+$str = '<h1>你好</h1><h1>mystical</h1>';
+$preg = '@<h1>(.+?)</h1>@';
+preg_match($preg, $str, $matches);
+print_r($matches);
+/*
+Array
+(
+    [0] => <h1>你好</h1>
+    [1] => 你好
+)
+*/
+$str = '<h1>你好</h1><h1>mystical</h1>';
+$preg = '@<h1>(.+)</h1>@';
+preg_match($preg, $str, $matches);
+print_r($matches);
+/*
+Array
+(
+    [0] => <h1>你好</h1><h1>mystical</h1>
+    [1] => 你好</h1><h1>mystical
+)
+*/
+$str = '<h1>你好</h1><h1>神隐</h1>';
+$preg = '/<h1>(.+?)<\/h1>/';
+preg_match_all($preg, $str, $matches);
+print_r($matches);
+/*
+
+Array
+(
+    [0] => Array
+        (
+            [0] => <h1>你好</h1>
+            [1] => <h1>神隐</h1>
+        )
+    [1] => Array
+        (
+            [0] => 你好
+            [1] => 神隐
+        )
+)
+*/
+```
+
+### 模式修正符i和s
+- `i`: 不区分大小写字母的匹配
+- `s`: 将字符串视为单行，换行符作为普通字符看待，使'.'可以匹配任何字符
+```php
+$str = '<h1>hi</h1><H2>mystical</H2>';
+$preg = '#<h([1-6])>.*?</h\1>#i'; 
+// 修正符放到边界符后面， i 表示不区分大小写
+$replace = '';
+preg_match_all($preg, $str, $matches);
+print_r($matches);
+echo preg_replace($preg, '\2', $str);
+```
+```php
+$str = '<h1>
+mystical
+</h1>'; // 里面有换行符，不使用修正符的话，.不能匹配换行
+$preg = '#<h1>.*?</h1>#is'; // 使用s就会自动去掉换行匹配
+$replace = '';
+preg_match_all($preg, $str, $matches);
+print_r($matches);
+```
+
+### 模式修正符m和x
+- `m`: 将字符串按多行进行处理
+```php
+$str = <<<php
+#1
+mystical
+@#3
+#2
+recluse
+php;
+$preg = '/#\d+/m'; // m的作用，就是逐行进行匹配，而不是按整体去匹配
+echo preg_replace($preg, '', $str);
+/*
+mystical
+@#3
+recluse
+*/
+```
+- `x`：忽略空格，#及其后面的字符
+```php
+$str = 'abc';
+$preg = '/^a\w+  #this is a reg test/x'; // x的效果使忽略正则表达式中的空白
+// 同时会忽略#及其后面的所有字符，因此可以当正则注释使用
+echo preg_replace($preg, '', $str);
+```
+
+### 模式修正符UAD
+- `U`：禁止贪婪
+```php
+$str = '<h1>mystical</h1><h1>recluse</h1>';
+$preg = '/<h1>(.+)<\/h1>/U';
+// 等价于'/<h1>(.+?)<\/h1>/'
+preg_match_all($preg, $str, $matches);
+print_r($matches);
+```
+- `A`: 等价^，限定开头
+```php
+$str = '%%&%&)*34526548@qq.com';
+$preg = '/\w+@[\w\.]+/A';
+// 等价于：'/^\w+@[\w\.]+/'
+preg_match_all($preg, $str, $matches);
+print_r($matches);
+```
+- `D`: 不匹配换行符
+```php
+$str = "1a\n";
+$preg = '/\d+a$/D';
+// 如果不加D的话，$默认是可以匹配\n结尾的字符串的、
+// 但是加了D的话，就会检索\n，无法默认匹配\n
+preg_match_all($preg, $str, $matches);
+print_r($matches);
+```
+
+### 正则表达式的函数
+```php
+/* preg_match() */ 
+// 匹配一次就停止，返回值为数组
+$str = '1@2@3';
+preg_match('/\d+/', $str, $matches);
+// 匹配到1次后，后面就不在匹配
+print_r($matches); // Array([0]=>1)
+
+/* preg_match_all() */
+// 全部匹配，返回值为数组
+$str = '1@2@3';
+preg_match_all('/\d+/', $str, $matches);
+// 全部匹配
+print_r($matches); 
+// Array([0]=>1,[1]=>2,[2]=>3)
+
+/* preg_split() */
+// 按正则拆分字符串
+$str = '1@2#3';
+$arr = preg_split('/@|#/',$str);
+print_r($arr);
+// Array([0]=>1,[1]=>2,[2]=>3)
+
+/* greg_replace() */
+// 替换
+$str = '1@2#3';
+echo preg_replace('/@|#/', '-', $str);
+// 1-2-3
+
+/* greg_replace_callback() */
+// 使用闭包函数进行替换，负责复杂逻辑的替换
+$str = '1@2#3';
+echo preg_replace_callback('/\d+/', function($matches){
+    // 此时传递给$matches的参数就是每次匹配的内容
+    print_r($matches); // 返回值都是数组类型数据
+    if ($matches[0] > 2) {
+        return $matches[0] + 200;
+    }
+}, $str); // 1@2#203
+```
+
+## 文件与目录
+### 自动转换磁盘大小
+```php
+// 获取文件所在磁盘大小
+/* disk_total_space() */
+// 参数是目录,单位是字节
+echo __FILE__."<br/>";
+echo __DIR__."<br/>";
+echo disk_total_space(".") / 1024 / 1024 / 1024 . "GB";
+/*
+D:\git_repository\cyber_security_learning\PHP\php_prac\1211.php
+D:\git_repository\cyber_security_learning\PHP\php_prac
+931.49774551392GB
+*/
+
+// 转换空间大小函数
+function space_total(int $total): string
+{
+    $config = [3 => 'GB', 2 => 'MB', 1 => 'KB'];
+    foreach ($config as $num => $unit) {
+        if ($total > pow(1024, $num)) {
+            return round($total / pow(1024, $num))."$unit";
+        }
+    }
+    return $total.'B';
+}
+
+/* disk_free_space() */
+// 获取可用空间大小
+echo __FILE__."<br/>";
+echo __DIR__."<br/>";
+echo space_total(disk_free_space(__DIR__))."<br/>";
+```
+
+### fopen打开资源与fseek操作指针
+```php
+/* fopen() */
+// 打开文件
+// allow_url_fopen 开去才能打开远程文件
+$filename = 'xj.txt';
+$handle = fopen($filename, 'r');
+// 参数1为文件名； 参数2为文件打开模式
+// 文件打开模式：'r'，开启文件，并把文件指针（光标）引到最前面
+// 文件打开模式：'rb', 开启二进制文件，如图片，影音等
+// 返回值是资源类型数据
+
+/* filesize() */
+// 参数是文件名，返回值为文件大小
+echo filesize($filename);
+
+/* fread() */
+// 读取资源类型文件
+echo fread($handle, 2);
+// 参数2为指定读取字节大小
+// fread()是指针在哪，就从哪开始读取
+// 读取几个字节，指针就后移几个字节
+
+/* fseek() */
+// 操做指针
+fseek($handle, 3);
+// 指光标从第3个字节后开始
+
+```
+
+### r模式写入操做
+```php
+$filename = 'xj.txt';
+$handle = fopen($filename, 'r+');
+// 文件打开模式: r+ 同时支持读写操做
+// 如果需要处理二进制文件，则'r+b'
+
+/* fwrite() */
+// 向文件中写入操做, 返回值为成功写入的字节大小
+fseek($handle, filesize($filename));
+$res = fwrite($handle, 'mystical ');
+var_dump($res);
+// 从指针处开始写入，会覆盖原位置的字符
+// 指针跟随写入字符移动
+fseek($handle, 0);
+echo fread($handle, filesize($filename))
+
+/* fclose() */
+// 关闭文件
+fclose($handle)
+```
+
+### w模式操做细节技巧
+```php
+/* file_exists() */
+// 用于判断一个文件在当前目录下是否存在
+file_exists('xj2.txt');
+// 返回布尔值
+
+$filename = 'xj2.txt'
+$handle = fopen($filename, 'w');
+// 使用r的时候，必须打开已存在文件
+// 文件模式: w 如果文件不存在，系统创建一个新文件
+// 文件模式: w 如果文件存在，则会覆盖原文件
+// w 指支持写入，无法读取文件内容
+$handle = fopen($filename, 'w+');
+fwrite($handle, 'hello');
+fseek($handle, 0);
+echo fread($handle, filesize($filename));
+// w+，支持读取文件的操做
+// 二进制文件则：wb 或 w+b
+```
+
+### x模式使用技巧
+```php
+/* 文件模式 a */
+// a表示追加
+$handle = fopen('xj.txt', 'a');
+// 使用模式a，打开文件后，光标指向文件末尾
+// 如果文件不存在，则创建新文件
+fwrite($handle, 'mystical');
+// 如果要读取文件，需要a+
+fseek($handle, 0);
+echo fread($handle, filesize('xj.txt'));
+
+/* 文件模式 x */
+// 只有当文件不存在的时候，可以使用，否则报错
+$filename = 'xj3.txt'
+$handle = fopen($filename, 'x');
+// 读取文件需要使用 x+
+```
+
+### 采集操做与二进制文件操做
+```php
+// 解析二进制文件，需要添加头信息
+header('Content-type:image/png');
+$handle = fopen('xj.png', 'r');
+echo fread($handle, filesize('xj.png'));
+
+// 写入图片
+$handle = fopen('xj.png', 'r');
+$png = fopen('a.png', 'w');
+fwrite($png, fread($handle, filesize('xj.png')));
+
+// allow_url_fopen on 即可读取远程文件
+$handle = fopen('https://www.hdcms.com', 'r');
+$index = fopen('index.hmtl', 'w');
+fwrite($index, fread($handle, 99999999));
+
+// 数据采集
+preg_match('/<title>(.*)</title>/isU', fread($handle, 9999999), $matches);
+echo $matches[1];
+```
+
+### 常用函数
+```php
+/* feof */
+// 判断一个文件内容是否读取结束，如果读取结束则返回真，否则返回假
+// feof() 函数在 PHP 中用于判断文件指针是否已经到达了文件的末尾
+$handle = fopen('xj.txt', 'rb');
+while(!feof($handle)) {
+    echo fread($handle, 1);
+}
+
+/* fgetc() */
+// 作用：每次只读取一个字符
+while (!feof($handle)) {
+    echo fgetc($handle);
+    // 等价于fread($handle, 1)
+}
+
+/* fgets($handle) */
+// 作用：读取一行
+echo fgets($handle, 6);
+// 第二个参数为读取字符数量
+
+/* fgetcsv() */
+// 读取内容，返回数组
+$handle = fopen('xj.txt', 'rb'); // mystical,kobe,curry
+$users = fgetcsv($handle, ',');
+print_r($users);
+// Array([0]=>mystical,[1]=>kobe,[2]=>curry);
+```
+
+### 共享锁与独占锁
+```php
+/* flock() */
+// 文件锁定，参数1：资源类型数据， 参数2：锁常数
+// 读锁，即共享锁：LOCK_SH
+// 效果：读锁期间，其他用户或脚本对该文件读取无影响，无法执行写操做
+// 注意，写操作会被阻塞等待而不是直接被拒绝，直到所有共享锁被释放。
+// 使用场景：当多个脚本对一个文件进行操做是，常用共享锁
+$handle = fopen('xj.txt', 'rb');
+flock($handle, LOCK_US);
+// 锁只有在文件处理完之后，或者解锁后失效
+
+flock($handle, LOCK_UN); // 解锁
+fclose($handle);
+```
+
+```php
+// 写锁，即排他锁：LOCK_EX
+// 效果，当写操作处理完之前，其他用户/脚本无法对该文件进行读写操做
+$file = fopen("somefile.txt", "r+");
+
+// 尝试获取排他锁
+if (flock($file, LOCK_EX)) {
+    // 写入文件操作
+    fwrite($file, "Some data to write");
+
+    // 释放锁
+    flock($file, LOCK_UN);
+} else {
+    echo "Could not lock the file for writing.";
+}
+
+fclose($file);
+```
+- 总结：
+```
+共享锁 (LOCK_SH): 当文件被一个进程以共享锁的形式锁定时，其他进程仍然可以读取该文件，但不能对其进行写操作。共享锁允许多个进程同时读取同一个文件，这对于读取操作而言是安全的，因为它们不会改变文件的内容。
+
+排他锁 (LOCK_EX): 当一个进程对文件设置了排他锁时，其他任何进程都不能对该文件进行读取或写入操作，直到排他锁被释放。排他锁用于写操作，确保在写入或修改文件时不会有其他进程同时访问该文件，从而保证数据的完整性和一致性。
+
+因此，共享锁适用于多个用户或脚本需要同时读取数据的情况，而排他锁适用于需要修改文件数据时确保独占访问权的情况。这两种锁机制共同帮助管理并发访问文件时的数据完整性和一致性。
+```
+
+### 阻塞控制
+- 阻塞控制更多的是在数据库上去做，已经很少在php的文件上去处理
+```php
+// LOCK_NB
+$handle = fopen('xj.txt', 'w');
+$stat = flock($handle, LOCK_EX|LOCK_NB, $wouldblock);
+// 当处于阻塞状态时，$stat为false，$wouldblock的值为1，不阻塞为0
+if ($stat) {
+    // 或者 !$wouldblock
+    fwrite ($handle, 'mystical');
+} else {
+    echo 'file is locked';
+}
+```
+
+### 文件权限操做与文件检查操做
+```php
+/* is_writable() */
+// 对文件写权限的判断，参数：文件路径
+var_dump(is_writable('xj.txt'));
+
+/* is_readable() */
+// 对文件读权限的判断
+var_dump(is_readable('xj.txt'));
+
+// 应用实例
+if (is_writable('xj.txt')) {
+    $handle = fopen('xj.txt', 'w');
+    fwrite($handle, 'mystical');
+} else {
+    echo '权限不足';
+}
+
+/* file_exists() */
+// 判断文件是否存在
+// 注意这个函数也能判断目录
+var_dump(file_exists('xj.txt')); // 存在则返回true
+
+// 应用实例：根据某文件是否存在，判断是显示哪个页面
+// install.lock
+if (!file_exists('install.lock')) {
+    echo '显示安装界面'
+} else {
+    echo '显示登陆界面'
+}
+
+/* is_file() */
+// 只判断文件是否存在
+
+/* is_dir() */
+// 只判断目录是否存在
+```
+
+### 快速文件读写操做
+```php
+/* file_put_contents() */
+// 直接向文件中写入内容，如果源文件有内容则覆盖
+file_put_contents('xj.php', 'mystical');
+// 参数1：文件路径， 文件2：内容
+file_put_contents('xj.php', 'mystical', FILE_APPEND);
+// 通过参数3：FILE_APPEND来让写入的内容追加，而不是覆盖
+
+/* file_get_contents() */
+// 直接读取文件中的内容
+echo file_get_contents('xj.txt'); 
+// 支持远程文件读取
+echo file_get_contents('http://mystical.com'); 
+```
+
+### 开发文件缓存系统
+```php
+/* filemtime() */
+// 返回文件修改时间
+filemtime('xj.txt'); // 返回时间戳
+
+file_put_contents('xj.txt', time());
+echo filemtime('xj.txt');
+
+// 模拟读缓存
+$name = 'mystical';
+if(is_file('2.cache.php') && filemtime('2.cache.php') > (time()-10)) {
+    include '2.cache.php';
+    echo 'is cache...'
+} else {
+    ob_start();
+    include '2.blade.php';
+    $content = ob_get_contents();
+    file_put_contents('2.cache.php', $content);
+}
+ 
+// 模板文件 2.blade.php
+<h1><?php echo $name;?></h1>
+
+// 缓存文件 2.cache.php
+<h1>mystical</h>
+```
+
+### 输出缓冲控制函数
+- 输出缓冲（Output Buffering）是一种机制，它允许您暂时存储脚本的输出（例如 echo 或 print 等）而不是直接发送它们到浏览器。这种技术在处理动态内容时非常有用，尤其是在需要修改输出内容或在输出发送到浏览器之前执行某些操作时。
+```php
+// ob_start() 函数用于打开或激活输出缓冲区。
+// 当您调用这个函数后，所有的输出（例如通过 echo 或 print 等）不会直接发送到浏览器，
+// 而是被存储在内部的输出缓冲区中。
+ob_start();
+echo "Hello, World!";
+// 此时输出不会发送到浏览器，而是存储在缓冲区中
+// 程序运行结束后，输出到缓冲区内容全部输出到浏览器
+```
+```php
+// ob_get_contents() 函数用于获取当前输出缓冲区的内容，但不会清空缓冲区。
+// 这意味着你可以读取缓冲区的内容，而不影响缓冲区本身。
+ob_start();
+echo "Hello, World!";
+$content = ob_get_contents();
+// $content 现在包含 "Hello, World!"，但缓冲区依然保持不变
+```
+```php
+/* ob_end_flush() */
+// 关闭缓冲区，并将缓冲区的内容输出到浏览器
+
+/* ob_end_clean() */
+// 清空缓冲区内容，并关闭缓冲区
+ob_start();
+echo "Hello, World!";
+
+$content = ob_get_contents(); // 获取缓冲区内容
+ob_end_clean(); // 清空并关闭缓冲区
+
+// 处理或修改 $content
+$content = strtoupper($content); // 例如，将内容转换为大写
+
+echo $content; // 发送处理后的内容到浏览器
+```
+
+### 文件常用常量
+```php
+echo __FILE__; // 显示当前文件完整路径
+echo __DIR__; // 显示当前文件完整所在目录，不包含文件
+echo DIRECTORY_SEPARATOR; // 路径分隔符
+```
+
+### var_export创建网站配置文件
+```php
+$db = ['host'=>'localhost', 'user'=>'root', 'password'=>'admin123'];
+$config = var_export($db, true);
+// 不写true则输出到屏幕上，加true则返回值不输出，直接存到变量中
+file_put_contents('database.php', '<?php return '.$config.';');
+print_r(include 'database.php');
+```
+
+### 目录文件操做
+```php
+/* basename() */
+// 只输出文件名称
+echo basename(__FILE__);
+
+/* dirname() */
+// 只输出文件路径
+echo dirname(__FILE__);
+// 等价于echo __DIR__;
+
+/* mkdir() */
+// 在当前路径下创建一个目录
+mkdir('dirname', 0750);
+// 参数1：目录名称，参数2：目录权限
+mkdir('a/b/c/d', 0750, true);
+// 参数3：true相当于递归创建，等价于SHELL中mkdir -p 
+
+/* rmdir('') */ 
+// 无法直接删除多层目录
+rmdir('dirname');
+
+/* rename() */
+// 文件改名
+rename('oldname', 'new_name');
+// 使用rename()移动文件
+rename('hd.txt', 'a/hd.txt');
+
+/* copy() */
+// 复制
+copy('a/hd.txt', './hd.txt');
+
+/* opendir() */
+// 打开目录
+$handle = opendir('.');
+echo readdir($handle);
+echo readdir($handle);
+echo readdir($handle);
+echo readdir($handle);
+// 依次读取当前目录下的每个文件，全部读取完后返回假
+
+// 循环遍历目录
+$handle = opendir('.');
+while (false !== ($file = readdir($handle))) {
+    if (!in_array($file,['.','..'])):
+        echo filetype($file)."\t".$file."<br/>";
+    endif;
+}
+
+/* filetype() */
+// 打印文件类型
+
+/* scandir() */
+// 遍历，扫描目录，得到一个包含所有文件的数组
+$files = scandir('.');
+foreach ($files as $file) {
+    if (!in_array($file,['.','..'])):
+        echo filetype($file)."\t".$file."<br/>";
+    endif;
+}
+
+/* glob() */
+// 遍历目录，并得到一个数组，数组的值是包含指定路径
+$files = glob('../*', GLOB_MARK);
+// 第二个参数：加上GLOB_MARK后面会带有/
+$file = glob("{./*.php, ./*.txt, ./*.html}", GLOB_BRACE);
+// GLOB_BRACE，使用这个常量，可以同时指定多个数据类型，用逗号隔开
+```
+
+### 递归统计目录大小和复制目录
+```php
+// 获取目录大小
+function dirSize(string $dir): int {
+    foreach(glob($dir.'/*') as $file) {
+        $size += is_file($file)? filesize($file):dirSize($file);
+    }
+    return $size;
+}
+dirSize('.');
+
+// 复制目录
+function copyDir($dir,$to) {
+    is_dir($to) or mkdir($to, 0755, true);
+    foreach(glob($dir.'/*') as $file) {
+        $target = $to .'/'.basename($file);
+        is_file($file) ? copy($file, $target) : copyDir($file, $target);
+    }
+}
+copyDir('.','../877');
+```
+
+## 文件上传
+### 文件上传前台表单构建
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form action="form.php" method="post" enctype="multipart/form-data">
+        <input type="file" name="up">
+        <button>提交</button>
+    </form>
+    
+</body>
+</html>
+```
+```php
+// form.php
+print_r($_FILES);
+/*
+Array ( 
+    [up] => Array ( 
+        [name] => hello.txt 
+        [type] => text/plain 
+        [tmp_name] => /tmp/phpAAUjT0 
+        [error] => 0 
+        [size] => 6 
+        ) 
+    ) 
+*/
+```
+
+### 后台上传状态和临时目录
+```php
+// php.ini配置
+// file_uplaod = on，才能上传文件
+// upload_tmp_dir = ../.. （临时上传目录）
+// upload_max_filesize (允许上传的最大文件大小，可以使用K,M,G单位)
+// post_max_size (PHP将接受的最大POST数据大小)
+// max_file_uploads (最大上传文件数量)
+```
+```html
+<!-- 在前端限制文件大小 -->
+<input type="hidden" name="MAX_FILE_SIZE" value="200" />
+<input type="file" name="up">
+<!-- 限制文件大小标签写在上传标签的前面才能生效 -->
+```
+
+### 上传安全
+```php
+/* is_uploaded_file() */
+// 判断文件是否是合法上传文件
+// is_uploaded_file() 函数用于检查指定的文件是否是通过 HTTP POST 方法上传的。
+// 这个函数主要用于安全性检查，确保文件确实是通过 PHP 的文件上传机制上传的，
+// 而不是其他方式（如直接复制或伪造路径）放置在临时目录中的。
+
+/* move_uploaded_file() */
+// 移动文件
+
+function upload() {
+    if(is_uploaded_file($FILES['up']['tmp_name'])) {
+        $to = 'upload/'.$FILES['up']['name'];
+        if (move_uploaded_file($FILES['up']['tmp_name'], $to)) {
+            return $to;
+        } 
+    }
+    return false;
+
+}
+```
+
+### 多文件上传-表单优化
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form action="form.php" method="post" enctype="multipart/form-data">
+        <input type="file" name="up">
+        <input type="file" name="images[]">
+        <input type="file" name="images[]">
+        <!--
+            images[]，会以数组的形式接受多个文件信息
+            类似：
+            Array ( 
+    [images] => Array ( 
+        [name] => Array
+            (
+                [0] => icon.jpg
+                [1] => IMG_0105.jpg
+            )
+        [type] => Array
+            (
+                [0] => image/jpeg
+                [1] => image/jpeg
+            )
+        [tmp_name] => Array
+            (
+                [0] => ...
+                [1] => ...
+            )
+        [error] => Array
+            (
+                [0] => 0
+                [1] => 0
+            )
+        [size] => Array
+            (
+                [0] => ...
+                [1] => ...
+            )
+        ) 
+    ) 
+*/
+        -->
+        <button>提交</button>
+    </form>
+    
+</body>
+</html>
+```
+
+### 面向对象处理PHP上传思路分析
+```php
+// 类的思想简介
+class Uploader {
+    public function a() {
+        return $this->b();
+    } // a是对外开放的接口
+    private function b() {
+        return ';bbb';
+    } // b不对外开放
+}
+$obj = new Uploader;
+echo $obj->a();
+
+// 知识点补充
+/* pathinfo() */
+// 返回关于指定文件的相关信息
+pathinfo($file['name']);
+/*
+
+Array
+(
+    [dirname] => .
+    [basename] => xj.txt
+    [extension] => txt
+    [filename] => xj
+)
+*/ 
+
+// 实例
+class Uploader {
+    protected $dir;
+
+    public function make(): array {
+        $this->makeDir();
+        $files = $this->format();
+        $saveFiles = [];
+        print_r($files);
+        foreach ($files as $file) {
+            if ($file['error'] == 0) {
+                if (is_uploaded_file($file['tmp_name'])) {
+                    $to = $this->dir.'/'.time().mt_rand(1,9999).'.'.pathinfo($file['name'])['extension'];
+                    if (move_uploaded_file($file['tmp_name'], $to)) {
+                        $saveFiles[] = [
+                            'path' => $to,
+                            'size' => $file['size'],
+                            'name' => $file['name']
+                        ];
+                    }
+                }
+            }
+        }
+        return $saveFiles;
+    }
+
+    private function makeDir(): bool {
+        $path = 'uploads/'.date('y/m');
+        $this->dir = $path;
+        return is_dir($path) or mkdir($path, 0755, true);
+    }
+
+    private function format():array {
+        $files = [];
+        foreach ($_FILES as $field) {
+            if (is_array($field['name'])) {
+                foreach ($field['name'] as $id => $file) {
+                    $files[] = [
+                         'name' => $field['name'][$id],
+                         'type' => $field['type'][$id],
+                         'error' => $field['error'][$id],
+                         'tmp_name' => $field['tmp_name'][$id],
+                         'size' => $field['size'][$id]
+                    ];
+                }
+            } else {
+                $files[] = $field; 
+            }
+            return $files;
+        }
+    }
+}
+```
+
+## Cookie
+### 设置和查看Cookie
+```php
+/* setcookie() */
+// 设置cookie, 第一个参数是键，第二个参数是值
+setcookie('user', 'mystical');
+
+// 使用超全局变量读取cookie
+print_r($_COOKIE);
+```
+
+### Cookie的生命周期
+```php
+// 默认会话状态的Cookie，浏览器关闭后，不会存储Cookie
+// 如果要延长Cookie的生命周期使其在关闭会话后仍存在，需要设置setcookie的第三个参数
+setcookie('web', 'mystical.com', time() + 15);
+// 第三个参数是时间戳，以秒为单位，表示cookie过期时间
+// 第三个参数表示从1970-1-1往后的秒数，即时间戳
+// 第三个参数 0 表示会话状态，即浏览器关闭就不存在，否则一直存在
+```
+
+### Cookie的访问路径
+```php
+// setcookie的第四个参数，表示cookie作用路径
+// 默认为根 / 表示网站所有路径都可以访问
+// 这个路径的设置可以指定路径下的文件由cookie的设置访问权限
+// 如果cookie键名重复，优先使用当前路径的cookie
+setcookie('web', 'mystical.com', 0);
+setcookie('cms', 'www.mystical.com');
+setcookie('cms', 'recluse.com', 0, '/app');
+```
+
+### 子域名Cookie共享
+```php
+// 第5个参数，表示cookie在哪些域名下可用
+// 可以直接填主域名，则所有相关子域名都可用
+setcookie('web','recluse.com',0,'/','recluse.com')
+```
+
+### Cookie限制访问
+```php
+// setcookie第6个参数：如果设置为true，则只有在https协议下，该cookie才能访问生效
+// setcookie第7个参数，如果设置为true, 则进入js调用，使用该cookie 可以防止一定程度的XSS攻击
+setcookie('name', 'houdunren.com', 0, '/', '', false, true);
+```
+
+## SESSION
+### 服务端SESSION工作原理
+```php
+/* session_start() */
+// 开启服务端会话
+// 不同的浏览器就会有不同的会话、
+// 每在新的浏览器开启一个会话，后端SESSION就会在指定目录生成一个新的SISSON会话文件
+// 在生成SESSION的同时，会生成一个钥匙，即Cookie，cookie的值和Sisson的文件名后半部分一致
+// 实际场景中，可能会给浏览器端的Session生成的Cookie值加密，然后再服务器端解密后处理
+session_start();
+
+// 使用超全局数组$_SESSION得到SESSION文件的内容，进行处理
+print_r($SESSION);  
+
+// 细节：用户第一次访问含有session_start()页面时，如果没有SESSIONID，
+// 则服务器返回响应时自动set-cookie，给用户设置一个SESSIONID的cookie值
+// 后面如果用户发送请求时，请求包里携带了SESSIONID的cookie，则服务器响应时不再重复setcookie
+
+```
+
+### 会话共享体验与会话变量操做
+```php
+// 1.php
+session_start();
+$_SESSION['name'] = 'mystical';
+$_SESSION['cms'] = 'recluse.com'; // 向session文件中添加数据
+unset($_SESSION['cms']);
+// 删除session文件中的指定数据
+$_SESSION = []; // 清空session文件中的数据
+session_destory(); // 删除session文件
+```
+```php
+session_start();
+print_r($_SESSION);
+```
+
+### 修改SESSION存储目录优化性能
+- 查看session文件存储路径
+```php
+session_start();
+
+/* echo session_save_path(); */
+// 查看session文件存储路径
+echo session_save_path();
+```
+- 更改session文件路径
+```php
+// 首先先在当前目录下，创建session目录
+session_save_path('session');
+session_start();
+// 打开会话后生成的文件，就会在指定的session目录下
+```
+
+### session有关函数
+```php
+session_save_path('session');
+session_start();
+/* session_name() */
+// 读取和设置session的NAME
+// 设置
+// 重新设置session_name后，使用新的session_name,源session_name作为普通cookie使用
+session_name('mystical');
+
+// 读取
+echo session_name(); // PHPSESSID
+
+/* session_id() */
+// 获得session的值，自定义session驱动使用该函数
+```
+
+### GC垃圾回收的session原理分析
+- 垃圾回收共两个方面
+  - 一方面：session文件多长时间没有修改，则删除session文件
+  - 另一方面：多大概率扫描依次session目录下所有的文件，然后将满足条件的删掉
+  
+- 详细解读
+```
+PHP 的 Session 垃圾回收机制主要依赖于两个重要的php.ini配置参数：
+
+session.gc_maxlifetime (默认1440)
+session.gc_probability 和 session.gc_divisor （默认1和100）
+
+1. session.gc_maxlifetime
+这个配置定义了 session 文件在服务器上存储的最长时间（以秒为单位）。如果 session 文件自上次修改后已经存在超过这个时间，那么它将被视为“垃圾”并有资格被垃圾回收机制删除。
+例如，如果 session.gc_maxlifetime 设置为 1440（默认值，即 24 分钟），那么超过 24 分钟没有被访问（修改）的 session 文件将被标记为过期。
+
+2. session.gc_probability 和 session.gc_divisor
+这两个配置一起决定了在每个 session 初始化时，启动垃圾回收进程的概率。
+session.gc_probability 是触发 GC 进程的概率，session.gc_divisor 是这个概率的基数。例如，如果 session.gc_probability 为 1，session.gc_divisor 为 100，则每次启动 session 时，有 1%（1/100）的概率触发垃圾回收。
+
+垃圾回收过程
+当垃圾回收进程被触发时，PHP 会扫描 session 保存路径中的所有文件。
+它会检查每个 session 文件的最后修改时间，如果文件的最后修改时间比当前时间减去 session.gc_maxlifetime 更早，那么该文件将被删除。
+```
+
+### 自定义SESSION引擎
+```php
+// 使用自定义SESSION引擎，要在session_start()之前声明
+include 'FileHandle.php'
+session_set_save_handler(new FileHandle);
+ 
+```
+
+- 实现FileHandle接口
+```php
+// SESSION引擎接口中的方法：“开，关，读，写，卸，垃”
+// open, close, read, write, destory, gc
+class FileHandle implements SessonHandlerInterface {\
+    // session文件保存目录
+    protected $path
+    // session文件过期时间
+    protected $maxlifetime;
+
+    public function_construct($path = 'session', $maxlifetime = 1440) {
+
+    }
+    // 外面new 类的时候，该方法自动执行
+
+    public function close() {
+        return true;
+    }
+
+    public function destory($id) {
+        return true;
+    }
+
+    public function gc($maxlifetime) {
+
+    }
+
+    public function open($path, $name) {
+        return true;
+    }
+
+    public function read($id) {
+
+    }
+    
+    public function write($id, $data) {
+
+    }
+
+}
+```
+
+## 面向对象
+### 类的基础
+- 类的定义
+```
+对象的属性（Instance Variables）：
+
+当您创建一个类的实例时，每个实例（对象）都会拥有自己的属性集（除非属性被声明为静态）。这意味着每个对象可以有不同的属性值。
+例如，如果您有一个 Car 类，每个 Car 对象可以有不同的 color 或 model 属性值。
+对象共享的方法：
+
+尽管每个对象拥有自己的属性集，但所有对象共享类定义的方法。这意味着每个对象都可以调用相同的方法，这些方法的行为通常依赖于对象的当前属性值。
+在上面的 Car 类例子中，所有的 Car 对象可能都可以调用 drive() 或 stop() 方法。当这些方法被调用时，它们会根据调用它们的特定 Car 对象的属性来执行操作。
+静态属性和方法：
+
+类还可以有静态属性和方法。这些不属于任何特定的实例，而是属于类本身。静态属性和方法可以在没有任何类实例的情况下访问。
+```
+```php
+// 定义类，实例化对象
+class User 
+{
+    protected $name;
+    protected static $classname = '3.1-class';
+
+    public function say() 
+    {
+        echo self::$classname;
+        return User::$classname."'s".$this->name;
+        // $this->$classname 使用this直接调用静态属性会报错
+        // $this指向的是对象，而静态属性是类的，而不是对象的
+        // 因此调用静态属性需要 User :: $classname
+        // 此时就可以调用$classname的值
+        // 此时的User可以使用self替代，表示当前类
+        
+    }
+
+    public function setName(string $name)
+    {
+        $this->name = $name;// 使用$this调用该类的属性
+    }
+
+    public function getName()
+    {
+        return $this->name;
+    }
+
+    // 静态方法（静态方法只能通过类调用，不能通过对象调用）
+    public static function getClassName() {
+        // $this->getName() 会报错
+        // $this指向当前对象，静态方法不能通过对象调用
+        // 静态方法最适合那些不依赖于对象状态（即不依赖于实例变量）的操作
+        return self::$classname;
+    }
+}
+$obj = new User;
+$obj->setName('mystical');
+echo $obj->say(); // 333
+```
+```php
+class MyClass {
+    public static function staticMethod() {
+        echo "这是一个静态方法";
+    }
+}
+
+$obj = new MyClass();
+$obj->staticMethod(); // 这是有效的，但不推荐
+MyClass::staticMethod(); // 这是推荐的调用方式
+//技术上来说，实例对象可以调用静态方法，但是不推荐，会引起混淆，建议使用类::静态方法去调用
+```
+
+### 类常量
+```php
+class Model {
+    const EXISTS_VALIDATE = 1;
+    public function validate() {
+        // 方法内部调用类常量
+        return self::EXISTS_VALIDATE;
+    }
+}
+// 调用类常量
+Model::EXISTS_VALIDATE;
+```
+
+### 类的继承重写
+```php
+class Notify{
+    protected $color = 'red';
+    protected $credit = 10;
+    public function message()
+    {
+        return '<span style="color:'.$this->color.'">
+        发送通知信息,奖励'.$this->credit().'</span>';
+    }
+    /*
+    public final function message()
+    {
+        return '<span style="color:'.$this->color.'">
+        发送通知信息,奖励'.$this->credit().'</span>';
+    }
+    */
+    // 使用final 关键字，可以禁止子类重写指定方法，保护这个方法
+    public function credit()
+    {
+        return $this->$credit;
+    }
+}
+
+class User extends Notify
+{
+    public function register() 
+    {
+        return $this->message();
+    }
+    // 重写Notify的credit方法
+    public function credit() 
+    {
+        return '5';
+    } // 只需用相同的函数名重新继承的类的方法，即可优先使用重写的方法
+}
+
+class Comment extends Notify
+{
+    public function send() 
+    {
+        return $this->message();
+    }
+}
+// extends的继承方式只能继承一个类
+$obj = new User;
+echo $obj->register();
+echo "<hr/>";
+$obj2 = new Comment;
+echo $obj2->send();
+```
+
+### 抽象类
+```php
+abstract class Notify{ // 使用abstract定义抽象类
+    protected $color = 'red';
+    protected $credit = 10;
+    abstract public function content(); // 使用abstract定义一个抽象方法
+    // 该方法没有实现体
+    public function message()
+    {
+        return '<span style="color:'.$this->color.'">
+        发送通知信息,奖励'.$this->credit().'</span>';
+    }
+  
+    public function credit()
+    {
+        return $this->$credit;
+    }
+}
+
+class User extends Notify
+{
+    protected $credit = 20;
+    public function register() 
+    {
+        return $this->message();
+    }
+    // 场景：想在父类方法上扩充的同时保留父类方法的作用
+    // 如果直接在子类重写，那么父类的方法会被覆盖
+    // 因此使用parent::来保留父类的方法的同时扩充需要的功能
+    public function message()
+    {
+        // 保存到数据库的代码
+        return parenet::message();
+    }
+    public function content()
+    {
+        return '感谢注册后盾人'；
+    }
+}
+
+class Comment extends Notify
+{
+    public function send() 
+    {
+        return $this->message();
+    }
+    public function content()
+    {
+        return '感谢你的评论'
+    }
+}
+// extends的继承方式只能继承一个类
+$obj = new User;
+echo $obj->register();
+echo "<hr/>";
+$obj2 = new Comment;
+echo $obj2->send();
+```
+- 抽象类详细讲解
+```
+抽象类的使用场景和目的
+定义通用模板：
+抽象类通常用作其他类的基类。它定义了子类应该遵循的通用模板，包括属性和方法的集合。抽象类本身不能被实例化。
+
+强制实现特定方法：
+通过在抽象类中声明抽象方法，您可以强制所有派生类实现这些方法，确保这些子类遵循特定的接口。
+
+代码复用：
+抽象类允许您定义一些可以在多个子类中共享的方法实现，这有助于减少代码重复。
+
+设计灵活性和扩展性：
+抽象类为应用程序的设计提供了更高的灵活性和扩展性。它们让您更容易修改和扩展特定功能，而不必改变所有依赖于这个基类的代码。
+
+抽象方法的使用场景和目的
+抽象方法在抽象类中声明，但没有具体的实现。这些方法必须在派生类中具体实现。这样做的目的是确保所有派生类都有一致的接口，并且它们都提供了某些特定功能的实现。
+```
+```php
+abstract class Animal {
+    protected $name;
+
+    public function __construct($name) {
+        $this->name = $name;
+    }
+    // 构造函数是一个特殊的方法，它在创建类的新实例时自动调用。
+    // 构造函数通常用于初始化对象的属性或执行其他必要的设置
+
+    // 定义抽象方法
+    abstract public function makeSound();
+}
+
+// 实现抽象类
+class Dog extends Animal {
+    public function makeSound() {
+        return "Woof!";
+    }
+}
+
+class Cat extends Animal {
+    public function makeSound() {
+        return "Meow!";
+    }
+}
+// 实例化派生类
+$dog = new Dog("Buddy");
+echo $dog->makeSound(); // 输出 "Woof!"
+
+$cat = new Cat("Whiskers");
+echo $cat->makeSound(); // 输出 "Meow!"
+// new Dog("Buddy");括号中的参数，传递给构造函数
+// 因为class Dog extends Animal
+// Animal的父类中，包含构造函数
+```
+
+### 接口详解
+- 接口定义规范，不做任何实现
+```php
+interface InterFaceCache {
+    public function set($name, $value);
+    public function get($name);
+} 
+// 使用关键字：implements实现接口
+class Mysql implements InterFaceCache 
+{
+    public function set($name, $value)
+    {}
+    public function get($name)
+    {}
+    
+}
+
+class Redis implements InterFaceCache 
+{
+    public function set($name, $value)
+    {}
+    public function get($name)
+    {}
+    
+}
+
+class Cache{
+    public static function instance(string $driver) {
+        switch(strtolower($driver)){
+            case 'mysql':
+                return new Mysql;
+            case 'redis':
+                return new Reids;
+        }
+    }
+}
+
+$cache = Cache::instance('mysql');
+var_dump($cache->get('name'));
+```
+
+### 抽象类和接口的区别
+- 抽象类（Abstract Class）和接口（Interface）在面向对象编程中都用于定义抽象层级，但它们的应用场景和目的存在一些关键区别：
+
+- <font color=tomato>抽象类的应用场景</font>
+  - 共享代码基础：
+    - 当多个类有相似的特性和行为时，可以使用抽象类来提供一个共同的基础结构。抽象类允许您在基类中实现一些共通的功能（例如，方法实现），这些功能可以被多个子类继承和共享。
+
+  - 部分实现：
+    - 抽象类允许您为一些方法提供实现，同时将其他方法留作抽象的，要求子类提供具体的实现。这适用于那些有一些通用实现，但同时又保留定制化空间的情况。
+
+  - 状态和行为：
+    - 抽象类可以拥有状态（属性）和行为（方法），并且可以将状态和行为传递给子类。这适用于对象需要维护状态的场景。
+
+- <font color=tomato>接口的应用场景</font>
+  - 定义合同：
+    - 接口主要用于定义一个“合同”或“协议”，类通过实现接口来遵守这个合同。接口只声明方法，不提供任何方法的实现。这适用于定义一组应该由类实现的方法。
+
+  - 多重继承：
+    - 在 PHP 中，类可以实现多个接口，这允许开发者创建可以在不同上下文中重用的模块化接口。由于 PHP 不支持多重类继承，接口是实现多种功能组合的一种方式。
+
+  - 松耦合设计：
+    - 接口促进了松耦合的设计，使得不同的类可以独立于它们的具体实现而相互交互。这在依赖注入和面向接口编程中非常重要。
+
+- <font color=tomato>抽象类 vs 接口</font>
+  - 实现继承 vs 接口继承：
+    - 抽象类是实现继承（即继承方法的实现），而接口是接口继承（即仅继承方法的签名）。
+
+  - 单继承 vs 多实现：
+    - 类可以扩展一个抽象类，但可以实现多个接口。
+
+  - 方法定义：
+    - 抽象类可以有完全实现的方法，接口则只能声明方法，不能实现。
+
+- <font color=tomato>总结</font>
+  - 在选择抽象类和接口时，应考虑具体的应用场景和设计目标。如果需要提供一些方法的实现，并且涉及到继承和共享代码，则抽象类可能是合适的选择。如果您需要定义一组必须由类实现的方法，且希望实现松耦合和灵活的设计，则接口可能是更好的选择。
+
+### 多重继承
+```php
+trait Log
+{
+    public function save()
+    {
+        return __METHOD__;
+    }
+}
+trait Comment
+{
+    public function total()
+    {
+        return __METHOD__;
+    }
+}
+class Site
+{
+    public function total()
+    {
+        return __METHOD__;
+    }
+}
+
+class Topic extends Site // 当extends和trait冲突的时候，优先使用trait
+{
+    use Log, Comment;    
+}
+$topic = new Topic;
+echo $topic->save(); // 可以直接使用log的方法
+```
+
+### trait的冲突解决
+```php
+trait Log
+{
+    public function save()
+    {
+        return __METHOD__;
+    }
+}
+trait Comment
+{
+    public function save() 
+    {
+        return __METHOD__;
+    }
+}
+
+class Topic
+{
+    use Log, Comment{ // 正常引用同名方法会报错
+    Log::save insteadof Comment; // 使用Log的save替代掉Comment的save
+    Comment::save as send; // 将Comment的save方法改名为send
+    // 通过调用$topic->send();代替原save()
+    }
+}
+$topic = new Topic;
+echo $topic->save(); // 可以直接使用log的方法
+```
+
+### trait的权限控制
+```php
+trait Site{
+    public function getSiteName()
+    {
+        return 'mystical';
+    }
+}
+trait Log
+{
+    public function save()
+    {
+        return __METHOD__;
+    }
+}
+trait Comment
+{
+    use Site;
+    abstract public function name(); // 定义抽象方法
+    public static function show()
+    {
+        return 'show...static';
+    }
+    public function save() 
+    {
+        return __METHOD__;
+    }
+}
+
+class Topic
+{
+    use Log, Comment{
+    Log::save insteadof Comment; 
+    // Log::save as protected; 
+    // 此时Log的save()方法也无法调用
+    Comment::save as protected send; 
+    // 使用protected将send()保护起来，则send无法被外部调用
+    }
+    public function name()
+    { }
+}
+$topic = new Topic;
+echo $topic->save(); // 可以直接使用log的方法
+echo $topic->getSiteName(); // mystical
+echo $topic->show(); // 不推荐
+echo Topic::show(); // 推荐
+```
+
+### 类的属性和方法的控制访问
+```php
+class Notify
+{
+    public function send()
+    {
+        return 'notify send';
+    }
+    private function send1()
+    { }
+    protected function send2()
+    { }
+}
+class User extends Notify
+{
+    // 理论上可以不加public, 默认是public，建议添加
+    public function say() 
+    {
+        return 'hi, mystical'.$this->send2();
+    }
+    protected function say1()
+    { } // 保护后，外部无法调用共
+    private function say2()
+    { }
+}
+$user = new User;
+echo $user->say();
+// 总结
+// protected和private都不能被外部访问
+// 但是protected可以子类调用
+// private只能被类本身调用，无法在子类调用 
+```
+
+### 构造函数与析构函数
+```php
+class Code{
+    protected $width;
+    public function __contruct(int $width=300) // 默认值
+    // 构造方法，（魔术方法，php内置方法）
+    {
+        $this->width = $width;
+        // 构造函数没有返回值
+    }
+    public function make()
+    {
+        return '你生成了'.$this->width.'宽度的验证码'
+    }
+    public function __destruct() // 析构函数
+    {
+        echo 'destrcut'
+    }
+    // 析构函数自动执行，无需调用
+}
+
+echo (new Code(100))->make();
+```
+- 析构函数 __destruct 
+  - 是一个特殊的方法，它在对象不再需要时（即对象被销毁时）自动调用。析构函数主要用于执行清理工作，如关闭文件句柄、释放资源、清理数据库连接等
+
+### 魔术方法
+```php
+abstract class Query{
+    // 模拟数据库查询
+    abstract protected function record(array $data);
+    public function select() 
+    {
+        $this->record(['name' => 'mystical', 'age' => 21]);
+    }
+}
+class Model extends Query
+{
+    // 模拟查询后的数据处理
+    protected $field = [];
+    public function all()
+    {
+        $this->select();
+        return $this->field;
+    }
+    protected function record(array $data)
+    { 
+        $this->field = $data;
+    }
+    public function __get($name)
+    {
+        echo $name;
+        if(isset($this->field[$name])) {
+            return $this->field[$name];
+        }
+        throw new Exception('参数错误')；
+    }
+}
+try {
+    $user = new Model;
+    print_r($user->all());
+    echo $user->name;
+} catch (Exception $e) {
+    echo $e->getMessage();
+}
+```
