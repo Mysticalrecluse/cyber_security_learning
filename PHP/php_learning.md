@@ -81,7 +81,7 @@
   echo "<br>";
   echo "This ", "string ", "was ", "made ", "with multiple parameters.";
   // This string was made with multiple parameters.多个字符串自动拼接
-
+  
   $a = 1
   $b = 2
   echo $a,'+',$b,'=',$a+$b; // 1+2=3
@@ -104,7 +104,7 @@
   ```php
   $arr = array('a', 'b', 'c');
   print_r($arr);
-
+  
   // 使用返回值而不是输出
   $output = print_r($arr, true); // 返回值的类型是String
   ```
@@ -298,7 +298,7 @@ function show() {
   ```php
   unset($name);
   var_dump(isset($name)); // 之前删除了$name，所以打印结果为false
-
+  
   场景2：
   $name = 'mystical';
   
@@ -326,7 +326,7 @@ function show() {
   echo make();
   echo make();
   echo make();
-
+  
   function make(){
     static $num = 1; // 将$name的数据固定
     // static之后，函数的声明执行一次，后续再调用，不会再重新声明
@@ -398,10 +398,10 @@ echo $str1.'-'.$str2;
   $string = "mysticalrecluse" //15
   echo strlen($string);
   echo strlen('神秘隐士'); // 12 宽字节一个汉字占3个字节
-
+  
   // 显示汉字(宽字节)的数量
   echo mb_strlen('神秘隐士','utf8');
-
+  
   //
   ```
   - 删除左右字符数据
@@ -412,14 +412,14 @@ echo $str1.'-'.$str2;
   echo strlen(trim($string)); // 13
   echo strlen(trim($string,' esum'));  
   // 这里第二个参数表示左右删除的指定字符，以单个字符进行判定
-
+  
   $str = " mysticalrecluse ";
   $str1 = trim($str,' emysr');
   echo $str.'<hr/>'; // mysticalrecluse
   echo $str1; // ticalreclu
-
+  
   // 只删除左边的指定字符ltrim()
-
+  
   // 只删除右边的指定字符rtrim()
   ```
   - 转大小写
@@ -427,12 +427,12 @@ echo $str1.'-'.$str2;
   $str = "HelloWorld";
   strtolower(); // 指定字符转换为小写
   echo strtolower($str);
-
+  
   strtoupper(); // 指定字符转换为大写
   echo strtoupper($str);
-
+  
   ucfirst() // 指定字符首字母大写
-
+  
   ucwords() // 每个单词首字母大写，默认空格是分隔符
   // ucwords(字符串，分隔符)
   echo ucwords('hello,world',',');
@@ -462,7 +462,7 @@ echo $str1.'-'.$str2;
   // substr(字符串，起始位置(索引), 终止到第几个字符);
   $str = "mystical";
   echo substr($str,0,3); // mys
-
+  
   $ad = "大家好"
   echo mb_substr($ad,0,1,'utf-8')
   ```
@@ -477,7 +477,7 @@ define('NAME', 'mystical', true);
 // true不区分， false严格区分
 define('NAME', 'mystical', false);
 echo name; // 报错
-``` 
+```
 
 - const定义常量
 ```php
@@ -1123,6 +1123,7 @@ function hd_array_change_key_case(array $data,int $type=CASE_UPPER):array{
 /* array_walk_recursive() */
 // 操作数组中的键值（能深入到子数组）
 // array_walk_recursive 只对数组的值进行操作，不改变键
+// 参数1：数组， 参数2：匿名函数（值，键，附加参数）， 参数3：函数的附加参数
 $database = include 'database.php';
 function array_change_value(array &$data, int $type=CASE_UPPER):array{
     array_walk_recursive($data, function(&$value, $key, $type) {
@@ -1141,7 +1142,7 @@ print_r($database);
 $database = include 'database.php';
 $config = var_export($database, true);
 // true表示有返回值，返回值为合法的字符串
-file_put_contents('database.php', '<?php return'.$config);
+file_put_contents('database.php', '<?php return'.$config.';');
 // var_export()的作用是生成的php语法的字符串，在别的文件中，依然可以被php环境引用执行
 ```
 
@@ -1339,7 +1340,7 @@ preg_match('/(12))/', 12); // 必须含12才能使true
 
 // 原子组示例
 $str = "hundunren.com, mystical.com, baidu.com";
-$preg = "/(./)(com)/";
+$preg = "/(\.)(com)/";
 echo preg_replace($preg, '\1<span style="color:red">\2</span>', $str);
 // \1表示第一个括号的内容, \2表示第二个，\0表示全部
 
@@ -1694,6 +1695,7 @@ echo $matches[1];
 // 判断一个文件内容是否读取结束，如果读取结束则返回真，否则返回假
 // feof() 函数在 PHP 中用于判断文件指针是否已经到达了文件的末尾
 $handle = fopen('xj.txt', 'rb');
+
 while(!feof($handle)) {
     echo fread($handle, 1);
 }
@@ -2404,6 +2406,356 @@ class FileHandle implements SessonHandlerInterface {\
 
 }
 ```
+## 图像处理（验证码）
+### 多平台安装GD库
+```php
+var_dump(extension_loaded('GD'));
+// 判断某个库是否在php加载安装
+
+// 在ubuntu安装GD库
+// apt install php7.4-gd\
+// 在php.ini中，将;extends gd的注释去掉
+```
+
+### 向浏览器正确响应图片流与画布构建
+```php
+// 需要加请求头信息才能显示图像
+header('Content-type:image/jpeg');
+// readfile('icon.jpeg');
+
+// imageCreateTrueColor(width, width);
+// 创建画布
+$res = imagecreatetruecolor(500,500); // resource类型
+```
+
+### 颜色定义与基本函数使用
+```php
+// imageColorAllocate(img_resource,R,G,B);
+// 配置颜色的函数
+$red = imageColorAllocate($res, 255, 0, 0);
+$green = imageColorAllocate($res, 0, 255, 0);
+$blue = imageColorAllocate($res, 0, 0, 255);
+
+// imageFill(image_resource,x,y,color);
+// 填充颜色
+imagefill($res, 0, 0, $red);
+
+
+// 输出图像
+// imagegif(img_resource[filename]);
+// imagejpeg(img_resource[filename]);
+// imagepng(img_resource[filename]);
+// imagebmp(img_resource[filename]);
+imagepng($res);
+
+// 绘制空心矩形
+// imagerectangle(img_resource, x1, y1, x2, y2, color);
+imagerectangle($res, 100, 100, 400, 400, $green);
+
+// 绘制实心矩形
+// imagefilledrectangle(img_resource, x1, y1, x2, y2, color)
+imagefilledrectangle($res, 200, 200, 300, 300, $blue);
+```
+
+### 圆形图像与线条绘制
+```php
+// 绘制空心圆
+// imageellipse($image, $cx, $cy, $width, $height, $color);
+imageellipse($res, 250, 250, 50, 50, $green)
+
+// 绘制实心圆
+// imagefilledellipse($image, $cx, $cy, $width, $height, $color);
+imagefilledellipse($res, 250, 250, 100, 100, $green)
+
+// 调整线条宽度
+// imagesetthickness($res, 10);
+
+// 线条的风格
+imagesetstyle($res, [$res, $blue, $green]);
+imageline($res, 0, 0, 490, 490, IMG_COLOR_STYLED);
+// 要使用imagesetstyle，imageline的参数必须是常量IMG_COLOR_STYLED
+// 这个是红蓝绿交替混搭
+
+// 绘制线条
+// imageline($res, 0, 0, 490, 490, $blue);
+imageline($res, 0, 0, 490, 490, $green);
+imageline($res, 490, 0, 0, 490, $green);
+```
+
+### 绘制干扰线和点
+```php
+header('Content-type:image/jpeg');
+$res = imagecreatetruecolor(500,500);
+$red = imageColorAllocate($res, 255, 0, 0);
+$green = imageColorAllocate($res, 0, 255, 0);
+$blue = imageColorAllocate($res, 0, 0, 255);
+$white = imageCOlorAllocate($res, 255, 255, 255);
+imagefill($res, 0, 0, $white)
+
+// 绘制像素点
+// imagesetpixel($res, x1, y1, color);
+imagesetpixel($res, 0, 0, $red);
+
+// 绘制干扰点
+for ($i = 0; $i < 5000; $i++) {
+    imagesetpixel($res, mt_rand(0, 500), mt_rand(0, 500), $red);
+}
+
+// 绘制干扰线
+for ($i = 0; i < 5000; i++) {
+    imageline(
+        $res,
+        mt_rand(0, 500),
+        mt_rand(0, 500),
+        mt_rand(0, 500),
+        mt_rand(0, 500),
+        $red    
+    )
+}
+
+imagepng($res)
+```
+
+### 图像的输出和保存
+```php
+// 保存图像
+// imagepng($res, 路径)；
+// 第二个参数填写路径和文件名，即可保存图片
+// 如果重名，图像会被覆盖
+imagepng($res, '1.png');
+imagepng($res); // 查看图片
+imagedestroy($res); // 释放图片占用内存
+```
+
+### 图形上操做文字技巧
+```php
+// 添加文字
+/* imagettftext(
+    $res, // resource $image 资源（画布）
+    20, // float $size 字体大小
+    0, // float $angle 字体旋转角度
+    0, // int $x
+    0, // int $y
+    $red, // int $color
+    $font, // string $fontfile 字体文件
+    $test, // string $text 要输入的文本
+)
+*/
+$font = realpath('source.otf'); // 字体使用绝对路径
+$text = 'Mystical';
+imagettftext($res, 20, 0, 0, 50, $red, $font, $text);
+for ($i = 0, $j = strlen($text); $i < $j; $i++) {
+    imagettftext($res, 20, mt_rand(-30, 30), 20*$i, 50, $red, $font, $text[$i]);
+}
+
+// 汉字的实现
+$font = realpath('source.otf');
+$text = '后盾人'；
+for ($i = 0; $i < mb_strlen($text, 'utf-8'); $i++) {
+    imagettftext(
+        $res,
+        20,
+        mt_rand(-20, 20),
+        20 * $i,
+        50,
+        $red,
+        $font,
+        mb_substr($text, $i, 1, 'utf-8')
+    );
+}
+
+imagepng($res); // 查看图片
+imagedestroy($res); // 释放图片占用内存
+```
+
+### 文本盒子
+```php
+$font = realpath('source.otf'); // 字体使用绝对路径
+$text = 'Mystical';
+$size = 20;
+/* imagettfbbox(
+    $size, // 文本大小 
+    0, // 旋转角度
+    $font, 
+    $text
+    );
+*/
+$box = imagettfbbox($size, 0, $font, $text);
+print_r($box);
+/*
+Array
+(
+    [0] => 1     //左下角X位置
+    [1] => 7
+    [2] => 102   //右下角X位置
+    [3] => 7
+    [4] => 102   //右上角X位置
+    [5] => -22
+    [6] => 1     //左上角X位置
+    [7] => -22
+)
+*/
+// 获取盒子宽度和高度
+$width = $box[2] - $box[0];
+$height = $box[1] - $box[7];
+// 居中
+imagettftext($res, $size, 0, 250 - $width / 2, 250 - $height / 2, $blue, $font, $text);
+
+```
+
+### 基于面向对象的验证码基础
+```php
+// Captcha.php
+class Captcha
+{
+    protected $width;
+    protected $height;
+    protected $res;
+    // 验证码位数
+    protected $len;
+    // 最终的验证码
+    protected $code;
+    public function __construct(int $width=100, int $height=30, int $len = 5)
+    {
+        $this->width = $width;
+        $this->height = $height;
+        $this->len = $len;
+    }
+    public function render()
+    {
+        $res = imagecreatetruecolor($this->width, $this->height);
+        imagefill($this->res = $res, imagecolorallocate($res, 100, 100, 100));
+        $this->text();
+        $this->line();
+        $this->pix();
+        $this->show();
+        return $this->code;
+
+    }
+    // 绘制验证码
+    protected function text()
+    {
+        $font = realpath(''); // 填绝对路径
+        $text = 'abcdefghigklmnopqrstuvwxyz1234567890'
+        for($i = 0; $i < $this->len; i++) {
+            $x = $this->width / $this->len;
+            $angle = mt_rand(-20, 20);
+            $box = imagettfbox(20, $angle, $font, 'A');
+            $text_height = $box[1] - $box[7];
+            $code = strtoupper($text[mt_rand(0, strlen($text) - 1)]);
+            $this->code = $code;
+            imagettftext($this->res,
+            20,
+            $angle,
+            $x * $i + 10,
+            $this->height / 2 - $text_height / 2,
+            $this->textColor(),
+            $font,
+            $code
+            );
+        }
+    }
+    // 绘制干扰点
+    protected function pix()
+    {
+        for ($i = 0; $i < 300; $i++) {
+            imagesetpixel(
+                $this->res,
+                mt_rand(0, $this->width),
+                mt_rand(0, $this->height),
+                $this->randColor()
+            );
+        }
+    } 
+    // 显示渲染
+    protected function show()
+    {
+        header("Content-type:image/png");
+        imagepng($this->res);
+    }
+    // 绘制干扰线
+    protected function line()
+    {
+        for ($i = 0; $i < 6; $i++) {
+            imagesetthickness($this->res, mt_rand(1, 5));
+            imageline(
+                $this->res, 
+                mt_rand(0, $this->width),
+                mt_rand(0, $this->height),
+                mt_rand(0, $this->width),
+                mt_rand(0, $this->height),
+                $this->randColor();
+            );
+        }
+    }
+    protected function randColor()
+    {
+        return imagecolorallocate(
+            $this->res, 
+            mt_rand(0, 255),
+            mt_rand(0, 255),
+            mt_rand(0, 255)
+        );
+    }
+     
+}
+```
+```php
+// controller.php
+include 'Captcha.php'
+$captcha = new Captcha;
+
+$captcha->render();
+```
+
+### 验证码前后台实际操做
+```php
+// index.php
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <form action="2.php" method="post">
+        <table border="1">
+            <tr>
+                <td>
+                    <input type="text" name="captcha">
+                </td>
+                <td>
+                    <img src="controller.php" alt="验证码" onclick="this.src='controller.php?'+Math.random()">
+                </td>
+            </tr>
+        </table>
+        <button class="">提交</button>
+    </form>
+</body>
+</html>
+```
+```php
+// controller.php
+session_start();
+include 'captcha.php'
+$captcha = new Captcha(130,30);
+$code = $captcha->render();
+$_SESSION['captcha'] = $code;
+```
+```php
+// 2.php
+session_start();
+if (strtoupper($_POST['captcha']) == $_SESSION['captcha'])
+{
+    echo 'OK';
+}else {
+    echo 'error';
+}
+```
+
+
+
 
 ## 面向对象
 ### 类的基础
@@ -2898,7 +3250,126 @@ echo (new Code(100))->make();
 - 析构函数 __destruct 
   - 是一个特殊的方法，它在对象不再需要时（即对象被销毁时）自动调用。析构函数主要用于执行清理工作，如关闭文件句柄、释放资源、清理数据库连接等
 
+### 可调用（callable）
+- 定于：在 PHP 中，"callable" 是指任何可以被调用的实体。
+  - 这可以是一个函数
+  - 一个方法（对象上的函数）
+  - 一个闭包（匿名函数）
+  - 任何实现了 __invoke 方法的对象
+  - 数组（包含对象和方法名或类名和静态方法名）
+
+- 数组（包含对象和方法名或类名和静态方法名）
+```php
+// 一种特殊的语法，用于创建指向对象实例方法的可调用（callable）
+class Example {
+    public function instanceMethod() {
+        echo "Instance method called\n";
+    }
+}
+
+// 创建一个指向实例方法的可调用
+$callable = [new Example, 'instanceMethod'];
+$callable();
+```
+```php
+class Example {
+    public function instanceMethod() {
+        echo "Instance method called\n";
+    }
+
+    public static function createCallable() {
+        // 使用 new self 创建当前类的实例，并创建一个指向 instanceMethod 的可调用
+        return [new self, 'instanceMethod'];
+    }
+}
+
+// 使用静态方法创建可调用
+$callable = Example::createCallable();
+
+// 调用可调用
+call_user_func($callable);  // 输出: Instance method called
+```
+
+- 补充知识：call_user_func()
+  - call_user_func()基本语法：
+  ```php
+  mixed call_user_func(callable $callback [, mixed $parameter [, mixed $... ]])
+  ```
+  - $callback：要调用的可调用实体。
+  - $parameter：传递给回调函数的参数。
+  - 返回值：回调函数的返回值。
+  - 函数示例：
+  ```php
+  function sayHello($name) {
+    return "Hello, $name!";
+  }
+  
+  echo call_user_func('sayHello', 'Alice');
+  ```
+  - 调用对象的方法示例
+  ```php
+  class Greeting {
+    public function sayHello($name) {
+        return "Hello, $name!";
+    }
+  }
+  
+  $greeting = new Greeting();
+  echo call_user_func([$greeting, 'sayHello'], 'Bob');
+  ```
+  - 调用静态方法
+  ```php
+  class Greeting {
+    public static function sayHello($name) {
+        return "Hello, $name!";
+    }
+  }
+  
+  echo call_user_func(['Greeting', 'sayHello'], 'Charlie');
+  ```
+  - 调用实现了 __invoke 的对象：
+  ```php
+  class InvokableGreeting {
+    public function __invoke($name) {
+        return "Hello, $name!";
+    }
+  }
+  
+  $invokable = new InvokableGreeting();
+  echo call_user_func($invokable, 'Eve');
+  ```
+
+
 ### 魔术方法
+#### __invoke 方法
+- 功能：
+  - __invoke 方法是一个魔术方法，它允许一个对象像函数那样被调用。当你尝试以调用函数的方式调用一个对象时，如果这个对象的类中定义了 __invoke 方法，那么这个 __invoke 方法会被自动调用。
+
+- 代码示例
+```php
+class CallableClass
+{
+    public function __invoke($arg)
+    {
+        return "调用了 __invoke 方法，参数为: " . $arg;
+    }
+}
+
+$obj = new CallableClass();
+echo $obj("测试");  // 这里直接调用对象，就像调用一个函数一样
+
+```
+- 应用场景：__invoke 方法在需要对象行为表现得像是函数时非常有用，常见的场景包括：
+  - 回调函数： 当需要传递回调函数，但同时又希望保留某种状态时，可调用对象（使用 __invoke 方法）就非常有用。
+
+  - 事件监听器： 在事件驱动的编程中，可以使用带有 __invoke 方法的对象作为事件处理器。
+
+  - 中间件： 在一些基于中间件的框架中，中间件常常通过可调用对象实现。
+
+
+
+#### __get,set,isset,unset,call,callstatic方法
+- 作用：当读取对象中不可访问或不存在的属性时，__get() 方法会被自动调用。
 ```php
 abstract class Query{
     // 模拟数据库查询
@@ -2921,20 +3392,749 @@ class Model extends Query
     { 
         $this->field = $data;
     }
+    protected function __mobile()
+    {
+        return substr($this->field['mobile'], 0, 8).'***';
+    }
     public function __get($name)
     {
+        if (method_exists($this,'__'.$name)) {
+            return call_user_function_array([$this,'__'.$name], []);
+        }
         echo $name;
         if(isset($this->field[$name])) {
             return $this->field[$name];
         }
         throw new Exception('参数错误')；
     }
+    //当尝试设置一个不可见的属性（如 $obj->a = 1）时，__set() 方法被调用。
+    public function __set($name, $value)
+    {
+        if (isset($this->field[$name])) {
+            $this->field[$name] = $value;
+        } else {
+            throw new Exception ('参数错误')
+        }
+    }
+    // 运行unset($user->name),当对象中不存在或不可访问name时，自动执行__unset
+    public function __unset($name)
+    {
+        if (isset($this->field[$name])) {
+            unset($this->field[$name]='');
+            return true;
+        }
+        throw new Exception('属性不存在')
+    }
+    // 运行isset($user->title),当对象中不存在或不可访问title时，自动执行__isset
+    public function __isset($name) {
+        return isset($this->field[$name]);
+    }
+    public function __call($name, $arguments)
+    {
+        $action = 'getAttribute'.$name;
+        if(method_exists($this, $action) {
+            return call_user_func_array([$this, $action], $arguments);
+        })
+    }
+    // 当执行一个不存在或不可访问的静态方法的时候，使用__callstatic
+    public function __callstatic($name, $arguments)
+    {
+        echo 123;
+    }
+}
+class User extends Model
+{
+    protected function getAttributeMobile(int $len = 9)
+    {
+        return substr($this->field['mobile'], 0, $len).'***';
+    }
 }
 try {
     $user = new Model;
     print_r($user->all());
     echo $user->name;
+    $user->mobile = '23354557874'; // 自动执行__set()
+    echo $user->mobile; // 自动执行 __get()
+    unset($user->name);
+    var_dumpo(isset($user->title));
+    $user2 = new User;
+    echo $user2->mobile(); // 当执行一个不存在的方法时，自动执行__call函数
+    User::abc()
 } catch (Exception $e) {
     echo $e->getMessage();
 }
 ```
+
+
+
+
+## 命名空间
+### 命名空间的基本使用
+```php
+// User.php
+namespace Controller; // 一般这个名称和文件夹匹配
+
+class User
+{
+    public static function make()
+    {
+        return __METHOD__;
+    }
+}
+```
+```php
+// helper.php
+namespace Helper;
+function show() {
+    echo "show function";
+}
+```
+```php
+include "User.php";
+include "Helper";
+echo Controller\User::make(); // 引用命名空间的类，防止类名冲突
+echo Helper\show(); 
+```
+
+### 命名空间的相对引用和绝对引用
+- 参考文件目录的相对路径和绝对路径
+```php
+// Order.php
+namespace App\Controller;
+
+class Order
+{
+    public static function make()
+    {
+        echo __METHOD__;
+    }
+}
+```
+```php
+// Comment.php
+namespace Common;
+
+class Comment
+{
+    public static function make()
+    {
+        echo __METHOD__;
+    }
+}
+```
+```php
+// index.php
+namespace App;
+
+include 'Order.php';
+include 'Comment.php';
+class User
+{
+    public static function make()
+    {
+        echo __METHOD__;
+    }
+}
+user::make;
+Controller\Order::make(); // 默认先从当前的命名空间，即App开始引用
+\Common\Commnet::make(); //在最前面使用\相当于从绝对路径引用Common
+
+```
+
+### 函数和常量在命名空间的特殊性
+- 函数的特殊性：
+```
+如果当前命名空间无该函数，引用文件中有，但是引用文件没有命名空间保护，则默认为全局函数
+可以被引用
+```
+
+- 常量的特殊性
+```php
+define('NAME', 'mystical');
+// define定义的常量不受命名空间影响
+
+const WEB = 'recluse';
+// const的原理和函数相同
+```
+
+### 命名空间特殊关键字
+```php
+namespace App;
+
+__NAMESPACE__; // App
+// 当前命名空间的常量
+
+namespace \Controller\User::make(); // namespace指代App
+```
+
+### 类与空间声明
+```php
+// User.php
+namespace App\Module\Shop\Controller;
+
+class User
+{
+    public static function make()
+    {
+        return __METHOD__;
+    }
+}
+```
+```php
+// index.php
+namespace App;
+
+use App\Module\Shop\Controller\User;
+
+include 'Module/Shop/Controller/User.php'
+User::make(); 
+// 在上面使用Use声明后，后面直接使用最后一个类名代替一长串的命名空间
+```
+
+### 多个类声明的定义
+```php
+//use多用几次，声明多个类使用
+use App\Module\Shop\Controller\User;
+use App\Module\Shop\Server\Pay;
+use App\Module\Shop\Server\User as UserServer;
+// 多类声明，使用as别名解决类名冲突问题
+```
+
+### 类自动加载处理
+```php
+// bootstrap.php
+spl_autoload_register(function ($class)) {
+    $file = str_replace('\\', '/', $class). '.php';
+    require $file;
+}
+// 使用自动加载，要求路径及文件名和命名空间，类名一致
+
+// 原型：
+spl_autoload_register(function ($class) {
+    $file = str_replace('\\', DIRECTORY_SEPARATOR, $class) . '.php';
+    if (file_exists($file)) {
+        require $file;
+    }
+});
+
+```
+- 基本原理
+  - 注册自动加载器： 使用 spl_autoload_register 函数注册一个或多个自动加载器函数。当尝试使用一个当前未定义的类时，这些加载器函数将被调用。
+
+  - 自动加载器函数： 这个函数接受一个参数（通常命名为 $class），这个参数是尝试实例化的类的完整名称（包括命名空间）。
+
+  - 类文件的路径转换： 在自动加载器函数内部，你需要编写逻辑来将类名转换为相应的文件路径。例如，你可以将命名空间的分隔符（\）替换为目录分隔符（/ 或 \\），然后添加文件扩展名（通常是 .php）。
+
+  - 加载类文件： 最后，使用 require 或 include 语句来加载计算出的文件路径。
+  
+```php
+// index.php
+namespace App;
+include 'bootstrap.php' // 自动加载器
+use App\Module\Shop\Controller\User;
+use App\Module\Shop\Server\Pay;
+use App\Module\Shop\Server\User as UserServer;
+
+// include 'Module/Shop/Controller/User.php'
+// include 'Module/Shop/Server/Pay.php'
+// include 'Module/Shop/Server/User.php'
+
+Pay::make();
+UserServer::make();
+User::make();
+
+// 在App目录下的index.php中加载了自动加载器后，后面的所有的命名空间，类，都会自动加载
+```
+
+### 面对对象的方式自动加载
+```php
+// bootstrap.php
+namespace App;
+class BootStrap
+{
+    public static function boot()
+    {
+        spl_autoload_register([new self, 'autoload']);
+    }
+    public function autoload(string $class)
+    {
+        $file = str_replace('\\', '/', $class).'.php';
+        require $file;
+    }
+}
+Bootstrap::boot();
+```
+
+## 错误机制
+### php.ini配置
+```
+display_errors= On // 开启
+```
+### 相关函数
+```php
+/* error_reporting() */
+// 控制显示错误的函数
+error_reporting(~E_WARNING & ~E_COMPILE_ERROR);
+// 不显示警告和编译错误
+require a;
+
+// 除通知性错误外，显示所有错误
+error_reporting(E_ALL & ~E_NOTICE);
+
+// 所有错误都不显示
+error_reporting(0);
+```
+![Alt text](image.png)
+
+### 自定义错误处理引擎
+- set_error_handler(错误处理器)
+```php
+function myErrorHandler($errno, $errstr, $errfile, $errline) {
+    echo "错误级别: {$errno}\n";
+    echo "错误信息: {$errstr}\n";
+    echo "错误文件: {$errfile}\n";
+    echo "错误行号: {$errline}\n";
+}
+
+// 设置自定义错误处理器
+set_error_handler("myErrorHandler");
+
+// 触发一个错误
+echo($undefinedVar); // 尝试使用未定义的变量
+
+```
+- error_log()
+```php
+// 作用：error_log() 函数在 PHP 中用于将错误消息发送到错误日志、到邮箱或者到其他目标。
+// 这个函数常用于记录错误信息，尤其是在生产环境中，当你不希望错误直接显示在用户界面上时
+// 基本语法
+bool error_log ( string $message [, int $message_type = 0 [, string $destination [, string $additional_headers ]]] )
+```
+- 参数：
+  - $message：要记录的错误消息。
+  - $message_type：指定错误消息的处理方式。默认为 0，表示消息被发送到 PHP 的系统日志，使用服务器配置或 ini 文件中定义的日志记录方式。
+  - $destination：当 $message_type 设置为 1 时，这个参数设置错误消息发送的目的地（如邮箱地址）。
+  - $additional_headers：当 $message_type 设置为 1 时，这个参数用于额外的邮件头信息。
+
+- 消息类型 ($message_type)
+  - 0：错误消息被发送到 PHP 的系统日志，或者到文件（如果在 php.ini 文件中设置了 error_log）。
+  - 1：错误消息被通过电子邮件发送。此时，$destination 应该是一个电子邮件地址。
+  - 3：错误消息被写入到由 $destination 指定的文件。
+  - 4：错误消息通过 SAPI 日志处理器发送。
+
+- 示例：
+```php
+// 发送到系统日志：
+error_log("发生了一个错误！");
+// 这会将消息 "发生了一个错误！" 发送到服务器的错误日志文件
+// 通常在 /var/log/apache2/error.log 或 /var/log/php/error.log 等位置。
+
+// 发送错误到指定邮箱
+error_log("发生了一个紧急错误！", 1, "admin@example.com");
+
+// 写入到指定文件：
+error_log("记录的错误信息", 3, "/path/to/my-errors.log");
+```
+- 注意事项
+  - 如果选择将错误消息写入文件（$message_type 为 3），确保 PHP 有权限写入指定的文件。
+  - 当通过电子邮件发送错误时（$message_type 为 1），确保邮件服务器正确配置，否则邮件可能发送失败。
+```php
+// Error.php
+namespace Core;
+class Error{
+    protected $debug;
+    public function __construct($debug = true)
+    {
+        $this->debug = $debug;
+    }
+    public function error()
+    {
+        error_reporting(0); // 屏蔽所有php错误，只使用自定义错误
+        set_error_handler([$this, 'handle'], E_ALL | E_STRICT);
+        //  E_ALL | E_STRICT 两个一起可以代表所有错误
+        
+    }
+    public function handle($code, $error, $file, $line) {
+        $msg = $error . "($code)" . $file . "($line)";
+        switch($code) {
+            case E_NOTICE:
+                if ($this->debug) {
+                    include 'views/notice.php'; // 可以使用模板
+                }
+                break;
+            default:
+                if ($this->debug) {
+                    include 'views/error.php'; // 可以使用模板
+                } else {
+                    // 使用日志保存错误
+                    $file = 'logs/'.date("Y_m_d") . '.php';
+                    error_log(date('[c]') . $msg . PHP_EOL, 3, $file);
+                }
+                break;
+        }
+    }
+}
+```
+```php
+use Core\Error;
+include 'Error.php'
+
+(new Error())->error();
+```
+
+## 异常处理
+### 传统错误处理方式
+```php
+// code.php
+class Code
+{
+    protected $error;
+    public function make(int $len){
+       if ($this->line($len) === false) {
+            $this->error
+            return false;
+       }
+    }
+    // 绘制干扰线
+    protected function line(int $len){
+        if($len > 5) {
+            $this->error = '验证码线数量不能超过5个'
+            return false
+        }
+    }
+    public function getError()
+    {
+        return $this->error;
+    }
+}
+```
+```php
+// 1.php
+include "code.php";
+$code = new Code;
+if ($code->make(50) === false) {
+    echo $code->getError();
+}
+```
+
+### Exception异常处理方式
+```php
+// code.php
+class Code
+{
+    public function make(int $len)
+    {
+        $this->line($len);       
+    }
+    // 绘制干扰线
+    protected function line(int $len)
+    {
+        if($len > 5) {
+            throw new Exception('验证码数量不能超过5个');
+            // 异常抛出后，程序自动停止
+        }
+    }
+}
+```
+```php
+// 1.php
+include "code.php";
+// 接收异常
+try{
+    $code = new Code;
+    $code->make(50);
+}catch(Exception $e){
+    echo $e->getMessage(); // 接收错误消息
+}
+```
+
+### 多个异常类使用场景
+```php
+// 自定义异常，继承系统内置异常
+class LoginException extends Exception
+{
+
+}
+class UploaderException extends Exception
+{
+
+}
+// 接收自定义异常
+try{
+    throw new LoginException("您还没有登录", 403); 
+    // 参数2为错误码，可自定义
+}catch(LoginException $e) {
+    echo 333;
+}catch(UploaderException $e) {
+
+}finally{
+    echo '永远执行';
+}
+```
+
+### 异常处理优先级问题
+```php
+class ValidateException extends Exception{
+
+}
+try{
+    throw new ValidateException('验证码错误');
+}catch(ValidateException $e){
+    echo $e->getMessage();
+}catch(Exception $e) { 
+    // 在自定义异常类之后，再使用系统的异常基类，记得将其放到最后
+    echo $e->getMessage();
+}
+```
+
+### 异常类内置方法
+```php
+class ValidateException extends Exception{
+    // Exception中的内置方法，定义了final关键字保护，不能被重写
+    // Exception中的魔术方法，__toString()可以被重写
+    public function __toString()
+    {
+        return 'Fix->'.$this->getFile().$this->getCode().
+        $this->getLine().$this->getMessage();
+    }
+}
+try{
+    throw new ValidateException('验证码错误', 403);
+}catch(ValidateException $e){
+    // 获取抛出错误所在文件
+    echo $e->getFile()."<br/>";
+    // 获取错误码
+    echo $e->getCode()."<br/>";
+    // 抛出错误代码所在文件的行号
+    echo $e->getLine()."<br/>";
+    echo $e->getMessage()."<br/>";
+    echo $e // $e 接收魔术方法__toString返回的值
+}catch(Exception $e) { 
+    
+}
+```
+
+## 操做数据库
+### 连接mysql
+```php
+// 定义配置项
+header("Content-type:text/html;charset=utf8");
+$config = [
+    'host'=>'127.0.0.1:3308',
+    'user'=>'root',
+    'password'=>'Zyf646130..',
+    'database'=>'atguigudb',
+    'charset'=>'utf8'
+];
+$dsn = sprintf(
+    "mysql:host=%s;dbname=%s;charset=%s", 
+    $config['host'],
+    $config['database'],
+    $config['charset']
+);
+try{
+    $pdo = new PDO($dsn, $config['user'], $config['password']，
+    [PDO::ATTR_ERRMODE=>PDO::ERRMODE_WARNING]);
+    // 表示错误处理模式-> 警告模式
+    // mysql连接异常时，错误处理模式不生效，而PDOExecption生效
+    // PDO的错误处理模式，针对连接成功后的sql查询异常生效
+}catch (PDOExecption $e){
+    die($e->getMessage());
+}
+```
+
+### PDO处理错误类型
+```php
+// PDO的异常处理模式
+[PDO::ATTR_ERRMODE=>PDO::ERRMODE_WARNING] // 只返回警告
+[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION] // 正常返回异常
+[PDO::ATTR_ERRMODE=>PDO::ERRMODE_SILENT] // 忽略错误
+```
+- 通过函数设置异常
+```php
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_SILENT);
+```
+- 通过函数设置查询输出字段大小写
+```php
+$pdo->setAttribute(PDO::ATTR_CASE, PDO::NATURAL);
+$pdo->setAttribute(PDO::ATTR_CASE, PDO::CASE_UPPER);
+$pdo->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
+```
+- 设置返回数组结果的属性
+```php
+// 设置默认返回属性
+// 设置成关联数组，此时不返回索引数组
+$pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
+// 只返回索引数组
+$pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_NUM);
+// 返回对象,可以通过类似$rows[0]->id得到返回值
+$pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ);
+// 默认两者都有
+
+```
+
+### PDO快速操做执行语句
+```php
+// 发送执行语句
+$pdo->exec("CREATE TABLE IF NOT EXISTS testphp (
+    id int,
+    `name` varchar(50),
+    gender varchar(10),
+    age int
+)");
+
+// $pdo->exec(`sql执行语句`)
+
+// 获得自增组件
+$pdo->lastInsertId();
+```
+
+### PDO查询语句
+```php
+// $pdo->query(); 查询语句
+$query = $pdo->query("SELECT * FROM employees");
+// $rows->fetchAll(); 将所有查询结果以数组形式返回
+$rows = $query->fetchAll();
+// 也可以在fetchAll()中设置输出形式
+// fetchAll(PDO::FETCH_ASSOC)
+// fetchAll(PDO::FETCH_NUM)
+// fetchAll(PDO::FETCH_OBJ)
+
+print_r($rows);
+```
+
+### 单条循环获取MYSQL结果集
+```php
+$query = $pdo->query("SELECT * FROM testphp");
+// 只返回一条查询结果
+print_r($query->fetch());
+// 多次执行，依次返回后续返回结果，直到全部查询完毕，返回false
+print_r($query->fetch());
+print_r($query->fetch());
+
+```
+
+### 预编译-防止SQL注入
+```php
+$id = $_GET['id'];
+$sql = "SELECT * FROM news WHERE id = $id";
+$query = $pdo->query($sql);
+print_R($query->fetchAll());
+```
+- 预编译-查询
+```php
+$pdo = new PDO($dsn, $config['user'], $config['password']，
+    [PDO::ATTR_ERRMODE=>PDO::ERRMODE_WARNING]);
+$sth = $pdo->prepare("SELECT * FROM news WHERE id =:id");
+// 这里:id是命名符
+$sth->execute([':id'=>$_GET['id']]);
+print_r($sth->fetchAll());
+```
+- 预编译-添加
+```php
+$sth = $pdo->prepare('INSERT INTO news (title,author)
+VALUES(:title, :author)');
+$sth->execute([':title'=>$_GET['title'], ':author'=>$_GET['author']]);
+```
+- 预编译-占位符
+```php
+$sth = $pdo->prepare("SELECT * FROM news WHERE id >= ?");
+// 占位符?就是$_GET['id'],使用占位符需要注意位置
+$sth->execute($_GET['id']);
+print_r($sth->fetchAll());
+```
+
+### SQL生成器
+```php
+// DB.php
+namespace Database;
+use PDO;
+class DB
+{
+    protected $link;
+    // 链式操做机制
+    protected $options = [
+        'table'=>'',
+        'field'=>'*',
+        'order'=>'',
+        'limit'=>'',
+        'where'=>''
+    ]
+    public function __construct(array $config)
+    {
+        print_r($config);
+        $this->connect($config);
+    }
+    protected function connect(array $config)
+    {
+        $dsn = sprintf(
+            "mysql:host=%s;dbname=%s;charset=%s", 
+            $config['host'],
+            $config['database'],
+            $config['charset']
+        );
+        $this->link = new PDO($dsn, $config['user'], $config['password']，
+        [PDO::ATTR_ERRMODE=>PDO::ERRMODE_WARNING]);
+    }
+    public function query(string $sql, array $vars = []) {
+        $sth = $this->link->prepare($sql);
+        $sth->execute($vars);
+        return $sth->fetchAll();
+    }
+    public function execute(string $sql, array $vars) {
+        $sth = $this->link->prepare($sql);
+        return $sth->execute($vars);
+    }
+    public function table(string $table) {
+        $this->options['table']=$table;
+        return $this;
+    }
+    public function field(...$fields) {
+        $this->options['field'] = '`'. implode('`,`',$fields).'`';
+        return $this;
+    }
+    public function limit(...$limit){
+        $this->options['limit'] = " LIMIT " . implode(',', $limit);
+        return $this;
+    }
+    public function order(string $order){
+        $this->options['order'] = " ORDER BY " . $order;
+        return $this;
+    }
+    public function where(string $where){
+        $this->options['where'] = " WHERE " . $where;
+        return $this;
+    }
+    public function get() {
+        // SELECT * FROM NEWS WHERE ORDER LIMIT
+        $sql = "SELECT {$this->options['field']} FROM {$this->options['table']}
+        {$this->options['where']}
+        {$this->options['order']}
+        {$this->options['limit']}" ;
+        return $this->query($sql);
+
+    }
+}
+```
+```php
+// 7.php
+include "DB.php";
+$config = [
+    'host'=>'127.0.0.1:3308',
+    'user'=>'root',
+    'password'=>'Zyf646130..',
+    'database'=>'atguigudb',
+    'charset'=>'utf8'
+];
+try{
+    $db = new DB($config);
+    $db->execute("INSERT INTO news SET title=?, author=?", ['mystical', 'mystical.com'])
+    $rows = $db->table('news')->field('title', 'author')->limit(1,2)->get();
+
+} catch (Execption $e) {
+    die($e->getMessage());
+}
+```
+
