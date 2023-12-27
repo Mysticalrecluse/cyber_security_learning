@@ -66,6 +66,21 @@
 - 多行注释：/* */
 - 文档注释：/**  */
   - 使用场景：文档注释内容可以被JDK提供的工具javadoc所解析，生成一套以网页文件形式体现的该程序的说明文档
+  ```java
+  /**
+  这是我的第一个Java程序
+
+  @author mystical
+  @version 1.0
+
+  */
+  public class HelloWorld{
+    public static void main(String[] args) {
+      System.out.println("hello world");
+      // 结尾自动加换行
+    }
+  }
+  ```
   - javadoc生成说明文档的指令
     - `javadoc -d <自定义文件夹名> -author -version HelloWorld.java`
     - 这里的author和version是文档输出中的@后面的
@@ -91,6 +106,8 @@
 
 - JVM功能说明
   - JVM(Java Virual Machine,java虚拟机)：是一个虚拟的计算机，是Java程序的运行环境。JVM具有指令集并使用不同的存储区域，负责执行指令，管理数据、内存、寄存器。
+  - 功能1：实现Java程序的跨平台性
+  - 功能2：自动内存管理（内存分配，内存回收）
 
 ## 变量与运算符
 ### 标识符
@@ -221,7 +238,7 @@ class VariableTest1 {
   - boolean bo1 = true;
   - boolean bo2 = false;
 - 扩展：
-  - 和C语言不同，不能使用0或非0的整数替代false和true
+  - <font color=tomato>和C语言不同，不能使用0或非0的整数替代false和true</font>
   - 我们不谈boolean类型占用的空间大小。但是，真正在内存中分配的话，使用的是4个字节
 
 #### 基本数据类型变量间的运算规则
@@ -377,6 +394,103 @@ class BinaryTest {
   - 建议：在二者都能使用的情况下，推荐使用条件运算符，因为执行效率稍高
 
 
+## 控制流程语句
+### if-else条件判断
+- 基本语法
+```java
+if (条件表达式) {
+  //TODO;
+}
+
+// 双分支条件判断
+if (条件表达式) {
+  //TODO;
+} else {
+  // TODO;
+}
+
+// 多分支条件判断
+if (条件表达式1) {
+  	语句块1;
+} else if (条件表达式2) {
+  	语句块2;
+}
+...
+}else if (条件表达式n) {
+ 	语句块n;
+} else {
+  	语句块n+1;
+}
+``` 
+
+### switch-case选择结构
+```java
+switch(表达式){
+    case 常量值1:
+        语句块1;
+        //break;
+    case 常量值2:
+        语句块2;
+        //break; 
+    // ...
+   [default:
+        语句块n+1;
+        break;
+   ]
+}
+```
+### Scanner
+- 作用：键盘输入功能
+```java
+/*
+1. 使用Scanner获取不同类型数据的步骤
+步骤1：导包 import java.util.Scanner
+步骤2：提供(或创建)一个Scanner类的实例
+步骤3：调用Scanner类中过的方法，过去指定类型的变量
+步骤4：关闭资源，调用Scanner类的close()
+
+Scanner类中提供了获取byte / short / int / long / float / double / boolean / String
+注意：没有提供获取char类型变量的方法。需要使用next().charAt(0)
+
+2. 案例：小明注册某交友网站，要求录入个人相关信息如下：
+请输入你的网名，你的年龄，你的体重，你是否单身，你的性别等情况
+*/
+
+import java.util.Scanner;
+
+class ScannerTest {
+    public static void main(String[] args) {
+        // 创建一个Scanner类的实例
+        Scanner scan = new Scanner(System.in);
+        System.out.println("Welcome to here!");
+        System.out.print("please input your name: ");
+        // 调用Scanner类中的方法，获取指定的类型变量
+        String name = scan.next();
+        System.out.print("please input your age: ");
+        int age = scan.nextInt();
+        System.out.print("please input your weight: ");
+        double weight = scan.nextDouble();
+        System.out.print("are you marrage: ");
+        boolean isSingle = scan.nextBoolean();
+        System.out.print("please input your gender: (m/f)");
+        char gender = scan.next().charAt(0);
+
+        System.out.println("name: " + name + "age: " + age + "weight: " + weight + "isSingle: " + isSingle + "gender: " + gender);
+
+        // 关闭资源，调用Scanner类的close()
+        scan.close();
+    }
+}
+```
+
+### 获取随机数
+```java
+class RandomTest {
+  public static void main(String[] args) {
+    // 使用Math类的random方法，随机生成范围在0.0-1.0之间的数
+  }
+}
+```
 
 # Java面向对象编程
 

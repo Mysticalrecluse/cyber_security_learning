@@ -4138,3 +4138,99 @@ try{
 }
 ```
 
+## 知识补充
+### Iterator接口
+- 定义：在PHP中，Iterator是一个内置的接口，它为遍历各种数据结构（如数组和对象）提供了一种标准的方法。任何实现了Iterator接口的类都可以使用foreach循环进行遍历。
+
+- Iterator声明的方法
+```
+current(): 返回当前元素。
+key(): 返回当前元素的键。
+next(): 移动到下一个元素。
+rewind(): 重置迭代器到第一个元素。
+valid(): 检查当前位置是否有效。
+```
+
+- 使用Iterator接口自定义迭代器示例
+```php
+class MyCollection implements Iterator {
+    private $items = [];
+    private $currentIndex = 0;
+
+    public function __construct($items) {
+        $this->items = array_values($items);
+    }
+
+    public function current() {
+        return $this->items[$this->currentIndex];
+    }
+
+    public function key() {
+        return $this->currentIndex;
+    }
+
+    public function next() {
+        ++$this->currentIndex;
+    }
+
+    public function prev() {
+        --$this->currentIndex;
+    }
+
+    public function rewind() {
+        $this->currentIndex = 0;
+    }
+
+    public function valid() {
+        return isset($this->items[$this->currentIndex]);
+    }
+}
+$obj = new MyCollection([1, 2, 3]);
+echo $obj->current(); // 1
+```
+
+
+
+
+### 生成器
+- 定义：生成器函数看起来像普通函数——不同的是普通函数返回一个值，而生成器可以 yield 生成多个想要的值。 <font color=tomato>任何包含 yield 的函数</font>都是一个生成器函数
+
+- yield关键字
+```php
+function gen_one_to_three() {
+    for ($i = 1; $i <= 3; $i++) {
+        //注意变量$i的值在不同的yield之间是保持传递的。
+        yield $i;
+    }
+}
+
+$generator = gen_one_to_three();
+foreach ($generator as $value) {
+    echo "$value\n";
+}
+// 在内部会为生成的值配对连续的整型索引，就像一个非关联的数组
+```
+
+- 指定键名来生成值
+```php
+$input = <<<'EOF'
+1;PHP;Likes dollar signs
+2;Python;Likes whitespace
+3;Ruby;Likes blocks
+EOF;
+
+function input_parser($input) {
+    foreach (explode("\n", $input) as $line) {
+        $fields = explode(';', $line);
+        $id = array_shift($fields);
+
+        yield $id => $fields;
+    }
+}
+
+foreach (input_parser($input) as $id => $fields) {
+    echo "$id:\n";
+    echo "    $fields[0]\n";
+    echo "    $fields[1]\n";
+}
+```
