@@ -1,0 +1,100 @@
+<mxfile host="Electron" modified="2023-12-31T05:43:43.612Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.16 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="o9-X0rv49jOKqWcfoF-T" version="22.1.16" type="device">
+  <diagram name="第 1 页" id="IovgS_aEp_Hrv9ue0V_u">
+    <mxGraphModel dx="913" dy="1414" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-1" value="&lt;b style=&quot;font-size: 31px;&quot;&gt;&lt;font style=&quot;font-size: 31px;&quot;&gt;变量赋值运算的底层原理&lt;/font&gt;&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=31;" vertex="1" parent="1">
+          <mxGeometry x="230" y="30" width="386" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-35" value="" style="group" vertex="1" connectable="0" parent="1">
+          <mxGeometry x="9" y="140" width="810" height="510" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-6" value="" style="group" vertex="1" connectable="0" parent="Jq-ky12mmeQCaE-cNW-S-35">
+          <mxGeometry x="70" y="40" width="160" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-4" value="&lt;div style=&quot;color: rgb(204, 204, 204); background-color: rgb(31, 31, 31); font-family: Consolas, &amp;quot;Courier New&amp;quot;, monospace; font-size: 19px; line-height: 19px;&quot;&gt;&lt;div&gt;a = &lt;span style=&quot;color: #b5cea8;&quot;&gt;1&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp;&lt;span style=&quot;color: #d4d4d4;&quot;&gt;a = a + &lt;/span&gt;&lt;span style=&quot;color: #b5cea8;&quot;&gt;1&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#121212;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-6">
+          <mxGeometry y="37.5" width="160" height="62.5" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-5" value="&lt;b&gt;代码示例1&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-6">
+          <mxGeometry x="34.285714285714285" width="68.57142857142857" height="37.5" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-20" value="" style="group" vertex="1" connectable="0" parent="Jq-ky12mmeQCaE-cNW-S-35">
+          <mxGeometry x="310" width="421" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-7" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-20">
+          <mxGeometry width="421" height="240" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-8" value="&lt;span style=&quot;font-weight: normal;&quot;&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;变量a&lt;/font&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4F81D6;strokeColor=#b85450;fontStyle=1;fontColor=#FFFFFF;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-20">
+          <mxGeometry x="28.310195227765725" y="46.15384615384615" width="63.926247288503255" height="36.92307692307693" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-9" value="数据: 1&lt;br&gt;内存地址：0xa1b22f2c&lt;br&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-20">
+          <mxGeometry x="210.95661605206072" y="36.92307692307693" width="136.98481561822126" height="55.38461538461539" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-20" source="Jq-ky12mmeQCaE-cNW-S-8" target="Jq-ky12mmeQCaE-cNW-S-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-11" value="a = 1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-20">
+          <mxGeometry x="119.63340563991324" y="36.92307692307693" width="54.7939262472885" height="27.692307692307693" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-12" value="数据：2&lt;br&gt;内存地址：0xa1b22f2d" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-20">
+          <mxGeometry x="215.5227765726681" y="147.6923076923077" width="127.85249457700651" height="55.38461538461539" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-19" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-20" source="Jq-ky12mmeQCaE-cNW-S-9" target="Jq-ky12mmeQCaE-cNW-S-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-14" value="" style="endArrow=classic;html=1;rounded=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-20" source="Jq-ky12mmeQCaE-cNW-S-8" target="Jq-ky12mmeQCaE-cNW-S-12">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="137.89804772234274" y="64.61538461538461" as="sourcePoint" />
+            <mxPoint x="183.55965292841648" y="18.461538461538463" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-15" value="a = a + 1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-20">
+          <mxGeometry x="101.36876355748373" y="120" width="54.7939262472885" height="27.692307692307693" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-18" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;拷贝1，然后+1，得到数据2&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-20">
+          <mxGeometry x="284.01518438177874" y="106.15384615384616" width="118.72017353579176" height="27.692307692307693" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-21" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=-0.007;entryY=0.45;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-35" source="Jq-ky12mmeQCaE-cNW-S-4" target="Jq-ky12mmeQCaE-cNW-S-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-23" value="&lt;b&gt;&lt;font style=&quot;font-size: 17px;&quot;&gt;重点&lt;/font&gt;&lt;/b&gt;" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-35">
+          <mxGeometry x="115" y="190" width="70" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-35" source="Jq-ky12mmeQCaE-cNW-S-4" target="Jq-ky12mmeQCaE-cNW-S-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-25" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;变量a改变的是&lt;br&gt;指向内存的地址&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-35">
+          <mxGeometry y="320" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-35" source="Jq-ky12mmeQCaE-cNW-S-23" target="Jq-ky12mmeQCaE-cNW-S-25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-26" value="&lt;span style=&quot;font-size: 14px;&quot;&gt;python中&lt;br&gt;整数是不可变数据&lt;br&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-35">
+          <mxGeometry x="190" y="320" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-35" source="Jq-ky12mmeQCaE-cNW-S-23" target="Jq-ky12mmeQCaE-cNW-S-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-27" value="&lt;span style=&quot;font-size: 14px;&quot;&gt;上述示例中&lt;br&gt;整数对象1会被垃圾回收器回收&lt;br&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-35">
+          <mxGeometry x="600" y="320" width="210" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-35" source="Jq-ky12mmeQCaE-cNW-S-23" target="Jq-ky12mmeQCaE-cNW-S-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-28" value="&lt;span style=&quot;font-size: 14px;&quot;&gt;python对小的整数和短字符串进行特殊处理&lt;br&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-35">
+          <mxGeometry x="380" y="320" width="194" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-35" source="Jq-ky12mmeQCaE-cNW-S-23" target="Jq-ky12mmeQCaE-cNW-S-28">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-33" value="&lt;span style=&quot;font-size: 14px;&quot;&gt;通常预先创建并重用&lt;br&gt;（一种内存优化方式）&lt;br&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" vertex="1" parent="Jq-ky12mmeQCaE-cNW-S-35">
+          <mxGeometry x="380" y="440" width="194" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="Jq-ky12mmeQCaE-cNW-S-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="Jq-ky12mmeQCaE-cNW-S-35" source="Jq-ky12mmeQCaE-cNW-S-28" target="Jq-ky12mmeQCaE-cNW-S-33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

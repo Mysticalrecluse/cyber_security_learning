@@ -35,3 +35,24 @@ The data shows a significant disparity in caregiving roles: About 80% of childre
 In addition, father are responsible for only about 4% and 5% of daily and nightly childcare, <b title="分别">respectively</b>
 
 The study <b title="已确定">identified</b> <b title="持续的，一致的">consistent</b> patterns of childcare without fathers <mark style="background-color: tomato" title="在场">being present</mark> across both <b title="城市的">urban</b> and <b title="乡村的">rural</b> settings. It showd that only 3% of children aged 0 to 6 are primarily cared for by their fathers during the day in both environments
+
+## Date: 2023/12/30
+### Article
+The study also highlights that the income <b title="差距">gap</b> between parents signifficantly affects how childcare duties are divided within the family. When the husband's income is higher of similar to the wife's, women <mark style="background-color: tomato" title="tend:趋向，tend to: 倾向于">tend to</mark> take on the <b title="多数">majority</b> of childcare duties.
+
+However, when the wife's income is higher than the husband's, the roles <b title="几乎不">rarely</b> reverse. The latter <b title="情况">scenario</b> became the <b title="主体">subject</b> of <b title="wide + spread 广为流传的">widespread</b> <b title="辩论，争论">debate</b> across the country after TV personality Fu Shou'er and her stay-at-home husband <b title="名词：特征，特点；动词：放映">featured</b> in the popular <b title="真人秀">reality show</b> "See you Again" in October
+
+To <b title="推动，促进">promote</b> greater involvement of Chinese fathers in parenting, experts have <b title="强调">emphasized</b> the importance of policy <b title="改革">reforms</b>, including <b title="增强，完善">enhancing</b> <b title="产假">maternity leave</b> and childcare leave systems.
+```C
+// tips: ~leave ~假
+```
+
+The Blue Book <b title="表明">indicates</b> that paternity leave and parental leave are <b title="至关重要的">crucial</b> in <b title="促进">boosting</b> fatherly <mark style="background-color: tomato" title="参与">engagement in</mark> childcare. These policies can serve as <b title="制度性的">institutional</b> <b title="措施，手段">measures</b> to address the issue of "widowed parenting"
+
+## Date: 2023/12/31
+### Article
+Under current policies, Chinese women <mark style="background-color: tomato" title="be entitled to 有权享受">are entitled to</mark> 98 days of maternity leave, with additional days as determined by local <b title="规则，规定">regulations.</b> <mark style="background-color: tomato" title="相比之下">In contrast</mark>, paternity leave is <b title="大量地">considerably</b> shorter, lasting only 10 to 30 days, depending on the <b title="地区">region</b>.
+
+In response to China's <b title="下架，衰退">declining</b> birth rate, the goverment has <b title="主语是政府的时候，一般翻译为出台">introduced</b> various policy measures to <b title="减缓，减轻">ease</b> the <b title="负担">burden</b> of childcare on families. This <mark style="background-color: tomato" title="gain:获得，赢得， 词组：势头猛了起来">gained momentum</mark> following a 2019 <b title="国务院">State Council</b> <b title="指示，这里是名词">directive</b> that introduced the <b title="概念">concept</b> of "childcare leave."
+
+<b title="于是，所以">Consequently</b>, <b title="无数的">numermous</b> cities have adopted similar policies, <b title="授予，准许，发放">granting</b> both parents the opportunity to support child-<b title="饲养">rearing</b> more actively. <b title="例如">For instance</b>, in the southern province of Guangdong, each parent of a child under the age of three is eligible for ten days of "childcare leave" every year.
