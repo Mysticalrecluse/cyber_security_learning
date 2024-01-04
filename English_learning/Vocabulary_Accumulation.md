@@ -56,3 +56,24 @@ Under current policies, Chinese women <mark style="background-color: tomato" tit
 In response to China's <b title="下架，衰退">declining</b> birth rate, the goverment has <b title="主语是政府的时候，一般翻译为出台">introduced</b> various policy measures to <b title="减缓，减轻">ease</b> the <b title="负担">burden</b> of childcare on families. This <mark style="background-color: tomato" title="gain:获得，赢得， 词组：势头猛了起来">gained momentum</mark> following a 2019 <b title="国务院">State Council</b> <b title="指示，这里是名词">directive</b> that introduced the <b title="概念">concept</b> of "childcare leave."
 
 <b title="于是，所以">Consequently</b>, <b title="无数的">numermous</b> cities have adopted similar policies, <b title="授予，准许，发放">granting</b> both parents the opportunity to support child-<b title="饲养">rearing</b> more actively. <b title="例如">For instance</b>, in the southern province of Guangdong, each parent of a child under the age of three is eligible for ten days of "childcare leave" every year.
+
+
+## Data: 2024/01/03
+### Article
+<h3>E-Commerce <b title="巨头">Giants</b> <b title="名词：目标，动词；瞄准了...目标">Target</b> a New Singles'Day Market: China's Elderly</h3>
+
+<b title="曾经一度...">Once</b> almost the <b title="独占的，独家独享的">exclusive</b> <b title="领域">domain</b> of young <b title="消费者">consumers</b>, China's Double Eleven shopping festival - also known as Singles Day - is now <b title="拓展">expanding</b> its <b title="做宾语，表触达范围">reach</b> to include <b title="年长的">senior</b> citizens.
+
+Recognizing the growing purchasing power of the senior <b title="人口，人口统计">demographic</b> in the country, e-commerce platforms are actively <b title="迎合">catering</b> to their needs and <b title="偏好，偏爱，优先权">preferences</b>. The <b title="转变">shift</b> is <b title="明显">evident</b> in the increasing number of products and services specifically designed for senior consumers, who <b title="占">account for</b > 18.9% of the total <b title="人口">population.</b>
+
+<b title="可利用的，这里翻译为现有的">Available</b> sales data shows a huge increase in senior consumption. In the first 10 minutes after JD.com started its <b title="活动，营销活动">campaign</b>, the <b title="销售额，这里transaction：交易，volume: 额度">transaction volume</b> of the electric wheelchair <b title="类目">category</b> <b title="激增">surged</b> <b title="十倍">tenfold</b> compared to the same period last year, while the hearing aid category rose fivefold. And on Taobao, Alibaba's e-commerce platform, the transaction volume of elderly products was 2.6 times more than last year.
+
+
+## Data: 2024/01/04
+### Article
+This year, JD.com, one of China's largest e-commerce platforms, launched a campaign <b title="这里修饰campaign,表示以...为特点">featuring</b> age-friednly products such as <b title="无障碍的，适宜的">accessible</b> smart toilets and <b title="手掌">palm</b> recognition smart doorbells. The platform also launched its Double Eleven campaign on Oct. 23, which marks the traditional Chinese <b title="重阳节">"Senior</b> Citizen Festival."
+
+Chen Waner, from AgeClub, an <b title="工业的，产业的">industrial</b> platform focusing on business information in the elderly industry for JD.com, stated: "We've noticed that campaigns targeting seniors on platforms like JD.com are becoming more systematic, and the products more <b title="多种的，各种各样的，多样化">diverse</b>."
+
+Chen underscored that, in the past, the elderly population was smaller, and may not have had as many options to choose from on e-commerce platforms. "As a result, they may not have been able to easily find the products they wanted or may have been <b title="犹豫的">hesitant</b> to shop online," he said.
+
