@@ -77,3 +77,33 @@ Chen Waner, from AgeClub, an <b title="工业的，产业的">industrial</b> pla
 
 Chen underscored that, in the past, the elderly population was smaller, and may not have had as many options to choose from on e-commerce platforms. "As a result, they may not have been able to easily find the products they wanted or may have been <b title="犹豫的">hesitant</b> to shop online," he said.
 
+
+## Data: 2024/01/05
+### Article
+The Double Eleven shopping festival is among the world's largest <b title="年度的">annual</b> online shopping events, and <b title="这里表：一段时间以来">over</b> the years it has grown to become a <b title="原型：rely,依靠；reliable，能依靠的,可信赖的">reliable</b> <b title="指标">indicator</b> of consumer spending trends and a crucial driver of economic growth in China.
+
+Originating as a <b title="小众的">niche</b> online shopping event for single people on Nov. 11, Double Eleven has now <b title="进化">evolved</b> into a multi-week shopping phenomenon, which serves as a platform for product launches, <b title="品牌">brand</b> <b title="">collaborations</b>, and <b title="创新的">innovative</b> marketing campaigns.
+
+This year's Double Eleven holds <b title="特别的">particular</b> significance as it marks the biggest shopping festival since the country lifted its COVID-19 <b title="限制">restrictions</b> last December. It is also expected to be the longest ever, <b title="跨越">spanning</b> several weeks to further <b title="刺激">stimulate</b> consumer spending and <b title="支撑">bolster</b> economic recovery.
+
+## Data: 2024/01/08
+### Article
+<b title="在中间">Amid</b> a surge in <b title="竞争">competition</b>, companies often <mark style="background-color: tomato" title="选择...的方法">resort to</mark> <b title="侵略性的">aggressive</b> price wars to win customer <b title="忠诚度">loyalty</b>, offering big discounts and products at low prices to attract consumers.
+
+While price was have <b title="典型的">typically</b> been <b title="针对">aimed at</b> younger demographics, top e-commerce platforms are now expanding their focus to include China's elderly, who are <b title="迅速的">rapidly</b> <b title="拥抱，接收">embracing</b> online shopping.
+
+According to data from QuestMoblie, a database platform focusing on China's mobile internet market, in September 2023, 40.7% of the new users on JD.com were aged over 50 - a significant increase from last year.
+
+And data from KAWO, one of China's social media management platforms, show that the average time spent online by this demographic has increased by 8.6% - four times the growth rate of any other age group
+
+Chen Yanjun 36, is the <b title="创始人">founder</b> of Xiaohaha, a company focused on catering to the needs of China's elderly. <b title="自从">Since</b> its <b title="起始，创立">inception</b> in 2012, Xiaohaha has expanded its reach through various <b title="风险，冒险">ventures</b>, including group buying and setting up stores in collaboration with differents brands.
+
+## Data: 2024/01/09
+### Article
+However, this year marks a significant <b title="转变">shift</b> for Chen and his company, which has <b title="采取">adopted</b> a new operating model, <b title="过度">transitioning</b> from selling self-managed products to collaborating with major e-commerce platforms like Douyin, the Chinese version of TikTok, and Taobao.
+
+According to Chen, during the Double Eleven shopping festival, users can receive <mark style="background-color: tomato" title="至多">up to</mark> 3,000 yuan ($411.90) in cashback when purchasing a 4,980 yuan double-door <b title="冰箱">refrigerator</b> through Xiaohaha's app, which <b title="以...优先">prioritizes</b> converience and <b title="清晰">clarity</b> for senior users.
+
+With such <b title="合作">partnerships</b>, Chen hopes to double his company's sales volumes this year.
+
+Major e-commerce platforms are adopting similar <b title="策略">strategies</b>. This year, Taobao launched an AI shopping assistant specifically designed for the elderly. The tool allows seniors to easily compare prices and select the best-selling products within a category by simply speaking to the AI assistant.

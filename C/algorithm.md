@@ -114,23 +114,23 @@ int main() {
     #define MAX_OP 20
     vector *v = getNewVector(2);
     for (int i = 0; i < MAX_OP; i++) {
-        switch (MAX_OP % 5) {
-            case 0:
+        int op = rand() % 4, pos, val, ret;
+        switch (op) {
+            case 0: 
             case 1:
-            case 2:
-            case 3: {
+            case 2: {
                 pos = rand() % (v->count + 2);
                 val = rand() % 100;
                 ret = insert(v, pos, val);
-                printf("insert %d at %d to vector = %d\n", 
-                val, pos, ret);
-            }; break;
-            case 4: {
+                printf("insert %d at %d to vetor = %d\n", 
+                    val, pos, ret);
+            };break;
+            case 3:{
                 pos = rand() % (v->count + 2);
                 ret = erase(v, pos);
-                printf("erase item at %d in vector = %d\n",
-                pos, ret);
-            }; break
+                printf("erase item at %d in vector = %d\n", 
+                    pos, ret);
+            };break;
         }
         output_vector(v);
     }
@@ -296,7 +296,9 @@ Node *insert(Node *head, int pos, int val) {
     // 有头链表的优势：同时整合了插入的两种情况
     Node new_head, *p = &new_head, *node = getNewNode(val);
     new_head.next = head;
-    for (int i = 0; i < pos; i++) p = p->next;
+    for (int i = 0; i < pos; i++) p = p->next; // 有无虚拟头的关键所在
+    // 如果没有虚拟头的话，当插入到0位置时，就找不到0位置的前一个节点
+    // 因为0位置没有节点，仅是一个记录首地址的指针
     node->next = p->next;
     p->next = node;   
     return new_head.next;
