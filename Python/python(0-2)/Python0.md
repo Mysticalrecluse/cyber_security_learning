@@ -1,35 +1,13 @@
-<style> 
-.tip {
-    background-color: #EEEEEE; 
-    margin-top: -10px; 
-    padding: 10px;
-    font-size: 15px;
-}
-
-.focus {
-    color: tomato;
-    font-weight: 700;
-}
-
-.greentip {
-    background-color: #96ffcf; 
-    margin-top: -10px; 
-    padding: 10px;
-    font-size: 14px;
-    color: darkgreen;
-    border: 1px solid darkgreen;
-}
-</style>
 # Python入门
 ## Python介绍
 <h4>Python是一门动态强类型语言</h4>
 <b>动态</b>： 
-指python在赋值的时候不需要指定变量类型，因为在python中，变量的本质是数据的指针（正确说法是对对象的引用）<span class="focus">在 Python 中，所有的数据都是对象，变量则是对这些对象的引用。</span>
+指python在赋值的时候不需要指定变量类型，因为在python中，变量的本质是数据的指针（正确说法是对对象的引用）<span style="color: tomato; font-weight: 700;">在 Python 中，所有的数据都是对象，变量则是对这些对象的引用。</span>
 
 <b>强类型</b>：
 指python变量一旦被赋值，类型就确定了，除非进行强制转换，否则不会被当作其他类型使用
 
-<h4>Python是拥有<span class="focus">“编译时间”</span>和<span class="focus">“运行时间”</span>两个阶段的解释型语言。</h4>
+<h4>Python是拥有<span style="color: tomato; font-weight: 700;">“编译时间”</span>和<span style="color: tomato; font-weight: 700;">“运行时间”</span>两个阶段的解释型语言。</h4>
 编译过程：
 源代码(.py) -（Python解释器）-> 字节码(.pyc) -(Python虚拟机)-> 机器执行
 
@@ -38,8 +16,8 @@
     - 这个过程类似"编译"
 - 将字节码（.pyc）-> 经过Python虚拟机（PVM），PVM是解释器，字节码被PVM逐行指令翻译执行
 
-<span class="focus">Tip: 解释执行的过程</span>
-<div class="greentip">PVM并不直接与硬件进行交互，而是通过调用操作系统提供的API接口，以操作系统为中介，最终达到间接与硬件交互的结果。实际调动硬件的是操作系统</div>
+<span style="color: tomato; font-weight: 700;">Tip: 解释执行的过程</span>
+<div style="background-color: #96ffcf; margin-top: -10px; padding: 10px; font-size: 14px; color: darkgreen; border: 1px solid darkgreen;">PVM并不直接与硬件进行交互，而是通过调用操作系统提供的API接口，以操作系统为中介，最终达到间接与硬件交互的结果。实际调动硬件的是操作系统</div>
 
 ### .pyc文件的详情
 <b>优化加载时间</b>
@@ -58,7 +36,7 @@
 <b>运行时无需`.py`文件</b>
 - 一旦`.pyc`文件被创建，即使删除或移动原始的`.py`文件，只要`.pyc`文件存在，程序仍可执行
 
-<b class="focus">Python执行模式</b>
+<b style="color: tomato; font-weight: 700;">Python执行模式</b>
 - 当Python运行一个模块时，首先检查是否存在与该文件对应的`.pyc`文件，且该文件是最新的。
     - 如果存在最新的`.pyc`文件，Python会加载这个字节码文件
     - 否则，Python会重新编译源文件，并保存新的`.pyc`文件
@@ -120,7 +98,7 @@ print(a) # 5
 ```
 <h4 style="color:red">!! Python中一切皆对象(Everything is Object) !!</h4>
 
-<div class="greentip">Python 采用了“一切皆对象”的设计哲学，这意味着无论是简单的数据类型（如整数、字符串）还是复杂的数据结构（如列表、字典、函数等），都是以对象的形式存在的。因此，这些对象都具有以下特点：
+<div style="background-color: #96ffcf; margin-top: -10px; padding: 10px; font-size: 14px; color: darkgreen; border: 1px solid darkgreen;">Python 采用了“一切皆对象”的设计哲学，这意味着无论是简单的数据类型（如整数、字符串）还是复杂的数据结构（如列表、字典、函数等），都是以对象的形式存在的。因此，这些对象都具有以下特点：
 <br><br>
 <b>类型信息：</b>对象知道它是什么类型的，比如 int、str、list 等。
 身份：每个对象都有一个唯一的标识符（可以通过 id() 函数获得），用于区分不同的对象。<br><br>
@@ -145,8 +123,9 @@ print(s[-1])  # 输出: o
 ```
 
 ### 创建字符串
-<scan style='font-size: 20px'>单引号和双引号</scan>
-<scan style='font-size: 15px'>字符串包含单引号或双引号。</scan>
+<div style='font-size: 20px'>单引号和双引号</div>
+<div style='font-size: 15px'>字符串包含单引号或双引号。</div>
+
 ```python
 my_string = "This is a double-quoted string."
 print(my_string) # This is a double-quoted string.
@@ -165,8 +144,9 @@ s2 = "This is a long string that spans multiple lines in the source code."
 # s1和s2代码等效，\的作用是告诉 Python 解释器忽略字符串的实际换行。
 ```
 
-<scan style='font-size: 20px'>多行字符串</scan>
-<scan style='font-size: 15px'>如果需要创建一个多行字符串，可以使用三重引号。</scan>
+<div style='font-size: 20px'>多行字符串</div>
+<div style='font-size: 15px'>如果需要创建一个多行字符串，可以使用三重引号。</div>
+
 ```python
 multiline_string = '''This is a string where I 
 can comfortably write on multiple lines
@@ -178,8 +158,9 @@ As you'll see, the original string formatting is preserved.
 print(multiline_string)
 ```
 
-<scan style='font-size: 20px'>str()构造函数</scan>
-<scan style='font-size: 15px'>可以使用str()的类型构造函数将Python中的几乎所有对象转换为字符串</scan>
+<div style='font-size: 20px'>str()构造函数</div>
+<div style='font-size: 15px'>可以使用str()的类型构造函数将Python中的几乎所有对象转换为字符串</div>
+
 ```python
 S = str(35)
 print(S) # '35'
@@ -190,8 +171,10 @@ print(str_dic)  # 输出: "{'a': 1, 'b': 2}"
 ```
 
 ### 字符串操作
-<scan style='font-size: 20px'>使用索引访问字符串中的字符</scan>
-<scan style='font-size: 15px'>方括号可用于访问字符串中的元素</scan>
+<div style='font-size: 20px'>使用索引访问字符串中的字符</div>
+<div style='font-size: 15px'>方括号可用于访问字符串中的元素</div>
+
+
 ```python
 # Indexing
 S = 'ABCDEFGHI'
@@ -202,15 +185,16 @@ print(S[-6])    # D
 ```
 <hr>
 
-<scan style='font-size: 20px'>切片 (Slicing)</scan>
-<scan style='font-size: 15px'>可以使用slice语法返回一定范围的字符。
-指定开始索引和结束索引，以冒号分隔，以返回字符串的一部分。</scan>
+<div style='font-size: 20px'>切片 (Slicing)</div>
+<div style='font-size: 15px'>可以使用slice语法返回一定范围的字符。
+指定开始索引和结束索引，以冒号分隔，以返回字符串的一部分。</div>
+
 ```python
 b = "Hello, World!"
 print(b[2:5]) #llo
 ```
-<div class='greentip'>在Python中使用切片时，开始索引是包含的（inclusive），而结束索引是不包含的（exclusive）。</div>
-<br>
+<div style="background-color: #96ffcf; margin-top: -10px; padding: 10px; font-size: 14px; color: darkgreen; border: 1px solid darkgreen;">在Python中使用切片时，开始索引是包含的（inclusive），而结束索引是不包含的（exclusive）。</div>
+
 该设计的合理的处：
 
 1. 当两个相邻的切片相连时，它们之间没有重叠，例如s[:2]和s[2:]会恰好将字符串分为两部分。
@@ -219,8 +203,9 @@ print(b[2:5]) #llo
 
 <hr>
 
-<scan style='font-size: 20px'>负索引 (Negative Indexing)</scan>
-<scan style='font-size: 15px'>使用负索引从字符串末尾开始切片：</scan>
+<div style='font-size: 20px'>负索引 (Negative Indexing)</div>
+<div style='font-size: 15px'>使用负索引从字符串末尾开始切片：</div>
+
 ```python
 b = "Hello, World!"
 print(b[-1])  # '!'
