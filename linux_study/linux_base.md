@@ -432,7 +432,7 @@ POSIX 标准的意义：
    7	  /usr/bin/ls
    3	  /usr/bin/whereis
   ```
-  - shell 的 hash 表机制主要用于跟踪和缓存 $PATH 环境变量指定的目录中找到的命令的位置。非$PATH记录的路径下的程序，执行后也不会记录在hash中
+  - shell 的 hash 表机制主要用于跟踪和缓存 `$PATH` 环境变量指定的目录中找到的命令的位置。非$PATH记录的路径下的程序，执行后也不会记录在hash中
 
   
 - 别名
