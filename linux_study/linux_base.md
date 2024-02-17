@@ -1431,11 +1431,11 @@ echo magedu | passwd --stdin wang &> /dev/null
 ## 用户组和权限管理
 ### Linux安全模型
 - 3A资源分派
-  - Authentication：认证，验证用户身份
+  - <b style="color:red">Authentication：</b>认证，验证用户身份
     - 常见的通过用户名和口令，来区分验证用户信息
-  - Authorization：授权，不同的用户设置不同的权限
+  - <b style="color:red">Authorization：</b>授权，不同的用户设置不同的权限
     - 比如，某个文件，张三有访问权限，而李四没有
-  - Accouting|Auditon：审计
+  - <b style="color:red">Accouting|Auditon：</b>审计
     - 记录不同用户的操作记录
 
 - 当用户登录成功时，系统会自动分配命令token，包括用户标识和组成员等信息
@@ -1564,6 +1564,49 @@ echo magedu | passwd --stdin wang &> /dev/null
   // 附加组成员
   ```
 
+
+- 用户管理命令配置文件
+  - `/etc/login.defs`
+
+  - /etc/login.defs文件在Linux系统中扮演着重要角色，它提供了系统管理员用于配置系统全局用户和组设置的默认值。这个文件被login程序和大多数用于添加和管理用户的工具读取，如useradd、userdel、usermod、passwd等。/etc/login.defs文件包含了一系列的配置指令，这些指令定义了用户账户和密码策略的各种方面，比如密码过期时间、密码复杂度要求、新用户的默认家目录权限等。
+
+  - 以下是/etc/login.defs文件中一些常见配置项的说明：
+
+    - <b style="color:red">MAIL_DIR：</b>定义用户邮件存放的目录。通常设为/var/mail。
+    - <b style="color:red">PASS_MAX_DAYS：</b>账户密码的最大有效期。过了这个期限，用户必须更改密码。
+    - <b style="color:red">PASS_MIN_DAYS：</b>两次密码更改之间需要等待的最少天数。这防止用户立即更改密码以绕过密码历史策略。
+    - <b style="color:red">PASS_WARN_AGE：</b>密码过期前，系统开始警告用户的天数。
+    - <b style="color:red">UID_MIN和UID_MAX：</b>分配给新用户的UID范围。这通常用来区分系统账户和普通用户账户。
+    - <b style="color:red">GID_MIN和GID_MAX：</b>分配给新用户组的GID范围。
+    - <b style="color:red">CREATE_HOME：</b>是否为新用户自动创建家目录。通常设置为yes，以确保每个用户都有自己的家目录。
+    - <b style="color:red">UMASK：</b>定义了新创建的用户文件的默认权限掩码。通常设置为022或027，以防止新文件和目录对其他用户是可写的。
+    - <b style="color:red">USERGROUPS_ENAB：</b>如果设置为yes，当创建一个新用户时，系统也会创建一个与用户名相同的用户组，并将此用户添加到该组。
+    - <b style="color:red">ENCRYPT_METHOD：</b>定义用于加密用户密码的算法。常见的值包括MD5、SHA256、SHA512。
+    - <b style="color:red">CREATE_MAIL_SPOOL：</b>定义是否为每个新创建的用户创建一个邮件池文件。
+  - 这个文件还包含其他多个设置，可以根据系统管理员的需求来调整。编辑/etc/login.defs文件时应格外小心，因为错误的配置可能会影响系统安全和用户管理策略。修改完毕后，强烈建议对配置进行检查，以确保没有意外的更改会影响系统操作。
+
+- useradd命令默认配置文件
+  - `cat /etc/default/useradd`
+  ```sql
+  [root@rocky8 ~]# cat /etc/default/useradd
+  # useradd defaults file
+  GROUP=100               
+  # useradd不指定组,且/etc/login.defs中的USERGROUPS_ENAB为no或
+  # useradd -N时，group 为100
+  HOME=/home              
+  INACTIVE=-1             
+  表示不锁定
+  EXPIRE=                 
+  SHELL=/bin/bash         
+  SKEL=/etc/skel          
+  #默认家目录父目录
+  #对应/etc/shadow文件第7列，即用户密码过期后的帐号锁定的宽限期,-1
+  #对应/etc/shadow文件第8列，即用户帐号的有效期
+  #默认bash
+  #用于生成新建用户家目录的模版文件
+  CREATE_MAIL_SPOOL=yes   
+  ```
+
 - 用户管理常用命令
 ```sql
 useradd     新建用户
@@ -1596,7 +1639,7 @@ userdel     删除用户
 
 # userdel wilson    -- 删除指定用户（保留家目录）
 # userdel -r wilson   -- 删除用户（不保留家目录）
-# userdel -rf wilson  -- 强制删除
+# userdel -rf wilson  -- 强制删除 
 
 --------------------------------------------------
 passwd      修改用户密码
@@ -1628,9 +1671,10 @@ usermod     修改用户属性
 
 --------------------------------------------------
 
-chage       修改用户属性
+chage       修改用户密码策略
 
-# 
+# chage -l <username> -- 查看指定用户的密码管理策略
+
 ```
 
 - useradd的默认属性的文件
@@ -1657,7 +1701,18 @@ CREATE_MAIL_SPOOL=yes # 默认创建账号邮箱
 
 - 批量创建用户
 ```
-newusers passwd 格式文件
+newusers newusers file
+```
+- 范例：
+```shell
+[root@ubuntu2204 ~]# cat user.txt 
+u1:123456:1024:1024::/home/u1:/bin/bash
+u2:123456:1025:1025::/home/u2:/bin/bash
+[root@ubuntu2204 ~]# newusers user.txt 
+[root@ubuntu2204 ~]# id u1
+uid=1024(u1) gid=1024(u1) groups=1024(u1)
+[root@ubuntu2204 ~]# id u2
+uid=1025(u2) gid=1025(u2) groups=1025(u2)
 ```
 
 - 批量更改用户口令
@@ -1677,6 +1732,18 @@ echo password | passwd --stdin <user_name>
 因此，可以使用如下口令实现非交互式更改口令：
 echo user_name:passwd | chpasswd
 
+[root@ubuntu2204 ~]# cat pwd.txt
+u1:1234567
+u2:1234567
+
+#标准输入重定向
+[root@ubuntu2204 ~]# chpasswd < pwd.txt
+
+#多行重定向
+[root@ubuntu2204 ~]# chpasswd <<EOF
+> u1:1234567
+> u2:1234567
+> EOF
 ```
 
 - 查看用户相关的ID信息
