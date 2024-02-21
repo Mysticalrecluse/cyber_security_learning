@@ -2018,7 +2018,105 @@ SBIT
 
 # chattr +a     -- 只能追加，不能修改，不能删除
 
+以下是一些chattr命令的常用属性：
+
+1. a（Append only）
+设置后，文件只能被追加内容，不能被删除或覆盖。这对于日志文件非常有用。
+使用方法：chattr +a filename
+2. i（Immutable）
+设置后，文件变为不可修改，即不能被删除、修改、重命名，也不能添加链接。即使是root用户也不能绕过这一限制。
+使用方法：chattr +i filename
+3. s（Secure deletion）
+设置后，当文件被删除时，其占用的磁盘空间会被立即覆盖，以确保数据不能被恢复。适用于包含敏感数据的文件。
+使用方法：chattr +s filename
+4. S（Synchronous updates）
+设置后，对文件的修改立即写入磁盘，类似于使用sync命令。这对于需要即时保存更改的重要文件很有帮助。
+使用方法：chattr +S filename
+5. u（Undeletable）
+设置后，文件内容在被删除后可以被恢复。这提供了一种简单的文件恢复机制。
+使用方法：chattr +u filename
+6. A（No atime updates）
+设置后，访问文件时不更新文件的访问时间。这可以提高对于频繁访问但不需要保持访问记录的文件的性能。
+使用方法：chattr +A filename
+7. D（Synchronous directory updates）
+设置后，对目录的更改会立即写入磁盘，这适用于需要高数据一致性的目录。
+使用方法：chattr +D dirname
 ```
+
+### ACL(Access Control List) 访问控制列表
+
+- ACL权限功能：
+  - rwx 权限体系中，仅仅只能将用户分成三种角色，如果要对单独用户设置额外的权限，则无法完成；而ACL可以单独对指定的用户设定各不相同的权限；提供颗粒度更细的权限控制
+  - CentOS7 默认创建的xfs和ext4文件系统具有ACL功能
+  - CentOS7 之前版本，默认手工创建的ext4文件系统无ACL功能,需手动增加
+  ```bash
+  tune2fs –o acl /dev/sdb1
+  mount –o acl /dev/sdb1 /mnt/test
+  ```
+- ACL安装
+```
+sudo apt install acl
+```
+-  ACL生效顺序：
+```
+所有者，自定义用户，所属组，自定义组，其他人
+```
+
+- ACL相关命令
+  - getfacl 可查看设置的ACL权限
+  ```shell
+  # Display the file access control list:
+  getfacl {{path/to/file_or_directory}}
+
+  # Display the file access control list with numeric user and group IDs:
+  getfacl -n {{path/to/file_or_directory}}
+
+  # Display the file access control list with tabular output format:
+  getfacl -t {{path/to/file_or_directory}}
+  ```
+  - setfacl 可设置ACL权限
+  ```shell
+  setfacl [-bkndRLPvh] [{-m|-x} acl_spec] [{-M|-X} acl_file] file ...
+  #常用选项
+  -m|--modify=acl             #修改acl权限
+  -M|--modify-file=file       #从文件读取规则
+  -x|--remove=acl             #删除文件acl 权限
+  -X|--remove-file=file       #从文件读取规则
+  -b|--remove-all             #删除文件所有acl权限
+  -k|--remove-default         #删除默认acl规则
+  --set=acl                   #用新规则替换旧规则，会删除原有ACL项，用新的替代，一定要包含UGO的设置，不能象 -m一样只有 ACL
+  --set-file=file             #从文件读取新规则
+  --mask                      #重新计算mask值
+  -n|--no-mask                #不重新计算mask值
+  -d|--default                #在目录上设置默认acl
+  -R|--recursive              #递归执行
+  -L|--logical                #将acl 应用在软链接指向的目标文件上，与-R一起使用
+  -P|--physical               #将acl 不应用在软链接指向的目标文件上，与-R一起使用
+  ```
+  - setfacl示例：
+  ```shell
+  #设置 tom 无任何权限
+  [root@ubuntu2204 tmp]# setfacl -m u:tom:- f1
+  [root@ubuntu2204 tmp]# getfacl f1
+  # file: f1
+  # owner: root
+  # group: root
+  user::rw
+  user:tom:--
+  group::r-
+  mask::r-
+  other::r-
+  #查看文件，多了一个小 +
+  [root@ubuntu2204 tmp]# ll f1-rw-r--r--+ 1 root root 5 May  9 23:22 f1
+  ```
+  - 编辑ACL规则文件
+    - ACL规则文件是一个文本文件，其中每一行都包含一个ACL规则。这些规则的格式通常如下：
+    ```
+    [类型]:[用户/组]:[权限]
+    ```
+
+
+
 
 
 
