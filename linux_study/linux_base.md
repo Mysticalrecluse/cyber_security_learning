@@ -260,6 +260,111 @@ shutdown -C           # 取消关机计划
 - screen
 
 - Tmux
+  - Tmux安装
+  ```shell
+  # 软件安装
+  # Mac
+  $ brew install tmux
+
+  # Ubuntu 或 Debian
+  $ sudo apt-get install tmux
+
+  # CentOS 或 Fedor可以使用yum/dnf/brew等方式安装，brew版本更高些
+  $ yum install tmux
+
+  # 下载并加载字体
+  $ git clone https://github.com/powerline/fonts.git --depth=1
+  $ cd fonts
+  $ ./install.sh
+  $ cd ..
+  $ rm -rf fonts
+
+  # 安装风格包
+  # Clone项目代码
+  $ git clone https://github.com/odedlaz/tmux-onedark-theme
+
+  # 删除原~/.tmux.conf 文件
+  $ rm ~/.tmux.conf
+
+  # 安装 tmp (opens new window)与tmux-resurrect (opens new window)插件
+  $ git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+  $ git clone https://github.com/tmux-plugins/tmux-resurrect ~/.tmux/plugins/resurrect
+  
+  # 然后新建 ~/.tmux.conf 文件添加以下内容然后新建 ~/.tmux.conf 文件添加以下内容
+  run-shell ~/tmux-onedark-theme/tmux-onedark-theme.tmux
+
+  #set -g @onedark_widgets "Mystical Recluse #(ip)"
+  set -g @onedark_widgets "Mystical #(ip)"
+  set -g @onedark_time_format "%I:%M"
+  set -g @onedark_date_format "%m:%d"
+  #set -g @onedark_date_format "%m:%d"
+  set-option -g default-terminal "screen-256color"
+  set -g default-terminal "screen-256color"
+
+  # 解决neovim中esc响应慢
+  set -s escape-time 0
+  set-option -g status-position bottom
+
+  # 自动保存会话
+  set -g @plugin 'tmux-plugins/tpm'
+  set -g @plugin 'tmux-plugins/tmux-sensible'
+  set -g @plugin 'tmux-plugins/tmux-resurrect'
+  set -g @plugin 'tmux-plugins/tmux-continuum'
+  set -g @continuum-save-interval '15'
+  set -g @continuum-restore 'on'
+  set -g @resurrect-capture-pane-contents 'on'
+  run '~/.tmux/plugins/tpm/tpm'
+
+  run-shell ~/.tmux/plugins/resurrect/resurrect.tmux
+
+  # 解除默认前缀
+  unbind C-b
+  # 设置自定义前缀
+  set -g prefix C-f
+  # 采用vim的操作方式
+  setw -g mode-keys vi
+  # 窗口序号从1开始计数
+  set -g base-index 1
+  # 开启鼠标模式
+  set-option -g mouse on
+
+  # 通过前缀+KJHL快速切换pane
+  #up
+  bind-key k select-pane -U
+  #down
+  bind-key j select-pane -D
+  #left
+  bind-key h select-pane -L
+  #right
+  bind-key l select-pane -R
+  ```
+  - tmux常用热键
+  ```shell
+  # 新建会话
+  tmux new -s hdcms
+  # 查看会话
+  ctrl+b s
+  # 重命名会话
+  Ctrl+b $
+
+  # 创建窗口
+  ctrl+b c
+  # 切换到2号窗口
+  ctrl+b 2
+  # 重命名窗口
+  ctrl+b ,
+  # 关闭窗口
+  ctrl+b &
+
+  # 水平拆分出一个新窗格
+  ctrl+b %
+  # 垂直拆分窗格
+  ctrl+b "
+  # 切换到下一个窗格
+  ctrl+b o
+  # 关闭窗格
+  ctrl+b x
+  ```
 
 ### 显示模式切换
 - 查看显示模式
@@ -2122,6 +2227,329 @@ sudo apt install acl
 
 
 ## 文本处理
+### 查看文本内容
+#### cat
+- cat 可以查看文本内容
+```shell
+cat [OPTION]... [FILE]...
+
+#常见选项
+-E|--show-ends          #显示行结束符$
+-A|--show-all           #显示所有控制符
+-n|--number             #对显示出的每一行进行编号
+-b|--number-nonblank    #非空行编号
+-s|--squeeze-blank      #压缩连续的空行成一行
+```
+
+#### tac
+- tac 逆向显示文本内容，行倒序显示
+- 格式
+```shell
+tac [option]... file...
+
+# 常用选项
+-s      # 以指定分隔符进行逆序，默认以换行符为分隔逆序
+-r      # 配合-s使用，可以用正则表达式指代复杂规则的分隔符
+-b      # 将分隔符视为行的一部分，并将其放在每行的开头，默认情况下，分隔符被认为是行的末尾部分
+
+示例：
+seq 10| tac
+
+cat f1  # 1-2-3-4-5-
+echo -n `cat f1` | tac -s '-' #-5-4-3-2-1
+
+cat f2  # 1--2---3-4---5-
+echo -n `cat f2` | tac -r -s '-+' #-5----4-3---2--1
+
+cat f3  # ,1,2,3,4,5
+echo -n `cat f3` | tac -b -s ','  # ,5,4,3,2,1
+```
+#### rev
+- rev: 同一行的文本内容，反转显示
+```
+echo "12345" | rev
+>> 54321
+```
+
+### 查看非文本文件内容
+#### hexdump
+```shell
+hexdump [option] file
+
+# 常用option：
+-C            # 规范的十六进制和ASCII显示。这可能是最常用的选项
+-n length     # 显示文件的前length个字节 
+-s offest     # 从指定偏移量offest处开始显示
+
+# 示例：
+hexdump -n 100 -C /dev/sda
+hexdump -C < <(echo {a..z}|tr -d ' ')
+# <(command) 括号内会临时生成一个临时文件，然后传给前面的指令
+```
+
+### 分页查看文件内容
+#### more
+- 可以实现分页查看文件，可以配合管道实现输出信息的分页
+- 格式
+```shell
+more [option] file
+
+# 常用选项
+-d    # 在底部显示提示
+-s    # 压缩连续空行
+```
+
+- 命令选项
+```shell
+空格键      # 翻页
+回车键      # 下一行
+!command    # 执行指令
+h           # 显示帮助
+:f          # 显示文件名和当前行号
+=           # 显示行号
+```
+
+#### less
+- less 也可以实现分页查看文件或STDIN输出，less 命令是man命令使用的分页器
+
+- 配置(.bashrc)
+```shell
+# 默认man指令分页器
+# 配置彩色man页面，使用使用less和groff
+# 确保man命令使用less作为分页器。这通常是默认配置，但你可以通过设置MANPAGER或PAGER环境变量来明确指定
+export MANPAGER='less -R'
+export PAGER='less -R' 
+# -R选项告诉less解释颜色编码，这是显示颜色输出的关键
+
+# 指定颜色样式
+export LESS_TERMCAP_mb=$(printf '\e[01;31m')       # 开始闪烁
+export LESS_TERMCAP_md=$(printf '\e[01;38;5;74m')  # 开始粗体
+export LESS_TERMCAP_me=$(printf '\e[0m')           # 结束模式
+export LESS_TERMCAP_se=$(printf '\e[0m')           # 结束强调模式
+export LESS_TERMCAP_so=$(printf '\e[38;5;246m')    # 开始强调模式
+export LESS_TERMCAP_ue=$(printf '\e[0m')           # 结束下划线
+export LESS_TERMCAP_us=$(printf '\e[04;38;5;146m') # 开始下划线
+```
+- 命令选项
+  - 类似与VIM中的操作
+
+### 显示文本前面或后面的行内容
+#### head
+- head 可以显示文件或标准输入的前面行
+
+- 格式
+```shell
+head [option]... file...
+
+# 常用选项
+-c | --bytes=N      # 指定获取前N个字节
+-n | --lines=N      #指定获取前N行,N如果为负数,表示从文件头取到倒数第N前
+```
+
+- 应用
+```shell
+# 设置随机10位密码并记录
+cat /dev/urandom | tr -dc '[:alnum:]' | head -c 10 | tee -a pass.log | passwd --stdin mage
+```
+
+#### tail
+- tail: tail 和 head 相反，查看文件或标准输入的倒数行
+- 格式
+```shell
+tail [option]... file...
+
+# 常用选项
+-c      # 指定获取后N字节
+-n      # 指定获取后N行,如果写成+N,表示从第N行开始到文件结束
+-f      # #跟踪显示文件fd新追加的内容,常用日志监控
+        # 当删除再新建同名文件,将无法继续跟踪
+-F      # 跟踪文件名，当删除文件再新建同名文件，可继续追踪
+```
+
+### 按列抽取cut
+- cut 命令可以提取文本文件或STDIN数据的指定列
+- 格式
+```shell
+cut [option] file
+
+# 常用选项
+-b          # 以字节分割，指定要显示的列
+-c          # 以字符分割，指定要显示的列
+-d          # 以指定分割符分割
+-f          # 显示指定的列 eg:-f1; f1,2; f1-10
+--output-delimiter=String   # 用指定字符替代分隔符
+```
+- 示例：
+```shell
+df | head -n 2| tail -n 1|tr -s " "| cut -d " " -f5
+```
+
+### 合并多个文件paste
+- paste 合并多个文件同行号的行到一行
+- 格式
+```shell
+paste [option] file
+
+# 常用选项
+-d      # 指定分隔符, 默认tab
+-s      # 合成一行显示，默认用tab分割
+-z      # 以NULL 字符而非换行符作为行尾分隔符
+```
+
+- 示例：批量修改密码
+```shell
+[root@ubuntu2204 ~]# cat user.txt
+tom
+jerry
+[root@ubuntu2204 ~]# cat pass.txt
+123456
+654321
+[root@ubuntu2204 ~]## paste -d: user.txt pass.txt
+tom:123456
+jerry:654321
+[root@ubuntu2204 ~]# paste -d: user.txt pass.txt | chpasswd
+```
+
+### 文本折叠fold
+- fold命令是一个在Unix和类Unix系统中用于折叠文本的实用工具，它能够将较长的文本行折叠（或分割）成多个较短的行，使得文本适合在限定宽度的显示区域中查看。这在处理长行文本文件或输出时特别有用，以便更易于阅读或符合特定格式要求。
+
+- 格式
+```shell
+fold [option]... file...
+
+# 常用选项
+-w, --width=WIDTH       # 设置每行的目标宽度
+-s, --spaces            # 在空格处断行
+-b, --bytes             # 按字节计数而非按列计数。这对于处理包含多字节字符的文本（如UTF-8编码的文本）时特别有用，以确保正确的宽度计算。
+```
+
+
+### 分析文本工具
+#### 文本数据统计wc
+- wc 命令可用于统计文件的行总数、单词总数、字节总数和字符总数，可以对文件或STDIN中的数据统计
+- 格式
+```shell
+wc [option] file
+cat file | wc [option]
+
+# 常用选项
+-l|--lines   #只计数行数           
+-w|--words   #只计数单词总数           
+-c|--bytes   #只计数字节总数           
+-m|--chars   #只计数字符总数
+-L|--max-line-length   #显示文件中最长行的长度           
+```
+
+#### 文本排序sort
+- 把整理过的文本显示在STDOUT，不改变原始文件
+- 格式
+```shell
+sort [option] file
+
+# 常用选项
+-n        # 以数字大小排序
+-R        # 随机排序
+-r        # 倒序排序
+-t        # 指定列分隔符
+-k        # 指定排序列
+-u        # 去重
+```
+
+#### uniq
+- uniq 命令从输入中删除前后相接的重复的行，常和 sort 配合使用
+- 格式
+```shell
+uniq [option]... file...
+
+# 常用选项
+-c      # 显示每行出现的次数
+-d      # 仅显示重复行
+-u      # 仅显示不重复的行
+```
+
+### 比较文件
+#### diff
+- diff 命令比较两个文件之间的区别
+
+- 格式
+```shell
+diff [option]... file...
+
+# 常用选项
+-u      # 详细显示
+```
+
+#### patch
+- 使用diff生成的文件和其中一个源文件修复两一个源文件
+```shell
+patch [option]... file1 file2
+
+# 常规选项
+-b      # 备份原文件，防止覆盖后丢失
+
+# 使用场景
+diff f1 f2 > diff.log
+
+# 使用diff.log和f1可以生成f2文件
+patch -b f1 diff.log
+# 此时f1文件的内容变为f2，原f1的内容在备份文件f1.orig中
+```
+
+#### cmp
+- 查看二进制文件的不同
+```shell
+cmp file1 file2
+
+示例：
+mystical@ubuntu2204:~/test$ cmp /bin/ls /bin/dir
+/bin/ls /bin/dir differ: byte 25, line 1
+# 表示在25字节后，出现不同，使用hexdump进行查看
+
+mystical@ubuntu2204:~/test$ hexdump -s 20 -Cn 20 /bin/dir
+00000014  01 00 00 00 90 6a 00 00  00 00 00 00 40 00 00 00
+# 90
+mystical@ubuntu2204:~/test$ hexdump -s 20 -Cn 20 /bin/ls
+00000014  01 00 00 00 b0 6a 00 00  00 00 00 00 40 00 00 00
+# b0
+```
+
+
+### 文本处理三剑客之 grep
+- 作用：
+  - 文本搜索工具，根据用户指定的 “模式” 对目标文本逐行进行匹配检查；打印匹配到的行
+
+- 模式：
+  - 由正则表达式字符及文本字符所编写的过滤条件
+
+- 格式
+```shell
+grep [option]... PATTERN [FILE]...
+
+#常用选项
+--color=auto      # 对匹配到的文本着色处理
+-m N              # 匹配N次后停止
+-v                # 取反
+-i                # 忽略大小写
+-n                # 显示行号
+-c                # 统计匹配次数
+-o                # 仅显示匹配到的字符，使用o的时候，后面一般跟正则表达式
+-q                # 静默模式，什么都不输出，但是匹配成功与否可以通过$?的数值看出来
+-A N              # 匹配到的行的后N行
+-B N              # 匹配到的行的前N行
+-C N              # 匹配到的行的前后各N行
+-e                # 表示或关系，进行查询
+# 示例：
+grep -e false -e bash /etc/passwd
+-w                # 表示匹配的是单词，而不是仅仅包含该字符
+-E                # 表示使用ERE
+-F                # 表示不支持正则表达式
+-f file           # 将文件中的每行内容作为匹配的正则规则
+                  # 也可以用来判断两个文件中的相同行
+-r                # 递归处理，不处理链接文件
+-R                # 递归处理，处理链接文件
+```
+
+
 ### Awk
 #### Awk基础
 - Awk语法
@@ -2491,6 +2919,300 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
 #用括号分组
 用反斜杠'\'+数字表示分组的代号
 ```
+
+## 文件查找与打包压缩
+### 文件查找
+- 非实时查找（数据库查找）：locate
+- 实时查找：find
+
+#### locate
+- locate简介
+  - locate 查询系统上预建的文件索引数据库 /var/lib/mlocate/mlocate.db
+  - 索引的构建是在系统较为空闲时自动进行(周期任务)，执行updatedb可以更新数据库
+  - 索引构建过程需要遍历整个根文件系统，很消耗资源
+  - locate和update命令来自于mlocate包
+
+- 工作特点
+  - 查找速度快
+  - 模糊查询
+  - 非实时查找
+  - 搜索的是文件全路径，不仅仅是文件名
+  - 可能只搜索用户具备读取和执行权限的目录
+
+- locate安装
+```shell
+# CentOS
+yum install -y mlocate
+
+# Ubuntu
+apt install -y plocate
+```
+
+- 格式
+```shell
+locate [option...] [PATTERN]...
+
+# 手动更新数据库
+updatedb
+
+# 常用选项
+-A                # 输出所有能匹配到的文件名，不管文件是否存在
+-b                # 仅匹配文件名部份，而不匹配路径中的内容
+-c                # 统计匹配到的数量
+-d database       # 指定数据库查找
+-i                # 忽略大小写
+-n N              # 只显示前N条匹配数据
+-r                # 使用基本正则表达式
+--regex           # 使用扩展正则表达式
+```
+
+#### find
+- find 是实时查找工具，通过遍历指定路径完成文件查找；
+
+- 工作特点
+  - 查找速度略慢
+  - 精确查找
+  - 实时查找
+  - 查找条件丰富
+  - 可能只搜索用户具备读取和执行权限的目录
+
+
+- 格式
+```shell
+#find [-H] [-L] [-P] [-Olevel] [-D help|tree|search|stat|rates|opt|exec][path...] [expression]
+
+find [OPTION]... [查找路径] [查找条件] [处理动作]
+
+## 条件组合（-a,-o,-not）不加括号的情况下，默认处理动作只针对最后一个查找条件
+
+# 查找路径：指定具体目标路径，默认当前路径
+# 查找条件：指定的查找条件，可以为文件名，大小，类型，权限等标准进行，默认找出指定路径下的所有文件
+# 处理动作：对符合条件的文件做操作，默认输出至屏幕
+
+# 常用查找条件
+-maxdepth       # 为最大搜索遍历深度
+-mindepth       # 为最小搜索遍历深度
+-name           # 指定文件名， 支持通配符
+-depth          # 优先处理文件（用处不大）
+
+# 根据文件名和inode查找
+-name name
+-iname name
+-inum number
+-samefiles name   # 查找相同inode号的文件
+-link n           # 链接数为n的文件
+-regex "PATTERN"  # 以PATTERN匹配整个路径，而非文件名
+
+# 根据属主属组查找
+-user USERNAME      # 查找属主为指定用户（UID）的文件
+-group GPRNAME      # 查找属组为指定用户组（GID）的文件
+-uid UserID
+-gid GrpID
+-nouser
+-nogroup
+
+# 根据文件类型查找
+-type TYPE
+
+# 查找空文件或空目录
+-empty
+
+# 组合条件
+-a          # 与，默认值
+-o          # 或
+-not | !    # 非
+
+# 排除子目录
+-prune      # 跳过，排除指定目录，必须配合-path使用
+
+## 示例：
+# 排除当前目录下的dir1目录下的.txt文件，但是会输出dir1
+find -path './dir1' -prune -o -name "*.txt"
+# 去除dir1
+find -path './dir1' -prune -o -name "*.txt" -print
+
+# 根据文件大小查找
+-size [-|+]N UNIT
+
+10k: (9k, 10k]
+-10k: (--，9k]
++10k: (10k,++)
+
+# 根据时间查找
+## 以天为时间单位
+-atime [-|+]N
+-mtime [-|+]N
+-ctime [-|+]N
+
+## 以分钟为单位
+-amin [-|+]N
+-mmin [-|+]N
+-cmin [-|+]N
+
+# 根据权限查找
+- perm [/|-] MODE
+MODE    # 精确匹配权限
+/MODE   # （u,g,o）只要有一位匹配即可，or关系
++MODE   # 每一类对象都必须同时拥有指定权限，and关系
+        # 权限位是0表示不关注该位置的权限
+
+# 正则表达式
+-regextype type     # 正则表达式类型
+-regex pattern      # 正则表达式
+
+# 处理动作
+-print          # 将匹配到的内容输出到控制台
+-print0         # 用空字符null代替换行符进行分界
+-ls             # 将匹配到的内容ls -l显示出来
+-fls            # 查找到的所有文件的长格式信息保存至指定文件中，相当于 -ls > file
+-delete             # 删除查找到的文件，慎用！
+-ok command {} \;   # 对查找到的每个文件执行有command指定的命令，并对每个文件进行交互式确认
+-exec command {} \; #对查找到的每个文件执行由COMMAND指定的命令
+{}                  # 用于引用查找到的文件名称自身
+```
+
+### 参数替换 - xargs
+- 作用：
+  - 使不支持标准输入的命令可以接受管道传递的参数
+  - 许多命令不支持过多参数，可以使xargs分组传参
+
+- 格式
+```shell
+xargs [OPTION]... COMMAND [INITIAL-ARGS]...
+
+# 常用选项
+-0            # 用 assic 中的0或 null 作分隔符
+# 示例：
+# [root@ubuntu2204 ~]# find -type f -print0 |xargs -0 ls
+# './a b'   ./f-1.txt   ./f-2.txt   ./f-3.txt
+# 适用于分隔文件中带空格的情况
+-a           # 从文件中读入作为输入
+-d           # 指定分隔符
+-E END       # 指定结束符，执行到此处截止
+-n           # 一次接受n个参数
+-p           # 每次执行前确认
+-t           # 显示过程
+```
+
+### 压缩与解压缩
+#### compress和uncompress
+- 此工具来自于ncompress包，目前已很少使用
+
+- 对应文件是.Z后缀
+
+- 格式
+```shell
+compress...[option]... [file]...
+uncompress [option]... [file]...
+
+# 常用选项
+-d        # 解压缩，相当于uncompress
+-c        # 结果输出至标准输出，不删除源文件
+# 保留源文件方法
+# compress -c syslog > syslog.Z
+-f        # 覆盖已存在目标文件
+-v        # 显示过程
+-r        # 递归压缩目录下所有内容
+
+# 压缩比：1:5
+```
+
+#### gzip和gunzip
+- 来自于gzip包
+- 对应的文件是.gz后缀
+- 格式
+```shell
+gzip [option]... FILE...
+gunzip [option]... FILE...
+
+# 常用选项
+-c        #将压缩数据输出到标准输出中，并保留原文件
+-d        # 解压缩，相当于gunzip
+-k        # 保留原文件
+-l        #显示原文件大小，压缩文件大小，压缩比，压缩前文件名
+-r        # 递归压缩目录下所有文件
+-S        # 指定压缩文件后缀
+-v        # 显示过程
+-1        # 最快压缩，压缩比最小，但压缩时间块
+-9        # 最慢压缩，压缩比最高，但压缩
+
+# 压缩比：1:8
+```
+
+#### bzip2和bunzip2
+- 来自于bzip2包
+- 对应文件是.bz2后缀
+- 格式
+```shell
+bzip2 [option]... FILE...
+bunzip2 [option]... FILE...
+bzcat # 不解压，查看文件内容
+ 
+# 常用选项
+# 同gzip: -dkvfc19
+
+# 压缩比：1:10
+```
+
+#### xz和unx
+- 来自于xz包
+- 对应文件是.xz包
+- 格式
+```shell
+xz [option]... FILE...
+unxz [option]... FILE...
+
+# 常规选项
+# 同gzip: -dzkvfc19
+-T      # 开多线程，默认为1
+```
+
+#### zip和unzip
+- zip可以实现打包目录和多个文件大包为一个文件并压缩，但可能会丢失文件属性信息（如属主属组）
+- 对应的文件是.zip后缀
+- 格式
+```shell
+zip [option]... zipfile [FILE]...
+unzip [option]... zipfile [FILE]...
+
+# zip常用选项
+-f    # 仅更新，不追加
+-u    # 有则更新，无则追加
+-d    # 删除指定压缩包内文件
+-m    # 将文件压缩之后，删除原始文件
+-r    # 递归压缩目录
+-1~9
+-v    # 显示过程
+-c    # 替每个压缩的文件添加注释
+-z    # 给压缩包添加注释
+-P    # 非交互设置密码
+-e    # 交互式设置密码
+-i    # 仅压缩指定文件
+-x    # 压缩时排除指定文件
+
+# unzip常用选项
+-l    # 显示压缩文件内所包含的文件
+-t    # 查看压缩文件完整性
+-z    # 查看压缩包注释
+-v    # 列出包内文件信息
+-x    # 指定不需要解压缩的文件
+-d    # 指定解压的目标目录
+-n    # 压缩时不要覆盖原有文件
+-o    # 直接覆盖
+```
+#### zcat
+- 其功能是在不解压的情况下查看压缩文件内容
+- 格式
+```shell
+zcat [option]... FILE...
+
+# 常用选项
+-d        # 解压缩
+-l        # 显示压缩文件内的文件列表
+-r        # 递归操作
+-t        # 测试文件完整性
+```
+
 
 ## 网络协议和管理
  - OSI网络国际标准
