@@ -352,6 +352,15 @@ wang
 - 示例
 ```shell
 # 多个命令并行执行 
+{ sleep 2; echo "Task 1 completed"; } &
+{ sleep 5; echo "Task 2 completed"; } &
+{ sleep 3; echo "Task 3 completed"; } &
+wait
+echo "All tasks completed"
+
+# 重点1：结尾必须加分号
+# 重点2：括号内首尾加空格
+# 重点3：确保使用 wait 命令以避免脚本在后台进程完成前就结束，特别是当后续操作依赖于这些并发任务的结果时。
 ```
 
 ### 组合条件测试

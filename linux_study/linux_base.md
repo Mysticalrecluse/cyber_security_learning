@@ -1,4 +1,4 @@
-v# LINUX 基础
+# LINUX 基础
 ## Linux文件基本操作
 ### 终端和控制台的区别
 - 区别标志：
@@ -12,7 +12,7 @@ v# LINUX 基础
 
 - 查看当前终端设备
 ```bash
-
+tty
 ```
 ### 登录前提示
 ```bash
@@ -546,6 +546,11 @@ POSIX 标准的意义：
   [Sat Oct 14 08:23:59 30] root@rocky9:bin #whereis gcc
   gcc: /usr/bin/gcc /usr/lib/gcc /usr/libexec/gcc /usr/share/man/man1/gcc.1.gz /usr/share/info/gcc.info.gz
   ```
+  - which和where命令的区别
+  ```shell
+  which命令找到相关的二进制程序是否已经在搜索路径中
+  whereis， 该命令会搜索shell的搜索路径之外更大范围的系统目录
+  ```
   - 当第一次执行外部命令后，系统会自动将外部的路径记录到内存缓存区中，下次再执行此外部命令，将会从缓存区中找到路径，直接到对应的磁盘路径找到此命令并执行。通过hash命令可以查看到已执行过的外部命令及路径
   ```shell
   [Sat Oct 14 08:24:24 31] root@rocky9:bin #hash
@@ -949,6 +954,11 @@ dirname `which cat`
   -rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
   -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
   -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+
+  ls -l <file>
+  #如果file是目录，则直接查询该目录下的内容，要查询目录使用
+  ls -dl <file>
+  # 如果file是普通文件，则正常查看list
 
   ```
 
@@ -3246,6 +3256,1061 @@ zcat [option]... FILE...
 -J        # xz压缩算法
 ```
 
+## 磁盘存储和文件系统
+### 磁盘结构
+#### 设备文件
+- 设备文件：关联至一个设备驱动程序，进而能够与之对应硬件设备进行通信
+
+- 设备号码：
+  - 主设备号：major number, 标识设备类型
+  - 次设备号：minor number, 标识同一类型下的不同设备
+
+- 设备类型
+  - 块设备：block，存取单位"块"，磁盘
+  - 字符设备：char，存取单位"字符"，键盘
+
+- 磁盘设备的设备文件命名
+```shell
+/dev/DEV_FILE
+/dev/sdX    # SAS, SATA, SCSI, IDE, USB
+/dev/nvme0n     # nvme协议硬盘，如：第一个硬盘：nvme0n1, 第二个硬盘：nvme0n2  
+```
+
+- 虚拟磁盘
+```shell
+/dev/vd
+/dev/xvd
+```
+
+- 不同磁盘标识：a-z, aa, ab..
+```shell
+/dev/sda, /dev/sdb...
+```
+
+- 同一设备的不同分区：1，2....
+```shell
+/dev/sda1
+/dev/sda5
+```
+
+- 添加硬盘不重启识别
+```shell
+echo '- - -' > /sys/class/scsi_host/host0/scan
+echo '- - -' > /sys/class/scsi_host/host1/scan
+echo '- - -' > /sys/class/scsi_host/host2/scan
+
+
+# 解读/sys/class/scsi_host/host*
+scsi_host文件夹下，代表了所有的scsi主机适配器接口，每个hostN都表示一个SCSI主机适配器接口
+
+# 解读hostN目录下的文件
+hostN目录包含了与该接口相关的一系列参数和操作接口。这些文件和目录提供了一种机制，允许用户空间程序查询和修改 SCSI 主机适配器的属性，以及执行特定的操作，如扫描新设备
+
+# 举例
+scan   
+> 这是一个写入接口，用于触发 SCSI 主机适配器扫描其管理的总线以识别新连接的设备。
+> 向这个文件写入特定的字符串（通常是 "- - -"）会指示适配器扫描所有可能的通道（channel）、目标（target）和逻辑单元号（LUN）
+
+state
+> 显示适配器的当前状态，如 "running" 或 "offline"
+
+proc_name
+> 显示 SCSI 主机适配器的驱动程序名称
+> 知道了proc_name，即驱动程序名称，可以通过"modinfo 驱动名称"查询驱动详细信息
+> 也可以通过lsmod|grep "驱动名称"查询该模块是否被加载
+> 使用modprobe可以手动加载或卸载驱动程序
+> 大多驱动程序以模块的形式被加载，模块（Kernel Module）是一种可以在系统运行时动态加载和卸载的代码块
+
+unique_id
+> 为 SCSI 主机适配器提供一个唯一标识符
+```
+
+- SCSI主机适配器接口hostN放在sys目录下的原因
+```shell
+/sys 目录是 Linux 系统中的一个特殊文件系统，称为 sysfs。sysfs 提供了一种机制，通过它用户空间的程序可以与内核空间的数据结构进行交互，获取系统和硬件组件的信息，以及在某些情况下修改这些信息。
+
+#为什么使用 sysfs
+简化访问：
+通过 sysfs，提供了一种标准和简单的方式来访问内核提供的信息和服务，这些服务以前可能需要特殊的系统调用或复杂的编程接口来访问。
+
+统一接口：
+sysfs 为许多不同类型的内核结构提供了一个统一的文件系统接口，包括设备、驱动程序和内核模块等，这使得管理和查询这些结构更加一致和简单。
+
+动态性：sysfs 
+是动态生成的，它的内容反映了当前系统的状态。当硬件设备被添加或移除时，sysfs 中相应的条目会相应地出现或消失，这提供了一种实时反映系统状态的机制。
+```
+
+- <scan style="color:tomato; font-weight:700;">扩展内容：检查和管理模块</scan>
+```shell
+lsmod：列出当前加载的所有模块。
+
+modinfo：显示有关特定模块的详细信息。
+
+modprobe：智能地加载或卸载模块，包括处理模块依赖关系。
+
+insmod：加载一个模块到内核中，但不解决依赖关系。
+
+rmmod：从内核中卸载一个模块
+```
+
+- 创建设备文件
+```shell
+mknod /data/partition-sda1 b 8 1
+mount /data/partition-sda1 /mnt/
+```
+#### dd指令
+- 指令格式
+```shell
+dd if=输入文件 of=输出文件 [选项]
+
+# if=文件名：指定输入文件（input file），可以是设备文件（如磁盘分区 /dev/sda）或普通文件。
+# of=文件名：指定输出文件（output file），同样可以是设备文件或普通文件。
+# [选项]：dd 命令提供了多种选项，用于控制数据的读取、写入和转换过程。
+```
+
+- 常用选项
+    - bs=大小：设置块大小，例如 bs=512 表示每次读写512字节。bs 对性能有很大影响。
+    - count=数量：复制指定的块数量，与 bs 一起使用可以控制复制的总数据量。
+    - skip=数量：跳过输入文件开头的指定块数量。
+    - seek=数量：跳过输出文件开头的指定块数量，用于在指定位置开始写入。
+    - conv=转换选项：指定数据转换选项，如 conv=notrunc 避免截断输出文件，conv=noerror 在读取错误时继续处理。
+    - status=进度选项：控制进度报告的输出，status=progress 显示处理过程中的进度信息。
+
+- 示例
+```shell
+# 创建一个固定大小的文件
+dd if=/dev/zero of=文件名 bs=1G count=1
+
+# 备份和恢复硬盘分区
+dd if=/dev/sda1 of=/path/to/backup.img
+
+# 将备份文件恢复到分区
+dd if=/path/to/backup.img of=/dev/sda1
+
+# 复制光盘到ISO文件
+dd if=/dev/cdrom of=/path/to/cdimage.iso
+```
+
+#### 硬盘类型
+![alt text](images/image15.png)
+
+- 硬盘接口类型
+  - IDE：133MB/s，并型接口，早期家用服务器
+  - SCSI：640MB/s，并行接口，早期服务器
+  - SATA：6Gbps,SATA数据端口与电源端口是分开的，即需要两条线，一条数据线，一条电源线
+  - SAS: 6Gbps，SAS是一整条线，数据端口与电源端口是一体化的，SAS中是包含供电线的，而SATA中不包含供电线。SATA标准其实是SAS标准的一个子集，二者可兼容，SATA硬盘可以插入SAS主板上，反之不行
+  - USB: 480MB/s
+  - 注意：速度不是由单纯的接口类型决定，支持Nvme协议硬盘速度是最快的
+
+#### 硬盘存储术语
+![alt text](images/image16.png)
+- 硬盘存储术语CHS
+  - head：磁头；磁头数=盘面数
+  - track：磁道，磁道=柱面数
+  - sector：扇区，512bytes
+  - cylinder：柱面 1柱面=512*sector数/track*head数=512*63*255=7.84M
+
+- CHS(已基本淘汰)
+  - CHS采用24bit位寻址
+  - 其中前10位表示cylinder，中间8位表示head，后面6位表示sector
+  - 最大寻址空间8G（8G计算方式：2^24=16M，这个表示扇区的数量，一个扇区512byte,所以最大存储是16M*512=8G）
+  - 对于机械硬盘，外层磁道的数据，读取更快，因为单位时间内，外层磁头划过的更长，读取数据更多，<scan style="color:tomato;">因此一种优化方式，是把数据尽量存放到外磁道扇区，对于机械硬盘，数字越小，扇区越靠外</scan>
+
+- LBA（Logic block addressing）
+  - LBA是一个整数，通过转换成CHS格式完成磁盘具体寻址
+
+- 查看扇区信息
+```shell
+fdisk -l /dev/sda
+# 默认只有扇区信息
+Disk /dev/sda: 200 GiB, 214748364800 bytes, 419430400 sectors
+Disk model: VMware Virtual S
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt #（分区方式）
+Disk identifier: E6097981-0CC8-4229-AC57-CFFCAF3BC758
+
+Device       Start       End   Sectors  Size Type
+/dev/sda1     2048      4095      2048    1M BIOS boot
+/dev/sda2     4096   4198399   4194304    2G Linux filesystem
+/dev/sda3  4198400 419428351 415229952  198G Linux filesystem
+root@mystical:/dev#
+
+# 加参数可以得到更详细的信息
+fdisk -u=cylinder -l /dev/sda
+Disk /dev/sda: 200 GiB, 214748364800 bytes, 419430400 sectors
+Disk model: VMware Virtual S
+Geometry: 255 heads, 63 sectors/track, 26108 cylinders
+Units: cylinders of 16065 * 512 = 8225280 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt
+Disk identifier: E6097981-0CC8-4229-AC57-CFFCAF3BC758
+
+Device     Start   End  Size Type
+/dev/sda1      1     1    1M BIOS boot
+/dev/sda2      1   262    2G Linux filesystem
+/dev/sda3    262 26109  198G Linux filesystem
+```
+
+
+### 分区类型
+- Linux中使用磁盘的过程
+  - 设备分区
+  - 创建文件系统
+  - 挂载该文件系统
+
+- 分区的原因
+  - 优化I/O性能
+    - 比如：1000G空间中找一个文件和40G中找一个文件，明显40G中搜索查找更容易
+  - 实现磁盘空间的配额限制
+  - 提高修复速度
+  - 隔离系统和程序
+  - 安装多个操作系统
+  - 采用不同的文件系统
+
+- 分区方式
+  - MBR
+  - GPT
+
+#### MBR分区
+- 定义：Master Boot Record，1982年，使用32位表示扇区数，分区不超过2T
+- 查询
+```shell
+fdisk -l /dev/sda
+# Disklabel type: dos (表示MBR分区)
+```
+
+- 0磁道0扇区：512byte
+  - 446bytes: boot loader启动想关
+  - 64bytes: 分区表，其中每16bytes表示一个分区
+  ```shell
+  # 分区表信息
+  fdisk -l /dev/sda
+
+  # 这些为GPT分区表信息
+  Device       Start       End   Sectors  Size Type
+  /dev/sda1     2048      4095      2048    1M BIOS boot
+  /dev/sda2     4096   4198399   4194304    2G Linux filesystem
+  /dev/sda3  4198400 419428351 415229952  198G Linux filesystem
+
+  # MBR分区表信息
+  Device     Boot   Start       End   Sectors  Size Id Type
+  /dev/sda1  *       2048   2099199   2097152    1G 83 Linux
+  /dev/sda2       2099200 419430399 417331200  199G 8e Linux LVM
+  # *（星号）表示该分区为活动分区，分区信息第一字节为80
+  ```
+  - 2bytes: 55AA标识符
+
+- MBR分区特点
+  - MBR分区中一个硬盘最多有4个主分区，也可以3个主分区+1个扩展（N个逻辑分区）
+  - MBR分区：主和扩展分区对应的1--4，/dev/sda1-4,逻辑分区从5开始，/dev/sda5(逻辑分区从扩展分区中分，但是sda4代表扩展分区，逻辑分区从sda5开始)
+  - <scan style="color:tomato;font-weight:700">MBR最多4个分区的原因</scan>
+  ```shell
+  因为分区表一共64字节，而一个分区16字节，因此MBR分区方式最多4个分区
+  ```
+  - <scan style="color:tomato;font-weight:700">总分区不能超过2T的原因</scan>
+  ```shell
+  一个分区的信息共16字节，其中4字节起始位置，4字节记录结束位置，（因为MBR中，使用32位，4字节记录分区地址），因此一共能记录的数量是2^32=4G个扇区数量，一个扇区512字节，因此，一个分区空间最多不能超过2T，否则分区表无法记录
+  ```
+
+  - <scan style="color:tomato;font-weight:700">详解16字节分区表中分区信息</scan>
+  ```shell
+  1. 第一个字节80表示活动分区，00表示非活动分区
+  2. 9-12字节，分区起始LBA地址
+  3. 13-16字节，分区结束LBA地址
+
+  # 以80 04 01 04 83 fe c2 ff  00 08 00 00 00 00 20 00举例
+  80表示该分区为活动分区
+  
+  后面的数据表示磁盘扇区位置和内存逻辑位置的地址信息
+  ```
+  - <scan style="color:tomato;font-weight:700">扩展分区记录逻辑分区的方式</scan>
+  ```shell
+  在 MBR 的0扇区中，确实有64字节用于存储分区信息，这部分被分成4个分区条目，每个分区条目占用16字节。如果硬盘使用扩展分区，其中一个分区条目将用来定义扩展分区的起始位置（通常是在哪个扇区开始）。
+
+  这16字节的扩展分区条目指向第一个 EBR（Extended Boot Record），这个 EBR 存在于扩展分区的起始位置。每个 EBR 也有自己的小型分区表，其中包括两个条目：
+
+  第一个条目定义了一个逻辑分区的起始位置和大小。
+  第二个条目指向下一个 EBR（如果有的话），实际上是一个指向扩展分区中下一个逻辑分区的 EBR 的相对位置。
+  这样就形成了一种链表结构：
+
+  MBR 的扩展分区条目指向第一个 EBR。
+  第一个 EBR 定义第一个逻辑分区，并指向下一个 EBR。
+  第二个 EBR 定义第二个逻辑分区，并指向下一个 EBR。
+  以此类推，直到最后一个 EBR，其通常不再指向任何 EBR，表示链表的结束。
+  ```
+
+![alt text](images/image17.png)
+![alt text](images/image18.png)
+- 详细解读
+  - 主引导程序（偏移地址0000H--0088H），它负责从活动分区中装载，并运行系统引导程序
+  - 出错信息数据区，偏移地址0089H--00E1H为出错信息，00E2H--01BDH全为0字节 
+  - 分区表（DPT,Disk Partition Table）含4个分区项，偏移地址01BEH--01FDH,每个分区表项长16个字节，共64字节为分区项1、分区项2、分区项3、分区项4
+  - 结束标志字，偏移地址01FE--01FF的2个字节值为结束标志55AA
+
+#### MBR分区表破坏与修复实验
+- MBR分区表破坏
+```shell
+# 备份分区表(将数据备份到mbrtb.img文件)
+dd if=/dev/sda of=/home/mystical/mbrtb.img bs=1 count=64 skip=446
+
+# 将备份数据放到远程服务器保存(保存到服务器10.0.0.150)
+scp 10.0.0.164:/home/mystical/mbrtb.img .
+
+# 将分区表的64byte部分，填充0
+dd if=/dev/zero of=/dev/sda bs=1 count=64 seek=446
+
+# Ubuntu分区修复
+1. 关闭服务器，进入Bios，使用CD-ROM drive加载引导程序
+
+2. 选择Try or Install Ubuntu Server进入安装界面
+3. 按ctrl+alt+f2 进入救援模式的命令行
+4. 将之前备份在远程服务器的备份文件复制到待修复的服务器中
+scp root@10.0.0.150:/home/mystical/mbrtb.img
+
+5. 加载过来后，将数据恢复重启即可
+dd if=mbrtb.img of=/dev/sda bs=1 count=64 seek=446
+fdisk -l /dev/sda # 看到分区表信息，即证明修复成功
+
+6 使用bios复原加载启动项，然后重启即可
+
+# ---------------------------------------------------------
+
+# Rocky分区修复
+
+# 从光驱启动进救援模式
+1. 使用CD-ROM drive启动，进入安装界面后，选择Troubleshooting
+2. 选择Rescue a Rocky Linux System
+3. 出现选择页面后，选择1，回车，再回车，拿到一个shell
+4. 当前没有网络，需要先配置网络，然后远程将分区备份拷贝过来
+ip address add 10.0.0.160/24 dev ens160
+scp root@10.0.0.157:/root/mbrtb.img
+
+5. 然后使用备份数据修复磁盘分区表后，调整加载启动项，重启即可
+```
+
+#### GPT分区
+- GPT：
+  - 定义：GUID（Globals Unique Identifiers）Partition table 支持128个分区，使用64位，支持8Z（512Byte/block）64Z(4096Byte/block)
+  - 使用128位UUID（Universally unique Identifires）表示磁盘和分区，GPT分区表自动备份在头和尾两份，并有CRC校验位
+  - UEFI（同一可扩展硬件接口）支持GPT，是的操作系统可以使用
+
+- GPT分区结构
+![alt text](images/image19.png)
+
+#### BIOS和UEFI
+- BIOS：BIOS是固化在电脑主板上的程序，主要用于<scan style="color:tomato;">开机系统自检</scan>和<scan style="color:tomato;">引导操作系统</scan>。目前新式的电脑基本上都是UEFI启动 
+
+### 管理分区
+- 列出块设备lsblk
+```shell
+lsblk
+
+# 列出设备和挂载地址的完整路径
+lsblk -p
+
+# 列出每个分区的操作系统
+lsblk -f
+
+# 常用字段
+NAME        # 设备名称
+MAJ:MIN     # 主设备号:次设备号
+RM          # 是否是可移动设备
+SIZE        # 设备容量大小
+RO          # 是否是只读设备
+TYPE        # 设备类型
+MOUNTPOINT  # 挂载点
+```
+
+- 创建分区的命令
+```shell
+fdisk         # 管理MBR分区
+gdisk         # 管理GPT分区
+parted        # 高级分区操作，可以是交互或非交互方式
+
+partprobe     # 重新设置内存中的内核分区表版本，适合除CentOS 6之外的其他版本
+```
+
+#### parted命令 
+- parted的操作都是实时生效的，没有交互式确认
+- 由于parted命令，回车后直接生效，比较危险，因此生产中使用的比较少
+- 格式：
+```shell
+parted [OPTION]... [DEVICE [COMMAND [PARAMETERS]...]...]
+
+# 常用选项
+-l | --list                             # 显示所有硬盘分区信息
+-s | --script                           # 不输出提示信息
+
+# 常用子命令
+help [COMMAND]                          # 显示命令帮助
+print                                   # 显示 
+quit                                    # 退出（交互式操作时使用）
+mklabel|mktable LABEL-TYPE              # 指定磁盘的分区类型gpt|msdos(mbr)
+mkpart PART-TYPE [FS-TYPE] START END    # 新建分区，指定分区类型，文件系统，开始结束位置（默认单位是M）
+rm NUMBER                               # 删除指定分区
+
+```
+
+- 示例：
+```shell
+root@ubuntu2204~# parted -l
+Model: VMware, VMware Virtual S (scsi)                                             
+Disk /dev/sda: 215GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End     Size    File system  Name  Flags
+ 1      1049kB  2097kB  1049kB                     bios_grub
+ 2      2097kB  2150MB  2147MB  ext4
+ 3      2150MB  215GB   213GB
+
+#----------------------------------------------------------------
+
+Error: /dev/sdb: unrecognised disk label
+Model: VMware, VMware Virtual S (scsi)                                    
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: unknown
+Disk Flags: 
+
+#----------------------------------------------------------------
+
+Model: Linux device-mapper (linear) (dm)
+Disk /dev/mapper/ubuntu--vg-ubuntu--lv: 106GB
+Sector size (logical/physical): 512B/512B
+Partition Table: loop
+Disk Flags: 
+
+Number  Start  End    Size   File system  Flags
+ 1      0.00B  106GB  106GB  ext4
+
+#----------------------------------------------------------------
+
+Warning: Unable to open /dev/sr0 read-write (Read-only file system).  /dev/sr0
+has been opened read-only.
+Error: /dev/sr0: unrecognised disk label
+Model: NECVMWar VMware SATA CD01 (scsi)                                   
+Disk /dev/sr0: 2133MB
+Sector size (logical/physical): 2048B/2048B
+Partition Table: unknown
+Disk Flags: 
+```
+
+- 创建分区
+```shell
+# 创建分区表种类（msdos|gpt）
+root@ubuntu2204~# parted /dev/sdb mklabel gpt
+Information: You may need to update /etc/fstab.
+# 只有将/etc/fstab文件同步更新，才能永久生效
+
+root@ubuntu2204~# parted /dev/sdb print                                   
+Model: VMware, VMware Virtual S (scsi)
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start  End  Size  File system  Name  Flags
+
+#------------------------------------------------------------
+
+# 创建分区
+root@ubuntu2204~# parted /dev/sdb mkpart primary 1 300
+Information: You may need to update /etc/fstab.
+
+root@ubuntu2204~# parted /dev/sdb print
+Model: VMware, VMware Virtual S (scsi)
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End    Size   File system  Name     Flags
+ 1      1049kB  300MB  299MB               primary
+# 这里从1M即1024KB开始，但实际从1049的原因：
+# parted 会默认对齐分区到硬盘的最优写入边界，这通常是硬盘的物理块大小的整数倍，或者对于更现代的硬盘来说，是最佳I/O性能的位置。这个对齐通常是为了性能考虑，确保分区边界与底层存储介质的物理布局相匹配，可以提高存取效率并减少潜在的读写错误。
+
+root@ubuntu2204~# parted /dev/sdb mkpart primary 301 500
+Information: You may need to update /etc/fstab.
+
+root@ubuntu2204~# parted /dev/sdb print
+Model: VMware, VMware Virtual S (scsi)
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End    Size   File system  Name     Flags
+ 1      1049kB  300MB  299MB               primary
+ 2      301MB   500MB  199MB               primary
+
+#-----------------------------------------------------------------
+
+# 删除分区
+root@ubuntu2204~# parted /dev/sdb rm 1
+Information: You may need to update /etc/fstab.
+
+root@ubuntu2204~# parted /dev/sdb print
+Model: VMware, VMware Virtual S (scsi)
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start  End    Size   File system  Name     Flags
+ 2      301MB  500MB  199MB               primary
+```
+
+#### 分区工具fdisk,gdisk
+- fdisk
+```shell
+fdisk /dev/sdb
+
+# p 打印分区表
+Command (m for help): p
+Disk /dev/sdb: 20 GiB, 21474836480 bytes, 41943040 sectors
+Disk model: VMware Virtual S
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xe3be2582
+
+# n 创建一个新的分区 
+
+# d 删除一个分区
+删除主分区，磁盘编号不变
+删除逻辑分区，磁盘编号可能会变，保证是从5往下依次顺延
+
+# t 更改分区类型
+
+# w 保存退出
+
+# q 不保存退出
+```
+
+- gdisk
+```shell
+gdisk和fdisk用法基本相同
+```
+
+- 如果出现分区表信息分区后未更新，执行partprobe
+```shell
+partprobe    # 更新分区表信息
+```
+
+- 非交互式创建分区
+```sehll
+echo "n\np\n\n\n+2G\nw" | fdisk /dev/sdb
+```
+
+### 管理文件系统
+- 文件系统
+  - 概念：文件系统是操作系统用于明确存储设备或分区上的文件的方法和数据结构；即在存储设备上组织文件的方法
+  - 操作系统中负责管理和存储文件信息的软件结构称为文件管理系统，简称文件系统
+  - 从系统角度来看，文件系统是对文件存储设备的空间进行组织和分配，负责文件存储并对存入的文件进行保护和检索的系统。具体地说，它负责为用户建立文件，存入、读出、修改、转储文件，控制文件的存取，安全控制，日志，压缩，加密等。
+
+- ext4和xfs文件系统的比较
+```shell
+ext4最大支持16GB到16TB的文件，分区最大支持1EB
+xfs最大支持8EB的文件，最大支持分区8EB
+# 指 XFS 文件系统可以理论上管理和存储的最大数据量。
+```
+
+- 查看当前内核支持的文件系统
+```shell
+# rokcy8.6
+ls /lib/modules/`uname -r`/kernel/fs
+
+# Ubuntu22.04
+ls /lib/modules/`uname -r`/kernel/fs
+```
+
+- 查看当前系统可用的文件系统
+```shell
+cat /proc/filesystems
+```
+
+- 当前系统支持的文件系统和当前系统可用的文件系统是两回事，modules 中的文件系统在编译时选择了才是可用的，而可用的文件系统包含了默认支持的文件系统，如果需要使用某个文件系统，而该文件系统又不在proc 中，则需要重新编译内核；
+```
+对这句话的详细解读：
+这个概念可以分为三个关键点：
+
+支持但不可用：如果 Linux 内核的源代码包含了文件系统A的支持，这意味着理论上内核可以处理文件系统A。然而，如果这个支持没有在您当前运行的内核版本中被编译进去（无论是作为内核的一部分，还是作为可以动态加载的模块），那么文件系统A虽然被支持，但在实践中是不可用的。
+
+添加模块和重新编译内核：为了使文件系统A在您的系统中可用，您需要确保内核编译过程中包括了文件系统A的模块。这通常意味着您需要获取内核的源代码，配置内核以包括文件系统A的支持（可以选择直接编译进内核，或者作为模块编译），然后重新编译并安装这个定制的内核。
+
+使用文件系统：一旦您的系统运行了包含了文件系统A支持的内核（无论是静态还是动态模块），您就可以正常创建、挂载和使用文件系统A了。
+```
+
+#### 文件系统类型
+- Linux常用文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>ext2</td>
+      <td>Extended file system 适用于那些分区容量不是太大，更新也不频繁的情况，例如/boot 分 区</td>
+    </tr>
+    <tr>
+      <td>ext3</td>
+      <td>ext2 的改进版本，其支持日志功能，能够帮助系统从非正常关机导致的异常中恢复</td>
+    </tr>
+    <tr>
+      <td>ext4</td>
+      <td>ext 文件系统的最新版。有很多新的特性，包括纳秒级时间戳、巨型文件 (16TB)、最大1EB的文件系统，以及速度的提升</td>
+    </tr>
+    <tr>
+      <td>xfs</td>
+      <td>SGI，支持最大8EB的文件系统</td>
+    </tr>
+    <tr>
+      <td>swap</td>
+      <td>交换分区专用的文件系统</td>
+    </tr>
+    <tr>
+      <td>iso9660</td>
+      <td>光盘文件系统</td>
+    </tr>
+    <tr>
+      <td>btrfs</td>
+      <td>Oracle公司开发</td>
+    </tr>
+  </tbody>
+</table>
+
+- Windows常用文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>FAT32</td>
+      <td>最多只能支持16TB的文件系统和4GB的文件</td>
+    </tr>
+    <tr>
+      <td>NTFS</td>
+      <td>最多只能支持16EB的文件系统和16EB的文件</td>
+    </tr>
+    <tr>
+      <td>extFAT</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- Unix常用文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>FFS(fast)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>UFS(unix)</td>
+      <td>UFS是UNIX文件系统的简称，几乎是大部分UNIX类操作系统默认的基于磁盘的文件系统</td>
+    </tr>
+    <tr>
+      <td>JFS2</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- 网络文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>NFS</td>
+      <td>Network File System，即网络文件系统</td>
+    </tr>
+    <tr>
+      <td>CIFS</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- 集群文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>GFS2</td>
+      <td>基于X86_64，最大文件系统可到100TB</td>
+    </tr>
+    <tr>
+      <td>OCFS2(oracle)</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- 分布式文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>fastdFS</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>ceph</td>
+      <td>不仅仅是一个文件系统，还是一个有企业级功能的对象存储生态环境</td>
+    </tr>
+    <tr>
+      <td>mooseFS</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>mogileFS</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>glusterFS</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Lustre</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- Raw
+  - 裸文件系统，未经处理或者未经格式化产生的文件系统
+
+- 文件系统的组成部分
+  - 内核中的模块：ext4,xfs,vfat
+  - Linux虚拟文件系统：VFS
+  - 用户空间的管理工具：mkfs.ext4, mkfs.xfs, mkfs.vfat
+
+- 详解文件系统的三个组成部分的功能
+  - 内核中的模块
+    - 这些模块实际上是文件系统的核心实现，它们直接在内核空间运行。<scan style="color:tomato">每个模块支持特定的文件系统类型（如 ext4、xfs、vfat 等），处理实际的数据存储、目录结构、文件操作（打开、读写、关闭）、权限检查、元数据管理等。</scan>这些模块使得内核能够理解和操作存储在磁盘或其他存储设备上的文件和目录结构。
+
+    - ext4：是目前Linux上广泛使用的日志文件系统，提供了高性能、大容量、文件系统恢复和扩展属性等特性。
+    - XFS：是一种高性能的日志文件系统，最初由Silicon Graphics为IRIX系统开发，特别适用于大文件处理和高并发环境。
+    - vfat：是FAT文件系统的扩展，兼容于早期的FAT16和FAT32，提供了长文件名支持，通常用于与Windows系统交换数据。
+
+  - Linux虚拟文件系统：VFS
+    - VFS 是一个抽象层，<scan style="color:tomato">它为不同的文件系统提供一个统一的接口。这意味着无论底层使用的是哪种文件系统（ext4、XFS、vfat 或其他），上层应用和用户都使用相同的标准系统调用（如 open、read、write 等）来操作文件和目录。</scan>VFS 负责将这些调用转发到相应的文件系统模块进行处理。它也处理文件描述符、挂载点、缓存等核心概念，确保文件系统操作的高效和一致性。
+
+    - VFS 的设计允许 Linux 系统同时支持多种文件系统，且能够灵活地挂载和使用它们，这是 Linux 系统灵活性和强大功能的基础之一。
+  - 用户空间的管理工具：mkfs.ext4, mkfs.xfs, mkfs.vfat
+    - <scan style="color:tomato">这些工具运行在用户空间，为用户和管理员提供创建、检查、修复和调整文件系统的能力。每种文件系统类型通常都会有相应的管理工具。</scan>这些工具使用内核提供的接口与特定的文件系统模块交互，执行各种管理任务。
+
+    - mkfs.ext4、mkfs.xfs、mkfs.vfat：这些是格式化工具，用于在磁盘或分区上创建新的文件系统。例如，mkfs.ext4 /dev/sda1 会在 /dev/sda1 分区上创建一个新的 ext4 文件系统。
+    - fsck 类工具：用于检查和修复文件系统错误。
+    - tune2fs、xfs_admin 等：用于调整文件系统参数和属性。
+
+#### 文件系统选择管理
+- 创建文件系统
+  - mkfs命令
+  ```shell
+  # 创建ext4
+  # mkfs.ext4 或者mkfs -t ext4
+  # 后接要指定硬盘分区
+  mkfs -t ext4 /dev/sdb1
+
+  # 创建xfs
+  mkfs.xfs 或者mkfs -t xfs
+  mkfs.xfs /dev/sdb1
+
+  # 示例
+  root@ubuntu2204~# mkfs.ext4 /dev/sdb1
+  mke2fs 1.46.5 (30-Dec-2021)
+  Creating filesystem with 524288 4k blocks and 131072 inodes
+  Filesystem UUID: 93003898-536c-4f9d-a1ba-6bdaaa3ac155
+  Superblock backups stored on blocks:
+          32768, 98304, 163840, 229376, 294912
+
+  Allocating group tables: done
+  Writing inode tables: done
+  Creating journal (16384 blocks): done
+  Writing superblocks and filesystem accounting information: done
+  ```
+
+- 该内容的详细解读
+  - Creating filesystem with 524288 4k blocks and 131072 inodes：
+    - 这表明您创建的文件系统包含524,288个4KB大小的块，以及131,072个inode。每个块是文件系统存储数据的基本单位，而inode是文件系统用来存储文件元数据（如文件大小、权限、修改时间等）的数据结构。
+    总计存储空间为 524,288 \times 4KB = 2,097,152KB = 2GB524,288×4KB=2,097,152KB=2GB。
+  - Filesystem UUID: 93003898-536c-4f9d-a1ba-6bdaaa3ac155：
+    - 这是文件系统的全局唯一标识符（UUID），用于在系统中唯一地标识这个文件系统。
+  - Superblock backups stored on blocks: 32768, 98304, 163840, 229376, 294912：
+    - 这列出了一些包含超级块备份的块的位置。超级块是文件系统的一个重要部分，包含了文件系统的整体信息（如块的大小、块的总数、inode的总数、空闲块和inode的数目等）。
+    - 在多个不同位置存储超级块的备份，是为了在主超级块损坏时可以恢复文件系统。
+  - Allocating group tables: done：
+    - 分配组表完成。组表用于管理文件系统中的块和inode分组，有助于优化存储空间的使用和提高访问效率。
+  - Writing inode tables: done：
+    - 写入inode表完成。每个inode表包含了一组inode的信息，这对于文件系统来说是核心数据结构。
+  - Creating journal (16384 blocks): done：
+    - 创建了一个由16,384个块组成的日志（Journal）。ext4文件系统支持日志功能，可以通过记录对文件系统所做更改的日志，来提高文件系统的可靠性和恢复能力。
+  - Writing superblocks and filesystem accounting information: done：
+    - 写入超级块和文件系统的会计信息完成。这是在文件系统创建的最后阶段，确保所有重要的文件系统信息都被正确记录。
+
+- SuperBlack超级快概念
+  - 超级块是文件系统中的一个关键数据结构，它存储了描述整个文件系统状态的信息，如：<div style="color:tomato">
+    - 块大小
+    - 文件系统中块和inode的总数
+    - 空闲块和inode的数目
+    - 文件系统的挂载状态
+    - 最后一次检查（fsck）的时间等</div>
+  - 每个文件系统都有一个超级块，位于文件系统的开始位置。由于超级块对文件系统的健康至关重要，因此在多个位置保留其备份是一种常见的做法，以防止数据损坏导致文件系统不可用。
+
+- 关于`Superblock backups stored on blocks: 32768, 98304, 163840, 229376, 29491`的解读
+  - 这表示文件系统创建时在指定的块位置保存了超级块的备份。这些位置是相对于文件系统开始处的块号。在这个例子中，超级块的备份被存储在块号 32768、98304、163840、229376 和 294912。
+  - 如何查看超级块的位置
+    - 块号：这些数字直接表示了存储超级块备份的块的位置。在文件系统中，一个块是数据存储的基本单位，其大小通常是 4KB（这个大小可以根据文件系统的创建时的设置而变化）。因此，当你看到块号 32768，这意味着备份超级块存储在从文件系统开始处的第 32768 个块的位置。
+
+    - 理解块号的意义：要理解这些块号的物理意义，你需要知道块的大小。如果块的大小是 4KB，那么块号 32768 实际上指的是距离文件系统开始 32768 × 4KB = 128MB 的位置。这意味着第一个备份超级块位于文件系统开始后的 128MB 处。 
+
+- 如何使用备份超级块
+  - 在某些情况下，如果主超级块受损，你可以使用这些备份超级块来恢复文件系统。例如，e2fsck 是一个检查和修复 ext 类文件系统的工具，可以指定备份超级块来执行文件系统检查，如
+  ```shell
+  e2fsck -b 32768 /dev/sda1
+  # 这条命令告诉 e2fsck 使用 /dev/sda1 分区上块号 32768 处的超级块备份来进行文件系统检查。
+  ```
+
+#### 查看和管理分区信息
+- blkid
+```shell
+# 查看块设备属性
+blkid [option]... [DEVICE]
+
+# 常用选项
+-U UUID       # 根据指定ID来查找对应设备
+-L LABEL      # 根据指定LABEL来查找对应设备
+``` 
+- e2label
+```shell
+# 管理ext4系列文件系统的LABEL
+e2label DEVICE [LABEL]    # 卷标，后面可以通过这个名称挂载，类似分区别名？
+
+# 清除label
+e2label DEVICE ""
+```
+
+- findfs
+```shell
+# 查找分区
+findfs [options] {LABEL,UUID,PARTUUID,PARTLABEL}=<value>
+
+# 示例；
+findfs UUID="XXXXX"
+findfs LABEL="XXXXX"
+```
+
+-tune2fs 
+```shell
+# 查看ext4文件系统信息，无法查看xfs
+tune2fs -l /dev/sdb1
+
+# 常用选项
+-l              # 查看指定文件系统信息
+-L              # 修改卷标
+-m N            # 修改预留root用户空间百分比，默认5% 
+```
+
+#### MBR分区和ext4文件系统的结构
+
+- 超级块和Inode table
+![alt text](images/image20.png)
+
+- 块组(BLOCK GROUP)
+  - 概念：将很多连续的块放到一个块组里
+  - 查看块组命令——dumpe2fs
+  ```shell
+  dumpe2fs /dev/sdb1
+  ```
+  - Boot Sector和MBR的区别
+  ```
+  Boot Sector，也称为启动扇区，是存储在存储设备上的一个特定区域，通常位于硬盘或分区的最开始部分。它包含了计算机启动时所需的一些基本代码和系统启动信息。对于启动过程来说，Boot Sector是至关重要的，因为它包含了启动加载程序（Bootloader），这是一个小程序，它的任务是加载操作系统。
+
+  在一个物理存储设备中（如硬盘），可以有多个分区，每个分区可以被视为独立的逻辑存储区域。理论上，每个分区都可以有自己的Boot Sector，尤其是当它们被配置为可启动分区时。这意味着，如果你有一个硬盘被分成多个分区，并且每个分区上都安装了操作系统，那么每个分区的Boot Sector都包含了启动该分区上操作系统的引导代码。
+
+  **主引导记录（MBR）**位于硬盘的最开始处，它包含了一个小程序和分区表。这个小程序负责读取分区表，找到被标记为活动（或可启动）的分区，然后执行该分区的Boot Sector中的代码。
+  分区的Boot Sector位于分区的开始处，它包含了启动分区上操作系统的具体代码。
+  因此，虽然每个分区的开始都可以有一个Boot Sector，但整个硬盘的最开始只有一个MBR，其中包含了指向可启动分区的引导代码。这意味着Boot Sector并非只在第一个分区上有；如果多个分区都被设置为包含操作系统，则它们各自都会有自己的Boot Sector。
+  
+  所以可以实现：在虚拟机的一个硬盘上安装多个Linux系统，每个系统独立于其他系统运行
+  ```
+  - 块组中的内容
+    - Super Block
+      - 超级块是文件系统中的一个关键数据结构，它存储了描述整个文件系统状态的信息（上文有详细说明）
+    - 块组描述符表（GDT）
+      - ext文件系统每一个块组信息使用32字节描述，这32个字节称为块组描述符，所有块组的块组描述符组成块组描述符表GDT(group descriptor table)。虽然每个块组都需要块组描述符来记录块组的信息和属性元数据，但是<scan style="color:tomato">不是每个块组中都存放了块组描述符。将所有块组的块组信息组成一个GDT保存,并将该GDT存放于某些块组中，类似存放superblock和备份superblock的块</scan>
+    - 块位图（Block Bitmap）
+      - 块位图是一个简单的数据结构，用一系列的位（bit）来表示块组中每个块的状态——即它是空闲的还是已被占用的。在块位图中：
+        - 一个“0”位表示相应的块当前是空闲的；
+        - 一个“1”位表示相应的块已经被占用。
+      - 这个位图使得文件系统能够快速查找到块组中的空闲块，当需要存储新数据时，文件系统可以迅速定位到一个空闲的块，并将其标记为已使用。
+    - Inode 位图（Inode Bitmap）
+      - 和块位图类似，inode位图也是一个位图数据结构，用来跟踪块组中的每个inode的状态。在inode位图中：
+        - 一个“0”位表示相应的inode是空闲的；
+        - 一个“1”位表示相应的inode已经被占用。
+      - 这使得文件系统能够迅速找到空闲的inode来存储新文件或目录的元数据信息。
+      - inode table
+      - Data Blocks
+      ```shell
+      # Inode表中数据块映射的原理和实现
+      小文件：对于小文件，它的数据通常直接存储在 inode 中指向的数据块中。如果这些数据块足够存放文件的内容，则这些数据块可能位于同一个块组中。
+
+      大文件：对于较大的文件，文件内容可能会分布在多个数据块中，这些数据块可能位于不同的块组中。当文件内容超过直接块指针可以引用的大小时，文件系统会使用间接指针、二级间接指针，甚至三级间接指针来存储额外的数据块位置。这意味着一个大文件的数据块可以分散在文件系统的多个块组中。
+      ```
+    
+#### XFS文件系统结构
+![alt text](images/image21.png)
+- 在XFS文件系统中，每个分区（或更准确地说，每个XFS文件系统）由多个Allocation Groups (AGs) 组成。Allocation Group是XFS设计的核心概念之一，它将文件系统的存储空间划分为若干个较小、管理上相对独立的区块
+
+- Allocation Group(AG)
+  - Superblock
+    - AG Superblock：每个Allocation Group都有自己的superblock，它存储了关于该AG的元数据，比如AG的大小、空闲块数量、空闲inode数量等。这个AG级别的superblock是整个文件系统superblock的一个子集，它允许文件系统在需要时只访问特定AG的信息，提高效率。
+  - Inode Allocation Section
+    - Inode表：管理该AG内的文件和目录的inode。inode包含了文件的元数据，如文件大小、权限、所有者、时间戳以及实际数据块的位置信息。通过在每个AG中独立管理inode，XFS能够提高文件创建和访问的速度。
+  - Free Space Management
+    - 空闲空间索引：XFS使用两种主要的数据结构来管理AG内的空闲空间——空间树（Space Trees）和空闲列表（Free Lists）。这些结构帮助XFS快速地找到足够大的连续空闲块来存储新文件或文件扩展。
+  - Directory Block Allocation
+    - 目录块：AG中还包含了目录的数据块，这些块存储了文件系统中目录的结构和信息。XFS优化了目录操作的性能，特别是在包含大量文件和子目录的目录中。
+    ```shell
+    1. 目录项（Directory Entries）
+    每个目录项代表目录中的一个文件或子目录，包含以下信息：
+    名称：文件或目录的名称。
+    Inode号：指向文件或目录inode的指针，inode中存储了关于文件的元数据，如大小、权限、所有者、时间戳以及数据块的位置等。
+
+    2. 目录块（Directory Blocks）
+    目录块是存储目录项的物理单位。XFS为每个目录维护一个或多个目录块，具体取决于目录项的数量和大小。为了高效管理，这些目录块可以按需增长或缩减。
+
+    3. B树索引（B-tree Index）
+    对于包含大量目录项的目录，XFS使用B树或B+树索引来组织目录块，这样可以加速目录项的查找过程。这种索引机制允许XFS以对数时间复杂度进行目录项的查找、添加和删除操作。
+
+    叶节点（Leaf Nodes）：包含实际的目录项数据。在B树中，所有的目录项都存储在叶节点中。
+    内部节点（Internal Nodes）：包含指向子节点的指针，用于导航B树。在较大的目录中，内部节点帮助快速定位到包含特定目录项的叶节点。
+
+    4. Extents
+    目录数据（包括目录块）可能被存储在连续的磁盘块中，这些连续块被称为extents。使用extents可以减少磁盘寻址时间，并提高读写效率。
+    ```
+  - Extent Allocation Trees
+    - Extent树：文件和目录的实际数据是通过extents（一系列连续的块）来存储的。Extent分配树记录了文件数据块的分配情况，使文件系统能够有效地管理大文件的存储，同时减少碎片。
+
+- 关于xfs更多详细知识，以及数据修复
+  - https://zorrozou.github.io/docs/xfs/XFS%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E7%BB%93%E6%9E%84.html
+
+- 查看xfs信息
+```shell
+xfs_info /dev/sdb2 
+```
+
+#### 文件系统检测和修复
+- ext4检测和修复
+```shell
+# fsck,修复文件系统
+fsck [options] -- [fs-options] [<filesystem> ...]
+fsck.FS_type
+fsck -t FS_type
+
+# 示例
+fsck /dev/sdb1 -y 
+# -y自动按yes, ext4可选，fsck可以自动识别ext文件系统
+fsck.ext4 /dev/sdb1 -y
+
+
+# e2fsck 和fsck使用方法类似
+e2fsck /dev/sdb1 -y
+```
+
+- 破坏文件系统的超级块与修复
+```shell
+# 将格式化文件系统的分区挂载到指定目录
+mount /dev/sdb1 /mnt
+
+# 复制两个文件到该目录
+cp /etc/passwd /mnt/f1
+cp /etc/passwd /mnt/f2
+
+# 然后破坏文件系统
+dd if=/dev/zero of=/dev/sdb1 bs=1M count=1
+
+# 此时tunefs -l /dev/sdb1会提示超级块被破坏，目录下文件也丢失
+root@ubuntu2204/mnt# tune2fs -l /dev/sdb1
+tune2fs 1.46.5 (30-Dec-2021)
+tune2fs: Bad magic number in super-block while trying to open /dev/sdb1
+
+# 修复
+# 先取消挂载
+umount /mnt
+
+# 使用fsck修复
+fsck.ext4 /dev/sdb1 -y
+
+# 修复后，使用tune2fs -l /dev/sdb1可正常查看文件系统信息，修复成功
+
+# 重新挂载
+mount /dev/sdb1 /mnt
+
+# 即可在该目录下，找到源f1,f2文件（不保证每次都成功，存在数据丢失风险）
+```
+
+- xfs文件系统专用的检测修复工具 —— xfs_repair
+```shell
+xfs_repair /dev/sdb2
+```
+
+### 挂载设备
+- 挂载：将额外文件系统与根文件系统某现存的目录建立起关联关系，进而使得此目录做为其它文件访问入口的行为
+
+- 卸载：为解除此关联关系的过程
+
+- 挂载点下原有文件在挂载完成后会被临时隐藏，因此，挂载点目录一般为空，进程正在使用中的设备无法被卸载
+
+- 挂载规则
+  - 一个挂载点同一时间只能挂载一个设备
+  - 一个挂载点同一时间挂载了多个设备，只能看到最后一个设备的数据，其它设备上的数据将被隐藏
+  - 一个设备可以同时挂载到多个挂载点
+  - 通常挂载点一般是已存在空的目录
+
+
+#### 挂载文件系统mount
+```shell
+mount device dir(挂载路径)
+```
+
+#### 卸载
+```shell
+umount dir
+```
+
+### 管理swap空间
+
+### RAID空间
+
+### LVM管理
+
+### LVM快照
+
 ## 网络协议和管理
  - OSI网络国际标准
    - 由ISO国际标准化组织定义
@@ -4321,7 +5386,7 @@ tcpdump ip host 10.0.0.101 and ! 10.0.0.1
 # 将tcpdump的数据包，重定向到一个文件中
 tcpdump -i eth0 -nn port ! 22 -w test.cap
 sz test.cap # 将虚拟机的文件传到本地
-
+```
 ```
 
 ### curl工具
