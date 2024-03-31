@@ -4636,8 +4636,7 @@ du [option]... [file]...
     ```
     - 拆除卷组中的PC硬盘
     ```shell
-    pvmove <需要转移数据的硬盘>
-    
+    pv 
     # 然后从卷组中取消
     vgreduce <vgname> <device>
     
@@ -4799,7 +4798,11 @@ mount /dev/testvg/lv3 /lv3
 
 - VLan原理-虚拟局域网
   - 虚拟局域网VLAN是由一些局域网网段构成的与物理位置无关的逻辑组，实在在交换机内进行局域网隔离的效果
-
+  - IEEE802.1Q帧结构
+    - 作用：在多个交换机之间的trunk干道中的数据包，带有vlan的标识，使其可以跨交换机实现vlan布局
+    - 原理：在传统的以太网帧的里面添加一个vlan编号
+    ![alt text](images/image25.png)
+    - 在数据帧中，只预留了12位用来表示VLAN的编号，也就是说，最多可以创建4096个vlan，在当前的云环境中可能不够用，因此，出现了VXLAN技术
 - VXLAN
   - 云环境下，进行虚拟局域网隔离
 
@@ -4813,7 +4816,14 @@ mount /dev/testvg/lv3 /lv3
     - 查看当前正在使用的端口号
     ```shell
     <!-- 去检索 /etc/services -->
+    nc -l 1023
+    # nc: Permission denied
+    # 1023以内的端口，只有管理员可以使用
+    nc -l 1024
+    # 可以正常使用
+
     grep <端口号> /etc/services
+    # /etc/services记录了著名程序使用的端口号
     
     监听端口号的使用
     ss -tntl
@@ -4823,6 +4833,7 @@ mount /dev/testvg/lv3 /lv3
   - 确认号：
     - 表示接收方期望收到的发送方下一个报文段的第一个字节数据的编号
     - 通过序号和确认号，保证数据包可靠有序的发送
+    - 如果发送方A发出的数据包的序号为100，接收方B会响应该数据包，发给A的响应包中，确认号为101表示希望发送方A下次方的包的序号为101
   - 数据偏移(4bit)
     - 表示tcp头部的长度
   - 保留（6bit）：没用到的空间
@@ -4838,7 +4849,7 @@ mount /dev/testvg/lv3 /lv3
     - <font color=tomato>FIN</font>
 
 - 三次握手和四次挥手
-  - 三次握手（建立连接）
+  - <span style="color: red; font-weight:700">三次握手（建立连接）</span>
   ![Alt text](images/image03.png)
   - 第一次：客户端向服务端发送报文；此时，SYN=1，seq即序列号为x
   - 第二次：服务端收到报文，响应客户端，发送报文；此时，SYN=1，ACK=1，序列号seq=y，确认号ack=x+1
@@ -4864,7 +4875,55 @@ mount /dev/testvg/lv3 /lv3
       - SYN-RECV的观测方法：客户端不接受服务器端的响应,在服务器端在发送数据包后，由LISTEN状态变成SYN-RECV状态，后续由于没有收到客户端后续发送的数据包，因此维持下SYN-RECV的状态，不会向ESTAB转变
       - 上述过程，需要使用到iptables的命令工具
 
-  - 四次挥手（退出连接）
+- <span style="color: red; font-weight:700">三次握手过程中的窗口大小协商 </span>
+  - 初始化窗口大小被称为接收窗口，它指定了接收方愿意接收的数据量，即发送方在等待接收方确认之前可以发送的最大数据量
+  - 第一次握手（SYN）：当客户端向服务器发起连接请求时，它会发送一个SYN（同步序列编号）包。这个SYN包中不仅包含客户端的初始序列号，还可以包含客户端支持的最大窗口大小
+  ```
+  客户端 （SYN包）------> 服务器
+  
+  发送过程中，告诉服务器，我发的是第几个包，我能接收多少流量
+  ```
+  - 第二次握手（SYN-ACK）：服务器收到客户端的SYN包，会回复一个SYN-ACK包，确认收到客户端的连接请求。这个SYN-ACK包同样包含服务器的初始序列号，并且会包含服务器的窗口大小，告知客服端服务器端愿意接收的数据量。
+  ```
+  客户端 <--------- (SYN-ACK) 服务器
+
+  响应过程中，服务器告诉客户端
+  我需要第几个包
+  我的包是第几个
+  我能接收多少流量
+  ```
+  - 第三次握手（ACK）：客户端收到服务器的SYN-ACK包后，会发送一个ACK包作为响应，确认连接建立。这个ACK包也可以包含窗口大小的信息，但通常情况下，窗口大小是在前两个步骤中协调的
+  - 三次连接的意义
+    - 第一次，第二次握手，可以证明服务端可以响应客户端的数据
+    - 第二次，第三次握手，可以证明客户端可以响应服务端的数据
+
+- <span style="color: red; font-weight:700">TCP滑动窗口（TCP Sliding Window）机制是在TCP三次握手建立连接之后发生的。这个机制是TCP流量控制和拥塞控制的关键部分，旨在优化网络通信的效率和可靠性。</span>
+  - 实现原理：
+    - TCP滑动窗口机制使用了窗口的概念来控制在任意时刻可以发送多少数据（未被确认的数据）。这个“窗口”是指发送方和接收方基于当前网络状况协商的数据量，可以理解为接收方告诉发送方在没有收到进一步确认前能接收多少字节的数据
+  - 运行过程
+    - <span style="color:red">连接建立与窗口初始化：</span>在TCP三次握手过程中，发送方和接收方会初始化各自的发送和接收窗口大小。这个大小可以在后续的通信过程中根据网络条件进行调整
+    - <span style="color:red">数据传输：</span>发送方基于当前的窗口大小发送数据。窗口大小表示发送方在接收到接收方的下一个确认（ACK）之前可以发送的最大数据量
+    ```
+    数据传输：
+
+    客户端 ---------> 服务端
+    客户端发送数据大小是由初始窗口大小决定
+    ```
+    - <span style="color:red">窗口滑动：</span>当接收方收到数据后，他会发送一个确认（ACK）给发送方，并在确认消息中更新自己的接收窗口大小，告知发送方还可以接受多少新的数据。发送方在收到确认后，会根据接收方的窗口大小调整自己的发送窗口，并继续发送新的数据。这个过程中，窗口会根据确认的接收和新数据的发送“滑动”
+    - <span style="color:red">流量控制：</span>滑动窗口机制允许接收方控制发送方的数据发送速率，避免接收方的缓冲区被溢出。接收方可以通过调整其窗口大小（甚至将窗口设置为0）来减慢发送方发送的速度
+    ```
+    在流量控制中，关注的是接收方的能力，确保发送方不会发送超过接收方缓冲区大小的数据。
+    接收窗口大小（rwnd）是在TCP头部显示告知对方的，用于流量控制
+    ```
+    - <span style="color:red">拥塞控制：</span>除了基于接收方能力的流量控制外，TCP还实现了基于网络拥塞情况的窗口调整策略
+    ```
+    拥塞控制使用的拥塞窗口（CWND）大小不通过TCP头部直接传递给接收方。
+    发送方基于ACK返回的速率和可能出现的丢包等信号来评估网络状况，并调整cwnd的大小
+    ```
+    - <span style="color:red">实际发送窗口：</span>实际的发送窗口大小由流量控制的接收窗口和拥塞控制的拥塞窗口中的较小值决定。
+    ![alt text](images/image26.png)
+
+- 四次挥手（退出连接）
   ![Alt text](images/image04.png)
 
 - 半连接队列和全连接队列
@@ -4942,7 +5001,7 @@ ping 10.0.0.8
 ping -f -s <ip地址> -c1
 #-f 表示泛洪，就是最大功率无限制发送数据包
 #-s 指定发送包的大小，最大不能超过65507
-#-c(num) ping的次数
+#-c(num) ping的次数 
 ```
 
 ### ARP协议(Address Resolution Protocol)
@@ -5209,6 +5268,9 @@ IPv6相比IPv4更加先进和健壮，设计时考虑了未来的扩展性、安
   - 合并超网：将多个网络合并成一个大网，主机ID位向网络ID位借位，主要实现路由聚合功能
 
 - 动态主机配置协议DHCP
+  - 服务器端：67端口
+  - 客户端：68端口
+
 
 ### 网络配置
 - 基本网络配置
@@ -5216,7 +5278,7 @@ IPv6相比IPv4更加先进和健壮，设计时考虑了未来的扩展性、安
     - 主机名
     - IP/netmask
     - 路由：默认网关
-    - DNS服务器
+    - DNS服务器（名称解析 ）
       - 主DNS服务器
       - 次DNS服务器
       - 第三个DNS服务器
@@ -5255,13 +5317,22 @@ GRUB_CMDLINE_LINUX="... net.ifnames=0"
 -- 执行之后重启即可
 
 -- ubuntu的修改和centos7类似
+
 # vim /etc/default/grub
 GRUB_CMDLINE_LINUX="net.ifnames=0"
 --进入文件，这行最后，添加net.ifnames=0
 
 # grub-mkconfig -o /boot/grub/grub.cfg
 -- 执行之后重启即可
+```
 
+- grub2-mkconfig的用法
+```shell
+grub2-mkconfig -o <output_file>
+
+# grub2-mkconfig: 这是命令本身，用于生成GRUB2的配置文件
+# -o：这个选项后面跟着输出文件的路径，即生成的配置文件存放的位置
+# <output_file>：这里指定了输出文件的完整路径，即新的GRUB配置文件的位置
 ```
 
 - ip地址修改
@@ -5273,7 +5344,7 @@ Centos网卡配置文件：
 -- 进入网卡配置目录
 # ifcfg-eth0
 -- 找到这个文件或新建这个文件（内容自己写）-网卡接口配置文件
--- 文件名必须以ifcfg开头，横杠后叫什么无所谓，建议和网卡名一致
+-- 文件名必须以ifcfg-开头，横杠后叫什么无所谓，建议和网卡名一致  
 
 文件配置内容：
 
@@ -5295,7 +5366,7 @@ DNS2=100.76.76.76
 -- 百度的：180.76.76.76
 -- 移动的：114.114.114.114
 -- 谷歌的：8.8.8.8 
--- 验证DNS，查看文件/etc/resolv.conf
+-- 验证DNS，查看文件/etc/resolv.conf 
 
 DOMAIN=<要修改的后缀名>
 -- 默认ping www 后面自动补充一个域名，该域名是hostname的后缀，如果不想修改hostname后缀，可以在网卡配置文件中加入：
@@ -5361,7 +5432,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
 - 路由route
   - route: 路由表管理命令
-  - 路由表:作用是导航，地图，不仅仅在路由器有，在任何通信的主机都有
+  - 路由表:作用是导航，地图，不仅仅在路由器有，<span style="color:red">在任何通信的主机都有</span>
   ```
   查看路由表
   # route -n
@@ -5378,7 +5449,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   Destination：表示需要达到的目标网络，Destination配合Genmask（子网掩码）表示具体网络地址
   0.0.0.0 表示未知网络
   
-  iface接口：如果要达到目标网络ID，需要从本机的哪个接口将数据包发出
+  iface接口：如果要达到目标网络ID，需要从本机的哪个(网卡)接口将数据包发出 
   
   Gateway网关：如果目标网络不直接相连，需要将数据包发送到下一个路由器邻近的接口的IP，即网关；如果网络和本主机直连，则无需网关 
   
@@ -5437,11 +5508,13 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   RIP协议算法：经过的路由器越少（步跳），路线越优
   OSPF协议算法：除了路由数量，还会考虑带宽
   
+  ----------------------------------------------------------
+
   netstat工具(和ss选项基本一致)
   netstat和ifconfig都来自于net-tools
   其中 ifconfig建议使用ip代替；netstat建议使用ss代替
   ip和ss都来自于iproute
-  
+   
   常用选项
   -t：tcp协议相关
   -u：udp协议相关
@@ -5503,8 +5576,7 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   ```
 - 回环网卡：lo
   - 回环网卡的地址不会出现在路由表中
-  - 所有和回环网卡同一网啊的地址，都看作是本机之间的通讯
-  - 回环地址默认不参与网络通信
+  - 所有和回环网卡同一网啊的地址，都看作 trewgkllfk环地址默认不参与网络通信
   - 但是如果给回环网卡加上路由信息，也能实现网络通讯
 
 - ip地址的三种工作范围
@@ -5571,7 +5643,9 @@ BOOTPROTO=none
 IPADDR=10.0.0.100
 PREFIX=8
 # miimon指定链路监测时间间隔。如果miimon=100，那么系统每100ms监测一次链路连接状态，如果有一条线路不通就转入另一条线路
-BONDING_OPTS="mode=1 miimon=100"
+BONDING_OPTS="mode=1 miimon=100" 
+# BONDING_OPTS="mode=3 miimon=100" 
+# 这里相当于使用Mode3,使用广播模式
 
 /etc/sysconfig/network-scripts/ifcfg-eth0
 DEVICE=eth0
@@ -5585,7 +5659,7 @@ DEVICE=eth1
 BOOTPROTO=none
 MASTER=bond0
 SLAVE=yes
-ONBOOT=yes
+ONBOOT=yes 
 ```
 - 查看bond0状态：
   - `/proc/net/bonding/bond0`
@@ -5649,6 +5723,9 @@ ONBOOT=yes
   # 删除配置的网卡
   nmcli connection delete <网卡名>
   
+  # 使用nmcli看详细配置内容
+  nmcli connection show eth0
+
   -----------------------------------------------------------------
   使用nmcli实现bonding模式
   
@@ -5656,7 +5733,7 @@ ONBOOT=yes
   # 添加一个bond类型的虚拟网卡，起名为mybond0,mode定义bond模式
   
   nmcli connection add con-name mybond0 ifname bond0 type bond mode active-backup ipv4.addresses 10.0.0.100/24 ...
-  # 配置的时候添加ip地址，方式，网关等
+  # 配置的时候添加ip地址，方式，网关等  
   
   nmcli connection add con-name mybond0-eth1 ifname eth1 type bond-slave master bond0
   # 将eth1添加到bonding中
@@ -6080,7 +6157,7 @@ cat /proc/net/bonding/bond0
   - Windows与Linux不兼容
     - ELF（Executable and Linkable Format）Linux
     - PE（Portable Executable）Windows
-    - 解释；在不同的系统中，二进制的格式是不同的，比如同一段二进制数据，可能含义不同，有的代指指令，有的指代数值。
+    - <span style="color:tomato">解释：在不同的系统中，二进制的格式是不同的，比如同一段二进制数据，可能含义不同，有的代指指令，有的指代数值。</span>
     ```
     查看软件的文件信息（包含二进制格式）
     
@@ -6139,6 +6216,75 @@ cat /proc/net/bonding/bond0
     # ldd <要查询的文件>
     ```
 
+- 操作系统执行命令加载动态库的过程
+  - <span style="color:red; font-weight:700">加载共享库：</span>当你运行一个动态链接的程序（如你的 hello）时，操作系统（如 Linux）负责加载程序所需的共享库。这是通过动态链接器（如 Linux 上的 ld-linux.so）来完成的，它是操作系统的一部分，负责在程序启动时解析出程序需要的共享库，并将它们加载到内存中。
+
+  - <span style="color:red; font-weight:700">查找共享库：</span>操作系统按照特定的规则查找这些共享库。这通常包括一些预设的目录（如 /lib，/usr/lib）和环境变量（如 LD_LIBRARY_PATH）指定的目录。
+
+  - 符号解析：在库被加载之后，动态链接器还需要解决符号引用的问题，即确定程序中的外部函数或变量调用对应到库中具体哪些函数或变量的地址。这个过程称为符号解析（Symbol Resolution）。
+
+- <span style="color:red; font-weight:700">动态链接器的运行时机</span>
+  - <span style="color:tomato">在程序运行时</span>，通过操作系统的动态链接器（dynamic linker）或动态加载器（dynamic loader）来加载和链接共享库（动态库）的。
+  - 大致过程如下
+    - <span style="color:red; font-weight:700">加载共享库到内存：</span>当程序启动时，动态链接器根据程序的需求，将所需的共享库加载到内存中。如果库已经由其他程序加载到内存，操作系统会允许这些程序共享同一内存中的库副本，以节省资源。
+    - <span style="color:red; font-weight:700">符号解析和重定位：</span>接着，动态链接器对程序进行“符号解析”（symbol resolution）和“重定位”（relocation）。符号解析是指将程序中的外部引用（如函数调用）与其在共享库中定义的实际地址匹配起来的过程。重定位是调整这些引用，确保它们指向正确的内存地址。
+    - <span style="color:red; font-weight:700">执行：</span>一旦所有必需的库都被加载并且所有的符号都被正确解析和链接，程序就可以执行了。这意味着，程序中对共享库函数的调用会跳转到这些函数在内存中的实际位置执行
+
+- 静态链接和动态链接的区别
+  - <span style="color:red; font-weight:700">静态链接</span>
+    - 在这种链接方式中，编译器会把所有需要的库函数的代码复制到最终的可执行文件中。这意味着这些代码被物理地嵌入到了可执行文件里。静态链接的优点是可执行文件包含了所有它需要的代码，因此它不依赖于系统上的外部库文件；缺点是这可能会导致最终的可执行文件非常大。
+  - <span style="color:red; font-weight:700">动态链接</span>
+    - 与静态链接不同，动态链接不会把库代码嵌入到可执行文件中。相反，它在可执行文件中保留对库文件的引用，这些库文件在程序运行时被加载（通常是操作系统完成的）。这样，多个程序可以共享同一个库文件的单个副本，节省空间。
+
+
+- 动态链接器与动态库详解
+  - <span style="color:red; font-weight:700">动态链接器：动态链接器（dynamic linker）或动态加载器（dynamic loader）</span>是负责在运行时将程序所需的动态库（shared libraries）加载到内存中，并解析程序对这些库中函数和变量的引用的系统程序。它确保了动态链接的可执行文件能够在运行时找到并使用它们所依赖的共享库文件。
+  - <span style="color:tomato">动态链接器本身不是共享库，而是操作系统提供的一个特殊程序，通常是系统的一部分。</span>在Linux系统中，动态链接器通常是ld-linux.so（对于32位系统是ld-linux.so.2，对于64位系统是ld-linux-x86-64.so.2等等）。这个程序在可执行文件开始执行时由操作系统自动调用，负责：
+
+    - 加载共享库：根据可执行文件的动态链接信息，动态链接器将所需的共享库加载到内存中。
+    - 符号解析：动态链接器解析程序中未定义的符号（如函数和变量的引用），并将这些符号绑定到加载到内存中的共享库提供的相应符号上。
+    - 重定位：调整代码和数据的地址引用，确保程序中的引用指向正确的内存地址。
+
+  - <span style="color:red; font-weight:700">动态库：</span>
+    - 是包含代码和数据的文件，这些代码和数据可以被多个程序同时使用。与静态库不同，动态库在程序运行时被加载到内存中，而不是在编译时被链接到每个程序中。动态库在Linux系统中通常有.so（shared object）扩展名，在Windows中是.dll（dynamic-link library）文件。
+    - <span style="color:red; font-weight:700">动态库与可执行文件的对比</span>
+      - 相似之处
+        - 格式相似：动态库和可执行文件在很多操作系统中都是遵循相同格式的，例如，在Linux和Unix-like系统中，它们通常都是ELF（Executable and Linkable Format）格式。这意味着操作系统的加载器可以使用相同或类似的机制来读取和处理这些文件。
+
+        - 都可以包含代码和数据：无论是动态库还是可执行文件，它们都可以包含代码段和数据段。
+
+      - 不同之处
+        - 用途不同：可执行文件包含了运行一个完整程序所需的所有指令和资源，而动态库包含的是可以被多个程序共享使用的代码和数据。动态库的主要目的是重用代码，减少程序的内存占用和磁盘空间使用。
+
+        - 启动方式不同：可执行文件可以被操作系统直接加载和执行。动态库则不能直接执行，它们是被其他程序调用时动态加载到内存中的。当一个程序启动时，如果它依赖于某些动态库，操作系统的动态链接器会负责加载这些库。
+
+        - 符号解析和重定位：动态库在被加载时，需要通过动态链接器进行符号解析和地址重定位。这一步骤是必需的，因为动态库中的函数和数据在不同程序中可能被加载到不同的内存地址。
+    - <span style="color:red; font-weight:700">动态库的实现</span>
+      - 假设我们有一个加法函数，我们希望将其编译为动态库。首先，创建一个名为 add.c 的源文件：
+      ```c
+      // add.c
+      int add(int a, int b) {
+          return a + b;
+      }
+      ```
+      - 编译动态库：使用GCC（GNU Compiler Collection）编译这个文件为动态库。打开终端或命令行界面，然后使用以下命令：
+      ```shell
+      # 对于linux或Unix系统
+      gcc -shared -fPIC -o libadd.so add.c
+
+      # 选项的含义
+      -shared       # 告诉编译器生成一个共享对象，即动态库。
+      -fPIC         # 表示生成位置无关代码（Position Independent Code），这对于动态库是必需的，因为它允许代码在内存中被任意位置加载
+      -o libadd.so  #指定输出文件的名称。在Linux系统中，动态库通常以 .so（共享对象）扩展名结尾。
+
+      # Windows系统编译动态库
+      gcc -shared -o add.dll add.c
+      # 在Windows上，动态库通常以 .dll（Dynamic Link Library）扩展名结尾。
+      ```
+    - <span style="color:red; font-weight:700">使用动态库</span>
+      - 生成动态库后，你可以在其他C程序中使用它。为了使用这个动态库，你需要在使用它的程序中声明add函数的原型，并在链接时指定动态库的位置。这里不详细展开如何调用动态库中的函数，因为这涉及到动态链接库的加载和符号解析，通常需要使用动态加载机制（如dlopen和dlsym在Unix-like系统中，LoadLibrary和GetProcAddress在Windows中）或在编译时链接动态库。
+
+
 ### 软件包和包管理器  
 - 软件包介绍：开源软件最初只提供了打包的源码文件，用户必须自己编译每个想在GNU/LINUX上运行的软件。用户急需系统能提供一种更加便利的方法来管理这些软件，当Debian诞生时，这样一个管理工具dpkg也就应运而生,可用来管理deb后缀的“包”文件。
 <br>从而著名的“package”概念第一次出现在GNU/Linux系统中，稍后Red Hat才开发自己的rpm包管理系统
@@ -6167,8 +6313,8 @@ cat /proc/net/bonding/bond0
 - 程序包管理器
   - 功能：将编译好的应用程序的各组成文件打包一个或几个程序包文件，利用包管理器可以方便快捷地实现程序包的安装，卸载，查询，升级，校验等管理操作。
   - 主流的程序包管理器
-    - redhat:rpm文件，rpm包管理器
-    - debian:deb文件，dpkg包管理器
+    - redhat:rpm文件，<span style="color:red;font-weight:700">rpm包管理器</span>
+    - debian:deb文件，<span style="color:red;font-weight:700">dpkg包管理器</span>
 
 - 包命名
   - rpm包命名方式：
@@ -6256,6 +6402,7 @@ https://sourceforge.net/
   查询安装是否成功
   
   # rpm -q <软件名>   -- 这里不是包名，仅仅是开头的软件名
+  # rpm -q 后面必须接完整的软件名，很不好用，建议用qa在过滤
   # rpm -qa | grep '软件名'
   -- 使用qa查询所有安装过的包，通过grep筛选确认是否安装成功
   
@@ -6293,6 +6440,16 @@ https://sourceforge.net/
 # rpm -K <软件名>
 -- 查看软件的rpm包是否合法
 
+# 在查询合法性之前，必须导入所需公钥
+# 导入公钥(添加第三方软件仓库时尤其有用)
+rpm --import /etc/pki/rpm-gpg/RPM-XXXXXXXXXXX
+
+# 查看已导入的公钥
+rpm -qa "gpg-pubkey"
+
+# 查看公钥
+rpm -qi gpg-pubkey-XXXXXXXX
+
 # rpm -V <软件名>
 -- 查看软件在安装后，是否被改过
 
@@ -6300,6 +6457,38 @@ https://sourceforge.net/
 -- 系统所有包，安装后，被改过的都列出来
 ```
 
+#### 实验：误删除rpm命令（/usr/bin/rpm），如何修复
+```shell
+# 进入救援模式
+# 使用救援模式的rpm包进行安装，安装至/mnt/sysroot
+rpm -ivh /run/install/repo/BaseOS/Packages/r/rpm-4.XXXXXX --root=/mnt/sysroot --force
+
+# 检查是否安装成功
+ls /mnt/sysroot/usr/bin/rpm
+
+# 安装成功后重启
+```
+
+#### 数据库维护
+- rpm包安装时生成的信息,都放在rpm数据库中
+```shell
+/var/lib/rpm
+```
+- 可以重置数据库
+```shell
+rpm {--initdb|--rebuilddb}
+
+# 选项详解
+--initdb      # 初始化，如果事先不存在数据库，则新建之，否则不执行任何操作
+--rebuilddb   # 重建已安装的包头的数据库索引目录
+```
+
+#### 包更新日志
+```shell
+rpm -q --changelog <软件名>
+其实是一个doc软件包中的一个文件
+rpm -qd <软件名> 如果该软件有更新日志，则doc文件中含有changelog文件
+```
 ### yum和dnf
 - 作用：CentOS使用yum,dnf解决rpm的包依赖关系
 - YUM：Yellowdog Update Modifier，rpm的前端程序，可解决软件包相关依赖性，可在多个库之间定位软件包，up2date的替代工具，CentOS8用dnf代替了yum，不过保留了和yun的兼容性，配置也是通用的
@@ -6309,7 +6498,7 @@ https://sourceforge.net/
   - yum/dnf是基于C/S模式
     - yum 服务器存放rpm包和相关包的元数据库
     - yum 客户端访问yum服务器进行安装或查询等
-  - yum 实现过程：先在yum服务器上创建yum repository（仓库），在仓库中事先存储了众多rpm包（一般放在Packages目录下），以及包的相关的元数据文件（放置在特定目录repodata下），当yum客户端利用yum/dnf工具进行安装时，会自动下载repodata中的元数据，查询元数据是否存在相关的包及依赖关系，自动从仓库中找到相关包下载并安装。
+  - yum 实现过程：先在yum服务器上创建yum repository（仓库），在仓库中事先存储了众多rpm包（一般放在Packages目录下），以及包的相关的元数据文件（放置在特定目录repodata下），当yum客户端利用yum/dnf工具进行安装时，会自动下载repodata中的元数据，查询元数据是否存在相关的包及依赖关系，并再次访问yum服务器，自动从仓库中找到相关包下载并安装。
 - yum客户端配置
   - yum客户端配置文件
   ```txt
@@ -6319,24 +6508,34 @@ https://sourceforge.net/
   
   每个仓库对应一个配置文件
   ```
+  - yum公共配置（yum.conf）
+  ```shell
+  gpgcheck=1        # 安装包前要做包的合法和完整性校验
+  installonly_limit=3     # 同时可以安装3个包，最小值为2，如设0或1，为不限制
+  clean_requirements_on_remove=True   # 删除包时，是否将不再使用的包删除
+  best=True             # 升级时，自动安装最新版，即使缺少包依赖
+  skip_if_unavailable=False     # 跳过不可用
+  ```
+
   - repo仓库配置文件内容
   ```shell
   [repositoryID]
   name=Some name for this repository
   baseurl=url://path/to/repository
-  enabled={1|0}   默认为1，0表示禁用该仓库
-  gpgcheck={1|0}  默认1，检查包是否合法,0表示不检查
+  enabled={1|0}   # 默认为1，0表示禁用该仓库
+  gpgcheck={1|0}  # 默认1，检查包是否合法,0表示不检查
   
   gpgcheck必须配合gpgkey使用，否则就设置0，不检查
   
-  gpgkey=URL
+  gpgkey=URL  # 通过key的路径，来实现gpgcheck的检查
   
-  注意：yum仓库指向路径一定必须是repodata目录所在目录
+  # 注意：yum仓库指向路径一定必须是repodata目录所在目录
   
   ----------------------------------------------
   
   相关变量
   
+  # 下面的变量是yum自身带的变量，linux脚本不支持
   yum的repo配置文件中可用的变量
   $releasever: 当前OS的发行版的主版本号，如：8，7，6
   $arch: CPU架构，如：aarch64,i586,i686,x86_64
@@ -6347,6 +6546,15 @@ https://sourceforge.net/
 
   - yum相关指令
   ```txt
+  # yum repolist    查看所有的yum源客户端仓库
+
+  # yum repolist -v   查看yum仓库的详细信息
+
+  # yum repolist [all | enabled | disabled]
+
+  # yum repolist --repoid=XXX -v  # 显示指定源  
+  ----------------------------------------------------------
+
   # yum install <软件名>    下载软件
   
   # yum remove <软件名>     卸载软件
@@ -6354,6 +6562,14 @@ https://sourceforge.net/
   # yum list <软件名>     查询软件
   支持模糊查询，通配符，比如：msm* 表示msm开头的软件
   如果查询到的yum源前面有@，说明已经安装，反之，没安装
+  结果包含已安装的包，和源里的可用包
+
+  # yum list --installed 查询已安装过的包 
+
+  # yum list updates  显示所有本地可更新的包
+
+  # yum list --available --showduplicates <软件名>
+  列出该软件在当前源下所有版本的包
   
   # yum provides <软件名路径>  查询硬盘上没安装的软件来自于哪个包
   
@@ -6374,6 +6590,8 @@ https://sourceforge.net/
   
   # dnf clean all
   清理软件包元信息缓存
+  # 作用场景
+  这个命令通常在遇到与包数据库相关的问题或者当系统长时间没有更新且想要确保软件列表完全更新时使用。清理后，第一次运行 DNF 命令可能会比较慢，因为需要重新下载元数据缓存
   
   # yum history
   查看安装的历史
@@ -6381,8 +6599,10 @@ https://sourceforge.net/
   # yum history info <history的编号>
   根据编号查看历史下载的具体细节
   
-  # yum updatefinfo
+  # yum updatefnfo
   查看互联网上新版本的软件信息
+  # yum updateinfo info 查看详细信息
+  # yum updateinfo info bugfix | newpackage|security
   
   # yum grouplist
   查看包组
@@ -6399,14 +6619,311 @@ https://sourceforge.net/
   - yum 元数据过旧，清理缓存
   - yum 源出问题，或网络有问题
 
+- 包组
+  - 作用："包组"（Package Group）是一个方便的概念，它允许你将相关的软件包归纳为一个组进行管理。这样，用户可以通过安装单个包组来批量安装一组具有相似功能或相关依赖的软件包，而不需要逐一安装每个包。
+  - 包组的特点：
+    - 便捷性：包组使得安装具有相似用途或相关依赖的一系列软件包更加方便快捷。
+    - 管理简化：通过包组，系统管理员可以更容易地管理系统安装的软件，尤其是在进行初始系统设置或批量部署时。
+    - 可定制：某些发行版允许用户在安装过程中选择特定的包组进行安装，从而实现更加定制化的安装体验。
+    - 示例：
+    ```shell
+    sudo dnf groupinstall "Development Tools"
+    ```
+
 ### 实现私用yum仓库
 ```
-步骤一：安装阿帕奇httpd,使其拥有web共享功能
+步骤一：在yum server下搭建web服务，保证其他机器能通过web服务访问本机
 
-步骤二：web共享的目录在 /var/www/html 下
+步骤二：在yum server机上搭建yum仓服务（Packages repodate）
 
-步骤三：将需要的yum源下载到该目录下
+步骤三：在client机上将yum的repos源指向yum server机
 ```
+#### 服务端配置
+```shell
+# 安装web服务
+yum install -y httpd
+
+# 关闭防火墙
+systemctl disabled --now firewalld.service
+
+# 开启web服务
+systemctl enable --now httpd.service
+
+# 将阿里云的extras源的相关数据下载到本地，给客户端使用
+yum reposync --repoid=nju-extras --download-metadata -p /var/www/html
+
+# 将本地光盘中的内容CP到web目录中，给客户端使用
+mkdir /cdrom
+mount /dev/sr0 /cdrom
+cp -r /cdrom/BaseOS/* /var/www/html/BaseOS
+```
+
+#### yum仓同步工具
+```shell
+# CentOS 8 dnf 工具集成
+dnf reposync --repoid=REPOID --download-metadata -p /path 
+
+# CentOS 7 以前版本，reposync工具来自于yum-utils包
+reposync --repoid=REPOID --download-metadata -p /path
+```
+
+#### 创建YUM仓工具
+- 可以根据目录中的rpm生成repodata元数据
+```shell
+createrepo [Option] <directory_to_index>
+
+# 常用选项
+-v                      # 显示详细的操作信息
+-o|--outputdir          # 指定生成的仓库元数据的输出目录
+-d|--datebase           # 生成sqlite数据库文件，可以加快包管理器的处理速度，并支持一些高级查询功能
+--update                # 更新现有仓库元数据
+--excludes <pattern>    # 排除指定规则的文件
+--includepkgs           # 指定规则的包创建元数据，与excludes相反
+--compress-type <类型>   # 指定压缩类型，这会影响仓库元数据文件的压缩方式
+--workers <数量>        # 指定生成元数据时使用的进程数，可以加快元数据生成速度  
+```
+- 示例
+```shell
+# 创建仓库元数据
+createrepo /path/to/repository
+# 创建后会在指定目录下，生成一个repodata目录
+
+# 更新仓库
+createrepo --update /path/to/repository
+
+# 使用多进程创建仓库
+createrepo --workers 4 /path/to/repository
+
+# 在/etc/yum.repo.d/下，配置新创建的仓库*repo文件
+
+# 使用yum repolist --repid=myself_test -v 测试仓库是否配置成功
+
+# 如果出现进程占用的情况，使用yum clean all，可以清除缓存，解决问题
+```
+
+#### yum Troubleshooting
+```shell
+# yum的配置文件格式或路径有问题
+解决*.repo文件格式
+
+# yum cache
+yum clean all
+
+# 重新建立缓存
+yun makecache
+
+# 元数据缓存地址
+/var/cache/dnf
+/var/cache/yum
+
+# 网络不通
+网卡配置
+```
+
+### DNF介绍
+- DNF，是新一代RPM软件包管理器。DNF软件包采用python编写，yum程序在安装的过程中，如果被终止，下次在执行将无法解决依赖，DNF可解决此问题
+```shell
+# 配置文件
+/etc/dnf/dnf.conf
+
+# 仓库文件
+/etc/yum.repos.d/*.repo
+
+# 日志
+/var/log/dnf.rpm.log
+/var/log/dnf.log
+
+# 使用帮助
+man dnf
+```
+
+### Ubuntu软件管理
+- Debian 软件包通常为预编译的二进制格式的扩展名".deb",类似于rpm文件，因此安装快速，无需编译软件。包文件包括特定功能或软件所必须的文件、元数据和指令
+  - dpkg：package manager for Debian，类似于rpm，dpkg是基于Debian的系统的包管理器。可以安装，删除和构建软件包，但无法自动下载和安装软件包或其依赖性
+  - apt：Advanced Packaging Tool，功能强大的软件管理工具，甚至可升级整个Ubuntu的整个系统，基于客户/服务器（c/s）  
+  
+![alt text](images/image23.png)
+
+```shell
+# 判断软件是否已安装
+dpkg -V <软件包>
+# $?返回0，则安装成功
+
+# 安装
+dpkg -i XXXXXXX.deb
+
+# 列出安装详情
+dpkg -l XXXXXXX.deb
+
+# 可以接通配符
+dpkg -l <通配符>
+
+# 卸载
+dpkg -r <软件名>
+
+# 根据条件列出已安装的包
+dpkg --get-selections v*
+# 列出以v开头的包名的包
+
+# 显示所有可以安装的包
+dpkg -p 
+
+# 用于查询某个特定文件属于哪个已安装的软件包,dpkg -S 命令只能查询到已安装软件包的信息。 
+dpkg -S "XXXX"
+
+# 显示包的详细信息
+dpkg -s "XXX"
+
+# 列出已安装包的所有文件
+dpkg -L 应用程序名
+
+# 列出包内所有文件
+dpkg -L "XXXXX.deb "
+```
+
+#### dpkg -l 显示解读
+```shell
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name                     Version                Architecture Description
++++-========================-======================-============-===================================================================
+un  v4l2loopback-dkms        <none>                 <none>       (no description available)
+un  v4l2loopback-modules     <none>                 <none>       (no description available)
+ii  vim                      2:8.2.3995-1ubuntu2.16 amd64        Vi IMproved - enhanced vi editor
+un  vim-athena               <none>                 <none>       (no description available)
+ii  vim-common               2:8.2.3995-1ubuntu2.16 all          Vi IMproved - Common files
+un  vim-doc                  <none>                 <none>       (no description available)
+un  vim-gtk3                 <none>                 <none>       (no description available)
+un  vim-lua                  <none>                 <none>       (no description available)
+ii  vim-nox                  2:8.2.3995-1ubuntu2.16 amd64        Vi IMproved - enhanced vi editor - with scripting languages support
+un  vim-perl                 <none>                 <none>       (no description available)
+un  vim-python3              <none>                 <none>       (no description available)
+un  vim-ruby                 <none>                 <none>       (no description available)
+ii  vim-runtime              2:8.2.3995-1ubuntu2.16 all          Vi IMproved - Runtime files
+un  vim-scripts              <none>                 <none>       (no description available)
+un  vim-tcl                  <none>                 <none>       (no description available)
+ii  vim-tiny                 2:8.2.3995-1ubuntu2.16 amd64        Vi IMproved - enhanced vi editor - compact version
+un  virtualbox-guest-modules <none>                 <none>       (no description available)
+un  vsearch                  <none>                 <none>       (no description available)
+
+----------------------------------------------------------
+
+# 共7个字段
+Desired  Status  Err  Name  Version  Architecture Description
+
+# Desired 期望状态
+u       Unknown       # 没有安装过
+i       Install       # 请求安装
+r       Remove        # 请求卸载
+p       Purge         # 请求卸载并清理
+h       Hold          # 保持
+
+# Status 当前状态
+n       Not           # 软件没有安装
+i       Inst          # 安装完成并完成配置
+c       Conf-files    # 已卸载，但还有保留配置文件
+u       Unpacked      # 已解压缩，但没有配置
+f       half-conf     # 配置时出错
+h       Half-inst     # 安装时出错
+w       trig-await    # 触发器等待
+t       Trig-pend     # 触发器是未决状态
+
+# Err 错误状态
+空                    # 正常情况下为空
+h                     # 被锁定，有其他包对此依赖，无法升级
+r                     # 被损坏，需要重装才能使用
+x                     # 损坏且被锁定
+
+# NAME 包名
+# Version 版本
+# Architecture 平台架构
+# Description 包的描述信息
+
+# 前三列常见组合
+ii                    # 安装成功
+pn                    # 安装后卸载
+un                    # 没有安装过
+iu                    # 安装了但没有配置
+rc                    # 已卸载，但还有配置文件
+```
+
+#### apt命令用法
+```shell
+# 列出所有包
+apt list
+
+# 列出所有以安装的包
+apt list --installed
+
+# 列出所有可升级的包
+apt list --upgradeable
+
+# 指定包名，使用通配符进行模糊查询
+apt list *sql*
+
+#--------------------------------------------------------
+
+# 默认在包名和描述信息中搜索，支持正则
+apt search
+
+apt search --names-only <软件名>
+
+# 查询包的具体信息
+apt info <软件名>
+
+# 显示所有版本
+
+```
+
+#### apt包索引配置文件
+```shell
+# 配置系统默认编辑器的文件
+# Rocky/CentOS是通过环境变量$EDITOR来进行控制
+
+# select-editor命令可以用来配置系统默认编辑器文件
+```
+- apt配置文件位置
+```shell
+/etc/apt/sources.list
+/etc/apt/sources.list.d/
+# 该文件更新完后，要apt update进行更新软件包元数据
+
+# 在ubuntu中有两个重要目录，分别是dists和pool
+# dists目录中存放的时该仓库中的元数据
+# pool目录中存放的是具体的包文件
+```
+```shell
+deb URL section1 section2
+
+# 字段说明
+deb         # 固定开头，表示是二进制包的仓库，如果deb-src开头，则表示是源码库
+URL         # 库所在的地址，可以是网络地址，也可以是本地镜像地址
+section1    # Ubuntu版本的代号，可在os-release查看（VERSION CODENAME）
+            # section1              主仓
+            # section1-backports    后备仓，该仓中软件当前版本不一定支持
+            # section1-security     修复仓，主要用来打补丁，有重大漏洞需要在当前版本修复时，会放在此仓
+            # sections-updates      非安全性更新仓，不影响系统安全性的小版本迭代放在此仓
+            # section1-proposed     预更新仓，可理解为新软件的测试放在此仓
+section2    # 软件分类
+            # main完全自由软件
+            # restricted不完全自由的软件
+            # universe社区支持的软件
+            # multiverse非自由软件
+```
+#### 查看apt的安装历史
+```shell
+cat /var/log/dpkg.log
+```
+
+#### 查看yum的安装历史
+```shell
+yum history
+```
+
+### snap 工具
+- 默认snap应用格式包，专为物联网设备，嵌入式平台设计的迷你ubuntu
+
 ### 程序包编译
 - C、C++的源码编译：使用make项目管理器
   <br>configure脚本 --> Makefile.in --> Makefile
@@ -6418,6 +6935,19 @@ https://sourceforge.net/
 - 源码编译的好处
   - 可以实现软件功能的私人定制
   - 可以控制安装路径
+
+#### 编译安装准备
+```shell
+# CentOS
+yum install gcc make gcc-c++ glibc glibc-devel pcre pcre-devel openssl openssl
+devel systemd-devel zlib-devel vim lrzsz tree tmux lsof tcpdump wget net-tools 
+iotop bc bzip2 zip unzip nfs-utils man-pages
+
+# Ubuntu
+sudo apt update
+sudo apt install gcc make g++ libc6-dev libpcre3 libpcre3-dev libssl-dev libsystemd-dev zlib1g-dev vim lrzsz tree tmux lsof tcpdump wget net-tools iotop bc bzip2 zip unzip nfs-common manpages
+```
+
 - C语言源代码编译安装过程
 <br>利用编译工具，通常只需要三个大的步骤
   - ./configure
@@ -6426,7 +6956,7 @@ https://sourceforge.net/
   - make 根据Makefile文件，会检车依赖的环境，进行构建应用程序
   - make install 复制文件到相应路径
 
-- 编译安装实战案例（tree安装）：
+- 编译安装实战案例（tree安装）：  
 ```
 1. 到官网使用wget download_url，下载新版tree的源码到当前目录并解压
 
@@ -6468,6 +6998,40 @@ https://sourceforge.net/
 7.清除缓存
 
 # hash -r
+```
+
+#### 实验：编译安装nginx
+```shell
+# 下载nginx源码包
+wget http://nginx.org/download/nginx-1.23.0.tar.gz
+
+# 解压
+tar -xf nginx-1.23.0.tar.gz
+
+# 指定安装目录，同时开启http_ssl_module
+./configure --prefix=/lnmp/nginx --with-http_ssl_module
+
+# 如果中间失败，提示缺少依赖项，通过yum search 查找软件包名称，然后安装，安装后重新执行 ./configure ...
+
+# 经过补全依赖项后，成功编译，生成Makefile文件，执行make
+make
+
+# 使用make install 将文件按makefile规则转移到对应目录下
+make install
+
+# 安装成功后，修改nginx文件，修改/lnmp/nginx/conf/nginx.conf将user XXX; 改为 user root
+
+# 然后关闭防火墙
+systemctl stop ufw    # Ubuntu
+systemctl stop firewalld # CentOS|Rocky
+
+# 将/lnmp/nginx/sbin/nginx 创建软链接到PATH路径下
+ln -s /lnmp/nginx/sbin/nginx /usr/local/bin/nginx
+
+# 启动nginx
+nginx
+
+# 服务开启后测试，成功~~~~
 ```
 
 ### Ubuntu软件包管理工具
