@@ -1935,6 +1935,18 @@ cahr str[size] = {'h','e','l','l','o'};
     printf("string = %d, sizeof = %d\n", strlen(str), sizeof(str));
     // string = 3, sizeof = 4
     ```
+    - 注意区分字符数组大小和字符串长度之间的区别
+    ```C
+    #include<string.h>
+
+    int main() {
+        char str[] = "Hello\0 World";
+
+        printf("strlen : %zu\n", strlen(str));            // strlen: 5
+        printf("sizeof string : %lu\n", sizeof(str));     // sizeof(str): 13
+        return 0;
+    }
+    ```
   - `strcmp(str1, str2);` : 字符串比较
     - 从第一个字符开始比较，依次向后，知道能比较出结果为止
     ```C
@@ -2646,6 +2658,7 @@ int main() {
 ```
 进程
 概念：进程是计算机中的程序关于某数据集合上的一次运行活动，是系统进行资源分配和调度的一个独立单位。
+总结：操作系统分配资源的最基本单位
 
 作用与功能：
 
@@ -2662,6 +2675,7 @@ int main() {
 作用与功能：
 
 线程是执行指令的最小单位。
+线程：CPU计算的最基本单位
 它比进程更轻量级，拥有自己的执行堆栈和程序计数器等状态信息，但共享所属进程的其他资源，如内存和文件。
 联系：
 

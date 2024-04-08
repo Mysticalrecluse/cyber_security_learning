@@ -7391,8 +7391,8 @@ journalctl - 日志查看工具
   # systemctl set-default multi-user.target
   ```
 
-### 进程，系统性能和计划任务
-#### 进程和内存管理
+## 进程，系统性能和计划任务
+### 进程和内存管理
 - 内核功能：进程管理、内存管理、文件系统、网络功能、驱动程序、安全功能等
 - 什么是进程：
   - Process：运行中的程序的一个副本，是被载入内存的一个指令的集合，是资源分配的单位
@@ -7473,3 +7473,844 @@ journalctl - 日志查看工具
       - 栈：栈是用户存放程序临时创建的局部变量，也就是说我们函数括弧{}中定义的变量如：函数体中local声明的变量。除此之外，在函数被调用时，其参数也会被压入发起调用的进程栈中，并且待到调用结束后，函数的返回值也会被存放会栈中。由于栈的后进先出的特点，所以特别方便用来保存/恢复调用现场。可以把堆栈看成一个寄存、交换临时数据的内存区
       ![Alt text](images/image13.png)
       ![Alt text](images/image14.png)
+
+### 进程使用内存问题
+#### 内存泄漏：Memory Leak
+- 指程序中用malloc或new申请了一块内存，但是没有用free或delete将内存释放，导致这块内存一直处于占用状态
+
+#### 内存溢出：Memory Overflow
+- 指程序申请了10M的空间，但是在这个空间写入10M以上字节的数据，就是溢出
+
+#### 内存不足：OOM
+- OOM即Out Of Memory，"内存用完了"，的情况在java程序中比较常见。系统会选出一个进程将之杀死，在日志messages中看到类似下面的提示
+```shell
+Jul 10 10:20:30 kernel: Out of memory: Kill process 9527(java) score 88 or sacrifice child
+```
+- 当JVM因为没有足够的内存来为对象分配空间并且垃圾回收器也已经没有空间可回收时，就会抛出这个error，因为这个问题已经严重到不足以被应用处理。
+
+- 原因：
+  - 给应用分配内存太少：比如虚拟机本身可使用的内存（一般通过启动时的VM参数指定）太少。
+  - 应用用的太多，并且用完没释放，浪费了。此时就会造成内存泄漏或者内存溢出
+
+- 使用的解决办法：
+  - 限制java进程的max heap，并且降低java程序的worker数量，从而降低内存使用
+  - 给系统增加swap空间
+
+- 设置内核参数（不推荐），不允许内存申请过量：
+```shell
+echo 2 > /proc/sys/vm/overcommit_memory
+echo 2 > /proc/sys/vm/overcommit_ratio
+echo 2 > /proc/sys/vm/panic_on_oom
+```
+
+- 说明：
+  - Linux默认是允许memory overcommit的，只要你来申请内存我就给你，寄希望于进程实际上用不到那么多内存，但万一用到那么多呢？Linux<span style="color:red">设计了一个OOM killer机制挑选一个进程出来杀死，以腾出部分内存</span>，如果还不够就继续。也可<span style="color:red">通过设置内核参数vm.panic_on_oom使得发生OOM时自动重启系统。</span>这都是有风险的机制，重启可能造成业务中断，杀死进程也有可能导致业务中断。所以Linux2.6以后允许通过内核参数vm.overcommit_memory禁止memory_overcommit.
+  
+- vm.panic_on_oom 决定系统出现oom的时候，要做的操作。接受的三种取值如下：
+```shell
+0 - 默认值，当出现oom的时候，触发oom killer
+# 直接杀进程
+1 - 程序在有cpuset，memory policy，memcg的约束情况下的OOM，可以考虑不panic，而是启动OOM killer。其它情况触发 kernel panic,即系统直接重启
+# 根据情况杀进程或者重启
+2 - 当出现oom，直接触发kernel panic，即系统直接重启
+# 直接重启
+```
+
+- vm.overcommit_memory接受三种取值：
+```shell
+0 - Heuristic overcommit handling. 这是缺省值，它允许overcommit，但过于名目仗胆的overcommit会被拒绝，比如malloc一次性申请的内存大小就超过了系统总内存。Heuristic的意思是“试探式的”，内核利用某种算法猜测你的内存申请是否合理，它认为不合理就会拒绝overcommit。
+
+# kernel设有一个阈值，申请的内存总数超过这个阈值就算overcommit，在/proc/meminfo中可以看到这个阈值的大小
+
+1 - Always overcommit，允许overcommit，对内存申请来者不拒。内核执行无内存过量使用处理。使用这个设置会增大内存超载的可能性，但是也可以增强大量使用内存任务的性能
+
+2 - Don't overcommit,禁止overcommit。内存拒绝等于或大于总可用swap大小以及overcommit_ratio指定的物理RAM比例的内存请求。如果您希望减小内存过度使用的风险，这个设置就是最好的
+```
+
+- CommitLimit就是overcommit的阈值，申请的内存总数超过CommitLimit的话就算是overcommit。此值通过内核参数<span style="color:red">vm.overcommit_ratio</span>或vm.overcommit_kbytes间接设置的，公式如下：
+```shell
+CommitLimit= (Physical RAM * vm.overcommit_ratio / 100) + Swap
+```
+
+- vm.overcommit_ratio是内核参数，缺省值是50，表示物理内存的50%.如果你不想使用比率，也可以直接指定内存的字节数大小，通过另一个内核参数vm.overcommit_kbytes即可；
+- 如果使用了huge pages，那么需要从物理内存中减去，公式变成：
+```shell
+CommitLimit= ([total RAM] - [total huge TLB RAM]) * vm.overcommit_ratio / 100 + swap 
+```
+
+### 进程的状态切换
+#### 进程的基本状态
+![alt text](images/image27.png)
+-  创建状态：进程在创建时需要申请一个空白PCB（process control block进程控制块），向其中填写控制和管理进程的信息，完成资源分配。如果创建工作无法完成。比如资源无法满足，就无法被调度运行，把此时进程所处状态称为创建状态。
+
+- 就绪状态：进程已经准备好，已分配到所需资源，只要分配到CPU就能够立即运行
+
+- 执行状态：进程处于就绪状态被调度后，进程进入执行状态
+
+- 阻塞状态：正在执行的进程由于某些事件（I/O请求，申请缓存区失败）而暂时无法运行，进程受到阻塞。在满足请求时进入就绪状态等待系统调用
+
+- 终止状态：进程结束，或出现错误，或被系统终止，进入终止状态。无法再执行。
+
+#### 状态之间转换六种情况
+- 运行--->就绪：
+  - 主要是进程占用CPU的时间过长，而系统分配给该进程占用CPU的时间是有限的；
+
+  - 在采用抢先式优先级调度算法的系统中，当有更高优先级的进程要进行时，该进程就被迫让出CPU，该进程便由执行状态变为就绪状态
+
+- 就绪--->运行：
+  - 运行的进程的时间片用完，调度就转到就绪队列中选择合适的进程分配CPU
+
+- 运行--->阻塞：
+  - 正在执行的进程因发生某等待事件而无法执行，则进程由执行状态变为阻塞状态，如发生了I/O请求
+
+- 阻塞--->就绪：
+  - 进程所等待的事件已经发生，就进入就绪队列
+
+- 以下两种状态不可能发生：
+  - 阻塞--->运行：即使阻塞进程分配CPU，也无法执行，<span style="color:red">操作系统在进行调度时不会从阻塞队列进行挑选，</span>而是从就绪队列中选取
+  - 就绪--->阻塞：就绪态根本就没有执行，谈不上进入阻塞态
+
+#### 进程更多状态：
+
+- 运行态：running
+
+- 就绪态：ready
+
+- 睡眠态：分为两种，可中断：interruptable, 不可中断：uninterruptable
+
+- 停止态：stopped，暂停于内存，但不会被调度，除非手动启动
+
+- 僵死态：zombie，结束进程，父进程结束前，子进程不关闭
+  - 既不占有CPU资源，也仅占用极少的内存
+  - 进程列表中存在，重启时会从进程列表中清除
+  - 死的进程，无法再次杀死
+  - 实现
+  ```shell
+  echo $BASHPID
+  # 1436
+  bash
+  echo $BASHPID
+  # 1809
+  echo $PPID
+  # 1436
+
+  kill -19 1436 # 将父进程变为停止态 stat为T
+  kill -15 1809 # 给子进程发送后一个15信号，15信号为正常结束关闭进程
+  # 关闭进程后，回收该进程所有资源
+  # 正常关闭进程后，该进程应该在进程列表中清除，但是由于父进程为停止态，无法回收子进程的尸体，因此子进程变为了僵尸态 
+
+  kill -18 1436 # 激活父进程
+  # 由于父进程被激活，因此子进程的被回收，子进程从进程列表清除
+
+  # 强杀父进程的时候，可以将子进程也杀死
+  ```
+
+```shell
+ps aux 中的stat可以查看状态
+
+STAT：进程状态
+  R: running
+  S: interruptable sleeping（大部分进程处于睡眠态）
+  D: uninterruptable sleeping
+  T: stopped
+  Z: zombie
+  +: 前台进程
+  l: 多线程进程
+  L: 内存分页并带锁
+  N：低优先级进程
+  <：高优先级进程
+  s: session leader，会话发起者
+  I: Idle kernel thread, CentOS 8 新特性
+```
+
+### LRU算法
+- LRU: Least Recently Used 近期最少使用算法，释放内存
+- 计算机组成中详解
+
+
+### 进程间通信
+#### IPC:Inter Process Communication
+- 同一主机
+```shell
+pipe                  # 管道
+socket                # 套接字文件
+Memory-maped file     # 文件映射，将文件中的一段数据映射到物理内存，多个进程共享这片内存
+signal                # 信号
+Lock                  # 对资源上锁，如果资源已被某进程锁住，则其他进程想修改甚至读取这些资源，都将被阻塞，直到锁被打开
+semaphore             # 信号量，一种计数器
+```
+
+- 不同主机：socket=IP和端口号
+```shell
+RPC remote procedure call(远程过程调用)
+MQ 消息队列，生产者和消费者，如：Kafka，RabbitMQ,ActiveMQ
+```
+
+- 创建管道文件(单工，单向传输，只能一对一)
+```shell
+mkfifo /data/test.fifo
+
+cat > /data/test.fifo
+
+# 在另一个终端
+cat /data/test.fifo
+```
+
+### 进程优先级
+- 优先级范围（0-139）
+  - （0 - 99） 实时进程，内核中操作系统相关进程使用
+  - （100 - 139）非实时进程，用户进程使用 
+
+- CentOS 优先级 
+![alt text](images/image28.png)
+
+- 进程优先级
+  - realtime优先级：99 - 0， 值最大，优先级最高
+  - nice值：-20到19，对应系统优先级100 - 139
+
+- 进程优先级的执行过程（非Linux）
+```
+0 - 139个优先级，有140个优先级队列，数字越小，优先级越高
+
+假设当前只有100,101,102，3个队列中有进程排队
+100:p1, p2, p3
+101:p4, p5
+102:p6, p7
+
+由于p1在100优先级队列，优先级高，因此，cpu先给p1分配时间片，优先执行p1，
+
+如果在时间片消耗之后，p1仍未执行完毕，则剩余工作放入100优先级的就绪队列
+
+然后处于100优先级的运行队列中的p2被分配CPU时间片，运行，假设p2运行完毕
+
+100优先级队列中的p3被分配时间片，运行，此时100优先级队列中的进程数为空
+
+假设p3在时间片消耗完，也没有执行完毕，剩余进程进入100优先级的就绪队列，此时就绪队列有p1和p3,
+
+由于100优先级的运行队列中的进程为空，因此，100优先级的就绪队列变为运行队列，再执行p1, p3
+
+如此反复，当100优先级队列中的p1,p3彻底执行完毕后，运行优先级101的队列
+```
+- <span style="color:red">Linux内核使用的是完全公平调度器（CFS），其目标是确保CPU时间在所有进程间公平分享，而不是严格基于优先级调度。</span>
+
+```
+inux内核中的完全公平调度器（Completely Fair Scheduler, CFS）是自Linux 2.6.23版本开始引入的默认CPU调度器，它基于公平调度算法设计，旨在为运行在系统上的每个进程提供尽可能公平的CPU时间分配。CFS的核心思想是基于红黑树（一种自平衡二叉查找树）来动态管理和调度进程，从而实现公平性和高效性。下面是CFS实现的一些详细说明，以及nice值（优先级）是如何影响进程调度的。
+
+CFS的工作原理
+红黑树：CFS使用一棵红黑树来维护所有可运行的进程（即处于就绪状态，等待被调度到CPU上执行的进程）。红黑树的每个节点代表一个进程，按照进程的虚拟运行时间（vruntime）排序。vruntime是一个进程获得CPU时间的衡量，意图是反映每个进程使用CPU资源的量。
+
+选择下一个进程：当需要选择下一个要运行的进程时，CFS会选择红黑树最左侧的节点，即vruntime最小的进程，因为这代表了它相对于其他进程获得的CPU时间最少。
+
+时间片：CFS不固定分配时间片大小，而是根据系统负载和进程数动态调整。理论上，时间片的长度是与系统中就绪进程数量的倒数成比例的，意味着更多的就绪进程会导致更短的时间片，从而每个进程能更频繁地被调度。
+
+睡眠和唤醒：为了保证公平性，当进程从睡眠状态唤醒时，CFS会给予一定的时间补偿，确保长时间睡眠的进程在唤醒后能较快地获得CPU时间。
+
+nice值的影响
+在Linux中，nice值是一个介于-20到19的整数，用于调整进程的优先级。默认值为0，较低的nice值（负值）表示较高的优先级，而较高的nice值（正值）表示较低的优先级。
+
+在CFS中，nice值通过调整进程的vruntime来间接影响进程的调度优先级：
+
+负nice值（优先级高）：进程的vruntime增加得更慢，使得该进程更容易被调度。
+正nice值（优先级低）：进程的vruntime增加得更快，导致该进程相对较难获得CPU时间。
+这样，尽管CFS的目标是确保所有进程公平地分享CPU时间，nice值仍然允许系统管理员或用户调整特定进程的调度偏好，以反映出更高或更低的优先级需求。
+```
+
+### 进程分类
+- 守护进程：守护进程: daemon，在系统引导过程中启动的进程，和终端无关进程
+- 前台进程：跟终端相关，通过终端启动的进程
+
+- 按进程资源的使用分类
+  - CPU-Bound：CPU 密集型，非交互
+  - IO-Bound：IO 密集型，交互
+
+### I/O调度算法
+- 操作系统版本不同，I/O调度算法不同
+```shell
+cat /sys/block/sda/queue/scheduler
+```
+
+### 进程管理和性能相关工具
+#### 进程树 pstree
+- pstree
+```shell
+pstree [option] [PID | USER]
+```
+
+- 常用选项：
+```shell
+-p        # 显示PID
+-u        # 显示用户切换
+-H pid    # 高亮指定进程及其前辈进程
+-h        # 高亮显示当前进程及其前辈进程
+```
+
+#### 进程信息 ps
+- ps 即process state，可以显示进程当前状态的快照，默认显示当前终端中的进程，Linux系统各进程的相关信息均保存在`/proc/PID`目录下的各文件中
+
+- ps格式
+```shell
+ps [OPTION...]
+```
+
+- 支持三种选项
+  - UNIX选项：如：-A，-e
+  - BSD选项：如：a
+  - GNU选项：如：--help
+
+- 常用选项
+```shell
+a               # 选项包括所有终端中的进程
+x               # 选项包括不链接终端的进程
+u               # 选项显示进程所有者信息
+f               # 选项显示进程树，相当于 --forest
+k|--sort 属性   # 对属性排序，属性前加- 表示倒序
+o 属性...       # 显示定制信息：pid, cmd, %cpu, %mem...
+-U              # 显示指定RUID或用户的进程
+-u              # 显示指定EUID或用户的进程
+-f              # 显示完整格式程序信息
+-C              # 指定命令，多个命令用逗号分隔e
+```
+
+- 常用选项组合
+```shell
+ps aux
+
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.1 191184  3836 ?        Ss   Mar14   2:36 /usr/lib/systemd/systemd --switched-root --system --deserialize 22
+root         2  0.0  0.0      0     0 ?        S    Mar14   0:00 [kthreadd]
+root         4  0.0  0.0      0     0 ?        S<   Mar14   0:00 [kworker/0:0H]
+root         6  0.0  0.0      0     0 ?        S    Mar14   0:15 [ksoftirqd/0]
+root         7  0.0  0.0      0     0 ?        S    Mar14   0:08 [migration/0]
+root         8  0.0  0.0      0     0 ?        S    Mar14   0:00 [rcu_bh]
+root         9  0.0  0.0      0     0 ?        S    Mar14   6:41 [rcu_sched]
+root        10  0.0  0.0      0     0 ?        S<   Mar14   0:00 [lru-add-drain]
+root        11  0.0  0.0      0     0 ?        S    Mar14   0:05 [watchdog/0]
+root        12  0.0  0.0      0     0 ?        S    Mar14   0:04 [watchdog/1]
+root        13  0.0  0.0      0     0 ?        S    Mar14   0:08 [migration/1]
+root        14  0.0  0.0      0     0 ?        S    Mar14   0:14 [ksoftirqd/1]
+root        16  0.0  0.0      0     0 ?        S<   Mar14   0:00 [kworker/1:0H]
+root        18  0.0  0.0      0     0 ?        S    Mar14   0:00 [kdevtmpfs]
+
+# USER:    进程发起者
+# PID：    进程PID
+# %CPU：   占用CPU百分比
+# %MEM：   占用内存百分比
+# VSZ：    操作系统承诺的虚拟内存数量
+# RSS：    实际使用的内存大小
+# TTY：    终端
+# STAT：   状态信息
+# START：  什么时间启动的
+# TIME：   CPU时间片累加值
+# COMMAND：命令
+
+# 排序显示命令
+ps axo pid,cmd,%cpu,%mem k -%cpu
+```
+![alt text](images/image29.png)
+
+- 面试题：找到未知进程的执行程序文件路径
+```shell
+ls -l /proc/1272/exe
+# 通过查看proc/PID/exe的软链接指向
+```
+
+#### 查看进程信息prtstat
+- 可以显示进程信息，来自于psmisc包
+
+- 格式：
+```shell
+prtstat [options] PID ...
+```
+
+- 常用选项
+```shell
+-r   # 显示格式更容易观看
+```
+ 
+
+#### 设置和调整进程优先级
+- nice和renice只能调整非实时优先级
+
+- nice，翻译为友善度，这个术语源自于它决定了你对待系统的其他用户的友善度。友善度越高，越谦虚，优先级越低。友善度越低，说明你已经不打算让步了，则优先级越高
+
+- 详解实时优先级和非实时优先级的区别 
+```
+非实时优先级
+基于时间共享：非实时进程是基于时间共享（time-sharing）策略调度的，意味着这些进程按照一定的公平原则轮流使用CPU资源。操作系统调度器会尽量平等地分配CPU时间给每个进程，但也允许优先级调整以改变进程获取CPU时间的频率。
+nice值：在Linux中，非实时进程的优先级可以通过nice值来调整。nice值的范围通常是-20（最高优先级）到19（最低优先级）。默认情况下，进程的nice值为0。通过调整nice值，用户和系统管理员可以影响进程的调度优先级。
+适用场景：适用于大多数常规应用，如用户程序和系统后台服务。这些进程不需要严格的时间限制，可以接受在CPU调度上的延迟。
+
+实时优先级
+基于实时调度：实时进程根据实时调度策略运行，这意味着它们被赋予了更高的执行优先级，并且在被调度时，它们能够快速响应。实时进程旨在最小化响应时间，确保在指定的时间限制内完成任务。
+调度策略：Linux支持多种实时调度策略，如SCHED_FIFO（先入先出）、SCHED_RR（轮转轮询）和SCHED_DEADLINE（截止时间调度）。SCHED_FIFO和SCHED_RR进程有一个与之相关的实时优先级，范围通常是1到99，其中99代表最高优先级。
+实时优先级的设置：实时优先级通常由系统管理员设置，需要特定的权限。这是为了防止实时进程过多地占用CPU时间，影响系统的稳定性。
+适用场景：适用于需要快速确定性响应的应用，如音视频处理、工业控制和其他需要严格时间控制的应用。这些进程通常运行在高优先级，以确保它们能够及时完成任务。
+
+区别总结
+调度策略：实时优先级进程基于实时调度策略，而非实时优先级进程基于时间共享策略。
+优先级范围：实时进程优先级通常高于非实时进程，且优先级范围不同。
+响应时间：实时进程设计以保证最小响应时间，非实时进程则更侧重于公平性和资源共享。
+使用场景：实时进程用于对响应时间有严格要求的场景，而非实时进程用于一般的计算任务。
+正确配置和使用实时和非实时进程优先级是高效系统管理的关键部分，需要根据具体的应用场景和需求来调整。
+```
+
+- nice使用格式
+```shell
+nice -n -10 ping 127.0.0.1
+# 将ping命令以-10的友善度执行进程
+
+# -n 后面接具体数值（-20~19）,指定命令的友善度
+```  
+
+- 更改nice值
+```shell
+renice 命令
+
+# 可以调整正在执行中的进程的优先级
+renice -n -20 PID  
+```
+
+- <span style="color:red">pri与rtprio和nice的关系与对比</span>
+  - pri的范围是139 - 0，数值越高，优先级越高
+  - rtpri(实时优先级（系统优先级）) 范围是99 - 0
+    - rtpri的99对应pri的139，数值越高，优先级越高
+  - nice的范围是-20到19
+    - 对应pri的40 - 0， nice值越低，优先级越高
+
+#### 实现进程绑定指定CPU—— taskset
+- taskset
+- 格式：
+```shell
+taskset [options] mask command [argument...]
+taskset [options] -p [mask] pid
+```
+- mask是CPU亲和性掩码，用于指定进程可以运行的CPU核心。掩码是一个十六进制数，每一位代表一个CPU核心，最低位代表CPU0。位值为1表示进程可以在该CPU上运行，为0表示不可以。
+
+- `command [argument...]`是要启动的新进程及其参数。
+
+- `-p`选项用于操作已经运行的进程，后面跟着的是进程ID（PID）。
+
+- 示例：
+```shell
+# 假设有一个名为myapp的应用程序，你希望它只在第二个CPU（CPU1）上运行：
+taskset 0x2 myapp
+
+# 如果myapp已经在运行，其PID为1234，将其迁移到CPU1上：
+taskset -p 0x2 1234
+
+# 查询myapp的CPU亲和性设置
+taskset -p 1234
+```
+
+- 详解cpu亲和性掩码
+``` 
+# 示例:pid 1231725's current affinity mask: 3 
+
+在taskset使用的亲和性掩码中，每一位二进制数代表一个CPU核心，从右到左分别代表CPU0、CPU1、CPU2等。亲和性掩码是一个十六进制数，转换为二进制后，每个1表示进程可以在对应的CPU上运行，0表示不可以。
+
+亲和性掩码"3"转换为二进制是"11"。这意味着：
+
+最右边的位（第一位，值为1）表示进程可以在CPU0上运行。
+紧接着的第二位（值也为1）表示进程可以在CPU1上运行。
+因此，亲和性掩码"3"表示该进程可以在CPU0和CPU1上运行，而不是单独在CPU2上。如果要设置进程仅在CPU2上运行，亲和性掩码应该是"4"（二进制为"100"），这样第三位为1，表示进程可以在CPU2上运行。
+```
+
+#### 搜索进程 —— pgrep
+- 按条件搜索进程
+  - ps选项 | grep 'pattern' 灵活
+  - pgrep 按预定义的模式（过滤）
+  - /sbin/pidof 按确切的程序名称查看pid
+
+- pgrep命令格式
+```shell
+pgrep [option] pattern
+```
+
+- 常用选项
+```shell
+-u  uid:  effective user, 生效者
+-U  uid: real user, 真正发起运行命令者
+-t terminal: 与指定终端相关的进程
+-l：显示进程名
+-a：显示完整格式的进程名
+-P pid：显示指定进程的子进程
+```
+
+- pgrep示例
+```shell
+pgrep -lu wang
+# 注意l放在u的前面，u后面接wang
+
+pgrep -au wang
+
+# 显示指定进程的子进程
+pgrep -aP 2303 
+
+# 显示指定终端的进程
+pgrep -at pts/2
+```
+
+#### 查看进程编号（PID）
+- pidof
+
+- 格式：
+```shell
+pidof <command>
+
+# 示例：
+pidof ping  # 1987
+
+# 查看脚本文件
+pidof -x <脚本名称>
+
+# 示例
+pidof -x ping.sh
+```
+
+#### 负载查询 uptime 
+
+- `/proc/uptime` 包括两个值，单位s
+  - 系统启动时长
+  - 空闲进程的总时长（按总的CPU核数计算）
+  ```shell
+  cat /proc/uptime
+  # 13073.55  21437.56
+
+  # 系统空闲时间计算 21437.56 / 13073.5 * 2 
+  ```
+
+- uptime和w显示以下内容
+  - 当前时间
+  - 系统已启动的时间
+  - 当前上线人数
+  - 系统平均负载（1、5、15分钟的平均负载，一般不会超过1，超过5时建议警报）
+
+- 系统平均负载：指在特定时间间隔内运行队列中的平均进程数，通常每个CPU内核的当前活动进程数不大于3，那么系统性能良好，如果每个CPU内核的任务数大于5，那么此主机的性能由严重问题
+
+- uptime的显示和w的第一行一样
+
+#### 显示CPU相关统计 mpstat
+- 来自于sysstat包
+
+- 范例：
+```shell
+[root@localhost ~]# mpstat
+Linux 4.18.0-513.5.1.el8_9.x86_64 (localhost.localdomain)       04/08/2024      _x86_64_        (2 CPU)
+
+07:13:31 PM  CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle
+07:13:31 PM  all    5.68    0.06    7.18    0.31    1.05    0.34    0.00    0.00    0.00   85.38
+
+# 表示一秒执行一次
+mapstat 1
+
+# 表示一秒钟执行一次，收集6次退出
+mapstat 1 6
+``` 
+
+- 各字段含义
+```
+CPU：显示处理器编号。all 表示所有CPU的平均值。
+
+%usr：显示执行用户空间进程的时间百分比。用户空间进程是指那些不需要内核模式特权的进程。
+
+%nice：显示执行优先级较低的用户进程（被"nice"命令调整过优先级）的CPU时间百分比。
+
+%sys：显示在系统（内核）空间执行进程的时间百分比。系统空间进程是指那些需要内核模式特权的进程。
+
+%iowait：显示CPU等待输入输出操作完成时间的百分比。高的%iowait值表示磁盘IO可能是性能瓶颈。
+
+%irq：显示处理硬件中断请求时间的百分比。
+
+%soft：显示处理软件中断时间的百分比。软件中断通常由系统内部事件触发，而不是硬件中断。
+
+%steal：在虚拟化环境中，显示等待虚拟CPU的时间百分比，因为其他虚拟机占用了物理CPU时间。
+
+%guest：显示运行虚拟处理器的时间百分比。
+
+%gnice：显示运行带有nice优先级的虚拟处理器的时间百分比。
+
+%idle：显示CPU空闲时间的百分比，不包括等待I/O操作的时间。
+```
+
+#### 查看进程实时状态 top（常用）
+
+```shell
+top - 19:25:04 up 16 min,  1 user,  load average: 0.00, 0.02, 0.04
+Tasks: 151 total,   1 running, 150 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  0.2 us,  0.3 sy,  0.0 ni, 99.0 id,  0.0 wa,  0.3 hi,  0.2 si,  0.0 st
+MiB Mem :   1734.3 total,   1145.5 free,    237.6 used,    351.2 buff/cache
+MiB Swap:   2056.0 total,   2056.0 free,      0.0 used.   1340.4 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND                                                                                                                                                                                                          
+    923 root      20   0  352920  10804   9188 S   0.3   0.6   0:03.37 vmtoolsd                                                                                                                                                                                                         
+   1016 root      20   0  483004  31488  15372 S   0.3   1.8   0:05.64 tuned                                                                                                                                                                                                            
+   1769 root      20   0  126468   5508   4248 S   0.3   0.3   0:00.20 sshd                                                                                                                                                                                                             
+   2228 root      20   0   54364   4256   3556 R   0.3   0.2   0:00.06 top                                                                                                                                                                                                              
+      1 root      20   0  175432  13900   8512 S   0.0   0.8   0:07.06 systemd                                                                                                                                                                                                          
+      2 root      20   0       0      0      0 S   0.0   0.0   0:00.05 kthreadd                                                                                                                                                                                                         
+      3 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_gp                                                                                                                                                                                                           
+      4 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_par_gp                                                                                                                                                                                                       
+      5 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 slub_flushwq                                                                                                                                                                                                     
+      7 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/0:0H-events_highpri                                                                                                                                                                                      
+     10 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 mm_percpu_wq                                                                                                                                                                                                     
+     11 root      20   0       0      0      0 S   0.0   0.0   0:00.00 rcu_tasks_rude_                                                                                                                                                                                                  
+     12 root      20   0       0      0      0 S   0.0   0.0   0:00.00 rcu_tasks_trace                                                                                                                                                                                                  
+     13 root      20   0       0      0      0 S   0.0   0.0   0:00.08 ksoftirqd/0                 
+```
+
+- 信息详解
+  - 第一行：uptime的命令结果，显示负载情况
+  - 第二行：显示进程的统计结果
+  - 第三行：CPU相关数据统计
+  - 第四行：内存相关数据统计
+  - 第五行：Swap相关数据统计
+
+- 快捷键：
+  - `M` 是按内存利用率排序
+  - `P` 是按CPU利用率排序
+  - `T` 是按累计时间片Time+排序
+
+- 首部信息显示
+  - `l` 显示隐藏uptime信息
+  - `t` 改变和显示隐藏tasks及cpu信息
+  - `1` cpu分别显示
+  - `m` memory信息
+  - `q` 退出命令
+  - `k` 终止指定进程
+  - `s` 修改刷新时间间隔
+  - `W` 保存文件
+
+#### 页面炫酷版top ---htop
+- Ubuntu中可以直接下载是使用
+
+#### 内存空间free
+```shell
+free -h
+```
+
+#### 进程对应的内存映射pmap
+- 格式
+```shell
+pmap PID
+
+# 显示进程中的内存映射
+# 相当于cat /proc/PID/maps
+```
+
+#### 查看程序运行时的系统调用 strace
+- 示例
+```shell
+strace ls
+```
+
+#### 显示程序运行时的库调用（C语言库） ltrace
+```shell
+ltrace ls
+```
+
+#### 显示虚拟内存信息 vmstat
+```shell
+root@ubuntu2204:/proc/1025$vmstat
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 0  0      0 2853204  27964 687760    0    0    15     9   62  119  0  0 99  0  0
+```
+
+- 这里的si, so, bi, bo，都是以内存为参照物
+  - 比如：从硬盘中读取数据到内存，此时是内存进，硬盘出，所以是bi增长
+
+- system字段
+  - in: interrupts 中断速率，包括时钟
+  - cs：context switch 进程切换速率
+
+- 示例：
+```shell
+# 内存信息汇总
+vmstat -s 
+
+# 2秒钟显示1次，显示5次 
+vmstat 2 5
+``` 
+
+#### 统计CPU和设备IO信息iostat
+- 此工具由sysstat包提供
+- 范例：
+```shell
+root@ubuntu2204:/proc/1025$iostat
+Linux 5.15.0-101-generic (ubuntu2204.mystical.org)      04/08/2024      _x86_64_        (2 CPU)
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           0.31    0.10    0.48    0.02    0.00   99.09
+
+Device             tps    kB_read/s    kB_wrtn/s    kB_dscd/s    kB_read    kB_wrtn    kB_dscd
+dm-0              1.13        24.58        20.33         0.00     515289     426148          0
+dm-1              0.03         0.65         0.00         0.00      13684          0          0
+loop0             0.01         0.11         0.00         0.00       2212          0          0
+loop1             0.00         0.05         0.00         0.00       1056          0          0
+loop2             0.04         1.52         0.00         0.00      31827          0          0
+loop3             0.00         0.02         0.00         0.00        344          0          0
+loop4             0.00         0.02         0.00         0.00        345          0          0
+loop5             0.00         0.05         0.00         0.00       1099          0          0
+loop6             0.00         0.00         0.00         0.00         10          0          0
+sda               0.77        25.10        20.33         0.00     526190     426288          0
+sdb               0.06         1.32         0.10         0.00      27634       2052          0
+sdc               0.03         0.37         0.00         0.00       7816          0          0
+sr0               0.02         0.60         0.00         0.00      12554          0          0
+```
+```shell
+# 2秒钟显示1次，显示5次
+iostat 2 5
+```
+
+#### 系统资源统计 dstat
+- dstat用于替代vmstat，iostat
+- 由pcp-system-tools包提供
+
+
+#### 监视磁盘I/O iotop
+- 可以看出具体导致I/O异常的进程或命令
+
+#### 显示网络带宽使用情况 iftop
+- 常用选项
+```shell
+-n         # 以ip形式显示主机
+-F         # 仅显示ipv4流量
+-P         # 显示流量端口号
+```
+#### 查看网络实时吞吐量nload
+```shell
+# 使用方向键切换网卡 
+```
+
+
+#### 远程综合监控glances
+- 可以在一台设备上，远程监控另一台设备的情况
+- 示例
+```shell
+# 在两台机器上同时安装glances
+
+# 其中需要监控的设备设置为服务端 glances -s
+
+# 另一个监控设备为客户端 glances -c <服务端ip>
+```
+
+#### 查看进程打开文件 lsof
+```shell
+lsof [option] 
+
+# 常用选项
+-i           # 后面接 ":端口号",查看监听该端口的进程
+-p            # 列出指定进程打开的文件
+-c cmd        # 列出指定进程打开的文件
+```
+
+- 范例：
+```shell
+#查看当前哪个进程正在使用此文件
+[root@ubuntu ~]# lsof /var/log/messages
+ COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF     NODE NAME
+ rsyslogd 1279 root    5w   REG  253,0  1882516 26487520 /var/log/messages
+
+#查看指定终端启动的进程
+[root@ubuntu ~]# lsof /dev/pts/1
+```
+
+### 信号发送 kill
+- kill：内部命令，可用来向进程发送控制信号，以实现对进程管理，每个信号对应一个数字，信号名称以SIG开头，不区分大小写
+- 显示当前系统可用信号
+```shell
+kill -l
+trap -l
+```
+
+- 常用信号
+```shell
+1. SIGHUB     # 无须关闭进程而让其重读配置文件
+2. SIGINT     # 中止正在运行在的进程，相当于Ctrl+c
+3. SIGQUIT    # 相当于ctrl+\
+9. SIGKILL    # 强制杀死正在运行的进程
+15. SIGTERM   # 终止正在运行的进程（kill命名默认信号 ）
+18. SIGCONT   # 继续运行（可激活停止态进程）（或者让前台进程进入后台运行）
+19. SIGSTOP   # 后台休眠（使进程强制进入T停止态）无法被忽略
+20. SIGTSTP   # 相当于ctrl+z，一个可以被进程捕获和忽略的停止信号
+```
+
+- 对指定进程发送信号
+```shell
+kill -1 
+```
+
+#### killall 
+- 来自于psmisc
+```shell
+killall [信号] 命令名称
+
+# 特殊信号 0
+该信号不会真的发送一个信号，但是会进行错误检查，检查进程的健康性
+观察echo $? 如果是0，说明没问题 
+
+# kill -0 不能检查出僵尸进程，对于僵尸进程的检测，$?的值也为0
+```
+
+### 能够多个命令联动使用
+```shell
+lsof (查看进程) --->  pstree(查看父进程) --->  kill信号控制进程
+```
+
+### 作业管理
+#### Linux的作业控制
+- 前台作业：通过终端启动，且启动后一直占据终端
+- 后台作业：可通过终端启动，但启动后即转入后台运行（释放终端）
+
+- 让作业运行于后台
+  - 运行中的作业：Ctrl+z（进入后台，并进入停止态）
+  - 尚未启动的作业：COMMAND &
+
+- 使用kill信号，让前台进程进入后台并保持运行态
+```shell
+kill -18 %1
+# 百分号后面是作业编号，可通过jobs查看
+```
+
+- fg 
+  - 把后台指令恢复到前台运行
+  ```shell
+  fg <作业编号>
+  ```
+
+- 关闭终端保证进程不死的两种方法
+  - nohup <command> 
+    - 会将标准输出输入到当前目录的一个文件中hup.out
+    - 可以通过nohup <command> &> /dev/null 解决
+
+  - 会话管理
+    - screen
+    - tmux
+
+#### 并行运行
+- 方法1
+```shell
+cat all.sh
+f1.sh&
+f2.sh&
+f3.sh&
+wait
+```
+
+- 方法2
+```shell
+(ping 127.1&);(ping 127.2&);(ping 127.3&)
+```
+
+- 方法3
+```shell
+ping 127.1& ping 127.2& ping 127.3&
+```
+
+- 方法4
+```shell
+# 多组命令实现并行访问
+{ ping -c3 127.1; ping 127.2; }& ;{ ping -c3 127.3; ping 127.4; }&
+```
+
+
