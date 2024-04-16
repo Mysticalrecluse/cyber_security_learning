@@ -8314,3 +8314,2733 @@ ping 127.1& ping 127.2& ping 127.3&
 ```
 
 
+## 计划任务
+### 一次性任务
+#### at工具
+- 指定时间点，执行一次性任务
+- at 工具
+    - 由包at提供
+    - 依赖与atd服务，需要启动才能实现at任务
+    - at队列存放在/var/spool/at目录中
+
+- 使用前需要确认atd.service处于running状态
+```shell
+systemctl status atd.service
+```
+
+- at命令
+```shell
+at [option] TIME    # ctrl + D 结束并完成任务设置
+
+# 常用选项
+-l          # 列出未执行的一次性任务， 等价于atq命令
+-c <编号>    # 查看指定编号的计划任务的具体内容
+-d <编号>    # 删除指定编号的计划任务， 等价于atrm + 编号 
+-f file     # at -f a.txt 15:20 等机于at 15:20 < a.txt
+-m          # 当任务完成后，即使没有标准输出，也会给用户发邮件 
+
+# 非交互方式实现计划任务
+echo hello | at 14:30
+
+echo wall hello | at 14:30 # wall 命令是广播，会在所有终端屏幕上出现
+```
+
+- at 时间格式
+```shell
+HH:MM               # 若时刻以过，则明天的此时执行任务
+
+HH:MM  YYYY-MM-DD   # 规定某年某月 某天的特殊时刻执行该任务，不支持到秒，最小到分钟
+
+now+#{minutes, hours, days, OR weeks}
+
+```
+
+- 注意：
+    - 作业执行命令的结果中的标准输出和错误以执行任务的用户的身份，发邮件通知给root
+    - 默认CentOS8最小化安装没有安装邮件服务，需自行安装
+    ```shell
+    dnf install postfix -y
+    systemctl enable --now postfix
+
+    # 安装mail
+    sudo apt install mailutils
+    ```
+    - 创建的at任务，文件在`/var/spool/at`目录下 
+    - 执行任务时，PATH变量和当前定义任务的用户身份一致
+
+-  /etc/at.{allow, deny} 控制用户是否能执行at任务
+    - 白名单：/etc/at.allow , 默认不存在，只有该文件中的用户才能执行at命令
+    - 黑名单：默认存在，拒绝文件中的用户执行at命令
+    - 如果两个文件都不存在，则只有root能够执行at命令 
+    - 白名单的优先级高于黑名单
+
+
+
+#### batch
+- 系统自行选择空闲时间去执行此处指定的任务
+
+
+### 周期性计划任务cron
+- 周期性计划任务cron相关的程序包
+    - cronie：主程序包，提供crond守护进程及相关辅助工具
+    - crontabs：包含CentOS提供系统维护任务
+    - cronie-anacron:cronie的补充程序，用于监控cronie的任务执行状态，如：cronie中的任务在过去该运行的时间点未能正常运行，则anacron会随后启动一次任务
+
+- cron依赖于crond服务，确保crond守护处于运行状态
+
+#### CentOS中的cron
+- 有/etc/cron.deny，可以给cron设置黑名单 （Ubuntu默认没有该文件）
+- run-parts <dir>  立即执行目录中所有脚本，要求目录内脚本有执行权限 （Ubuntu默认没有该文件）
+
+- cron任务分为
+    - 系统cron任务：系统维护作业， /etc/crontab（总配置文件） /etc/cron.d/目录下，自行创建 (子配置文件 )
+    - 用户cron任务：保存在`/var/spool/cron/USERNAME`, 利用crontab命令管理
+    
+- 计划任务日志：`/var/log/cron` 
+
+- cron配置文件编辑
+```shell
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name command to be executed
+17 *    * * *   root    cd / && run-parts --report /etc/cron.hourly
+25 6    * * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6    * * 7   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6    1 * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+
+# 支持时间格式
+1. 逗号分隔
+2. 范围，eg：1-10
+3. 频率，eg：/5
+```
+
+#### 普通用户创建计划任务
+- 使用crontab命令
+```shell
+crontab -e 创建计划任务
+
+# 常用选项
+-l              # 列出所有任务
+-e              # 编辑任务
+-r              # 移除所有任务
+-i              # 同-r一同使用，已交互模式移除指定任务
+-u user         # 仅root可运行，指定用户管理cron任务
+```
+- 练习作业
+  - 每周的工作日1:30,将/etc/备份至/backup目录中，保存的文件名格式为"etcbak-yyyy-mm-dd-HH.tar.xz",其中日期是前一天的时间
+  - 每两小时取出当前系统/proc/meminfo文件中以S或M开头的信息追加至/tmp/meminfo.txt文件中
+  - 工作日时间，每10分钟执行一次磁盘空间检查，一旦发现任何分区利用率高于80%，就执行wall警报
+
+#### wall命令
+- 作用：wall（write all）是一个在Linux和Unix系统中用于向所有当前登录用户的终端发送消息的命令。这个命令对系统管理员特别有用，比如在重启服务器之前，管理员可以使用wall发送一条广播消息给所有用户，通知他们即将发生的重启。
+
+```shell
+echo message | wall
+
+wall message
+
+wall < filename
+```
+
+
+## Linux启动流程和内核管理
+
+### CentOS6 启动流程
+#### 硬件启动POST（Power-On-Self-Test）
+- BIOS加电自检
+  - BIOS是固化在主板ROM上的程序，主板上两个芯片，一个ROM，一个RAM，RAM上存储着BIOS程序的修改配置，由主板上的一颗纽扣电池供电
+    - 如果RAM上没电，则BIOS里面的设置项会恢复成出厂设置。
+
+
+#### GRUB启动阶段
+- stage 1：MBR前446字节（grub程序的一部分）这部分代码负载引导bootloader
+
+- stage 1.5：在MBR后续的扇区中（<span style="color:red">1扇区到2047扇区，也就是 存在于MBR和第一个分区之间的空间</span>），Stage 1.5 包含了一些文件系统的驱动，这允许它能够读取位于不同文件系统上的 /boot 分区,启动其中的配置文件，并进入stage2
+  - 在CentOS6中，它会启动配置文件`/boot/grub/grub.conf`,
+  - 在CentOS7以上版本，它会启动配置文件`/boot/grub2/grub.cfg`
+  - 在Ubuntu中，启动配置文件是`/boot/grub/grub.cfg`
+
+
+- stage2：通过配置文件中的内容，依次启动内核，和initramfs...img，
+  - 内核启动
+    - 内核被加载后，控制权从GRUB转移到内核。内核首先被解压（如果需要），然后开始执行。内核初始化硬件设备、驱动程序，并设置内存管理等系统基本结构
+    - <span style="color:red;font-weight:700">内核如何处理initramfs</span>
+      - 内核启动后，它被配置为使用 initramfs 作为其初始根文件系统。这不是由 Stage 1.5 中的文件系统驱动来处理的；而是内核自身，在被 GRUB 加载时，已经被告知 initramfs 的内存位置(<span style="color:red">GRUB 会将 initramfs 的加载位置作为启动参数传递给内核。</span>)。
+      - 内核具有必要的代码来“理解”和挂载 initramfs，并开始执行 initramfs 中的 /init 脚本或程序，以进行早期的系统设置和驱动加载。
+  - 使用initramfs（此时控制权在内核手中）：
+    - 内核随后使用加载到内存中的initramfs作为初始的根文件系统。initramfs中的初始化脚本开始执行，负责一系列启动前任务（例如检测硬件设备、加载必要的模块等，以确保内核能够访问真实的根文件系统。）。
+  - 切换到真实根文件系统：
+    - 细节：一旦initramfs中的脚本准备好了真实的根文件系统（比如通过挂载文件系统），系统会进行“切换根”操作（switch_root或pivot_root），从initramfs的临时根文件系统切换到真实的根文件系统上。这一步涉及到卸载旧的根文件系统（initramfs）并切换到新的根文件系统。
+  - 启动init或systemd
+    - 在真实的根文件系统中，内核会启动/sbin/init程序（这可能是一个指向如systemd或Upstart的符号链接），这是系统的第一个用户空间程序。
+
+![alt text](images/image30.png)
+
+- grub配置文件CentOS6
+```shell
+[root@c6 ~]# ll /etc/grub.conf 
+lrwxrwxrwx. 1 root root 22 Aug 29 05:50 /etc/grub.conf -> ../boot/grub/grub.conf
+ [root@c6 ~]# cat /boot/grub/grub.conf 
+# grub.conf generated by anaconda
+ #
+ # Note that you do not have to rerun grub after making changes to this file
+ # NOTICE:  You have a /boot partition.  This means that
+ #          all kernel and initrd paths are relative to /boot/, eg.
+ #          root (hd0,0)
+ #          kernel /vmlinuz-version ro root=/dev/mapper/vg_c6-lv_root
+ #          initrd /initrd-[generic-]version.img
+ #boot=/dev/sda
+ default=0
+ timeout=5
+ splashimage=(hd0,0)/grub/splash.xpm.gz
+ hiddenmenu
+ title CentOS (2.6.32-71.el6.x86_64)
+ root (hd0,0)
+ kernel /vmlinuz-2.6.32-71.el6.x86_64 ro root=/dev/mapper/vg_c6-lv_root 
+rd_LVM_LV=vg_c6/lv_root rd_LVM_LV=vg_c6/lv_swap rd_NO_LUKS rd_NO_MD rd_NO_DM 
+LANG=en_US.UTF-8 SYSFONT=latarcyrheb-sun16 KEYBOARDTYPE=pc KEYTABLE=us 
+crashkernel=auto rhgb quiet
+ initrd /initramfs-2.6.32-71.el6.x86_64.img
+```
+
+- CentOS的grub安装
+- 非交互式安装
+```shell
+grub-install --root-directory=DIR /dev/DISK
+```
+
+#### grub安全
+- 破解CentOS6中的root口令
+```shell
+1. 编辑grub菜单(选定要编辑的title，而后使用a 或 e 命令)
+2. 在选定的kernel后附加参数 1（s|S|single），此参数是用来进入单用户模式 
+3. 在kernel所在行，敲 b 键，以此配置启动，即可无密码以root身份进入系统
+```
+
+- 设置grub密码，防止破解系统root密码
+```shell
+grub-md5-crypt
+grub-crypt
+
+# 执行上述命令，生成口令后，按格式粘贴到grub配置文件中
+default=0
+timeout=5
+password --md5 $1$B0do8$z5jKhXah4sInKxPGQRQWE0
+title Centos6
+  root (hd0,0)
+  kernel /vmlinuz-2.6.32-71.el6.x86_64 ro root=/dev/mapper/vg_c6-lv_root
+  ...
+```
+
+
+
+#### 生成背景图片
+```shell
+convert -resize 640*480 -colors 14 winner.png splash.xpm
+# 生成splash.xpm.gz
+gzip splash.xpm
+mv splash.xpm.gz /boot/grub
+```
+
+### 加载内核
+#### kernel自身初始化过程
+- 探测可识别到的所有硬件设备
+- 加载硬件驱动程序（借助于ramdisk（initramfs）加载驱动）
+- 以只读方式挂载根目录
+- 运行用户空间的第一个应用程序：/sbin/init
+
+
+#### 内核特点
+- 支持模块化：.ko(内核对象)，如：文件系统，硬件驱动，网络协议等
+- 支持内核模块的动态装载和卸载
+
+#### 内核的组成
+- 核心文件：/boot/vmlinux-VERSION-release
+  - ramdisk:辅助的伪根系统，加载相应的硬件启动
+  
+- 模块文件：/lib/modules/VERSION-release
+
+
+### init初始化
+- init进程初始化文件
+  - init程序来自于upstart的包（仅CentOS6用 ）
+  - CentOS6： /etc/inittab
+```shell
+# inittab is only used by upstart for the default runlevel.
+#
+# ADDING OTHER CONFIGURATION HERE WILL HAVE NO EFFECT ON YOUR SYSTEM.
+#
+# System initialization is started by /etc/init/rcS.conf
+#
+# Individual runlevels are started by /etc/init/rc.conf
+#
+# Ctrl-Alt-Delete is handled by /etc/init/control-alt-delete.conf
+#
+# Terminal gettys are handled by /etc/init/tty.conf and /etc/init/serial.conf,
+# with configuration in /etc/sysconfig/init.
+#
+# For information on how to write upstart event handlers, or how
+# upstart works, see init(5), init(8), and initctl(8).
+#
+# Default runlevel. The runlevels used are:
+#   0 - halt (Do NOT set initdefault to this)
+#   1 - Single user mode
+#   2 - Multiuser, without NFS (The same as 3, if you do not have networking)
+#   3 - Full multiuser mode
+#   4 - unused
+#   5 - X11
+#   6 - reboot (Do NOT set initdefault to this)
+# 
+id:3:initdefault:   # 定义开机启动模式
+```
+- 如果不小心设置为默认模式6，无限重启，可以卡在操作系统选择界面，使用-a，修改grub，在最后输入3，进入多用户模式，将初始化文件改掉
+
+- CentOS6中的所有init相关配置文件
+  - /etc/init/control-alt-delete.conf (定义了同时按这3个按键会重启)
+  ```shell
+  # control-alt-delete - emergency keypress handling
+  #
+  # This task is run whenever the Control-Alt-Delete key combination is
+  # pressed.  Usually used to shut down the machine.
+  #
+  # Do not edit this file directly. If you want to change the behaviour,
+  # please create a file control-alt-delete.override and put your changes there.
+
+  start on control-alt-delete
+
+  exec /sbin/shutdown -r now "Control-Alt-Delete pressed"
+  # 将这行注释掉，可以让这三个按键不再有重启的效果
+  ```
+
+  - /etc/init/rc.conf
+  ```shell
+  start on runlevel [0123456]
+
+  stop on runlevel [!$RUNLEVEL]
+
+  task
+
+  export RUNLEVEL
+  console output
+  exec /etc/rc.d/rc $RUNLEVEL
+  # 这段脚本是执行/etc/rc.d/rc，这个shell脚本
+  ```
+  - /etc/rc.d/rc
+  ```shell
+  for i in /etc/rc$runlevel.d/K* ; do
+
+        # Check if the subsystem is already up.
+        subsys=${i#/etc/rc$runlevel.d/K??}
+        [ -f /var/lock/subsys/$subsys -o -f /var/lock/subsys/$subsys.init ] || continue
+        check_runlevel "$i" || continue
+
+        # Bring the subsystem down.
+        [ -n "$UPSTART" ] && initctl emit --quiet stopping JOB=$subsys
+        $i stop
+        [ -n "$UPSTART" ] && initctl emit --quiet stopped JOB=$subsys
+  done
+
+  # Now run the START scripts.
+  for i in /etc/rc$runlevel.d/S* ; do
+
+          # Check if the subsystem is already up.
+          subsys=${i#/etc/rc$runlevel.d/S??}
+          [ -f /var/lock/subsys/$subsys ] && continue
+          [ -f /var/lock/subsys/$subsys.init ] && continue
+          check_runlevel "$i" || continue
+                      
+          # If we're in confirmation mode, get user confirmation
+          if [ "$do_confirm" = "yes" ]; then
+                  confirm $subsys
+                  rc=$?
+                  if [ "$rc" = "1" ]; then
+                          continue
+                  elif [ "$rc" = "2" ]; then
+                          do_confirm="no"
+                  fi
+          fi
+
+          update_boot_stage "$subsys"
+          # Bring the subsystem up.
+          [ -n "$UPSTART" ] && initctl emit --quiet starting JOB=$subsys
+          if [ "$subsys" = "halt" -o "$subsys" = "reboot" ]; then
+                  export LC_ALL=C
+                  exec $i start
+          fi
+          $i start
+          [ -n "$UPSTART" ] && initctl emit --quiet started JOB=$subsys
+  done
+  [ "$do_confirm" = "yes" ] && rm -f /var/run/confirm
+  exit 0
+  ```
+  - 该脚本的作用是遍历初始化配置目录，将所有K开头的开机时关闭服务，所有S开头的开机时开启服务
+  - /etc/rc$runlevel.d/目录下的所有文件都是指向/etc/init.d/目录下的服务可执行文件的软连接，<span style="color:red">通过软链接名称的格式化，实现对多个服务的统一处理</span>
+
+- chkconfig命令管理服务（CentOS6）
+```shell
+chkconfig
+
+# 查看所有服务的开机启动
+chkconfig --list
+chkconfig --list <服务名>   # 查看指定服务的模式
+
+# 更改具体服务的开机启动项
+chkconfig --level [0-6]+ <服务名> <off|on>  # 不指定level，默认2，3，4，5
+
+# 实战示例：在CentOS6上关闭防火墙
+service iptables stop; chkconfig iptables off
+
+chkconfig --del <服务名> # 本质上是从/etc/rc$runlevel.d/目录下的软连接删掉
+```
+#### CentOS6中的服务脚本的书写格式
+```shell
+#!/bin/sh
+#
+# atd Starts/stop the "at" daemon
+#
+# chkconfig:   345 95 5
+# description: Runs commands scheduled by the "at" command at the time \
+#    specified when "at" was run, and runs batch commands when the load \
+#    average is low enough.
+
+### BEGIN INIT INFO
+# Provides: atd at batch
+# Required-Start: $local_fs
+# Required-Stop: $local_fs
+# Default-Start: 345
+# Default-Stop: 95
+# Short-Description: Starts/stop the "at" daemon
+# Description:      Runs commands scheduled by the "at" command at the time 
+#    specified when "at" was run, and runs batch commands when the load 
+#    average is low enough.
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+exec=/usr/sbin/atd
+prog="atd"
+config=/etc/sysconfig/atd
+
+[ -e /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
+
+lockfile=/var/lock/subsys/$prog
+
+start() {
+    [ -x $exec ] || exit 5
+    [ -f $config ] || exit 6
+    echo -n $"Starting $prog: "
+    daemon $exec $OPTS
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && touch $lockfile
+}
+
+stop() {
+    echo -n $"Stopping $prog: "
+    if [ -n "`pidfileofproc $exec`" ] ; then
+        killproc $exec
+                RETVAL=3
+    else
+        failure $"Stopping $prog"
+    fi
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+}
+
+restart() {
+    stop
+    start
+}
+
+reload() {
+    restart
+}
+
+force_reload() {
+    restart
+}
+
+rh_status() {
+    # run checks to determine if the service is running or use generic status
+    status $prog
+}
+
+rh_status_q() {
+    rh_status >/dev/null 2>&1
+}
+
+
+case "$1" in
+    start)
+        rh_status_q && exit 0
+        $1
+        ;;
+    stop)
+        rh_status_q || exit 0
+        $1
+        ;;
+    restart)
+        $1
+        ;;
+    reload)
+        rh_status_q || exit 7
+        $1
+        ;;
+    force-reload)
+        force_reload
+        ;;
+    status)
+        rh_status
+        ;;
+    condrestart|try-restart)
+        rh_status_q || exit 0
+        restart
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart|reload|force-reload}"
+        exit 2
+esac
+exit $?
+```
+
+- 重点：
+  - `# chkconfig:   345 95 5`
+  - 表示默认3，4，5模式下开机启动，S95，K5
+
+
+### <span style="color:red">init总结</span>
+- 内核显示执行 /sbin/init
+- /init 这个进程加载之后读取/etc/inittab这个文件
+  - 用来指定默认启动级别
+
+- 假设默认级别是3，那么就会进入/etc/rc3.d(rc$runlevel.d)/这个模式下，将S，K开头的服务，以一定的次序依次执行或关闭
+
+- /etc/init目录下的是所有的初始化配置脚本
+
+- `/etc/rc.d/rc.sysinit`里面是所有服务加载前的初始化的脚本（由`/etc/init/rcs.conf`调用该脚本）
+```shell
+1. 设置主机名
+2. 设置欢迎信息
+3. 激活udev和selinux
+4. 挂载/etc/fstab文件中定义的文件系统
+5. 检测根文件系统，并以读写方式重新挂载跟文件系统
+6. 设置系统时钟
+7. 激活swap设备
+8. 根据/etc/sysctl.conf文件设置内核参数
+9. 激活lvm及software raid设备
+10. 加载额外设备的驱动程序
+11. 清理操作
+```
+
+- `/etc/rc.d/rc`控制服务脚本呢的开机自动运行
+  - 脚本内容是调用etc/rc$runlevel.d/目录下的软连接
+
+- `etc/rc$runlevel.d/`目录下有一个特殊的文件`S99local->../rc.local`, 这个文件只有2-5有
+```shell
+#!/bin/sh
+#
+# This script will be executed *after* all the other init scripts.
+# You can put your own initialization stuff in here if you don't
+# want to do the full Sys V style init stuff.
+
+touch /var/lock/subsys/local
+```
+- 和普通服务格式不同，它的作用是在rc.local里的所有可执行文件都会开机启动
+  - 该文件下的可执行文件，都能被service执行
+  - centos7以后的版本也可以用这个文件进行开机启动，不过默认没有执行权限，需要自行添加
+
+### 独立和非独立服务管理
+
+- 一个服务，管理一系列不常使用的服务，负责监听，当某个服务被需要触发时，有该服务负责激活对应的服务，这种仿佛值班人的服务就是代理服务
+  - 在CentOS6上，该服务叫做超级守护服务（默认没有安装，需要自行下载）
+  ```shell
+  yum info xinetd
+  ```
+
+- 依赖超级守护服务的服务就叫做非独立服务
+```shell
+xinetd based services:
+        chargen-dgram:  off
+        chargen-stream: off
+        daytime-dgram:  off
+        daytime-stream: off
+        discard-dgram:  off
+        discard-stream: off
+        echo-dgram:     off
+        echo-stream:    off
+        rsync:          off
+        tcpmux-server:  off
+        time-dgram:     off
+        time-stream:    off
+```
+
+- xinetd管理的子服务都在/etc/xinetd.d的目录下
+- 更改自服务状态
+```shell
+# 通过命令改：
+chkconfig telnet off
+
+# 通过修改配置文件改
+vim /etc/xinetd.d/<文件名> # 修改disabled的值
+```
+
+### 实验：实现私人定义Linux
+#### 分区并创建文件系统
+```shell
+# 添加一个硬盘，然后分两个必要的分区
+fdisk /dev/sdb
+
+# /dev/sdb1对应 /boot   /dev/sdb2对应 根/
+mkfs.ext4 /dev/sdb1
+mkfs.ext4 /dev/sdb2
+```
+
+#### 挂载boot
+```shell
+mkdir /mnt/boot
+mount /dev/sdb1 /mnt/boot
+```
+
+#### 安装grub
+```shell
+# 重点：/mnt的下级目录，必须有boot目录
+# 因为默认在名字为boot的下级目录中创建grub子文件目录
+grub-install --root-directory=/mnt /dev/sdb
+```
+
+#### 准备内核和initramfs文件
+```shell
+cp /boot/vmlinux-2.6.32-642.el6.x86_64 /mnt/boot/
+cp /boot/initramfs-2.6.32-642.el6.x86_64.img /mnt/boot
+```
+
+#### 建立grub.conf
+```shell
+vim /mnt/boot/grub/grub.conf
+
+# 内容如下
+default=0
+timeout=6
+title mysticallinux
+root (hd0,0)
+# 禁用selinux,  root=/dev/sda2是因为装好系统后，将硬盘插到别的设备，作为第一个硬盘的名称会默认为sda
+kernel /vmlinux-2.6.32-642.el6.x86_64 root=/dev/sda2 selinux=0 init=/bin/bash
+initrd /nitramfs-2.6.32-642.el6.x86_64.img
+# -----------------------------------------
+
+```
+
+#### 准备根下面相关程序和库
+```shell
+mkdir /mnt/sysroot
+mount /dev/sdb2 /mnt/sysroot
+mkdir -pv
+/mnt/sysroot{etc,lib,lib64,bin,sbin,tmp,var,usr,sys,proc,opt,home,root,boot,dev,mnt,media}
+复制bash等命令和相关库文件，如：bash,ifconfig,insmod,ping,mount,ls,cat,lsblk,blkid,free,df,tree,ps,pstree,mkdir,vim,ip等
+```
+
+#### 复制相关命令需要写个脚本，脚本要求如下
+- 编写脚本/root/bin/copycmd.sh
+  - 提示用户输入一个可执行命令名称
+  - 获取此命令所依赖到的所有库文件列表
+  - 复制命令至某目标目录（例如/mnt/sysroot）下的对应路径下
+    - /bin/bash --> /mnt/sysroot/bin/bash
+    - /usr/bin/passwd --> /mnt/sysroot/usr/bin/passwd
+  - 复制此命令依赖到所有库文件至目标目录下的对应路径下：
+    - 如：/lib64/ld-linux-x86-64.so.2 --> /mnt/sysrooyt/lib64/ld-linux-x86-64.so.2
+  - 每次复制完成一个命令后，不要退出，而是提示用户键入新的要复制的命令，并重复完成上述功能，直到用户输入quit退出
+
+- 脚本如下
+```shell
+#!/bin/bash
+
+ch_root="/mnt/sysroot"
+[! -d $ch_root ] && mkdir $ch_root
+
+# 拷贝命令
+bincopy() {
+  if which $1 &> /dev/null; then
+    local cmd_path=`which --skip-alias $1`
+    local bin_dir=`dirname $cmd_path`
+    [ -d ${ch_root}${bin_dir} ] || mkdir -p ${ch_root}${bin_dir}
+    [ -f ${ch_root}${cmd_path} ] || cp ${cmd_paht} ${ch_root}${bin_dir}
+    return 0
+  else
+    echo "Command not found."
+    return 1
+  fi
+}
+
+# 拷贝依赖
+libcopy() {
+  ...
+}
+```
+
+#### 拷贝网卡驱动
+```shell
+# 查询网卡驱动名称
+ethtool -i eth0
+
+# 查看网卡驱动路径
+modinfo -n e1000
+
+# 将网卡驱动拷贝到指定的路径下
+cp `modinfo -n e1000` /mnt/sysroot/lib
+```
+
+#### 建议手动在/etc目录下创建fstab文件，手动指定挂载目录
+
+#### 尝试切根，查看效果
+```shell
+chroot /mnt/sysroot(切根)
+
+然后在自建的根下进行测试  
+```
+
+#### 将硬盘文件拿下来，然后新建虚拟机测试
+```shell
+进入自建的操作系统后，加载网卡驱动
+insmod /lib/c1000.ko
+```
+
+
+### /proc目录和内核参数管理
+- /proc目录：内核把自己内部状态信息及统计信息，以及可配置参数通过proc伪文件系统加入输出
+  - 帮助：man proc
+
+- 内核参数：
+  - 只读：只用于输出信息
+  - 可写：可接受用户指定"新值"来实现对内核某功能或特性的配置
+
+- /proc/sys设置
+  - sysctl命令用于查看或设定此目录中诸多参数
+  ```shell
+  sysctl -w path.to.parameter=VALUE
+
+  # 示例：
+  echo 1 > /proc/sys/net/ipv4/ip_forward
+
+  # 等价于
+  sysctl -w net.ipv4.ip_forward=1
+  ```
+  - 默认配置文件(永久保存内核参数)：/etc/sysctl.conf及以下文件
+  ```shell
+  # 总配置文件
+  /etc/sysctl.conf
+
+  # 示例：
+  echo "net.ipv4.ip_forward=1" >> /etc/sysctl.d/test.conf
+
+  # 使其立即生效
+  # 如果参数加载总配置文件/etc/sysctl.conf中则不用加文件地址
+  # 如果参数添加到其他配置文件，则需sysctl -p后面跟绝对路径信息
+  sysctl -p /etc/sysctl.d/test.conf
+
+  # 其他：
+  /run/sysctl.d/*.conf
+
+  # 推荐
+  /etc/sysctl.d/*.conf
+  /usr/local/lib/sysctl.d/*.conf
+  /usr/lib/sysctl.d/*.conf
+  /lib/sysctl.d/*.conf
+  /etc/sysctl.conf
+  ``` 
+  - sysctl命令
+  ```shell
+  # 列出各种正在生效的内核参数
+  sysctl -a
+  ```
+
+- 常用内核参数
+```shell
+net.ipv4.ip_forward
+net.ipv4.icmp_echo_ignore_all
+# 允许应用程序可以监听本地不存在的IP
+net.ipvr.ip_nonlocal_bind
+vm.drop_cache
+# 文件系统中文件最多能打开的个数
+fs.file-max=1020000
+```
+
+- fs.file-max的应用场景
+  - 用户访问网站，每个用户都会使该网站上打开一个socket文件，即文件描述符，如果有10w人同时访问网站，则此时服务器同时打开文件个数会是10w+，因此此时就需要优化该参数，使其可以承接这些流量
+
+- 关于nonlocal_bind内核参数的应用场景：
+  - 用户要访问一个大型互联网的IP，是一个VIP即虚拟IP，这个IP，并不是任何该互联网公司的设备IP
+  - 假设这个互联网公司，有两台设备，以主备的形式构建在该公司互联网的入口，用来接受用户请求，并将其发往后方
+  - 设备A作为主设备，日常用来接收用户请求，此时VIP和端口号绑定在设备A上，当设备A出现故障，设备B自动接任该工作
+  - 设备B上也应该绑定VIP和指定端口号，但是因为在A没有出现故障的时候，B并不工作你，但是也需要绑定VIP，防止意外，因此此时，VIP对于B来说就属于本地不存在的IP
+
+- 内核TCP参数优化
+```shell
+net.ipv4.tcp_fin_timeout = 2
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_tw_recycle = 1
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.ip_local_port_range = 2000 65000
+net.ipv4.tcp_max_syn_backlog = 16384
+net.ipv4.tcp_max_tw_buckets = 36000
+net.ipv4.route.gc_timeout = 100
+net.ipv4.tcp_syn_retries = 1
+net.ipv4.tcp_max_orphans = 16384
+net.core.somaxconn = 16384
+net.core.netdev_max_backlog = 16384
+```
+
+### /sys目录——伪文件系统（偏硬件）
+
+
+### 内核模块管理和编译
+- 单内核体系设计：但充分借鉴了微内核设计体系的优点，为内核引入模块化机制
+
+- 内核组成部分：
+  - kernel：内核核心，一般为bzimage，通常在/boot目录下，名称为vmlinuz-VERSION-RELEASE
+  - kernel object:内核对象，一般放置于/lib/modules/VERSION-RELEASE(一些不是必须的内核功能，模块，就放在该目录下)
+  - 辅助文件：ramdisk
+    - initrd
+    - initramfs
+
+#### <span style="color:red">查看各驱动文件路径</span>
+```shell
+modinfo -n ext4     # ext4文件系统的驱动路径
+ethtool -i eth0       # 查看网卡驱动名称
+modinfo -n e1000     # 网卡驱动路径
+```
+
+#### 内核版本
+- 运行中的内核：
+  - uname命令：
+  ```shell
+   
+  ```
+
+### 内核模块管理和编译
+#### 内核模块命令
+- lsmod命令
+    - 显示由核心已经装载的内核模块
+    - 显示的内容来自于：/proc/modules文件
+
+- modinfo命令
+    - 功能：管理内核模块
+    - 配置文件: /etc/modprobe.conf, /etc/modprobe.d/*.conf 
+    ```shell
+    -n          # 只显示模块文件路径
+    -p          # 显示模块参数
+    -a          # 作者
+    -d          # 描述
+    ```
+
+- modprobe命令
+    - 功能：加载或卸载内核模块
+    ```shell
+    
+    ```
+
+#### 内核编译与管理
+
+
+
+
+### systemd
+#### systemd特性
+- systemd：从CentOS7版本之后开始用systemd实现init进程，系统启动和服务器守护进程管理器，负责在系统启动运行时，激活系统资源，服务器进程和其他进程
+
+
+- systemd新特性
+    - 系统引导时，实现服务并行启动（并不是完全并行，有依赖关系的会有前后顺序）
+    - 按需启动守护进程
+    - 自动化的服务依赖关系管理
+    - 同时采用socket式与D-Bus总线式激活服务
+    - 向后兼容sysv，init脚本
+    - 使用systemctl命令管理，systemctl命令固定不变，不可扩展，非由systemd启动的服务，systemd无法与之通信和控制
+    - 系统状态快照
+
+#### systemd核心概念：unit
+- 查看unit类型
+```shell
+systemctl -t help
+
+#service unit,  文件扩展名为.service, 用于定义系统服务
+# Target unit，文件扩展名为.target, 用于模拟实现运行级别
+# Device unit，用于定义内核识别的设备
+# Mode unit， 定义文件系统挂载点
+# Socket unit， 定义进程间通信用的socket文件，也可在系统启动时，延迟驱动服务，实现按需分配
+# Snapshot， 管理系统快照
+# Swap 用于标识swap设备
+# Automount unit：automessage，文件系统的自动挂载点
+# Path unit ：.path,用于定义文件系统中的一个文件，或目录使用, 常用用于文件系统变化时，延迟激活服务，入伍微信，spool目录
+```
+
+- unit的配置文件
+```shell
+/usr/lib/systemd/system; # 每个服务最主要的启动脚本设置，类似于之前的/etc/init.d
+/lib/systemd/system      # ubuntu的对应目录
+/run/systemd/system； # 系统执行过程中所产生的服务脚本，比上面目录优先运行（内存中）
+/etc/systemd/system；   # 管理员建立的执行脚本，比上面目录优先运行
+```
+
+#### systemctl管理系统服务service unit
+- 命令：`systemctl COMAMND name.service`
+```shell
+# 启动，相当于service name start
+systemctl start name.service
+
+# 停止，相当于service name stop
+systemctl stop name.service
+
+# 重启，相当于service name restart
+systemctl restart name.service 
+
+# 查看状态，相当于service name status
+systemctl status name.service
+
+# 禁止自动和手动启动
+systemctl mask name.service
+
+# 取消禁止
+systemctl unmask name.service
+
+# 查看某服务当前激活与否的状态
+systemctl in-active name.service
+
+# 查看下会开机，是否自启
+systemctl is-enabled name.service
+
+# 查看所有已激活的服务
+systemctl list-units --type|-t service
+
+# 查看所有服务
+systemctl list-units --type service --all|-a
+
+# 设置某服务开机自启，相当于chkconfig name on
+systemctl enable [--now] name.service
+
+# 设置某服务开机禁止启动，相当于chkconfig name off
+systemctl disable [--now] name.service
+
+# 查看所有服务的开机自启状态
+systemctl list-units-files --type service
+
+# 重新加载systemctl的状态    
+systemctl daemon-reload
+
+# 列出失败的服务
+systemctl --failed --type=service
+
+# 查看服务的依赖关系
+systemctl list-dependencies name.service
+
+# 杀掉进程
+systemctl kill unitname
+```
+
+#### service unit文件格式
+```shell
+/etc/systemd/system       # 系统管理员和用户使用
+/usr/lib/systemd/system     # 发行版打包者使用
+```
+
+#### 实现Ubuntu开机启动
+- 创建可执行文件：/etc/rc.local
+- /etc/rc.local内的脚本程序，会实现开机直接运行
+
+- 注意：实现rc.local能够开机运行的服务：/lib/systemd/system/rc.local.service
+
+
+#### 运行级别
+- target units: 相当于CentOS6之前的runlevel， unit配置文件：.target
+```shell
+ls /usr/lib/systemd/system/*.target
+```
+
+- 查看不同级别target的下会加载的服务
+```shell
+systemctl list-dependencies graphical.target
+```
+
+- 级别切换
+```shell
+systemctl isolate name.target
+```
+
+- 设置开机进入的默认target
+```shell
+systemctl set-default name.target
+```
+
+- 查看当前的默认target
+```shell
+systemctl get-default
+```
+
+- 切换至紧急救援模式
+```shell
+systemctl rescue
+```
+
+- 禁用ctrl+alt+delete（重启快捷键）
+```shell
+systemctl mask ctrl_alt_del.target
+
+# 使其生效
+init q      # 等价于systemctl deamon reload
+```
+
+### CentOS7之后版本的引导顺序
+- 完整过程
+```shell
+1. UEFI或BIOS初始化，进行POST开机自检
+2. 选择启动设备
+3. 引导装载程序，CentOS7是grub2加载装载程序的配置文件：
+/etc/grub.d
+/etc/default/grub
+/boot/grub2/grub.cfg
+4. 加载initramfs驱动模块
+5. 加载内核选项
+6. 内核初始化，CentOS7使用systemd代替init
+7. 执行initrd.target所有单元，包括挂载/etc/fatab
+8. 从initramfs根文件系统切换到磁盘根目录
+9. systemd执行默认target配置，配置文件/etc/etc/systemd/default.target
+10. systemd执行sysinit.target初始化系统及basic.target准备操作系统
+11. systemd启动multi-user.target下的本机与服务器程序
+12. systemd执行multi-user.target下的/etc/rc.d/rc.local
+13. systemd执行multi-user.target下的getty.target及登陆服务
+14. systemd执行graphical需要的服务
+```
+
+- 通过systemd-analyze工具可以了解启动详情
+```shell
+systemd-analyze plot > boot.html 
+
+# 或者
+systemd-analyze blame
+```
+
+- 通过设置内核参数进入救援模式
+```shell
+启动时，到启动菜单，按e键，找到linux开头的行，后添加systemd.unit=rescue.target
+```
+
+#### 破解CentOS7，8的root密码
+```shell
+# 方法1
+在grub界面，按e进入编辑模式
+光标移动linux开始的行，添加内核参数rd.break
+按ctrl-x启动
+mount -o remount , rw /sysroot  # 因为当前的操作系统是只读，无法修改文件，因此需要重新挂载
+chroot /sysroot
+passwd root
+
+# 如果selinux启用，需添加下面的命令
+touch /.autorelabel
+
+# 方法2
+在linux开始的行，改为rw init=/sysroot/bin/sh
+按ctrl-x启动
+chroot  /sysroot
+passwd root
+```
+
+#### 实现grub2安全
+```shell
+添加grub密码 
+grub2-setpassword
+
+# 添加密码后会在/boot/grub2目录下，添加user.cfg文件，里面是密码
+echo "" > user.cfg      # 可以清空密码
+```
+
+#### 修复grub2
+- 主要配置文件：/boot/grub2/grub.cfg
+- 修复配置文件：grub2-mkconfig > /boot/grub2/grub.cfg
+
+- 修复grub
+```shell
+grub2-install /dev/sda  # BIOS环境
+grub2-install           # UEFI环境
+```
+
+- 设置默认启动内核
+```shell
+# 以下命令是修改 /boot/grub2/grubenv实现
+# 查看内核信息
+ls /boot/loader/entries/
+# 可以将需要设置的默认内核信息，添加替换至/boot/grub2/grubenv的saved_entry=后面，将它后面的替换掉 
+grub2-set-default 0
+# 或者
+vim /etc/default/grub
+GRUB_DEFAULT=0
+```
+
+- 实战案例1
+```shell
+# 破坏前446字节的引导信息
+dd if=/dev/zero of=/dev/sda bs=1 count=446 
+# 光盘进入救援模式
+grub2-install --root-directory=/mnt/sysimage /dev/sda
+```
+
+- 实战案例2
+```shell
+# 删除/boot/grub2/*所有内容，进行修复
+光盘进入救援模式
+chroot /mnt/sysimage
+grub2-install /dev/sda
+grub2-mkconfig -o /boot/grub2/grub.cfg
+```
+
+- 实战案例3
+```shell
+# 清空/boot下文件，进行修复
+光盘进入救援模式
+# 特别说明，CentOS8必须先grub，再安装kernel，否则安装kernel-core时会提示grub出错
+chroot /mnt/sysimage
+mount /dev/sr0 /mnt
+grub2-install /dev/sda
+
+2. 安装kernel
+rpm -ivh <安装包路径> --force
+
+3. 修复grub.cfg
+grub2-mkconfig -o /boot/grub2/grub.cfg
+
+4. 退出重启
+exit
+exit
+```
+
+
+
+# 服务
+## 域名系统DNS
+### 名称解析介绍和DNS
+- 实现此服务的方法
+  - 本地名称解析配置文件：hosts
+    - Linux：/etc/hosts
+    - windows: %WINDIR%/system32/drivers/etc/hosts
+      - windows中使用`set %WINDIR%`查看变量数值
+    ```shell
+    122.10.117.2 www.magedu.org
+    93.46.8.89 www.google.com
+    ```
+
+- DNS: Domain Name System 域名系统应用层协议，是互联网的一项服务，它作为将域名和IP地址相互映射的一个分布式数据库，能够使人更方便的访问互联网
+  - 基于C/S架构，<span style="color:red">服务端：53/udp, 53/tcp</span>
+
+- BIND: Bekerley Internet Name Domain，由ISC（www.isc.org）提供的DNS软件实现
+  - DHCP也是ISC负责维护管理的
+
+- <span style="color:red; font-weight:700">DNS重要思想：分布式管理</span>
+
+
+#### DNS域名结构
+- FQDN：全程域名 = 主机名 + 域名
+  - 域名 = 子域名 + 父域名
+
+- 域名结构
+  - 根域 . 13个
+  - 一级域名：Top Level Domain：com,edu,gov,org,io...
+    - 三类：组织域，国家域，反向域
+  - 二级域名：`magedu.com`
+  - 三级域名：`study.magedu.com`
+  - 最多可达到127级域名
+
+- ICANN(The Internet Corporation for Assigned Names and Numbers) 互联网名称与数字地址分配机构，负责在全球范围内对互联网通用顶级域名以及国家和地区顶级域名系统的管理，以及根服务器系统的管理
+
+#### DNS服务工作原理
+- 略
+
+#### DNS查询类型
+- 递归查询：最终结果，负责到底
+- 迭代查询：最好结果，不负责到底
+
+#### 解析类型
+- FQDN ---> IP 正向解析
+- IP ----> FQDN 反向解析
+- 注意：正反向解析是两个不同的名称空间，是两颗不同的树
+
+#### 完整的查询请求经过的流程
+```shell
+Client --> 
+hosts文件 --> 
+Client DNS Service Local Cache --> 
+DNS Server(Recursion 递归) --> 
+DNS Service Cache --> iteration(迭代) -->
+根 -->
+顶级域名DNS -->
+二级域名..
+```
+
+### DNS软件bind
+- DNS服务器软件：bind，powerdns（基于LAMP），unbound, coredns
+
+#### BIND相关程序包
+```shell
+yum list all bind*
+```
+- bind: 服务器
+- bind-libs: 相关库
+- bind-utils: 客户端
+- bind-chroot：安全包，将dns相关文件放至`/var/named/chroot`
+- 范例：安装bind软件
+```shell
+ 
+```
+
+#### BIND包相关文件
+- BIND主程序：`/usr/bin/named`
+- rndc使用953端口
+- 本地配置的DNS服务器文件`/etc/resolv.conf` 
+- 当安装并启动named的时候，此时并没有任何DNS配置，上面自带关于根域的记录，此时该DNS服务器叫做只缓存服务器，初次访问的所有域名都通过访问根，依次访问后几级域名，来实现DNS域名转换
+
+- `cat /var/named/named.ca`存放了13个根记录
+```shell
+#  /var/named/named.ca
+;; ANSWER SECTION:
+.                       518400  IN      NS      a.root-servers.net.
+.                       518400  IN      NS      b.root-servers.net.
+.                       518400  IN      NS      c.root-servers.net.
+.                       518400  IN      NS      d.root-servers.net.
+.                       518400  IN      NS      e.root-servers.net.
+.                       518400  IN      NS      f.root-servers.net.
+.                       518400  IN      NS      g.root-servers.net.
+.                       518400  IN      NS      h.root-servers.net.
+.                       518400  IN      NS      i.root-servers.net.
+.                       518400  IN      NS      j.root-servers.net.
+.                       518400  IN      NS      k.root-servers.net.
+.                       518400  IN      NS      l.root-servers.net.
+.                       518400  IN      NS      m.root-servers.net.
+
+;; ADDITIONAL SECTION:
+a.root-servers.net.     518400  IN      A       198.41.0.4
+b.root-servers.net.     518400  IN      A       199.9.14.201
+c.root-servers.net.     518400  IN      A       192.33.4.12
+d.root-servers.net.     518400  IN      A       199.7.91.13
+e.root-servers.net.     518400  IN      A       192.203.230.10
+f.root-servers.net.     518400  IN      A       192.5.5.241
+g.root-servers.net.     518400  IN      A       192.112.36.4
+h.root-servers.net.     518400  IN      A       198.97.190.53
+i.root-servers.net.     518400  IN      A       192.36.148.17
+j.root-servers.net.     518400  IN      A       192.58.128.30
+k.root-servers.net.     518400  IN      A       193.0.14.129
+l.root-servers.net.     518400  IN      A       199.7.83.42
+m.root-servers.net.     518400  IN      A       202.12.27.33
+a.root-servers.net.     518400  IN      AAAA    2001:503:ba3e::2:30
+b.root-servers.net.     518400  IN      AAAA    2001:500:200::b
+c.root-servers.net.     518400  IN      AAAA    2001:500:2::c
+d.root-servers.net.     518400  IN      AAAA    2001:500:2d::d
+e.root-servers.net.     518400  IN      AAAA    2001:500:a8::e
+f.root-servers.net.     518400  IN      AAAA    2001:500:2f::f
+g.root-servers.net.     518400  IN      AAAA    2001:500:12::d0d
+h.root-servers.net.     518400  IN      AAAA    2001:500:1::53
+i.root-servers.net.     518400  IN      AAAA    2001:7fe::53
+j.root-servers.net.     518400  IN      AAAA    2001:503:c27::2:30
+k.root-servers.net.     518400  IN      AAAA    2001:7fd::1
+l.root-servers.net.     518400  IN      AAAA    2001:500:9f::42
+m.root-servers.net.     518400  IN      AAAA    2001:dc3::35
+```
+- 每个根域名后面是一堆服务器，这里的IP是VIP虚拟IP
+
+- 通过`ss -ntulp`可以查看所有端口的信息
+```shell
+[root@localhost /etc/sysconfig/network-scripts] $ ss -tulpn
+Netid                     State                      Recv-Q                     Send-Q                                         Local Address:Port                                          Peer Address:Port                     Process                                                
+udp                       UNCONN                     0                          0                                                  127.0.0.1:53                                                 0.0.0.0:*                         users:(("named",pid=3286,fd=512))                     
+udp                       UNCONN                     0                          0                                                      [::1]:53                                                    [::]:*                         users:(("named",pid=3286,fd=513))                     
+tcp                       LISTEN                     0                          10                                                 127.0.0.1:53                                                 0.0.0.0:*                         users:(("named",pid=3286,fd=21))                      
+tcp                       LISTEN                     0                          128                                                  0.0.0.0:22                                                 0.0.0.0:*                         users:(("sshd",pid=1006,fd=3))                        
+tcp                       LISTEN                     0                          128                                                127.0.0.1:953                                                0.0.0.0:*                         users:(("named",pid=3286,fd=23))                      
+tcp                       LISTEN                     0                          10                                                     [::1]:53                                                    [::]:*                         users:(("named",pid=3286,fd=22))                      
+tcp                       LISTEN                     0                          128                                                     [::]:22                                                    [::]:*                         users:(("sshd",pid=1006,fd=4))                        
+tcp                       LISTEN                     0                          128                                                    [::1]:953                                                   [::]:*                         users:(("named",pid=3286,fd=24))     
+```
+- 发现，udp和tcp的53端口是监听在127.0.0.1这个端口上，也就是说，只能本机进行访问，无法对外提供服务，
+- 更改named上监听个端口需要修改配置文件(典型C语言风格的配置文件)
+  - `/etc/named.conf`
+```shell
+
+options {
+        # 更改这里
+        // listen-on port 53 { 127.0.0.1; };
+        listen-on port 53 { 127.0.0.1; 10.0.0.171;};
+        listen-on-v6 port 53 { ::1; };
+        directory       "/var/named";
+        dump-file       "/var/named/data/cache_dump.db";
+        statistics-file "/var/named/data/named_stats.txt";
+        memstatistics-file "/var/named/data/named_mem_stats.txt";
+        secroots-file   "/var/named/data/named.secroots";
+        recursing-file  "/var/named/data/named.recursing";
+        allow-query     { localhost; };
+
+        /* 
+         - If you are building an AUTHORITATIVE DNS server, do NOT enable recursion.
+         - If you are building a RECURSIVE (caching) DNS server, you need to enable 
+           recursion. 
+         - If your recursive DNS server has a public IP address, you MUST enable access 
+           control to limit queries to your legitimate users. Failing to do so will
+           cause your server to become part of large scale DNS amplification 
+           attacks. Implementing BCP38 within your network would greatly
+           reduce such attack surface 
+        */
+        recursion yes;
+
+        dnssec-enable yes;
+        dnssec-validation yes;
+
+        managed-keys-directory "/var/named/dynamic";
+
+        pid-file "/run/named/named.pid";
+        session-keyfile "/run/named/session.key";
+
+        /* https://fedoraproject.org/wiki/Changes/CryptoPolicy */
+        include "/etc/crypto-policies/back-ends/bind.config";
+};
+
+logging {
+        channel default_debug {
+                file "data/named.run";
+                severity dynamic;
+        };
+};
+
+zone "." IN {
+        type hint;
+        file "named.ca";
+};
+
+include "/etc/named.rfc1912.zones";
+include "/etc/named.root.key";
+```
+
+- 修改/etc/named.conf之后，使用named-checkconf进行该文件的语法检查
+```shell
+# 将/etc/named.conf中
+listen-on port 53 { 127.0.0.1; };
+# 改为
+listen-on port 53 { localhost; };
+# localhost是一个关键字在named中，表示本地所有的地址
+named-checkconf
+
+# 重启
+systemctl reload named
+rndc reload   # 等价
+
+# 问题排查期间使用的命令
+ss -ntupl
+
+tcpdump -i <网卡名> prot 端口
+
+# 更改下列字段，使其可以接受外界的传输
+allow-query { localhost; 10.0.0.0/24; };  # 这个位置可以写网段，表示这个网段内的所有设备都可以通过该DNS服务器实现域名查询
+allow-query { any;};   # any表示这台DNS是公共服务器，任何主机都可以通过它查询IP
+
+# 更简单的方法
+将allow-query和linsten-on 全部注释掉
+
+DNS默认允许任何设备从主服务器拉取信息
+# 严重安全问题补丁
+# 只允许从服务器进行区域传输(主服务器配置)
+allow-transfer { 从服务器IP; };
+
+# 不允许其他主机进行区域传输
+allow-transfer { none; }; （从服务器配置）
+```
+- 使用dig抓取信息的方法
+```shell
+dig -t axfr magedu.org @10.0.0.8
+```
+
+#### DNS服务器类型
+- 主DNS服务器
+  - 管理和维护所负责解析的域内解析库的服务器
+
+- 从DNS服务器
+  - 从主服务器或从服务器复制（区域传输）解析库副本
+    - 序列号：解析库版本号，主服务器解析库变化时，其序列递增
+    - 刷新时间间隔：从服务器从主服务器请求同步解析的时间间隔
+    - 重试时间间隔：从服务器请求同步失败时，再次尝试时间间隔
+    - 过期时间：从服务器联系不上主服务器时，多久会停止服务
+    - 通知机制：主服务器解析库放生变化时，会主动通知从服务器
+
+- 缓存DNS服务器（转发器）
+
+#### 区域传输
+- 完全传输：传输整个解析库
+- 增量传输：传递解析库变化的那部分内容
+
+#### 主DNS服务器实现
+- 要创建维护一个magedu.org的域，就要创建一个解析magedu.org的域的数据库
+  - 该数据库单独存放，这个数据库文件里面记录所有magedu.org为后缀的域以及IP的对应关系
+  - 一个区域数据库对应一个域
+  - 该区域数据库由一行一行的区域记录组合而成
+
+- 区域解析库：由众多RR组成
+  - 各种资源记录：RR（Resource Record）
+  - 记录类型：A，AAAA，PTR， SOA， NS， CNAME， MX
+  - SOA：Start Of Authority，起始授权记录：一个区域解析库有且仅有一个SOA记录，必须位于解析库的第一条记录
+  - A：Internet Addresses：作用：FQDN -> IP
+  - AAAA: FQDN -> IPv6
+  - PTR: IP -> FQDN
+  - NS：NAME Service，专用于标明当前区域的DNS服务
+  - CNAME：Canonical Name，别名记录
+  - MX：邮件交换器
+  - TXT：对域名进行标识和说明的一种方式
+
+- 资源记录定义的格式
+```shell
+name [TTL] IN rr_type value
+```
+- 注意：
+  - TTL可以从全局继承
+  - 使用@符号可用于引用当前区域的名字
+
+- SOA
+```shell
+$TTL 86400
+# 一个小时做一次拉取操作，如果失败了10分钟后重试，当从服务器和主服务器无法同步，一天之后，从主将无法对外提供服务，最后一个参数：错误结果缓存时间
+@ IN SOA ns1.magedu.org admin.magedu.org (123, 1h, 10m, 1D, 12h)
+ns1.magedu.org IN A 10.0.0.8
+
+#： ns1.magedu.org: 表示当前维护magedu.org这个域的服务器的名称（我是谁）
+
+#： 后面需要补一个
+ns1.magedu.org IN A 10.0.0.33  # 我在哪
+
+# admin.magedu.org: 域名服务器的管理员邮箱，指代admin@magedu.org
+
+# 123: 该数据库版本名称
+# 1h: 每隔一个小时从服务器从主服务器拉取数据，（是否更新的判断是版本号）
+# 10m: 如果同步失败，则每10分钟重新尝试一次
+# 1D：如果1天以上都无法实现同步，则从服务器数据失效
+# 12h: 错误访问记录的缓存有效期，即如果用户查找一个不存在数据库中的域名，则定一个缓存有效期，12个小时内，用户如果继续访问，则直接返回该记录不存在。（否定答案的TTL值 ）
+```
+- 主服务器和从服务器之间一般有两种操作：一种是推push，一种是拉pull
+  - 主服务器数据变了，主动把数据推送给从服务器
+  - 从服务器定时从主服务器 拉取数据，查看是否更新
+
+- NS：通过NS记录，判断当前数据库中，有哪些主从服务器
+  - 对NS记录而言，任何一个ns记录后面的服务器名称，都应该在后续有一个A记录
+```shell
+@ IN NS ns1       # 主服务器 
+@ IN NS ns2       # 从服务器
+ns1 IN NS ip_addr
+ns2 IN NS ip_addr
+```
+
+- 存放DNS数据库的路径`/var/named`
+- DNS数据库命名规范：所管理的域名+zone
+  - 示例：magedu.org.zone
+  - 新建DNS数据库的时候，可以复制之前的自带的文件，`cp -p 源文件`，将其权限等一同复制
+
+#### DNS客户端测试工具
+- host命令
+```shell
+host 域名
+# 测试该域名是否能够解析成功
+```
+
+- dig命令
+```shell
+dig 域名
+dig 域名 @DNS服务器IP   # @表示直接向该DNS服务器进行查询，而不是向默认服务器查询
+# 相比host,其信息显示更全 
+```
+
+- nslookup
+```shell
+nslookup 域名
+```
+
+- 使用CNAME实现流量分发(负载均衡)
+```shell
+@ IN SOA ns1 admin.magedu.org (123, ...)
+
+@ NS ns1
+ns1 A 10.0.0.8
+
+www    CNAME    websrv
+websrv    A      10.0.0.6
+websrv    A      10.0.0.7
+# 此时用户访问www，流量会被均摊到6,7两台服务器上，从而实现服务器性能的提升
+```
+
+
+#### 区域数据库写完后，通过配置文件让named服务加载区域数据库
+- 全局配置文件：`/etc/named.conf`（不推荐）
+```shell
+# 格式：
+zone "." IN {
+  type hint|master|slave;
+  file "named.ca";
+};
+```
+
+- `/etc/named.rfc1912.zones`(推荐)，将数据库信息加载至该文件
+```shell
+# 格式：
+zone "." IN {
+  type hint|master|slave;
+  file "named.ca";
+};
+
+# hint指示该服务器启动时应如何寻找根DNS服务器
+# hint类型的作用是在DNS查询过程开始时，提供一个初始的查询点
+
+zone "magedu.org" IN {
+  type master;
+  file "magedu.org.zone";
+  # 路径不用写，默认找/var/named，就是这么智能
+};
+```
+
+- 配好之后检查
+```shell
+# 配置文件语法检查
+named-checkconf
+
+# 区域数据库语法检查
+named-checkzone 域名 区域数据库路径
+```
+
+- 检查成功后，重新加载
+```shell
+systemctl reload named
+rndc reload
+```
+
+#### 解析邮件服务器
+```shell
+@   MX  10   mailsrv
+@   MX  20   mailsrv2
+mailsrv  A 10.0.0.6
+mailsrv  B 10.0.0.7
+```
+- 查询当前域中，谁是邮件服务器
+```shell
+dig -t mx magedu.org
+```
+
+#### 泛解析案例
+```shell
+# 使用 * 
+# 使用 @
+
+# $GENERATE 1-254 HOST$ IN  A  1.2.3.$ 相当于
+HOST1 IN A 1.2.3.1e
+HOST2 IN A 1.2.3.2
+...
+HOST254 IN A 1.2.3.254
+```
+
+
+#### 实现反向解析区域
+- 应用场景：邮件服务
+- 反向区域：即将IP反向解析为FQDN
+- 区域名称：网络地址反写in.addr.arpa
+```shell
+ 172.16.100. --> 100.16.172.in-addr.arpa.
+```
+
+- 定义区域
+```shell
+zone "ZONE_NAME" IN {
+  type {master | slave | forward};
+  file "网络地址.zone"; # eg:10.0.0.zone
+};
+```
+
+- 定义区域解析库文件
+  - 注意：不需要MX，以PTR记录为主
+
+- 区域数据库(10.0.0.zone)
+```shell
+$TTL 1D
+
+@ IN SOA ns1.magedu.org. admin.magedu.org. (1 12H 10M 3D 1D )
+
+      NS  ns1.magedu.org.
+
+7     PTR  websrv.magedu.org.
+123   PTR  mailsrv.magedu.com.
+```
+
+- 测试反向解析
+```shell
+dig -t ptr 7.0.0.10.in-addr.arpa
+# 等价于
+dig -x 10.0.0.7
+```
+
+
+#### 从服务器的实现
+- 实现过程
+  - 应该为一台独立的名称服务器
+  - 主服务器的区域解析库中必须有一条NS记录，指向从服务器
+  - 从服务器只需要定义区域，而不需提供解析库文件；解析库文件应该放置域/var/named/slaves目录中
+  - 主服务器得到允许从服务器做区域传输
+  - 主服务器时间应该同步，通过ntp进行
+  - bind程序的版本应该保持一致；否则，应该从高，主低
+
+- 定义从区域
+```shell
+zone "ZONE_NAME" IN {
+  type slave;
+  masters { MASTER_IP; };
+  file "slaves/ZONE_NAME.zone" ;
+}
+```
+
+- 主服务器增加NS记录
+```shell
+@  NS ns2
+ns2 A 10.0.0.18  #从服务器IP
+```
+
+
+#### 安全加固
+- 默认任何主机都可以从主服务器同步区域数据库，这有很大的安全风险
+- 解决方法
+```shell
+# 主从服务器添加配置信息
+allow-transfer {};
+# 主服务器
+allow-transfer { 从服务器IP; };
+# 从服务器
+allow-transter { none; };
+```
+
+### 实现子域
+```shell
+magedu.org 10.0.0.8 主DNS服务器
+
+# 用另一台设备来负责子域DNS服务
+sh.magedu.org 10.0.0.28
+```
+
+- 在10.0.0.28上实现
+```shell
+hostnamectl set-hostname shanghai
+
+# 在父的区域数据库中，增加子域记录
+sh  NS  ns3
+ns3 A 10.0.0.28
+
+# 在10.0.0.28配置
+/etc/named.conf
+
+注释：listen-on port 53...
+注释：allow-query { localhost; };
+
+allow-transfer { none; };
+
+# 添加数据库引用
+zone "sh.magedu.org" {
+  type master;
+  file "sh.magedu.org.zone"
+};
+
+# 在/var/named/创建sh.magedu.org.zone
+$TTL 1D
+@ IN SOA ns1 admin.magedu.org. (23, 1D, 1H, 1W, 3H)
+@ NS ns1
+ns1 A 10.0.0.28
+www CNAME websrv
+websrv A  10.0.0.66
+```
+
+- <span style="color:red">易错点：注意子域数据库的权限问题</span>
+
+
+### 实现DNS转发（缓存）服务器
+- DNS转发：利用DNS转发，可以将用户的DNS请求，转发至指定的DNS服务，而非默认的根DNS服务器，并将指定服务器查询的返回结果进行缓存，提高效率
+
+- 注意：
+  - 被转发的服务器需要能够为请求者做递归，否则转发请求不予进行
+  - 在全局配置中，关闭dnssec功能
+  ```shell
+  dnssec-enable no;
+  dnssec-validation no;
+  ```
+
+#### 全局转发
+- 对非本机所负责解析区域的请求，全转发给指定的服务器
+- 在全局配置块中实现：
+```shell
+Options {
+  forward first| only;
+  forwarders { ip; };
+}
+# first 表示如果转发给的DNS服务器上没有需要的记录，则自己去互联网查询
+# only 表示如果转发给的DNS服务器上没有需要的记录，直接返回失败，自己本身不去查询
+```
+
+#### 特定区域转发
+- 仅转发特定的区域请求，比全局转发优先级高
+```shell
+zone "ZONE_NAME" IN {
+  type forward;
+  forward first | only;
+  forwarders { ip; };
+}
+```
+
+
+### 智能DNS
+- 目的: 让网民访问网站的速度更快
+#### GSLB
+- GSLB：Global Server Load Balance 全局负载均衡； GSLB是对服务器和链路进行综合判断来决定哪个地点的服务器来提供服务，实现异地服务器群服务质量的保证；GSLB主要的目的是在整个网路范围内将用户的请求定向到最近的节点（或者区域）；
+
+- GSLB分为基于DNS实现，基于重定向实现，基于路由协议实现，其中最通用的是基于DNS解析方式
+
+- 范例：查询VIP（唯品会）使用网宿的CDN服务
+
+
+
+
+#### CDN（Content Delivery Network）内容分发网络
+- CDN服务商
+  - 服务商：阿里，腾讯，蓝汛，网宿，帝联等
+  - 智能DNS：dnspod， dns.la
+
+
+#### 智能DNS相关技术
+- bind中ACL：把一个或多个地址归并为一个集合，并通过一个统一的名称调用
+- 注意：只能先定义，后使用；因此一般定义在配置文件中，处于options的前面
+- 格式
+```shell
+acl acl_name {
+  ip;
+  net/prelen;
+};
+```
+- 范例：
+```shell
+acl beijingnet{
+  172.16.0.0/16;
+  10.10.10.10;
+  ...
+};
+```
+
+- bind有四个内置的acl
+  - none：没有一个主机
+  - andy：都是主机
+  - localhost：本机
+  - localnet：本机的IP同掩码运算后得到的网络地址
+
+
+- 访问控制的指令
+  - allow-query{}: 允许查询的主机：白名单
+  - allow-transfer{}: 允许区域传送的主机；白名单
+  - allow-recursion{}：允许递归的主机，建议全局使用
+  - allow-update{}; 允许更新区域数据库中的内容
+
+#### view视图
+- View：视图，将ACL和区域数据库实现对应关系，以实现只能DNS
+  - 一个bind服务器可以定义多个view，每个view中可定义一个或多个zone
+  - 每个view用来匹配一组客户端
+  - 多个view内可能需要对同一个区域进行解析，但使用不同的区域解析文件
+
+- 注意：
+  - 一旦启用了view，所有的zone都只能定义在view中
+  - 仅在允许递归请求的客户端所在view中定义根区域
+  - 客户端请求到达是，是自上而下检查每个view所服务的客户端列表
+
+
+- view格式
+```shell
+view VIEW_NAME {
+    match-clients { beijingnet; };
+    zone "magedu.org" {
+        type master;
+        file "magedu.org.zone.bj";
+    };
+    include "/etc/named.rfc1912.zones";
+};
+
+view VIEW_NAME {
+    match-clients { shanghainet; };
+    zone "magedu.org" {
+        type master;
+        file "magedu.org.zone.sh";
+    };
+};
+```
+#### 实战案例：利用view实现智能DNS
+- 实验目的：搭建DNS主存服务架构，实现DNS服务冗余
+
+- 环境要求：
+```shell
+需要五台主机
+DNS主服务器和web服务器1：192.168.8.8/24 172.16.0.8/16
+web服务器2：192.168.8.7/24
+web服务器3: 172.16.0.7/16
+DNS客户端1: 192.168.8.6/24
+DNS客户端2: 172.16.0.6/16
+```
+
+- 前提准备
+```shell
+关闭selinux
+关闭防火墙
+时间同步
+```
+
+#### 实现步骤
+
+- DNS服务器的网卡配置
+```shell
+# 配置两个IP地址
+# eth0: 192.168.8.8/24
+# eth1: 172.16.0.8/16
+```
+
+- 主DNS服务器配置文件实现view
+```shell
+yum install bind -y
+
+vim /etc/named.conf
+# 在文件最前面加下面行
+acl beijingnet {
+  192.168.8.0/24
+};
+
+acl shanghainet{
+  172.16.0.0/16
+};
+
+acl othernet {
+  any;
+};
+
+# 注释掉下面两行
+//listen-on-port 53...
+// allow-query...
+
+# 创建view
+view beijingview {
+    match-clients { beijingnet; };
+    include "/etc/named.rfc1912.zones.bj";
+};
+view shanghaiview {
+    match-clients { shanghainet; };
+    include "/etc/named.ref1912.zones.sh";
+};
+view otherview {
+    matchclients { othernet; };
+    include "/etc/named.rfc1912.zones.other"
+}
+include "/etc/named.root.key"
+```
+
+- 实现区域配置文件
+```shell
+vim /etc/named.rfc1912.zones.bj
+zone "." IN {
+  type hint;
+  file "named.ca";
+}
+
+zone "magedu.org" {
+    type master;
+    file "magedu.org.zones.bj";
+};
+
+vim /etc/named.rfc1912.zones.sh
+zone "." IN {
+  type hint;
+  file "named.ca";
+}
+
+zone "magedu.org" {
+    type master;
+    file "magedu.org.zones.sh";
+};
+
+vim /etc/named.rfc1912.zones.other
+zone "." IN {
+  type hint;
+  file "named.ca";
+}
+
+zone "magedu.org" {
+    type master;
+    file "magedu.org.zones.other";
+};
+
+chgrp named /etc/named.rfc1912.zones.bj
+chgrp named /etc/named.rfc1912.zones.sh
+chgrp named /etc/named.rfc1912.zones.other
+```
+
+- 创建区域数据库文件
+```shell
+vim /var/named/magedu.org.zones.bj
+$TTL 1D
+@ IN SOA master admin.magedu.org (...)
+      NS master
+master A 192.168.8.8
+websrv A 192.168.8.7
+www    CNAME websrv
+
+vim /var/named/magedu.org.zone.sh
+$TTL 1D
+@ IN SOA master admin.magedu.org (...)
+      NS master
+master A 192.168.8.8
+websrv A 172.16.0.7
+www    CNAME websrv
+
+vim /var/named/magedu.org.zone.other
+$TTL 1D
+@ IN SOA master admin.magedu.org (...)
+      NS master
+master A 192.168.8.8
+websrv A 127.0.0.1
+www    CNAME websrv
+
+chgrp named /var/named/magedu.org.zone.bj
+chgrp named /var/named/magedu.org.zone.sh
+chgrp named /var/named/magedu.org.zone.other
+
+systemctl start named   # 第一次启动
+rndc reload             # 不是第一次启动服务
+```
+
+- 实现位于不同区域的三个WEB服务器：略
+
+- 客户端测试
+
+
+#### 综合实验
+![alt text](images/image31.png)
+
+
+### Ubuntu中的systemd-resolved服务
+- 在ubuntu系统中，虽然在网卡中配置了DNS服务器的IP地址，但在使用相关命令进行DNS解析时，默认的DNS服务器使用的是127.0.0.53，而并不是我们在网卡上配置的DNS服务器地址
+![alt text](images/image35.png)
+
+- Ubuntu中的systemd-reloved服务为本地应用程序提供了网络名字解析服务，系统通过它对外进行dns请求
+```shell
+root@ubuntu2204:/etc$ll resolv.conf 
+lrwxrwxrwx 1 root root 39 Aug 10  2023 resolv.conf -> ../run/systemd/resolve/stub-resolv.conf
+# ubuntu中，resolv.conf是一个软连接，指向/run/systemd/resolve/stub-resolv.conf
+# 修改这个软链接的指向到/run/systemd/resolve/resolv.conf,而不是systemd-reloved
+
+ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf
+
+# 修改后，则会和网卡上配置的DNS对齐
+```
+- 设置全局DNS
+```shell
+vim /etc/systemd/resolved.conf
+...
+DNS=223.5.5.5
+```
+
+#### bind安装和配置
+- 配置文件 `/etc/bind/named.conf.default-zones`
+```shell
+root@ubuntu2204:/etc$cat /etc/bind/named.conf.default-zones 
+// prime the server with knowledge of the root servers
+zone "." {
+        type hint;
+        file "/usr/share/dns/root.hints";  # 记录了根域的信息
+};
+
+// be authoritative for the localhost forward and reverse zones, and for
+// broadcast zones as per RFC 1912
+
+zone "localhost" {
+        type master;
+        file "/etc/bind/db.local";
+};
+
+zone "127.in-addr.arpa" {
+        type master;
+        file "/etc/bind/db.127";
+};
+
+zone "0.in-addr.arpa" {
+        type master;
+        file "/etc/bind/db.0";
+};
+
+zone "255.in-addr.arpa" {
+        type master;
+        file "/etc/bind/db.255";
+};
+```
+- 主配置文件 `/etc/bind/named.conf`
+```shell
+// This is the primary configuration file for the BIND DNS server named.
+//
+// Please read /usr/share/doc/bind9/README.Debian.gz for information on the 
+// structure of BIND configuration files in Debian, *BEFORE* you customize 
+// this configuration file.
+//
+// If you are just adding zones, please do that in /etc/bind/named.conf.local
+
+include "/etc/bind/named.conf.options"; # bind配置项
+include "/etc/bind/named.conf.local";   # 基本不用
+include "/etc/bind/named.conf.default-zones"; # 中间配置文件，该文件中定义了域名和具体解析规则文件的对应关系
+```
+
+- bindp配置项文件`/etc/bind/named.conf.options`
+```shell
+options {
+    # 此配置表示DNS服务只监听了本机127.0.0.1的53端口，如果对外提供DNS服务，可以将此行注释或改为any
+    listen-on port 53 { 127.0.0.1; };
+
+    # 监听IPV6的53端口，配置方法同上
+    listen-on-v6 port 53 { ::1; };
+
+    # 此配置表示仅本机客户以使用DNS服务的解析查询功能，如果对外提供DNS服务，可以将此行注释或者值改为any
+    allow-query { localhost; };
+
+    # 是否启用加密验证，在使用转发的时候，将此项改为no
+    dnssec-validation auto;
+
+    # 转发服务器
+    forwards { 10.0.0.207; };
+
+    forward first; 
+}
+```
+
+
+
+
+
+## 加密安全
+### 重点1：综合加密和签名（面试题）
+- 签名的本质：即A使用私钥加密，B通过A的公钥去验证A的身份，同时里面的数据通过hash值保证数据的完整性
+![alt text](images/image32.png)
+
+### 重点2：Ca和证书原理
+- PKI：Public Key Infrastructure 公共密钥加密体系
+  - 签证机构：CA（Certificate Authority）
+
+- CA解决的问题：因为存在中间人攻击，导致双方的公钥无法得到信任，因此把公钥发给CA，由CA负责验证证书（公钥）的合法性
+
+- 过程：
+  - A把自己的公钥发送给CA，（CA也有自己的公钥和私钥），CA负责验证收到的公钥是否真实可靠，验证A的身份，
+  - 如果CA验证A的身份没有问题，CA就会用自己的私钥进行签名,然后将其生成证书
+    - 签名：把A的公钥用CA的私钥进行签名，同时添加ca的信息，有效期等其他信息
+    - 签名（CA私钥加密的A的公钥）+其他信息，构成证书
+  - CA将证书发给A
+  - A得到自己的证书后，就可以通过网路将证书发送给B，此时B就得到了A的证书
+    - B的到A的证书，目的就是安全可靠的得到A的公钥
+  - （前提B信任CA）B的到A的证书后，使用CA的公钥对证书进行解密，得到A的公钥
+  - 同样的逻辑，B向CA申请证书，然后将证书发给A，这样A就通过CA公钥解密证书，得到了B的公钥
+
+
+- CA1 和 CA2两个子CA机构要向root CA即根CA机构，验证自己的身份
+  - CA1将自己的公钥发给RootCA,RootCA也有自己的私钥和公钥
+  - RootCA使用自己的私钥加密CA1的公钥，加上根CA的信息+有效期等信息，生成CA1的证书，发给CA1
+  - CA2，同理，从RootCA那里得到CA2的证书（上面有RootCA私钥加密的CA2公钥的信息+RootCA信息+有效期等信息）
+   
+- CA1的用户向CA2的用户进行加密通讯，就需要互相得到对方的公钥，即CA2下的用户需要CA1的公钥，CA1下的用户需要CA2的公钥，此时需要向RootCA申请对方的证书，然后使用RootCA的公钥进行解密，得到对方的公钥
+
+
+- 所有电脑上默认保存着根CA的公钥
+![alt text](images/image33.png)
+
+- 根CA自己给自己办发证书（自签名的证书）
+```shell
+Srootca(Prootca) + Prootca + expire + other
+```
+
+- 为保证安全，根CA一般不联网
+
+- CRL分发点上面记录着被吊销的证书
+
+
+- 补充
+![alt text](images/image34.png)
+- 数字证书上的信息
+  - 信息摘要：
+    - 用户公钥
+    - 用户相关信息
+    - 证书颁发机构信息
+    - 证书有效期等
+  - 数字签名（将上面的所有数据算出一个hash算法，算一个hash值，然后使用CA私钥加密）
+  - 该hash值无法被中间人篡改，中间人只能篡改摘要信息，但是中间人更改了摘要信息，就会和数字签名中的信息不匹配，从而配判定不可信
+
+- 证书：里面有PK，可读不可改，并且不可伪造
+
+### 重点3：https简化原理
+- https单向认证，访问者要验证网站，而网站不能验证访问者
+
+- 整个过程
+```shell
+1. 客户端发起HTTPS请求
+用户在浏览器里面输入一个https网址，然后连接到服务器的443端口
+
+2. 服务端的配置
+采用HTTPS协议的服务器必须要有一套数字证书，可以自己制作，也可以向组织申请，区别就是自己办发的证书要客户端验证通过，才能继续访问，而使用受信任的公司申请的证书则不会弹出提示页面，这套证书起始就是一对公钥和私钥
+
+3. 传送服务器的证书给客户端
+证书里其实是公钥，并且还包含很多的信息，比如证书的颁发机构，过期时间等
+
+4. 客户端解析验证服务器证书
+这部分工作是由客户端的TLS来完成，首先会验证公钥是否有效，比如：颁发机构，过期时间等，如果发现异常，则会弹出一个提示，提示证书有问题，如果证书没问题，就会生成一个随机值，然后用证书的公钥对该随机值进行非对称加密
+
+5. 客户端加密信息传送服务器
+这部分传送使用证书加密后的随机值，目的就是让服务器得到这个随机值，以后客户端和服务器的通信就可以通过这个随机值进行对称加密 
+```
+
+- 总结：
+  - 就是客户端向服务端发起请求
+  - 服务端响应客户端并将证书发给客户端
+  - 客户端验证证书，如果验证没有问题，则产生一个随机值，并用公钥将其加密，并返回给服务端
+  - 服务端使用私钥将其解密，得到这个随机值，后续的通信，就可以用这个随机值作为密钥，进行对称加密
+  - 对称加密的好处就是简单高效，                                         效率高，性能好
+
+### base64编码原理
+- 一个ascll字符8bit
+- base64是将其进行6bit分割，然后查询base64的字符表，进行重组，如果最后不足6bit，每2bit用一个=补充
+
+### 重点4：openssl命令
+
+#### openssl单向哈希加密（摘要算法）
+- 查看所有摘要命令
+```shell
+openssl list -digest-commands
+```
+
+- 使用md5计算文件摘要值
+```shell
+openssl md5 fstab
+
+openssl dgst -md5 fstab
+
+md5sum fstab
+
+openssl dgst fstab 默认sha256 
+```
+
+- openssl passwd 生成用户密码
+
+### openssl命令
+
+- 查看openssl的版本
+```shell
+openssl version
+```
+
+#### openssl对称加密
+- 工具：`openssl enc, gpg`
+- 算法：`3des, aes, blowfish, twofish`
+- enc命令帮助：`man enc`
+```shell
+# 加密
+openssl enc -e -des3 -a -salt -in testfile -out testfile.cipher
+# -e 加密
+# -des3 对称加密算法
+# -a 使用base64输出可见字符
+# -salt 加盐（随机生成，默认）
+# - in 后面加要处理的文件
+# -out 将加密后的信息输出到指定文件
+
+# 解密
+openssl enc -d -des3 -a -salt -in testfile.cipher -out testfile 
+```
+
+#### openssl命令单向加密
+- 工具：openssl dgst
+- 算法：md5sum, sha1sum, sha224sum, sha256sum
+```shell
+openssl dgst -md5 /PATH/FILENAME
+md5sum /PATH/FILE
+```
+
+#### openssl生成用户密码
+```shell
+openssl passwd -l -salt SALT(最多8位)
+openssl passwd -6 -salt SALT value
+```
+
+#### openssl 生成随机数
+- 随机数生成器：伪随机数字，块终中断生成随机数
+- 调用：/dev/random； /dev/urandom
+```shell
+openssl rand -base64 8
+# 8 表示8个字节  
+
+openssl rand -base64 10 ｜ head -c10
+```
+
+#### openssl命令实现PKI
+- 公钥加密
+    - 算法：RSA, ELGama
+    - 工具：gpg, openssl rsautl
+- 生成私钥
+```shell
+openssl genrsa -out /PATH/TO/FILENAME [-des3 ] NUM_BITS # (默认2048位)
+
+#示例
+# 生成对称密钥加密的私钥
+(umask 077; openssl gensra -out test.key -des3 2048) # genrsa就是用rsa算法生成的私钥
+
+# 将加密对称密钥key解密
+openssl rsa -in test.key -out test2.key
+
+# 从私钥中提起出公钥
+openssl rsa -in PRIVATEKEYFILE -pubout -out PUBLICKEYFILE
+```
+
+### 建立私有CA实现证书申请颁发
+- 证书申请及签署步骤
+    - 生成申请请求
+    - RA核验
+    - CA签署
+    - 获取证书
+
+- openssl的配置文件
+```shell 
+/etc/pki/tls/openssl.cnf
+```
+
+- 三种策略
+    - match匹配、optional可选、supplied提供
+    - match：要求申请填写的信息跟CA设置信息必须一致
+    - optional：可有可无，跟CA设置信息可以不一致
+    - supplied：必须填写这项申请信息
+
+```shell
+cat /etc/pki/tls/openssl.cnf
+
+...
+# 一个设备可以创建多个CA，下面的是默认CA
+[ ca ]
+default_ca = CA_default         # the default ca section
+
+[ ca_default ]
+dir = /etc/pki/CA       # 所有创建CA相关文件都放在这里 ，如果该目录不存在，则需要手工创建
+certs = $dir/certs       # 存放发布的证书
+crl_dir = $dir/crl      # 证书的吊销列表
+database = $dir/index.txt       # 需要手工创建 
+
+new_certs_dir = $dir/newcerts       # 默认颁发的新证书放在这里
+certificate = $dir/cacert.pem       # 存放CA的证书（RootCA，自签名）
+serial = $dir/serial                # 证书的当前序号，下一个颁发证书的编号 
+crlnumber = $dir/crlnumber          # 吊销的编号
+
+crl = $dir/crl.pem                          # 吊销列表
+private_key = $dir/private/cakey.pem    # 自己的私钥
+RANDFILE = $dir/private/.rand
+
+x509_extensions = usr_cert
+
+name_opt = ca_default
+cert_opt = ca_default
+
+default_days = 365              # 默认有效期
+default_crl_days = 30
+default_md = sha256
+preserve = no
+
+policy = policy_match    # 证书颁发策略
+
+[ policy_match ]        # match意味着，CA信息和客户端向CA申请的信息必须一致
+countryName = match
+stateOrProvinceName = match
+OrganizationName = match
+OrganizationalUnitName = optional
+commonName = supplied           # 通常是网站域名
+emailaddress = optional
+
+[ policy_match ]        
+countryName = optional
+stateOrProvinceName = optional
+OrganizationName = optional
+OrganizationalUnitName = optional
+commonName = supplied           # 通常是网站域名
+emailaddress = optional
+```
+
+#### 创建私有CA
+- 创建CA所需的文件
+```shell
+# 生成证书索引数据库文件
+touch /etc/pki/CA/index.txt
+
+# 指定第一个颁发证书的系列号
+echo 01 > /etc/pki/CA/serial
+```
+
+- 生成CA私钥
+```shell
+cd /etc/pki/CA/
+
+(umask 066; openssl genrsa -out private/cakey.pem 2048)  # 文件名要和配置文件对上
+```
+
+- 生成CA自签名证书
+```shell
+openssl req -new -x509 -key /etc/pki/CA/private/cakey.pem -days 3650 -out /etc/pki/CA/cacert.pem
+
+# -new： 生成新证书签署请求
+# -x509：专用于CA生成自签证书
+# -key：生成请求时用到的私钥文件
+# -days：证书有效期
+# -out：证书的保存路径
+```
+- 国家代码：https://country-code.cl/（中国CN）
+
+- 以文本形式查看证书内容
+```shell
+openssl x509 -in /etc/pki/CA/cacert.pam -noout -text
+```
+
+#### 申请证书并颁发证书
+- 为需要使用证书的主机生成私钥
+```shell
+(umask 066; openssl genrsa -out /data/test.key 2048)
+```
+
+- 为需要使用证书的主机生成证书申请文件
+```shell
+openssl req -new -key /data/test.ky -out /data/test.csr
+
+使用标准输入重定向来非交互式生成申请证书
+openssl req -new -key /data/test.ky -out /data/test.csr << EOF
+CN
+beijing
+beijing
+magedu
+it
+...
+
+EOF
+```
+
+
+- 在CA签署证书并将证书颁发给请求者
+```shell
+openssl ca -in /tmp/test.csr -out /etc/pki/CA/certs/test.crt -days 100
+
+# 注意：默认要求国家，省，公司名称三项必须和CA一致
+```
+ 
+#### 查看/验证证书
+```shell
+验证指定编号证书的有效性
+openssl ca -status SERIAL
+```
+
+#### 最后将证书相关文件发送到用户端使用
+- 默认不允许同一个用户申请多个证书
+- 可以通过修改`/etc/pki/CA/index.txt.attr`
+```shell
+# 修改配置选项
+unique_subject = no   #原本是yes，仅允许唯一的目标，改为no则可以允许，同一用户申请多个证书
+```
+
+#### 吊销证书
+- 在客户端获取要吊销的证书的serial
+```shell
+openssl x509 -in /PATH/FROM/CERT_FILE -noout -serial -subject
+```
+
+- 在CA上，根据客户提交的serial与subject信息，对比验证是否与index.txt文件中的信息一致，吊销证书
+```shell
+openssl ca -revoke /etc/pki/CA/newcerts/SERIAL.pem
+```
+
+- 指定第一个吊销证书的编号，注意：第一次更新证书吊销列表前，才需要执行
+```shell
+echo 01 > /etc/pki/CA/crlnumber
+# /etc/pki/CA/crlnumber,手动出创建，是吊销证书的编号文件
+```
+
+- 更新证书吊销列表
+```shell
+openssl ca -gencrl -out /etc/pki/CA/crl.pem
+
+# 将此文件发送到windows，将后缀改为crl.pem.crl
+```
+
+- 查看crl文件
+```shell
+openssl crl -in /etc/pki/CA/crl.pem -noout -text
+```
+
+#### 作业：将申请证书的过程脚本自动化 
+
+
+### Ubuntu建立私有CA
+#### 安装包与配置文件
+```shell
+apt install libssl-dev
+
+# 配置文件路径
+cat /etc/ssl/openssl.cnf
+```
+
+#### 创建私有CA
+- 创建相关配置文件
+```shell
+mkdir -pv /etc/pki/CA/{certs,crl,newcerts,private}
+```
+
+- 生成CA私钥
+```shell
+cd /etc/pki/CA
+openssl genrsa -out private/cakey.pem 2048
+```
+
+- 生成CA自签名证书
+```shell
+openssl req -new -x509 -key /etc/pki/CA/private/cakey.pam -days 1000 -out /etc/pki/CA/cacert.pem
+```
+
+- 查看证书
+```shell
+openssl x509 -in /etc/pki/CA/cacert.pem -noout -text
+```
+
+
+
+## 时间同步服务
+- 多主机协作工作时，各个主机的时间同步很重要，时间不一致会造成很多重要应用的故障，如：加密协议，日志，集群等。
+- 利用NTP（Network Time Protocol）协议使各个网络中的各个计算机时间达到同步
+- 目前NTP协议属于运维基础架构中必备的基本服务之一。
+
+
+### chrony介绍
+- 实现NTP协议的自由软件
+- 可使系统时钟与NTP服务器，参考时钟（例如GPS接收器）以及使用手表和键盘的手动输入进行同步
+- 还可以作为NTPv4（RFC 5905）服务器和对等体运行，为网络中的计算机提供时间服务
+- 设计用于在各种条件下良好运行，包括间歇性和高度拥挤的网络连接，温度变化（计算机时钟对温度敏感），以及不能连续运行或在虚拟机上运行的系统。
+
+- CentOS8中以后得源中，只有chrony，且默认已经安装
+
+#### chrony的优势
+- 更快的同步只需要数分钟而非数小时时间，从而最大程度减少了时间和频率误差，对于并非全天24小时运行的虚拟计算机而言非常有用，能够更好地响应时钟频率的快速变化，对于具备了不稳定时钟的虚拟机或导致时钟频率发生变化的节能技术而言非常有用
+- 在初始同步后，它不会停止时钟，以防对需要系统时间保持单调的应用程序造成影响
+- 在应对临时非对称延迟时（例如，在大规模下载造成链接饱和时）提供了更好的稳定性
+- 无需对服务器进行定期轮询，因此具备间歇性网络连接的系统仍然可以快速同步时钟
+- 官方文档
+```shell
+https://chrony.tuxfamily.org/                             # 官方网站
+https:/.chrony.tuxfamily.org/documentation.html/          # 官方文档
+```
+
+#### chrony文件组成
+- 软件包
+```shell
+rpm -q chrony
+chrony-4.1-1.e18.x86_64
+```
+
+- 可执行程序
+```shell
+# 命令行用户工具，用于监控性能并进行多样化的配置。他可以在chrony实例控制的计算机上工作，也可在一台不同的远程计算机工作
+ll /usr/bin/chronyc
+
+# 后台运行的守护进程，用于调整内核中运行的系统时钟和时间服务器同步。它确定计算机增减时间的比率，并对此进行补偿
+ll /usr/bin/chronyd
+```
+
+- 服务unit文件
+```shell
+systemctl status chronyd.service
+```
+
+- 配置文件
+```shell
+root@ubuntu2204:~$tree /etc/chrony
+/etc/chrony
+├── chrony.conf       # 主配置文件
+├── chrony.keys
+├── conf.d
+│   └── README
+└── sources.d
+    └── README
+
+2 directories, 4 files
+```
+
+- 监听端口
+```shell
+服务端： 123/udp          # 其他机器通过此端口连接本机，将本机当做ntp服务器
+客户端：323/udp           # 本机通过此端口同步时间
+```
+
+
+#### 配置文件说明
+```shell
+https://chrony.tuxfamily.org/doc/3.5/chrony.conf.html
+
+man chrony.conf
+```
+
+
+#### 主配置文件内容与解读
+```shell
+# This will use (up to):
+# - 4 sources from ntp.ubuntu.com which some are ipv6 enabled
+# - 2 sources from 2.ubuntu.pool.ntp.org which is ipv6 enabled as well
+# - 1 source from [01].ubuntu.pool.ntp.org each (ipv4 only atm)
+# This means by default, up to 6 dual-stack and up to 2 additional IPv4-only
+# sources will be used.
+# At the same time it retains some protection against one of the entries being
+# down (compare to just using one of the lines). See (LP: #1754358) for the
+# discussion.
+#
+# About using servers from the NTP Pool Project in general see (LP: #104525).
+# Approved by Ubuntu Technical Board on 2011-02-08.
+# See http://www.pool.ntp.org/join.html for more information.
+pool ntp.ubuntu.com        iburst maxsources 4       # 指同步的服务器在哪
+pool 0.ubuntu.pool.ntp.org iburst maxsources 1
+pool 1.ubuntu.pool.ntp.org iburst maxsources 1
+pool 2.ubuntu.pool.ntp.org iburst maxsources 2
+
+# Use time sources from DHCP.
+sourcedir /run/chrony-dhcp
+
+# Use NTP sources found in /etc/chrony/sources.d.
+sourcedir /etc/chrony/sources.d
+
+# This directive specify the location of the file containing ID/key pairs for
+# NTP authentication.
+keyfile /etc/chrony/chrony.keys
+
+# This directive specify the file into which chronyd will store the rate
+# information.
+driftfile /var/lib/chrony/chrony.drift
+
+# Save NTS keys and cookies.
+ntsdumpdir /var/lib/chrony
+
+# Uncomment the following line to turn logging on.
+#log tracking measurements statistics
+
+# Log files location.
+logdir /var/log/chrony
+
+# Stop bad estimates upsetting machine clock.
+maxupdateskew 100.0
+
+# This directive enables kernel synchronisation (every 11 minutes) of the
+# real-time clock. Note that it can’t be used along with the 'rtcfile' directive.
+rtcsync
+
+# Step the system clock instead of slewing it if the adjustment is larger than
+# one second, but only in the first three clock updates.
+makestep 1 3
+
+# Get TAI-UTC offset and leap seconds from the system tz database.
+# This directive must be commented out when using time sources serving
+# leap-smeared time.
+leapsectz right/UTC
+```
+
+- 常用字段
+```shell
+server:         时钟服务器地址，加burst选项表示服务可用时，一次发送八个数据包，包间隔通常为2秒，可加快初始同步速度 （客户端配置）
+
+pool：          语法和指令与server字段相似，不同之处在于其指定的NTP服务可以解析多个地址
+
+allow:          指定可以使用本机服务的设备，格式可以是IP，子网，网段 （服务端配置）
+
+deny:           指定不可以使用本机服务的设备，格式可以是IP，子网，网段
+
+local stratum 10:  即使server指令中时间服务器不可用，也允许将本地时间作为标准时间授时给其他客户端
+```
+
+#### Chrony客户端工具
+- chronyc 可以运行在交互式和非交互式两种方式(c 表示client)
+
+- 交互式客户端有以下常用子命令
+```shell
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+^- prod-ntp-3.ntp1.ps5.cano>     2   9   377   280    -45ms[  -45ms] +/-  120ms
+^- prod-ntp-5.ntp1.ps5.cano>     2   9   377   473    -36ms[  -36ms] +/-  110ms
+^- prod-ntp-4.ntp1.ps5.cano>     2   9   377   470    -40ms[  -40ms] +/-  116ms
+^- alphyn.canonical.com          2   9   277   343    -18ms[  -17ms] +/-  140ms
+^+ 111.230.189.174               2   9   277   214  -5747us[-5747us] +/-   48ms
+^* time.neu.edu.cn               1   9   377   215    +11ms[  +12ms] +/-   25ms
+^- ntp1.flashdance.cx            2   8   377   281  -3051us[-2802us] +/-   78ms
+^+ 139.199.215.251               2   7   377    19  -6593us[-6593us] +/-   65ms
+
+# M                   NTP源，^表示服务器，=表示二级时钟， # 表示本地时钟
+# S                   NTP源状态，*此源已同步，+可接收的源，-合并算法排除的可接受的源，？没连上的源，x认为该源有错，~不确定的源 
+# Name / IP address   NTP服务器主机名后或ip地址或refid值
+# Stratum             层次，跳数，1.表示本地时钟，2.表示通过第一层级的服务器实现同步，依次类推
+# Poll                NTP源的轮询频率，以秒为单位，值为基数2的对数，6表示64秒进行一次同步
+# REACH               略
+```
+
+- 修改配置文件
+```shell
+vim /etc/chrony/chrony.conf
+
+# 注释pool行
+
+# 添加下列行
+server ntp.aliyun.com iburst (为高可用性，通常至少写两条)
+
+# 重启服务
+systemctl restart chronyd.service
+```
+
+- chrony是渐进式同步，如果差距过大，想立即同步完成，则可以重启服务
+```shell
+date +%F-%T
+
+systemctl restart chronyd.service
+```
+
+#### 常用公共NTP服务
+```shell
+ntp pool                cn.pool.ntp.org. 0-3.cn.pool.ntp.org
+阿里云公共NTP            ntp.aliyun.com, ntp1-7.aliyun.com time.pool.aliyun.com(windows)
+腾讯公共NTP              time1-5.cloud.tencent.com
+北京邮电大学NTP          s1a.time.edu.cn
+清华大学NTP              s1b.time.edu.cn
+北京大学NTP              s1c.time.edu.cn
+国家授时中心服务器        210.72.145.44
+美国标准技术院            time.nist.gov  
+```
+
+#### 使用timedatectl开关chrony.service
+```shell
+timedatectl set-ntp 0
+timedatectl set-ntp 1
+```
+
+#### 实现私有时间服务
+- 在同一网络内，如果有多个需要进行时间同步的服务器，则我们可以在内网自建NTP Server，这样可以节约访问外网的网路资源；另一方面，如果外网不可用，则至少可以保证，内网的NTP服务还是可用的 
+
+
+- 服务端配置
+```shell
+vim /etc/chrony/chrony.conf
+
+allow 10.0.0.0/24           # 允许10.0.0.0网段的主机将本机作为时间同步服务器
+local stratum 10            # 允许本机在不能与外网同步的情况下，还能提供服务
+
+# 重启服务
+systemctl restart chrony.service
+
+# 关闭防火墙
+systemctl stop firewalld.service
+```
+
+- chronyd
+  - 服务端监听使用123端口
+  - 客户端访问使用323端口
+
+- 客户端配置
+```shell
+# 添加server，生产环境下至少两台，保证高可用
+vim /etc/chrony.conf
+server 10.0.0.206 iburst    # 之前配置的服务端NTP的IP
+
+重启服务
+systemctl restart chrony
+```
+
+- 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

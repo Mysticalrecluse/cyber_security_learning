@@ -106,3 +106,15 @@ FTP账号资料
 用户：www_mysticalrecl
 
 密码：2h2cm4FbczpehLaw
+
+
+
+a发送数据给b <span style="color:red">需要请求b的公钥（因为后面需要使用b的公钥加密，保证数据的保密性），</span>
+被m劫持了    
+a就会请求m的公钥<span style="color:red">（但是a以为自己请求的是B的公钥）</span>加上自己的私钥 发送数据给 m <span style="color:red">(发送给B，但是被m拦截了)  </span>  
+m收到了数据包  有用自己公钥打包的数据包 m能用自己的私钥去解开 
+m就获取了a实际发送到b的数据     m用自己的私钥替换了a的私钥加密的包  伪装成a的私钥加密的包 在请求b的公钥 打成包发送给 b
+
+b以为是a的私钥加密的包  b就会请求a的公钥来解密  实际上b收到的是 m的私钥加密的包  请求a的公钥 m的公钥<span style="color:red">（b
+以为是a的公钥，实际是m的公钥）</span>    最后m的公钥解开这个私钥   他以为是a的公钥解开了a的私钥 
+以为是跟a建立了 通信      实际上 a再给m通信   b也在跟m通信 他们互相不知道 m扮演a 有扮演b
