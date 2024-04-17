@@ -1,5 +1,22 @@
 # LINUX 基础
 ## Linux文件基本操作
+<<<<<<< HEAD
+=======
+### 终端和控制台的区别
+- 区别标志：
+  - <span style="color:tomato">直接交互的标志</span>：控制台通常是指提供直接与操作系统交互的界面，尤其是在系统级别上，如直接查看和管理系统启动过程、内核消息等。
+  - <span style="color:tomato">远程和非系统级交互</span>：相比之下，终端可以是本地的也可以是远程的，提供用户级别的命令行界面，用于执行各种命令和程序，但不一定提供直接的系统级别交互。
+
+- 自我理解：
+  - 如果我使用vmware安装了一个linux系统的虚拟机，那么可以说，直接在vmware上打开这个虚拟机的界面是控制台，而ssh链接这个虚拟机的远程链接界面是终端，但不是控制台，控制台和终端的区别标志是是否直接与系统交互
+
+- Linux中终端是一个设备文件，本质就是一个文件，位置在/dev/pts/0 (终端编号，从0开始)
+
+- 查看当前终端设备
+```bash
+tty
+```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 ### 登录前提示
 ```bash
 /etc/issue # 里面的内容会在登录前出现在终端加载页面
@@ -68,10 +85,27 @@ S：显示的样式如下
 ```
 ```shell
 示例：
+<<<<<<< HEAD
 PS1="PS1="\e[32;40;1m[\d \t \e[31;40;1m\#] \e[33;40;1m\u@\h:\W \$\e[0m""
 注意：
 实测\$不好用，可以直接在root的目录下的.bashrc文件中改为#
 ```
+=======
+  PS1="\e[32;40;1m[\d \t \e[31;40;1m\#] \e[33;40;1m\u@\h:\W \$\e[0m"
+注意：
+实测\$不好用，可以直接在root的目录下的.bashrc文件中改为#
+```
+- 使其永久生效，可以在下列文件中修改配置项
+```Shell
+/etc/profile.d/env.sh #针对CentOS生效
+
+/usr/share/bash-completion/bash_completion 
+# 写在该文件最下方，对所有普通用户生效  
+
+~/.bashrc #针对当前目录的提示符效果生效
+```
+
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 ### 查看用户登录信息
 - whoami命令：显示当前登录有效用户
 - who命令：显示当前所有的登录会话
@@ -97,6 +131,270 @@ root     pts/1     21:56    7:22   0.03s  0.01s vim ps_demo.txt
   echo `cat /etc/redhat-release ` is OS-Version
   ```
 
+<<<<<<< HEAD
+=======
+### 查看硬件信息
+#### 查看CPU
+- command
+```Shell
+lscpu
+
+cat /proc/cpuinfo
+```
+
+#### 查看内存大小
+```Shell
+lsmem
+
+free -h
+free -h -s 1  # 每秒更新一次内存数据
+free -h -c 2  # 总共更新几次，默认一秒一次
+
+cat /proc/meminfo
+```
+
+#### 查看硬盘及分区情况
+```Shell
+lsblk
+
+cat /proc/partitions
+```
+
+### 查看系统版本信息
+#### 查看系统架构
+```shell
+arch
+```
+
+#### 查看内核版本
+```shell
+uname -r
+```
+
+#### 查看操作系统发行版本
+```shell
+# CentOS
+cat /etc/redhat-release
+
+cat /etc/os-release
+
+lsb_release -a
+
+#Ubuntu
+cat /etc/os-release
+
+cat /etc/issue
+```
+
+### 查看日期时间
+#### 系统时间
+```shell
+date  # 查看系统时间
+
+date -R # 显示时区信息
+
+date +%s  # 显示时间戳（从1970年1月1日到当前时间，经过的秒数）
+
+date +"%F %T" # 时间戳格式化，年月日时分秒
+
+# -d的基本用法：
+# date -d "string"
+
+date -d "yesterday"
+date -d "now"
+date -d "next friday"
+date -d "last month"
+date -d "2 weeks ago"
+# 格式化输出
+date -d "2024-01-01" +"%Y-%m-%d"
+date -d "next year" +"%A, %d %B %Y"
+# 时间计算
+date -d "-3 day" +%F
+
+
+```
+#### 硬件时间
+<scan style="font-weight: 700">- 主板上BIOS的时间</scan>
+```shell
+clock # 显示系统时钟
+
+hwclock # 显示硬件时钟
+```
+
+- <scan style="font-weight: 700">硬件时钟和系统时钟的区别和含义</scan>
+  - <scan style="color: tomato; font-weight: 400">硬件时钟（Real-Time Clock, RTC）</scan>：
+    - <scan style="color: tomato; font-weight: 400">物理设备</scan>：
+      硬件时钟是计算机主板上的一个实际的物理设备，有时被称为 CMOS 时钟。
+    - <scan style="color: tomato; font-weight: 400">独立供电</scan>：
+      它通常由一个小电池供电，这意味着即使计算机断电或关闭，硬件时钟也会继续运行。
+    - <scan style="color: tomato; font-weight: 400">持久性</scan>：
+      硬件时钟保存了日期和时间信息，并在系统启动时提供给操作系统。这个时间通常在计算机启动时由 BIOS 或 UEFI 读取。
+    - <scan style="color: tomato; font-weight: 400">精度</scan>：
+      硬件时钟的精度相对较低，可能会因电池老化或其他原因逐渐偏离准确时间。
+
+#### 对钟
+```shell
+hwclock -s | --hctosys  # 以硬件时钟为准，校正系统时间
+
+hwclock -w | --sysohc   # 以系统时钟为准，矫正硬件时间
+```
+
+#### 设置时区
+```shell
+timedatectl list-timezones  # 列出所有时区
+
+timedatectl set-timezone <时区> #设置时区
+# 示例：timedatectl set-timezone Asia/Shanghai
+```
+
+#### 显示日历
+```shell
+cal
+
+cal 2 2024 # 显示指定月份日历
+
+cal 2024 # 显示指定年份的12个月的所有日历
+```
+
+### 关机与重启
+- 关机
+```shell
+halt
+poweroff
+init 0
+shutdown -h now
+```
+
+- 重启
+```shell
+reboot
+init 6
+shutdown -r now
+```
+
+- shutdown
+```shell
+shutdown              # 一分钟后关机
+shutdown +10          # 十分钟后关机
+shutdown 01:02        # 1点过2分关机
+shutdown -r|--reboot  # 一分钟后重启
+shutdown -r now       # 现在重启
+shutdown -H|--halt    # 一分钟后调用halt关机
+shutdown -P|--poweroff # 一分钟后调用poweroff关机
+shutdown -C           # 取消关机计划 
+```
+
+### 会话管理
+- screen
+
+- Tmux
+  - Tmux安装
+  ```shell
+  # 软件安装
+  # Mac
+  $ brew install tmux
+  
+  # Ubuntu 或 Debian
+  $ sudo apt-get install tmux
+  
+  # CentOS 或 Fedor可以使用yum/dnf/brew等方式安装，brew版本更高些
+  $ yum install tmux
+  
+  # 下载并加载字体
+  $ git clone https://github.com/powerline/fonts.git --depth=1
+  $ cd fonts
+  $ ./install.sh
+  $ cd ..
+  $ rm -rf fonts
+  
+  # 安装风格包
+  # Clone项目代码
+  $ git clone https://github.com/odedlaz/tmux-onedark-theme
+  
+  # 删除原~/.tmux.conf 文件
+  $ rm ~/.tmux.conf
+  
+  # 安装 tmp (opens new window)与tmux-resurrect (opens new window)插件
+  $ git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+  $ git clone https://github.com/tmux-plugins/tmux-resurrect ~/.tmux/plugins/resurrect
+  
+  # 然后新建 ~/.tmux.conf 文件添加以下内容然后新建 ~/.tmux.conf 文件添加以下内容
+  run-shell ~/tmux-onedark-theme/tmux-onedark-theme.tmux
+  
+  #set -g @onedark_widgets "Mystical Recluse #(ip)"
+  set -g @onedark_widgets "Mystical #(ip)"
+  set -g @onedark_time_format "%I:%M"
+  set -g @onedark_date_format "%m:%d"
+  #set -g @onedark_date_format "%m:%d"
+  set-option -g default-terminal "screen-256color"
+  set -g default-terminal "screen-256color"
+  
+  # 解决neovim中esc响应慢
+  set -s escape-time 0
+  set-option -g status-position bottom
+  
+  # 自动保存会话
+  set -g @plugin 'tmux-plugins/tpm'
+  set -g @plugin 'tmux-plugins/tmux-sensible'
+  set -g @plugin 'tmux-plugins/tmux-resurrect'
+  set -g @plugin 'tmux-plugins/tmux-continuum'
+  set -g @continuum-save-interval '15'
+  set -g @continuum-restore 'on'
+  set -g @resurrect-capture-pane-contents 'on'
+  run '~/.tmux/plugins/tpm/tpm'
+  
+  run-shell ~/.tmux/plugins/resurrect/resurrect.tmux
+  
+  # 解除默认前缀
+  unbind C-b
+  # 设置自定义前缀
+  set -g prefix C-f
+  # 采用vim的操作方式
+  setw -g mode-keys vi
+  # 窗口序号从1开始计数
+  set -g base-index 1
+  # 开启鼠标模式
+  set-option -g mouse on
+  
+  # 通过前缀+KJHL快速切换pane
+  #up
+  bind-key k select-pane -U
+  #down
+  bind-key j select-pane -D
+  #left
+  bind-key h select-pane -L
+  #right
+  bind-key l select-pane -R
+  ```
+  - tmux常用热键
+  ```shell
+  # 新建会话
+  tmux new -s hdcms
+  # 查看会话
+  ctrl+b s
+  # 重命名会话
+  Ctrl+b $
+  
+  # 创建窗口
+  ctrl+b c
+  # 切换到2号窗口
+  ctrl+b 2
+  # 重命名窗口
+  ctrl+b ,
+  # 关闭窗口
+  ctrl+b &
+  
+  # 水平拆分出一个新窗格
+  ctrl+b %
+  # 垂直拆分窗格
+  ctrl+b "
+  # 切换到下一个窗格
+  ctrl+b o
+  # 关闭窗格
+  ctrl+b x
+  ```
+
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 ### 显示模式切换
 - 查看显示模式
 ```bash
@@ -123,6 +421,10 @@ hostname 新主机名
 ```bash
 hostnamectl set-hostname ubuntu1804.magedu.org
 ```
+<<<<<<< HEAD
+=======
+- 在不重启的情况下，是hostname在prompt上生效，最快的方法是开启一个新的终端会话
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 
 
 ### 显示字符echo
@@ -188,7 +490,64 @@ hostname is /usr/bin/hostname
   enable history
   enable jobs
   ...
+<<<<<<< HEAD
   ```
+=======
+  # enable -n <指定命令>
+  # 禁用指定内部命令， enable -n是查看禁用的内部命令列表
+  ```
+#### 扩展问题
+- echo是shell内置命令，但是/usr/bin/echo，也存在独立与shell的外部命令echo，存在这个现象的原因
+```
+
+独立的非内置的 echo 存在有几个原因，主要是为了提供兼容性、标准化以及在特定情况下的灵活性。以下是一些具体的原因：
+
+1. 标准化和兼容性
+POSIX 标准：/usr/bin/echo 程序通常会遵循 POSIX 或其他相关标准，确保在不同的 Unix-like 系统上有一致的行为。
+脚本兼容性：在编写可移植的 shell 脚本时，依赖于标准的 /usr/bin/echo 可能比使用特定 shell 的内置 echo 更可靠。
+2. 独立于 Shell
+不依赖于特定的 shell：独立的 echo 可以在没有启动 shell 的情况下直接执行，这对于某些脚本或系统程序很有用，尤其是在资源有限或需要避免启动完整 shell 会话的环境中。
+3. 特定功能的需要
+功能差异：不同的 shell 可能会在其内置的 echo 中实现不同的功能或选项。独立的 /usr/bin/echo 程序提供了一个统一的选项集，这可能在跨不同 shell 环境工作时非常有用。
+4. 历史原因
+遗留系统：在早期的 Unix 系统中，很多现在被认为是内置命令的工具最初是作为独立的程序存在的。随着时间的推移，为了性能和便利性，许多这样的程序被内置到了 shell 中。但是，独立的版本仍然被保留，以保证兼容性和符合标准。
+```
+#### POSIX标准
+```
+POSIX 标准的主要内容包括：
+系统调用和库：定义了一系列的 API，包括文件操作、进程控制、线程管理、输入/输出等。
+
+Shell 和工具：规定了 shell 的行为和一些基本的命令行工具，如 ls、echo 和 grep 等。
+
+程序编程接口（API）：为 C 语言提供了一套标准的库函数接口，用于实现系统服务。
+
+用户和软件环境：包括了用户环境的配置、软件包管理等方面的标准。
+
+POSIX 标准的意义：
+兼容性：POSIX 标准化了 UNIX 系统的核心接口，使得开发者可以编写可在不同 UNIX 系统之间移植的程序。
+
+一致性：通过遵循 POSIX 标准，操作系统厂商可以确保他们的系统提供一致的行为和服务。
+
+可移植性：对于软件开发者来说，POSIX 提供了一套稳定的、不依赖于特定系统的接口，大大提高了代码的可移植性。
+
+在实际应用中，虽然大多数类 UNIX 系统都遵循 POSIX 标准的大部分内容，但很少有系统是完全符合所有 POSIX 规范的。许多系统提供了超出 POSIX 标准的额外功能和扩展，但核心接口和服务通常保持一致。因此，POSIX 标准是理解和使用 UNIX 系统的基础，并且对于确保不同系统之间软件的兼容性和可移植性至关重要。
+```
+
+#### 指令执行过程
+```
+1. 先判断是内部命令还是外部命令
+2. 如果是内部命令：直接执行
+   如果是外部命令：先去hash里找，是否有该命令记录，如果没有，去PATH路径下找，如果还没有，则报错，command not found；如果找到，则直接执行，并将可执行文件的路径记录到hash中
+3. 如果hash中有该指令路径，但是该指令路径已经转移，即使转移到了PATH路径下，仍然会报错，不存在该文件/目录，此时应清空hash值，重新执行指令
+4. 清空hash值的方法
+    更新（更改）PATH路径：会自动清空hash记录
+    bash: hash -r
+          hash -d <指定路径>
+          hash -l 查看hash表详细数据
+    csh: rehash
+
+```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 - 外部命令
   - 概述；所谓外部命令，就是没有集成在shell程序中。具体表现为一个独立的可执行文件。所以外部命令都能在磁盘中找到对应文件
   - 系统查找外部命令的方式：
@@ -203,10 +562,22 @@ hostname is /usr/bin/hostname
   ```shell
   [Sat Oct 14 08:21:50 29] root@rocky9:bin #which gcc
   /usr/bin/gcc
+<<<<<<< HEAD
 
   [Sat Oct 14 08:23:59 30] root@rocky9:bin #whereis gcc
   gcc: /usr/bin/gcc /usr/lib/gcc /usr/libexec/gcc /usr/share/man/man1/gcc.1.gz /usr/share/info/gcc.info.gz
   ```
+=======
+  
+  [Sat Oct 14 08:23:59 30] root@rocky9:bin #whereis gcc
+  gcc: /usr/bin/gcc /usr/lib/gcc /usr/libexec/gcc /usr/share/man/man1/gcc.1.gz /usr/share/info/gcc.info.gz
+  ```
+  - which和where命令的区别
+  ```shell
+  which命令找到相关的二进制程序是否已经在搜索路径中
+  whereis， 该命令会搜索shell的搜索路径之外更大范围的系统目录
+  ```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   - 当第一次执行外部命令后，系统会自动将外部的路径记录到内存缓存区中，下次再执行此外部命令，将会从缓存区中找到路径，直接到对应的磁盘路径找到此命令并执行。通过hash命令可以查看到已执行过的外部命令及路径
   ```shell
   [Sat Oct 14 08:24:24 31] root@rocky9:bin #hash
@@ -214,12 +585,18 @@ hostname is /usr/bin/hostname
    7	  /usr/bin/ls
    3	  /usr/bin/whereis
   ```
+<<<<<<< HEAD
+=======
+  - shell 的 hash 表机制主要用于跟踪和缓存 `$PATH` 环境变量指定的目录中找到的命令的位置。非$PATH记录的路径下的程序，执行后也不会记录在hash中
+
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 - 别名
   - 概述：所谓别名，就是将一些常用的内部或外部命令，起一个较短的名称，这样每次执行这些常用命令时，就可以用别名替代
   - 管理和查看别名
   ```shell
   # 查看所有别名
   $ alias
+<<<<<<< HEAD
 
   # 查看指定别名
   $ alias 别名
@@ -227,6 +604,15 @@ hostname is /usr/bin/hostname
   # 定义别名
   $ alias 别名="命令"
 
+=======
+  
+  # 查看指定别名
+  $ alias 别名
+  
+  # 定义别名
+  $ alias 别名="命令"
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 取消别名
   $ unlias 别名
   ```
@@ -235,7 +621,11 @@ hostname is /usr/bin/hostname
     - 对所有人有效，写入 /etc/.bashrc
     - 启用配置文件
       - `source 文件名` 或 `. 文件名`
+<<<<<<< HEAD
   - 执行和别名相同的命令时，需要 `\别名` 或`'别名'`
+=======
+  - 执行和别名相同的命令时，需要 `\别名` 或`'别名'`或`"别名"`或`command 别名`
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 
 ### 命令的使用帮助
 - Whatis-查看命令简要说明
@@ -267,6 +657,7 @@ hostname is /usr/bin/hostname
   7 - 杂项
   8 - 管理类命令
   9 - Linux内核API
+<<<<<<< HEAD
 
   WORD：查看帮助的关键字，如：命令，文件名，函数名
 
@@ -279,19 +670,55 @@ hostname is /usr/bin/hostname
   - bin：给普通用户使用的工具
   - boot：开启启动的文件，包含linux内核
     - linux内核：`vmlinuz-5.14.0-284.11.1.el9_2.x86_64`
+=======
+  
+  WORD：查看帮助的关键字，如：命令，文件名，函数名
+  
+  man -f COMMAND
+  # 如果有多个相同的命令的话，可以使用-f分别进行查看
+  # 比如查看C语言的printf和bash命令的printf
+  
+  man -k [keyword]
+  # 查找man手册里的关键词
+  ```
+  - 使用彩色man手册
+  ```shell
+  sudo apt install most # 使用most打开man
+  .bashrc配置文件中，添加
+  export MANPAGER="most -s"
+  
+  # 之后执行source ./.bashrc
+  ```
+### Linux目录结构
+- 文件系统的目录结构
+  - bin：给普通用户使用的工具(二进制可执行文件)
+  - boot：开启启动的文件，包含linux内核
+    - linux内核：`vmlinuz-5.14.0-284.11.1.el9_2.x86_64`
+    - grub,开机引导加载程序
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   - dev：硬件设备，比如：硬盘
   - etc：类似于注册表，核心！各种配置文件
   - home：用户的数据，各个用户在家目录
   - root：root用户的家目录
   - run：运行过程中生成的临时文件
+<<<<<<< HEAD
   - sbin：给管理员使用的工具
+=======
+  - sbin：给管理员使用的工具（二进制可执行文件）
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   - tmp：临时文件
   - usr：操作系统下自带的文件，大多在usr
   - var：网页文件，日志等不断会变化的文件
   - lib/lib64:库文件，很多应用程序共同依赖的库文件
   - mnt/media：实现外围设备的挂载用的
+<<<<<<< HEAD
   - proc/sys：内存中的数据
   - opt/srv：外部下载的一些程序软件，如果不下载的话，一般为空
+=======
+  - proc/sys：内存中的数据，虚拟文件系统，内存映射到硬盘的数据
+  - opt：外部下载的一些程序软件，如果不下载的话，一般为空
+  - srv：系统上运行的服务用到的数据
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 
 ### 文件类型
 - 概述：
@@ -328,6 +755,10 @@ hostname is /usr/bin/hostname
     - 数据一旦被读后，便不在管道中存在，不可反复读取
     - 管道采用半双工通信方式
   - `ls -l`查看文件属性时，第一个属性表现为p
+<<<<<<< HEAD
+=======
+  - FIFO: 队列的数据结构，先进先出
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   - 更多细节后续详解
 
 - 字符设备文件（明黄色）
@@ -344,13 +775,77 @@ hostname is /usr/bin/hostname
   - 当两个进程在同一台主机上，但是像通过网络方式通信，可基于socket方式进行数据通信，可基于全双工方式实现，即可支持同时双向传输数据。
   - `ls -l`查看文件属性时，第一个属性表现为s
 
+<<<<<<< HEAD
 ### 管理目录类文件相关命令
+=======
+### 文件类型颜色的配置文件
+```shell
+# CentOS
+/etc/DIR_COLORS
+
+# Ubuntu
+Ubuntu 中与颜色设置相关的文件和命令包括：
+
+~/.dircolors 或 ~/.dir_colors:
+
+用户级别的配置文件。如果存在，dircolors 命令会使用这个文件中的配置。如果你想定制自己的颜色配置，可以在你的用户目录中创建这个文件。
+/etc/dircolors:
+
+系统级别的默认配置文件。这个文件可能在某些系统中不存在，或者命名可能有所不同。
+dircolors 命令:
+
+这个命令用于初始化颜色配置。它会检查 ~/.dircolors 或 ~/.dir_colors 文件，如果这些文件不存在，它会使用默认的颜色配置。你通常会在你的 shell 初始化文件中（比如 ~/.bashrc）看到类似于以下的命令：
+test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
+
+如果你想要调整 Ubuntu 中 ls 命令输出的颜色，你可以创建或编辑 ~/.dircolors 文件，并在该文件中定义你的颜色配置。然后，确保你的 shell 初始化文件（如 ~/.bashrc）中包含处理 dircolors 的命令。这样，每次你打开一个新的 shell 时，都会应用这些颜色设置。
+```
+
+### 管理目录类文件相关命令
+- 查看当前目录
+  - 命令：`pwd`
+  ```shell
+  pwd -P # 输出真实物理路径
+  pwd -L # 默认，输出链接路径
+  ```
+
+- 基名与文件名
+```Shell
+bashename <dir> #只输出文件名
+# 示例：
+basename `which cat`
+
+dirname <dir>  # 只输出路径
+# 示例：
+dirname `which cat`
+```
+
+- 路径间移动
+  - 命令：`cd`
+  ```shell
+  cd -P  # 移动到真实物理路径
+  # 示例
+  cd -P /bin  # 实际移动到/usr/bin
+  
+  cd -L # 默认，移动到链接路径
+  
+  cd ~  # 移动到家目录
+  cd ~username  # 移动到指定用户的家目录
+  
+  cd -  # 移动到上次所在的目录，之所以能移动到上次所在目录是因为有系统变量记录了这个数据
+  # $OLDPWD 记录上次所在目录；$PWD 记录当前所在目录
+  ```
+
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 - 查看目录
   - 命令: `tree`
   ```shell
   # 查看指定目录数的层级
   tree -L 1 /
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 每个文件和目录前显示完整的相对路径
   tree -f
   [Sun Oct 15 10:08:22 7] root@rocky9:~ #tree -f /Storage/
@@ -360,9 +855,15 @@ hostname is /usr/bin/hostname
       ├── /Storage/test/ps_demo.txt
       ├── /Storage/test/rename.txt
       └── /Storage/test/robots.txt
+<<<<<<< HEAD
 
   1 directory, 4 files
 
+=======
+  
+  1 directory, 4 files
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 每个文件和目录前显示最新更改时间
   tree -D
   [Sun Oct 15 10:10:36 11] root@rocky9:~ #tree -D /Storage/
@@ -372,9 +873,15 @@ hostname is /usr/bin/hostname
       ├── [Oct 13 20:48]  ps_demo.txt
       ├── [Jan  3  2020]  rename.txt
       └── [Jan  3  2020]  robots.txt
+<<<<<<< HEAD
 
   1 directory, 4 files
 
+=======
+  
+  1 directory, 4 files
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 每个文件和目录前显示文件大小
   tree -s
   [Sun Oct 15 10:08:30 8] root@rocky9:~ #tree -s /Storage/
@@ -384,7 +891,11 @@ hostname is /usr/bin/hostname
       ├── [        270]  ps_demo.txt
       ├── [       2814]  rename.txt
       └── [       2814]  robots.txt
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 每个文件和目录前显示文件/目录拥有者
   tree -u
   [Sun Oct 15 10:09:28 9] root@rocky9:~ #tree -u /Storage/
@@ -394,7 +905,11 @@ hostname is /usr/bin/hostname
       ├── [root    ]  ps_demo.txt
       ├── [root    ]  rename.txt
       └── [root    ]  robots.txt
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 每个文件和目录前显示权限标示
   tree -p
   [Sun Oct 15 10:11:18 12] root@rocky9:~ #tree -p /Storage/
@@ -404,7 +919,11 @@ hostname is /usr/bin/hostname
       ├── [-rw-r--r--]  ps_demo.txt
       ├── [-rw-r--r--]  rename.txt
       └── [-rw-r--r--]  robots.txt
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 使用通配符对tree的目录进行筛选
   tree -P pattern 这里的pattern不支持正则表达式，仅支持通配符
   [Sun Oct 15 10:33:09 26] root@rocky9:~ #tree -P 'r*.txt' /Storage/
@@ -412,9 +931,15 @@ hostname is /usr/bin/hostname
   └── test
       ├── rename.txt
       └── robots.txt
+<<<<<<< HEAD
 
   1 directory, 2 files
 
+=======
+  
+  1 directory, 2 files
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   常用通配符:
   * 匹配任意数量的字符（包括零个）。
   ? 匹配任意一个字符。
@@ -425,6 +950,7 @@ hostname is /usr/bin/hostname
   - 命令：`mkdir`
   ```shell
   语法格式：mkdir [pv] [-m mode] directory_name...
+<<<<<<< HEAD
 
   # mkdir在指定路径创建目录
   mkdir /Storage/test   # 在Storage目录下创建一个test目录
@@ -438,12 +964,31 @@ hostname is /usr/bin/hostname
   # 创建多级目录
   mkdir -p dir1/dir2/dir3
 
+=======
+  
+  # mkdir在指定路径创建目录
+  mkdir /Storage/test   # 在Storage目录下创建一个test目录
+  
+  # 默认在当前路径创建目录
+  mkdir dir1    # 在当前目录下创建名为dir1的目录
+  
+  # 一次创建多个同级目录，每个目录间用空格隔开
+  mkdir dir1 dir2 dir3
+  
+  # 创建多级目录
+  mkdir -p dir1/dir2/dir3
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # -v 会显示创建每个目录的详细信息 
   [Sun Oct 15 11:12:00 39] root@rocky9:/ #mkdir -pv /Storage/test/dir1/dir2/dir3
   mkdir: created directory '/Storage/test/dir1'
   mkdir: created directory '/Storage/test/dir1/dir2'
   mkdir: created directory '/Storage/test/dir1/dir2/dir3'
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # -m mod 指定创建文件的权限
   [Sun Oct 15 11:19:39 45] root@rocky9:demo #mkdir -m 644 demo2
   [Sun Oct 15 11:20:12 46] root@rocky9:demo #ll
@@ -459,10 +1004,17 @@ hostname is /usr/bin/hostname
   ```shell
   # 删除单一目录，注意：删除目录内不能有文件
   rmdir <dirctory_name>
+<<<<<<< HEAD
 
   # 同时删除同级多个目录，每个目录用空格隔开
   rmdir dir1 dir2 dir3
 
+=======
+  
+  # 同时删除同级多个目录，每个目录用空格隔开
+  rmdir dir1 dir2 dir3
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # -p 删除多级目录
   rmdir -p dir1/dir2/dir3  # 同时删除dir1及其子目录dir2,dir3
   ```
@@ -488,15 +1040,26 @@ hostname is /usr/bin/hostname
   - 命令：`ls`
   ```shell
   语法格式：ls [OPTION]... [FILE]...
+<<<<<<< HEAD
 
   # -a 显示包含隐藏文件在内的所有内容
   ls -a
 
+=======
+  
+  # -a 显示包含隐藏文件在内的所有内容
+  ls -a
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # -i 显示文件索引节点(inode)
   ls -i 
   [Sun Oct 15 11:39:16 65] root@rocky9:test #ls -i
   136601235 baidu.html  137507906 ps_demo.txt  136601225 rename.txt  136601224 robots.txt
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # -l 以长格式显示目录下内容列表
   # 长格式输出信息：文件名、文件类型、权限、硬链接数、所有者、组、文件大小、修改时间
   ls -l
@@ -506,7 +1069,11 @@ hostname is /usr/bin/hostname
   -rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
   -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
   -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 用文件目录的更改时间排序
   ls -t
   [Sun Oct 15 11:45:06 73] root@rocky9:test #ls -tl
@@ -515,17 +1082,50 @@ hostname is /usr/bin/hostname
   -rw-r--r--. 1 root root 2381 Sep 27 12:03 baidu.html
   -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
   -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+<<<<<<< HEAD
 
+=======
+  
+  # 按文件大小，从大到小排序
+  ls -S
+  mystical@mystical 0101 #ll-Sh  
+  total 60K
+  -rwxrwxr-x 1 mystical mystical  17K Jan  1 23:05 a.out
+  -rw-rw-r-- 1 mystical mystical 1.6K Jan  1 22:29 7.struct.c
+  -rw-rw-r-- 1 mystical mystical  861 Jan  1 21:12 6.ifdef.c
+  -rw-rw-r-- 1 mystical mystical  536 Jan  1 23:05 8.union.c
+  -rw-rw-r-- 1 mystical mystical  529 Jan  1 14:49 2.array.c
+  -rw-rw-r-- 1 mystical mystical  521 Jan  1 10:47 1.demo.c
+  -rw-rw-r-- 1 mystical mystical  445 Jan  1 16:45 3.string.c
+  -rw-rw-r-- 1 mystical mystical  404 Jan  1 17:14 4.pointer.c
+  -rw-rw-r-- 1 mystical mystical  402 Jan  1 20:53 5.ifdef.c
+  -rw-rw-r-- 1 mystical mystical  375 Jan  1 14:55 3.address.c
+  -rw-rw-r-- 1 mystical mystical   44 Jan  2 15:00 website.txt
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # ls后面支持通配符过滤，不加单引号
   [Sun Oct 15 11:49:26 80] root@rocky9:test #ls -l *.txt
   -rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
   -rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
   -rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+<<<<<<< HEAD
 
+=======
+  
+  ls -l <file>
+  #如果file是目录，则直接查询该目录下的内容，要查询目录使用
+  ls -dl <file>
+  # 如果file是普通文件，则正常查看list
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ```
 
 - 文件的时间属性
   - atime: 记录最后一次的访问时间
+<<<<<<< HEAD
+=======
+    - atime的更新策略：连续在24小时内访问读取atime,24小时内不会更新atime；但在更改文件内容的时候会顺便更新atime
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   - mtime: 记录最后一次文件数据部分的修改时间
   - ctime: 记录最后一次文件元数据的修改时间
   - 注意：mtime的改变一定会引起ctime的改变
@@ -537,10 +1137,17 @@ hostname is /usr/bin/hostname
   ```shell
   # 默认显示文件的mtime
   ls -l
+<<<<<<< HEAD
 
   # 显示文件的ctime
   ls -l --time=ctime
 
+=======
+  
+  # 显示文件的ctime
+  ls -l --time=ctime
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 显示文件的atime
   ls -l --time=atime
   ```
@@ -557,7 +1164,11 @@ hostname is /usr/bin/hostname
   - 作用：用于显示文件的详细属性
   ```shell
   语法格式：stat [文件或目录]
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 查看文件属性
   [Sun Oct 15 14:35:09 93] root@rocky9:test #stat rename.txt
   File: rename.txt
@@ -574,6 +1185,7 @@ hostname is /usr/bin/hostname
   - 作用：使用`file`辨识文件的类型
   ```shell
   语法格式：file [OPTION] file_name
+<<<<<<< HEAD
 
   # -i 查看文件的MIME类型
   [Sun Oct 15 14:46:28 102] root@rocky9:test #file -i test.log
@@ -583,18 +1195,81 @@ hostname is /usr/bin/hostname
 
 - 创建文件
   - 命令：`touch`
+=======
+  
+  # -i 查看文件的MIME类型
+  [Sun Oct 15 14:46:28 102] root@rocky9:test #file -i test.log
+  test.log: text/plain; charset=us-ascii
+  
+  # -b 省略文件名称，直接打印结果
+  mystical@ubuntu2204:~/C_coding/2024/jan/0128$ file 1.for.c
+  1.for.c: C source, Unicode text, UTF-8 text
+  
+  mystical@ubuntu2204:~/C_coding/2024/jan/0128$ file -b 1.for.c
+  C source, Unicode text, UTF-8 text
+  
+  # -f 从一个文件中，获取数据进行处理
+  mystical@ubuntu2204:~/test$ file -f studyvim.txt
+  /bin:        symbolic link to usr/bin
+  /etc/passwd: ASCII text
+  /home/:      directory
+  ```
+
+- windows与unix格式文本之间的相互转换
+  - Windows和Unix文本差异：
+    - Windows每行末尾是回车符加换行符
+    - Unix的每行末尾只有换行符结束
+  - 相互转换需要使用dos2unix
+  ```Shell
+  sudo apt install dos2unix
+  # Windows文本格式转Unix
+  dos2unix test.txt
+  
+  # Unix文本格式转Windows
+  unix2dos test.txt
+  ```
+
+- 创建或刷新文件
+  - 命令：`touch`
+  ```shell
+  # 如果文件存在则刷新时间，如果不存在则创建空文件
+  
+  touch -a    # 改变atime, ctime
+  touch -m    # 改变mtime, ctime
+  touch -h    # 刷新链接文件本身，默认刷新目标文件
+  touch -c    # 只刷新已存在的文件，如果文件不存在，也不会创建文件 
+  touch --time=STRING  # 修改指定时间，如：--time=atime
+  touch -r    # 使用某个文件的修改时间作为当前文件的修改时间
+  # 改变atime和mtime并刷新ctime
+  touch -t    # 修改atime,mtime到指定日期时间
+  # 比如01020304，指2024-01-02 03:04:00
+  # 比如0102030405， 指2001-02-03 04:05:00
+  
+  # 示例
+  touch `date +%F-%T`.txt
+  2024-01-30-18:08:58.txt 
+  ```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 
 - 复制文件
   - 命令：`cp`
   ```shell
   语法格式：cp [OPTION] SOURCE DEST
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # -b 覆盖已存在的目标前先对其做备份，后缀为~
   [Sun Oct 15 15:03:16 108] root@rocky9:test #cp -b newtest.txt test.log
   cp: overwrite 'test.log'? y
   [Sun Oct 15 15:03:32 109] root@rocky9:test #ls
   baidu.html  dir1  dir2  dir3  newtest.txt  ps_demo.txt  rename.txt  robots.txt  test.log  test.log~
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # -S 指定备份文件的后缀名
   [Sun Oct 15 15:10:53 123] root@rocky9:test #cp -S .bak dir1/cptext.txt  cptext.txt 
   cp: overwrite 'cptext.txt'? y
@@ -615,6 +1290,7 @@ hostname is /usr/bin/hostname
   ├── robots.txt
   ├── test.log
   └── test.log~
+<<<<<<< HEAD
 
   4 directories, 11 files
 
@@ -624,12 +1300,32 @@ hostname is /usr/bin/hostname
   # -r 递归处理，将目录及其中的为文件一同复制
   cp -r dir cp_dir
 
+=======
+  
+  4 directories, 11 files
+  
+  # -i 覆盖前会先询问用户（推荐使用）
+  cp -i file cp_file
+  
+  # -r 递归处理，将目录及其中的为文件一同复制
+  cp -r dir cp_dir
+  
+  # -a 复制特殊文件，使用-a
+  cp -a /dev/zero  /home/mystical 
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ```
 
 - 移动及重命名文件
   - 命令：`mv`
     - 语法：`mv 目标文件 目标路径`
     - 语法2：`mv -t 目标路径 目标文件`
+<<<<<<< HEAD
+=======
+    - 语法3：`mv -bi 目标文件 目标路径`
+      - i: 如果会覆盖文件则提示
+      - b: 覆盖文件时会备份被覆盖的文件
+    
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   - 命令：`rename`
   ```shell
   关于批量创建和批量修改文件名
@@ -645,18 +1341,30 @@ hostname is /usr/bin/hostname
   [Sun Oct 15 15:35:25 133] root@rocky9:py_test #rename py python py*
   [Sun Oct 15 15:35:43 134] root@rocky9:py_test #ls
   pythondemo1.py  pythondemo2.py  pythondemo3.py  pythondemo4.py  pythondemo5.py  pythondemo6.py  pythondemo7.py  pythondemo8.py  pythondemo9.py
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ```
 
 - 删除文件
   - 命令：`rm`
   ```shell
   语法格式：rm [OPTION]...FILE...
+<<<<<<< HEAD
 
   # -f 强制删除文件，即在删除文件时不提示确认，并自动忽略不存在的文件
 
   # -i 在删除每个文件之前请求确认
 
+=======
+  
+  # -f 强制删除文件，即在删除文件时不提示确认，并自动忽略不存在的文件
+  
+  # -i 在删除每个文件之前请求确认
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # -r 递归删除，目标是目录的话，整个目录文件全部删除
   ```
   - `rm`是危险命令，建议用以下命令替换
@@ -666,10 +1374,15 @@ hostname is /usr/bin/hostname
   ```
 
 ### 文件元数据和节点表结构
+<<<<<<< HEAD
+=======
+- 作用：df 命令用于显示文件系统的磁盘空间使用情况
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 - 查看不同分区的节点编号使用情况
   - 命令：df -i
   ```
   生产案例1：提示空间满NO space left on device，但df可以看到空间很多，为什么
+<<<<<<< HEAD
 
   答：
   节点编号不足，一个文件能被创建需要同时满足两个前提
@@ -689,6 +1402,27 @@ hostname is /usr/bin/hostname
   答：
   因为当一个文件被使用时，在另一侧删除该文件，该空间并不会被立即释放，只有当这个文件不被使用时，才会释放这个空间
 
+=======
+  
+  答：
+  节点编号不足，一个文件能被创建需要同时满足两个前提
+  足够的空间，以及该文件系统下还有剩余的节点编号
+  
+  生产案例2：为什么cp /dev/zero /boot/test.img会把/boot的空间撑满
+  
+  答：
+  1./dev/zero 是一个特殊的设备文件，它可以生成无限的零字节。当你尝试从它读取数据时，它会持续不断地返回零字节。
+  
+  2.cp 命令的作用是复制文件或目录。在这种情况下，它从 /dev/zero 复制数据并尝试写入 /boot/test.img。
+  
+  3.因为 /dev/zero 提供了无限的零字节，cp 会持续写入数据到 /boot/test.img，直到 /boot 分区没有更多的空间可用。
+  
+  生产案例3：当test.img被访问时，管理员在主服务器删除test.img后，为什么，空间依然是满的
+  
+  答：
+  因为当一个文件被使用时，在另一侧删除该文件，该空间并不会被立即释放，只有当这个文件不被使用时，才会释放这个空间
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   解决方法：
   cat /def/null > /boot/test.img; rm -rf /boot/test.img
   把文件清空后删除即可、
@@ -907,13 +1641,21 @@ cd /fd
   >|         强制覆盖（允许在set -C的情况下，强制覆盖）
   2>         把STDERR重定向到文件
   &>         把所有输出(标准输出和错误输出)重定向到文件
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   以上如果文件已经存在，文件内容会被覆盖
   ```
   ```shell
   set -C 禁止将内容覆盖已有文件，但可追加
   set +C 允许覆盖，默认
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 该知识点仅作了解
   ```
   - 追加：>>可以在原有内容上，追加内容
@@ -925,7 +1667,11 @@ cd /fd
   ```shell
   方法1：
   ls python/ err/ &> all.log
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   方法2：
   1s python/ err/ > all.log 2>&1
   ```
@@ -973,7 +1719,11 @@ cat > cat2.log <<EOF  # EOF是结束符
   id:000003
   id:000004
   id:000005
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 使所有数据同宽，位数小的前面补零，不能和-f同时使用
   root@ubuntu2004:/Storage$ seq -w 2 30 140
   002
@@ -981,11 +1731,19 @@ cat > cat2.log <<EOF  # EOF是结束符
   062
   092
   122
+<<<<<<< HEAD
 
   # -s：指定字符分隔产生的所有数字，默认为\n
   root@ubuntu2004:/Storage$ seq -s '+' 1 9
   1+2+3+4+5+6+7+8+9
 
+=======
+  
+  # -s：指定字符分隔产生的所有数字，默认为\n
+  root@ubuntu2004:/Storage$ seq -s '+' 1 9
+  1+2+3+4+5+6+7+8+9
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ```
 
 - `s-nail`(原mailx)
@@ -1013,7 +1771,11 @@ cat > cat2.log <<EOF  # EOF是结束符
   -s --squeeze-repeats：把连续重复的字符以单独一个字符表示，即去重
   -t --truncate-set1：将 第一个字符集对应字符转换为第二个字符集对应的字符，如果第一个字符集的字符数量多于第二字符集数量，超出部分忽略
   -c -C --complement：取字符集的补集
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   [:alnum:]：字母和数字
   [:alpha:]：字母
   [:digit:]：数字
@@ -1029,6 +1791,7 @@ cat > cat2.log <<EOF  # EOF是结束符
   - 示例：
   ```bash
   tr 'a-z' 'A-Z' < /etc/issue
+<<<<<<< HEAD
 
   tr [:lower:] [:upper:] < /etc/issue
 
@@ -1036,6 +1799,15 @@ cat > cat2.log <<EOF  # EOF是结束符
 
   tr -dc 'abc'  # 只保留字符中的abc，程序完全结束后返回结果
 
+=======
+  
+  tr [:lower:] [:upper:] < /etc/issue
+  
+  tr -d 'abc'  # 删除字符中的abc
+  
+  tr -dc 'abc'  # 只保留字符中的abc，程序完全结束后返回结果
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   df|tr -s ' '  # 将df的返回结果中的空格去重
   ```
 
@@ -1048,9 +1820,15 @@ cat > cat2.log <<EOF  # EOF是结束符
   - 示例
   ```shell
   ls -l | tee output1.txt
+<<<<<<< HEAD
 
   ls -l | tee -a output1.txt  # 追加内容到output1.txt，而不是覆盖
 
+=======
+  
+  ls -l | tee -a output1.txt  # 追加内容到output1.txt，而不是覆盖
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ls -l /bin |tee output1.txt|cat -n
   ```
 #### 重定向与管道案例
@@ -1072,11 +1850,19 @@ echo magedu | passwd --stdin wang &> /dev/null
 ## 用户组和权限管理
 ### Linux安全模型
 - 3A资源分派
+<<<<<<< HEAD
   - Authentication：认证，验证用户身份
     - 常见的通过用户名和口令，来区分验证用户信息
   - Authorization：授权，不同的用户设置不同的权限
     - 比如，某个文件，张三有访问权限，而李四没有
   - Accouting|Auditon：审计
+=======
+  - <b style="color:red">Authentication：</b>认证，验证用户身份
+    - 常见的通过用户名和口令，来区分验证用户信息
+  - <b style="color:red">Authorization：</b>授权，不同的用户设置不同的权限
+    - 比如，某个文件，张三有访问权限，而李四没有
+  - <b style="color:red">Accouting|Auditon：</b>审计
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
     - 记录不同用户的操作记录
 
 - 当用户登录成功时，系统会自动分配命令token，包括用户标识和组成员等信息
@@ -1127,13 +1913,13 @@ echo magedu | passwd --stdin wang &> /dev/null
   mail:x:8:8:mail:/var/mail:/usr/sbin/nologin
   ...
   后续省略
-
+  
   //每一个上都是一个用户信息，有几行，就有几个用户，大部分是程序服务作为用户的信息
   //这里的每个信息都用“:”隔开，一共7个信息，分别是：
   //name,password(密码被迁到别的地方存储),UID,GID,GECOS（描述）,directory(家目录),shell类型
-
+  
   /etc/shadow #存放指令的文件，密码，日期
-
+  
   root@ubuntu2004:/etc# cat shadow
   root:$6$CNc6y8cEgE3pNLSo$U6Nk1J2hmcMAf8y4yAPZLoXY12sWtBvO62z1l67OjetuR0Ndv9CL29SaSn7ZXRJFRHu0jgE5aJso1NYvopYgG0:19503:0:99999:7:::
   daemon:*:19430:0:99999:7:::
@@ -1172,9 +1958,13 @@ echo magedu | passwd --stdin wang &> /dev/null
   // 密码以前几天提醒，
   // 超过密码有效期，再过几天账号锁定
   // 账号有效期
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   /etc/group    
-
+  
   root:x:0:
   daemon:x:1:
   bin:x:2:
@@ -1187,11 +1977,11 @@ echo magedu | passwd --stdin wang &> /dev/null
   news:x:9:
   ...
   后续省略
-
+  
   //组的文件组成：组名，密码，id，成员
-
+  
   /etc/gshadow
-
+  
   root:*::
   daemon:*::
   bin:*::
@@ -1200,9 +1990,55 @@ echo magedu | passwd --stdin wang &> /dev/null
   tty:*::syslog
   ...
   后续省略
-
+  
   //组名，组的口令，管理员账号（管理员可以在组中增删用户）
   // 附加组成员
+<<<<<<< HEAD
+=======
+  ```
+
+
+- 用户管理命令配置文件
+  - `/etc/login.defs`
+
+  - /etc/login.defs文件在Linux系统中扮演着重要角色，它提供了系统管理员用于配置系统全局用户和组设置的默认值。这个文件被login程序和大多数用于添加和管理用户的工具读取，如useradd、userdel、usermod、passwd等。/etc/login.defs文件包含了一系列的配置指令，这些指令定义了用户账户和密码策略的各种方面，比如密码过期时间、密码复杂度要求、新用户的默认家目录权限等。
+
+  - 以下是/etc/login.defs文件中一些常见配置项的说明：
+
+    - <b style="color:red">MAIL_DIR：</b>定义用户邮件存放的目录。通常设为/var/mail。
+    - <b style="color:red">PASS_MAX_DAYS：</b>账户密码的最大有效期。过了这个期限，用户必须更改密码。
+    - <b style="color:red">PASS_MIN_DAYS：</b>两次密码更改之间需要等待的最少天数。这防止用户立即更改密码以绕过密码历史策略。
+    - <b style="color:red">PASS_WARN_AGE：</b>密码过期前，系统开始警告用户的天数。
+    - <b style="color:red">UID_MIN和UID_MAX：</b>分配给新用户的UID范围。这通常用来区分系统账户和普通用户账户。
+    - <b style="color:red">GID_MIN和GID_MAX：</b>分配给新用户组的GID范围。
+    - <b style="color:red">CREATE_HOME：</b>是否为新用户自动创建家目录。通常设置为yes，以确保每个用户都有自己的家目录。
+    - <b style="color:red">UMASK：</b>定义了新创建的用户文件的默认权限掩码。通常设置为022或027，以防止新文件和目录对其他用户是可写的。
+    - <b style="color:red">USERGROUPS_ENAB：</b>如果设置为yes，当创建一个新用户时，系统也会创建一个与用户名相同的用户组，并将此用户添加到该组。
+    - <b style="color:red">ENCRYPT_METHOD：</b>定义用于加密用户密码的算法。常见的值包括MD5、SHA256、SHA512。
+    - <b style="color:red">CREATE_MAIL_SPOOL：</b>定义是否为每个新创建的用户创建一个邮件池文件。
+  - 这个文件还包含其他多个设置，可以根据系统管理员的需求来调整。编辑/etc/login.defs文件时应格外小心，因为错误的配置可能会影响系统安全和用户管理策略。修改完毕后，强烈建议对配置进行检查，以确保没有意外的更改会影响系统操作。
+
+- useradd命令默认配置文件
+  - `cat /etc/default/useradd`
+  ```sql
+  [root@rocky8 ~]# cat /etc/default/useradd
+  # useradd defaults file
+  GROUP=100               
+  # useradd不指定组,且/etc/login.defs中的USERGROUPS_ENAB为no或
+  # useradd -N时，group 为100
+  HOME=/home              
+  INACTIVE=-1             
+  表示不锁定
+  EXPIRE=                 
+  SHELL=/bin/bash         
+  SKEL=/etc/skel          
+  #默认家目录父目录
+  #对应/etc/shadow文件第7列，即用户密码过期后的帐号锁定的宽限期,-1
+  #对应/etc/shadow文件第8列，即用户帐号的有效期
+  #默认bash
+  #用于生成新建用户家目录的模版文件
+  CREATE_MAIL_SPOOL=yes   
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ```
 
 - 用户管理常用命令
@@ -1237,7 +2073,7 @@ userdel     删除用户
 
 # userdel wilson    -- 删除指定用户（保留家目录）
 # userdel -r wilson   -- 删除用户（不保留家目录）
-# userdel -rf wilson  -- 强制删除
+# userdel -rf wilson  -- 强制删除 
 
 --------------------------------------------------
 passwd      修改用户密码
@@ -1269,9 +2105,14 @@ usermod     修改用户属性
 
 --------------------------------------------------
 
-chage       修改用户属性
+chage       修改用户密码策略
 
+<<<<<<< HEAD
 # 
+=======
+# chage -l <username> -- 查看指定用户的密码管理策略
+
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 ```
 
 - useradd的默认属性的文件
@@ -1294,11 +2135,30 @@ CREATE_MAIL_SPOOL=yes # 默认创建账号邮箱
 /etc/default/useradd
 /etc/skel/*
 /etc/login.defs  # 控制账号口令，即shadow后面配置的默认定义
+<<<<<<< HEAD
 ``` 
 
 - 批量创建用户
 ```
 newusers passwd 格式文件
+=======
+```
+
+- 批量创建用户
+```
+newusers newusers file
+```
+- 范例：
+```shell
+[root@ubuntu2204 ~]# cat user.txt 
+u1:123456:1024:1024::/home/u1:/bin/bash
+u2:123456:1025:1025::/home/u2:/bin/bash
+[root@ubuntu2204 ~]# newusers user.txt 
+[root@ubuntu2204 ~]# id u1
+uid=1024(u1) gid=1024(u1) groups=1024(u1)
+[root@ubuntu2204 ~]# id u2
+uid=1025(u2) gid=1025(u2) groups=1025(u2)
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 ```
 
 - 批量更改用户口令
@@ -1318,6 +2178,21 @@ echo password | passwd --stdin <user_name>
 因此，可以使用如下口令实现非交互式更改口令：
 echo user_name:passwd | chpasswd
 
+<<<<<<< HEAD
+=======
+[root@ubuntu2204 ~]# cat pwd.txt
+u1:1234567
+u2:1234567
+
+#标准输入重定向
+[root@ubuntu2204 ~]# chpasswd < pwd.txt
+
+#多行重定向
+[root@ubuntu2204 ~]# chpasswd <<EOF
+> u1:1234567
+> u2:1234567
+> EOF
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 ```
 
 - 查看用户相关的ID信息
@@ -1378,6 +2253,7 @@ exit 0
 ```sql
 su <用户名>     -- 切换为用户名的身份权限
 -- 不完全切换，身份切换了，但是环境还是之前的root路径下
+-- 而且环境变量依然是之前切换前的环境变量，对于依赖个人用户环境配置的程序执行，可能会出现非预期的现象
 su - <用户名>   -- 完全切换，身份和所在路径都切换了
 su - <用户名> -c 'cmd' 
 -- 以切换的指定身份执行命令，但本身不切换身份，依然是当前用户
@@ -1592,12 +2468,433 @@ SBIT
 
 # chattr +a     -- 只能追加，不能修改，不能删除
 
+以下是一些chattr命令的常用属性：
+
+1. a（Append only）
+设置后，文件只能被追加内容，不能被删除或覆盖。这对于日志文件非常有用。
+使用方法：chattr +a filename
+2. i（Immutable）
+设置后，文件变为不可修改，即不能被删除、修改、重命名，也不能添加链接。即使是root用户也不能绕过这一限制。
+使用方法：chattr +i filename
+3. s（Secure deletion）
+设置后，当文件被删除时，其占用的磁盘空间会被立即覆盖，以确保数据不能被恢复。适用于包含敏感数据的文件。
+使用方法：chattr +s filename
+4. S（Synchronous updates）
+设置后，对文件的修改立即写入磁盘，类似于使用sync命令。这对于需要即时保存更改的重要文件很有帮助。
+使用方法：chattr +S filename
+5. u（Undeletable）
+设置后，文件内容在被删除后可以被恢复。这提供了一种简单的文件恢复机制。
+使用方法：chattr +u filename
+6. A（No atime updates）
+设置后，访问文件时不更新文件的访问时间。这可以提高对于频繁访问但不需要保持访问记录的文件的性能。
+使用方法：chattr +A filename
+7. D（Synchronous directory updates）
+设置后，对目录的更改会立即写入磁盘，这适用于需要高数据一致性的目录。
+使用方法：chattr +D dirname
 ```
+
+### ACL(Access Control List) 访问控制列表
+
+- ACL权限功能：
+  - rwx 权限体系中，仅仅只能将用户分成三种角色，如果要对单独用户设置额外的权限，则无法完成；而ACL可以单独对指定的用户设定各不相同的权限；提供颗粒度更细的权限控制
+  - CentOS7 默认创建的xfs和ext4文件系统具有ACL功能
+  - CentOS7 之前版本，默认手工创建的ext4文件系统无ACL功能,需手动增加
+  ```bash
+  tune2fs –o acl /dev/sdb1
+  mount –o acl /dev/sdb1 /mnt/test
+  ```
+- ACL安装
+```
+sudo apt install acl
+```
+-  ACL生效顺序：
+```
+所有者，自定义用户，所属组，自定义组，其他人
+```
+
+- ACL相关命令
+  - getfacl 可查看设置的ACL权限
+  ```shell
+  # Display the file access control list:
+  getfacl {{path/to/file_or_directory}}
+  
+  # Display the file access control list with numeric user and group IDs:
+  getfacl -n {{path/to/file_or_directory}}
+  
+  # Display the file access control list with tabular output format:
+  getfacl -t {{path/to/file_or_directory}}
+  ```
+  - setfacl 可设置ACL权限
+  ```shell
+  setfacl [-bkndRLPvh] [{-m|-x} acl_spec] [{-M|-X} acl_file] file ...
+  #常用选项
+  -m|--modify=acl             #修改acl权限
+  -M|--modify-file=file       #从文件读取规则
+  -x|--remove=acl             #删除文件acl 权限
+  -X|--remove-file=file       #从文件读取规则
+  -b|--remove-all             #删除文件所有acl权限
+  -k|--remove-default         #删除默认acl规则
+  --set=acl                   #用新规则替换旧规则，会删除原有ACL项，用新的替代，一定要包含UGO的设置，不能象 -m一样只有 ACL
+  --set-file=file             #从文件读取新规则
+  --mask                      #重新计算mask值
+  -n|--no-mask                #不重新计算mask值
+  -d|--default                #在目录上设置默认acl
+  -R|--recursive              #递归执行
+  -L|--logical                #将acl 应用在软链接指向的目标文件上，与-R一起使用
+  -P|--physical               #将acl 不应用在软链接指向的目标文件上，与-R一起使用
+  ```
+  - setfacl示例：
+  ```shell
+  #设置 tom 无任何权限
+  [root@ubuntu2204 tmp]# setfacl -m u:tom:- f1
+  [root@ubuntu2204 tmp]# getfacl f1
+  # file: f1
+  # owner: root
+  # group: root
+  user::rw
+  user:tom:--
+  group::r-
+  mask::r-
+  other::r-
+  #查看文件，多了一个小 +
+  [root@ubuntu2204 tmp]# ll f1-rw-r--r--+ 1 root root 5 May  9 23:22 f1
+  ```
+  - 编辑ACL规则文件
+    - ACL规则文件是一个文本文件，其中每一行都包含一个ACL规则。这些规则的格式通常如下：
+    ```
+    [类型]:[用户/组]:[权限]
+    ```
+
+
+
 
 
 
 
 ## 文本处理
+### 查看文本内容
+#### cat
+- cat 可以查看文本内容
+```shell
+cat [OPTION]... [FILE]...
+
+#常见选项
+-E|--show-ends          #显示行结束符$
+-A|--show-all           #显示所有控制符
+-n|--number             #对显示出的每一行进行编号
+-b|--number-nonblank    #非空行编号
+-s|--squeeze-blank      #压缩连续的空行成一行
+```
+
+#### tac
+- tac 逆向显示文本内容，行倒序显示
+- 格式
+```shell
+tac [option]... file...
+
+# 常用选项
+-s      # 以指定分隔符进行逆序，默认以换行符为分隔逆序
+-r      # 配合-s使用，可以用正则表达式指代复杂规则的分隔符
+-b      # 将分隔符视为行的一部分，并将其放在每行的开头，默认情况下，分隔符被认为是行的末尾部分
+
+示例：
+seq 10| tac
+
+cat f1  # 1-2-3-4-5-
+echo -n `cat f1` | tac -s '-' #-5-4-3-2-1
+
+cat f2  # 1--2---3-4---5-
+echo -n `cat f2` | tac -r -s '-+' #-5----4-3---2--1
+
+cat f3  # ,1,2,3,4,5
+echo -n `cat f3` | tac -b -s ','  # ,5,4,3,2,1
+```
+#### rev
+- rev: 同一行的文本内容，反转显示
+```
+echo "12345" | rev
+>> 54321
+```
+
+### 查看非文本文件内容
+#### hexdump
+```shell
+hexdump [option] file
+
+# 常用option：
+-C            # 规范的十六进制和ASCII显示。这可能是最常用的选项
+-n length     # 显示文件的前length个字节 
+-s offest     # 从指定偏移量offest处开始显示
+
+# 示例：
+hexdump -n 100 -C /dev/sda
+hexdump -C < <(echo {a..z}|tr -d ' ')
+# <(command) 括号内会临时生成一个临时文件，然后传给前面的指令
+```
+
+### 分页查看文件内容
+#### more
+- 可以实现分页查看文件，可以配合管道实现输出信息的分页
+- 格式
+```shell
+more [option] file
+
+# 常用选项
+-d    # 在底部显示提示
+-s    # 压缩连续空行
+```
+
+- 命令选项
+```shell
+空格键      # 翻页
+回车键      # 下一行
+!command    # 执行指令
+h           # 显示帮助
+:f          # 显示文件名和当前行号
+=           # 显示行号
+```
+
+#### less
+- less 也可以实现分页查看文件或STDIN输出，less 命令是man命令使用的分页器
+
+- 配置(.bashrc)
+```shell
+# 默认man指令分页器
+# 配置彩色man页面，使用使用less和groff
+# 确保man命令使用less作为分页器。这通常是默认配置，但你可以通过设置MANPAGER或PAGER环境变量来明确指定
+export MANPAGER='less -R'
+export PAGER='less -R' 
+# -R选项告诉less解释颜色编码，这是显示颜色输出的关键
+
+# 指定颜色样式
+export LESS_TERMCAP_mb=$(printf '\e[01;31m')       # 开始闪烁
+export LESS_TERMCAP_md=$(printf '\e[01;38;5;74m')  # 开始粗体
+export LESS_TERMCAP_me=$(printf '\e[0m')           # 结束模式
+export LESS_TERMCAP_se=$(printf '\e[0m')           # 结束强调模式
+export LESS_TERMCAP_so=$(printf '\e[38;5;246m')    # 开始强调模式
+export LESS_TERMCAP_ue=$(printf '\e[0m')           # 结束下划线
+export LESS_TERMCAP_us=$(printf '\e[04;38;5;146m') # 开始下划线
+```
+- 命令选项
+  - 类似与VIM中的操作
+
+### 显示文本前面或后面的行内容
+#### head
+- head 可以显示文件或标准输入的前面行
+
+- 格式
+```shell
+head [option]... file...
+
+# 常用选项
+-c | --bytes=N      # 指定获取前N个字节
+-n | --lines=N      #指定获取前N行,N如果为负数,表示从文件头取到倒数第N前
+```
+
+- 应用
+```shell
+# 设置随机10位密码并记录
+cat /dev/urandom | tr -dc '[:alnum:]' | head -c 10 | tee -a pass.log | passwd --stdin mage
+```
+
+#### tail
+- tail: tail 和 head 相反，查看文件或标准输入的倒数行
+- 格式
+```shell
+tail [option]... file...
+
+# 常用选项
+-c      # 指定获取后N字节
+-n      # 指定获取后N行,如果写成+N,表示从第N行开始到文件结束
+-f      # #跟踪显示文件fd新追加的内容,常用日志监控
+        # 当删除再新建同名文件,将无法继续跟踪
+-F      # 跟踪文件名，当删除文件再新建同名文件，可继续追踪
+```
+
+### 按列抽取cut
+- cut 命令可以提取文本文件或STDIN数据的指定列
+- 格式
+```shell
+cut [option] file
+
+# 常用选项
+-b          # 以字节分割，指定要显示的列
+-c          # 以字符分割，指定要显示的列
+-d          # 以指定分割符分割
+-f          # 显示指定的列 eg:-f1; f1,2; f1-10
+--output-delimiter=String   # 用指定字符替代分隔符
+```
+- 示例：
+```shell
+df | head -n 2| tail -n 1|tr -s " "| cut -d " " -f5
+```
+
+### 合并多个文件paste
+- paste 合并多个文件同行号的行到一行
+- 格式
+```shell
+paste [option] file
+
+# 常用选项
+-d      # 指定分隔符, 默认tab
+-s      # 合成一行显示，默认用tab分割
+-z      # 以NULL 字符而非换行符作为行尾分隔符
+```
+
+- 示例：批量修改密码
+```shell
+[root@ubuntu2204 ~]# cat user.txt
+tom
+jerry
+[root@ubuntu2204 ~]# cat pass.txt
+123456
+654321
+[root@ubuntu2204 ~]## paste -d: user.txt pass.txt
+tom:123456
+jerry:654321
+[root@ubuntu2204 ~]# paste -d: user.txt pass.txt | chpasswd
+```
+
+### 文本折叠fold
+- fold命令是一个在Unix和类Unix系统中用于折叠文本的实用工具，它能够将较长的文本行折叠（或分割）成多个较短的行，使得文本适合在限定宽度的显示区域中查看。这在处理长行文本文件或输出时特别有用，以便更易于阅读或符合特定格式要求。
+
+- 格式
+```shell
+fold [option]... file...
+
+# 常用选项
+-w, --width=WIDTH       # 设置每行的目标宽度
+-s, --spaces            # 在空格处断行
+-b, --bytes             # 按字节计数而非按列计数。这对于处理包含多字节字符的文本（如UTF-8编码的文本）时特别有用，以确保正确的宽度计算。
+```
+
+
+### 分析文本工具
+#### 文本数据统计wc
+- wc 命令可用于统计文件的行总数、单词总数、字节总数和字符总数，可以对文件或STDIN中的数据统计
+- 格式
+```shell
+wc [option] file
+cat file | wc [option]
+
+# 常用选项
+-l|--lines   #只计数行数           
+-w|--words   #只计数单词总数           
+-c|--bytes   #只计数字节总数           
+-m|--chars   #只计数字符总数
+-L|--max-line-length   #显示文件中最长行的长度           
+```
+
+#### 文本排序sort
+- 把整理过的文本显示在STDOUT，不改变原始文件
+- 格式
+```shell
+sort [option] file
+
+# 常用选项
+-n        # 以数字大小排序
+-R        # 随机排序
+-r        # 倒序排序
+-t        # 指定列分隔符
+-k        # 指定排序列
+-u        # 去重
+```
+
+#### uniq
+- uniq 命令从输入中删除前后相接的重复的行，常和 sort 配合使用
+- 格式
+```shell
+uniq [option]... file...
+
+# 常用选项
+-c      # 显示每行出现的次数
+-d      # 仅显示重复行
+-u      # 仅显示不重复的行
+```
+
+### 比较文件
+#### diff
+- diff 命令比较两个文件之间的区别
+
+- 格式
+```shell
+diff [option]... file...
+
+# 常用选项
+-u      # 详细显示
+```
+
+#### patch
+- 使用diff生成的文件和其中一个源文件修复两一个源文件
+```shell
+patch [option]... file1 file2
+
+# 常规选项
+-b      # 备份原文件，防止覆盖后丢失
+
+# 使用场景
+diff f1 f2 > diff.log
+
+# 使用diff.log和f1可以生成f2文件
+patch -b f1 diff.log
+# 此时f1文件的内容变为f2，原f1的内容在备份文件f1.orig中
+```
+
+#### cmp
+- 查看二进制文件的不同
+```shell
+cmp file1 file2
+
+示例：
+mystical@ubuntu2204:~/test$ cmp /bin/ls /bin/dir
+/bin/ls /bin/dir differ: byte 25, line 1
+# 表示在25字节后，出现不同，使用hexdump进行查看
+
+mystical@ubuntu2204:~/test$ hexdump -s 20 -Cn 20 /bin/dir
+00000014  01 00 00 00 90 6a 00 00  00 00 00 00 40 00 00 00
+# 90
+mystical@ubuntu2204:~/test$ hexdump -s 20 -Cn 20 /bin/ls
+00000014  01 00 00 00 b0 6a 00 00  00 00 00 00 40 00 00 00
+# b0
+```
+
+
+### 文本处理三剑客之 grep
+- 作用：
+  - 文本搜索工具，根据用户指定的 “模式” 对目标文本逐行进行匹配检查；打印匹配到的行
+
+- 模式：
+  - 由正则表达式字符及文本字符所编写的过滤条件
+
+- 格式
+```shell
+grep [option]... PATTERN [FILE]...
+
+#常用选项
+--color=auto      # 对匹配到的文本着色处理
+-m N              # 匹配N次后停止
+-v                # 取反
+-i                # 忽略大小写
+-n                # 显示行号
+-c                # 统计匹配次数
+-o                # 仅显示匹配到的字符，使用o的时候，后面一般跟正则表达式
+-q                # 静默模式，什么都不输出，但是匹配成功与否可以通过$?的数值看出来
+-A N              # 匹配到的行的后N行
+-B N              # 匹配到的行的前N行
+-C N              # 匹配到的行的前后各N行
+-e                # 表示或关系，进行查询
+# 示例：
+grep -e false -e bash /etc/passwd
+-w                # 表示匹配的是单词，而不是仅仅包含该字符
+-E                # 表示使用ERE
+-F                # 表示不支持正则表达式
+-f file           # 将文件中的每行内容作为匹配的正则规则
+                  # 也可以用来判断两个文件中的相同行
+-r                # 递归处理，不处理链接文件
+-R                # 递归处理，处理链接文件
+```
+
+
 ### Awk
 #### Awk基础
 - Awk语法
@@ -1968,6 +3265,1772 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
 用反斜杠'\'+数字表示分组的代号
 ```
 
+## 文件查找与打包压缩
+### 文件查找
+- 非实时查找（数据库查找）：locate
+- 实时查找：find
+
+#### locate
+- locate简介
+  - locate 查询系统上预建的文件索引数据库 /var/lib/mlocate/mlocate.db
+  - 索引的构建是在系统较为空闲时自动进行(周期任务)，执行updatedb可以更新数据库
+  - 索引构建过程需要遍历整个根文件系统，很消耗资源
+  - locate和update命令来自于mlocate包
+
+- 工作特点
+  - 查找速度快
+  - 模糊查询
+  - 非实时查找
+  - 搜索的是文件全路径，不仅仅是文件名
+  - 可能只搜索用户具备读取和执行权限的目录
+
+- locate安装
+```shell
+# CentOS
+yum install -y mlocate
+
+# Ubuntu
+apt install -y plocate
+```
+
+- 格式
+```shell
+locate [option...] [PATTERN]...
+
+# 手动更新数据库
+updatedb
+
+# 常用选项
+-A                # 输出所有能匹配到的文件名，不管文件是否存在
+-b                # 仅匹配文件名部份，而不匹配路径中的内容
+-c                # 统计匹配到的数量
+-d database       # 指定数据库查找
+-i                # 忽略大小写
+-n N              # 只显示前N条匹配数据
+-r                # 使用基本正则表达式
+--regex           # 使用扩展正则表达式
+```
+
+#### find
+- find 是实时查找工具，通过遍历指定路径完成文件查找；
+
+- 工作特点
+  - 查找速度略慢
+  - 精确查找
+  - 实时查找
+  - 查找条件丰富
+  - 可能只搜索用户具备读取和执行权限的目录
+
+
+- 格式
+```shell
+#find [-H] [-L] [-P] [-Olevel] [-D help|tree|search|stat|rates|opt|exec][path...] [expression]
+
+find [OPTION]... [查找路径] [查找条件] [处理动作]
+
+## 条件组合（-a,-o,-not）不加括号的情况下，默认处理动作只针对最后一个查找条件
+
+# 查找路径：指定具体目标路径，默认当前路径
+# 查找条件：指定的查找条件，可以为文件名，大小，类型，权限等标准进行，默认找出指定路径下的所有文件
+# 处理动作：对符合条件的文件做操作，默认输出至屏幕
+
+# 常用查找条件
+-maxdepth       # 为最大搜索遍历深度
+-mindepth       # 为最小搜索遍历深度
+-name           # 指定文件名， 支持通配符
+-depth          # 优先处理文件（用处不大）
+
+# 根据文件名和inode查找
+-name name
+-iname name
+-inum number
+-samefiles name   # 查找相同inode号的文件
+-link n           # 链接数为n的文件
+-regex "PATTERN"  # 以PATTERN匹配整个路径，而非文件名
+
+# 根据属主属组查找
+-user USERNAME      # 查找属主为指定用户（UID）的文件
+-group GPRNAME      # 查找属组为指定用户组（GID）的文件
+-uid UserID
+-gid GrpID
+-nouser
+-nogroup
+
+# 根据文件类型查找
+-type TYPE
+
+# 查找空文件或空目录
+-empty
+
+# 组合条件
+-a          # 与，默认值
+-o          # 或
+-not | !    # 非
+
+# 排除子目录
+-prune      # 跳过，排除指定目录，必须配合-path使用
+
+## 示例：
+# 排除当前目录下的dir1目录下的.txt文件，但是会输出dir1
+find -path './dir1' -prune -o -name "*.txt"
+# 去除dir1
+find -path './dir1' -prune -o -name "*.txt" -print
+
+# 根据文件大小查找
+-size [-|+]N UNIT
+
+10k: (9k, 10k]
+-10k: (--，9k]
++10k: (10k,++)
+
+# 根据时间查找
+## 以天为时间单位
+-atime [-|+]N
+-mtime [-|+]N
+-ctime [-|+]N
+
+## 以分钟为单位
+-amin [-|+]N
+-mmin [-|+]N
+-cmin [-|+]N
+
+# 根据权限查找
+- perm [/|-] MODE
+MODE    # 精确匹配权限
+/MODE   # （u,g,o）只要有一位匹配即可，or关系
++MODE   # 每一类对象都必须同时拥有指定权限，and关系
+        # 权限位是0表示不关注该位置的权限
+
+# 正则表达式
+-regextype type     # 正则表达式类型
+-regex pattern      # 正则表达式
+
+# 处理动作
+-print          # 将匹配到的内容输出到控制台
+-print0         # 用空字符null代替换行符进行分界
+-ls             # 将匹配到的内容ls -l显示出来
+-fls            # 查找到的所有文件的长格式信息保存至指定文件中，相当于 -ls > file
+-delete             # 删除查找到的文件，慎用！
+-ok command {} \;   # 对查找到的每个文件执行有command指定的命令，并对每个文件进行交互式确认
+-exec command {} \; #对查找到的每个文件执行由COMMAND指定的命令
+{}                  # 用于引用查找到的文件名称自身
+```
+
+### 参数替换 - xargs
+- 作用：
+  - 使不支持标准输入的命令可以接受管道传递的参数
+  - 许多命令不支持过多参数，可以使xargs分组传参
+
+- 格式
+```shell
+xargs [OPTION]... COMMAND [INITIAL-ARGS]...
+
+# 常用选项
+-0            # 用 assic 中的0或 null 作分隔符
+# 示例：
+# [root@ubuntu2204 ~]# find -type f -print0 |xargs -0 ls
+# './a b'   ./f-1.txt   ./f-2.txt   ./f-3.txt
+# 适用于分隔文件中带空格的情况
+-a           # 从文件中读入作为输入
+-d           # 指定分隔符
+-E END       # 指定结束符，执行到此处截止
+-n           # 一次接受n个参数
+-p           # 每次执行前确认
+-t           # 显示过程
+```
+
+### 压缩与解压缩
+#### compress和uncompress
+- 此工具来自于ncompress包，目前已很少使用
+
+- 对应文件是.Z后缀
+
+- 格式
+```shell
+compress...[option]... [file]...
+uncompress [option]... [file]...
+
+# 常用选项
+-d        # 解压缩，相当于uncompress
+-c        # 结果输出至标准输出，不删除源文件
+# 保留源文件方法
+# compress -c syslog > syslog.Z
+-f        # 覆盖已存在目标文件
+-v        # 显示过程
+-r        # 递归压缩目录下所有内容
+
+# 压缩比：1:5
+```
+
+#### gzip和gunzip
+- 来自于gzip包
+- 对应的文件是.gz后缀
+- 格式
+```shell
+gzip [option]... FILE...
+gunzip [option]... FILE...
+
+# 常用选项
+-c        #将压缩数据输出到标准输出中，并保留原文件
+-d        # 解压缩，相当于gunzip
+-k        # 保留原文件
+-l        #显示原文件大小，压缩文件大小，压缩比，压缩前文件名
+-r        # 递归压缩目录下所有文件
+-S        # 指定压缩文件后缀
+-v        # 显示过程
+-1        # 最快压缩，压缩比最小，但压缩时间块
+-9        # 最慢压缩，压缩比最高，但压缩
+
+# 压缩比：1:8
+```
+
+#### bzip2和bunzip2
+- 来自于bzip2包
+- 对应文件是.bz2后缀
+- 格式
+```shell
+bzip2 [option]... FILE...
+bunzip2 [option]... FILE...
+bzcat # 不解压，查看文件内容
+ 
+# 常用选项
+# 同gzip: -dkvfc19
+
+# 压缩比：1:10
+```
+
+#### xz和unx
+- 来自于xz包
+- 对应文件是.xz包
+- 格式
+```shell
+xz [option]... FILE...
+unxz [option]... FILE...
+
+# 常规选项
+# 同gzip: -dzkvfc19
+-T      # 开多线程，默认为1
+```
+
+#### zip和unzip
+- zip可以实现打包目录和多个文件大包为一个文件并压缩，但可能会丢失文件属性信息（如属主属组）
+- 对应的文件是.zip后缀
+- 格式
+```shell
+zip [option]... zipfile [FILE]...
+unzip [option]... zipfile [FILE]...
+
+# zip常用选项
+-f    # 仅更新，不追加
+-u    # 有则更新，无则追加
+-d    # 删除指定压缩包内文件
+-m    # 将文件压缩之后，删除原始文件
+-r    # 递归压缩目录
+-1~9
+-v    # 显示过程
+-c    # 替每个压缩的文件添加注释
+-z    # 给压缩包添加注释
+-P    # 非交互设置密码
+-e    # 交互式设置密码
+-i    # 仅压缩指定文件
+-x    # 压缩时排除指定文件
+
+# unzip常用选项
+-l    # 显示压缩文件内所包含的文件
+-t    # 查看压缩文件完整性
+-z    # 查看压缩包注释
+-v    # 列出包内文件信息
+-x    # 指定不需要解压缩的文件
+-d    # 指定解压的目标目录
+-n    # 压缩时不要覆盖原有文件
+-o    # 直接覆盖
+```
+#### zcat
+- 其功能是在不解压的情况下查看压缩文件内容
+- 格式
+```shell
+zcat [option]... FILE...
+
+# 常用选项
+-d        # 解压缩
+-l        # 显示压缩文件内的文件列表
+-r        # 递归操作
+-t        # 测试文件完整性
+```
+
+### 打包和解包
+#### tar
+- tar 即 Tape ARchive 磁带归档，可以对目录和多个文件打包成一个文件进行归档；其本身不具备压缩功能，但可以使用参数调用相应的压缩命令进行压缩；此命令可以保留文件属性，推荐使用；
+- 对应文件后缀是.tar
+
+- 格式
+```shell
+# 常用选项
+-cvf      # 打包
+-tvf      # 查看包内文件
+-xvf      # 解包
+-z        # gz压缩算法
+-j        # bzip2压缩算法
+-J        # xz压缩算法
+```
+
+## 磁盘存储和文件系统
+### 磁盘结构
+#### 设备文件
+- 设备文件：关联至一个设备驱动程序，进而能够与之对应硬件设备进行通信
+
+- 设备号码：
+  - 主设备号：major number, 标识设备类型
+  - 次设备号：minor number, 标识同一类型下的不同设备
+
+- 设备类型
+  - 块设备：block，存取单位"块"，磁盘
+  - 字符设备：char，存取单位"字符"，键盘
+
+- 磁盘设备的设备文件命名
+```shell
+/dev/DEV_FILE
+/dev/sdX    # SAS, SATA, SCSI, IDE, USB
+/dev/nvme0n     # nvme协议硬盘，如：第一个硬盘：nvme0n1, 第二个硬盘：nvme0n2  
+```
+
+- 虚拟磁盘
+```shell
+/dev/vd
+/dev/xvd
+```
+
+- 不同磁盘标识：a-z, aa, ab..
+```shell
+/dev/sda, /dev/sdb...
+```
+
+- 同一设备的不同分区：1，2....
+```shell
+/dev/sda1
+/dev/sda5
+```
+
+- 添加硬盘不重启识别
+```shell
+echo '- - -' > /sys/class/scsi_host/host0/scan
+echo '- - -' > /sys/class/scsi_host/host1/scan
+echo '- - -' > /sys/class/scsi_host/host2/scan
+
+
+# 解读/sys/class/scsi_host/host*
+scsi_host文件夹下，代表了所有的scsi主机适配器接口，每个hostN都表示一个SCSI主机适配器接口
+
+# 解读hostN目录下的文件
+hostN目录包含了与该接口相关的一系列参数和操作接口。这些文件和目录提供了一种机制，允许用户空间程序查询和修改 SCSI 主机适配器的属性，以及执行特定的操作，如扫描新设备
+
+# 举例
+scan   
+> 这是一个写入接口，用于触发 SCSI 主机适配器扫描其管理的总线以识别新连接的设备。
+> 向这个文件写入特定的字符串（通常是 "- - -"）会指示适配器扫描所有可能的通道（channel）、目标（target）和逻辑单元号（LUN）
+
+state
+> 显示适配器的当前状态，如 "running" 或 "offline"
+
+proc_name
+> 显示 SCSI 主机适配器的驱动程序名称
+> 知道了proc_name，即驱动程序名称，可以通过"modinfo 驱动名称"查询驱动详细信息
+> 也可以通过lsmod|grep "驱动名称"查询该模块是否被加载
+> 使用modprobe可以手动加载或卸载驱动程序
+> 大多驱动程序以模块的形式被加载，模块（Kernel Module）是一种可以在系统运行时动态加载和卸载的代码块
+
+unique_id
+> 为 SCSI 主机适配器提供一个唯一标识符
+```
+
+- SCSI主机适配器接口hostN放在sys目录下的原因
+```shell
+/sys 目录是 Linux 系统中的一个特殊文件系统，称为 sysfs。sysfs 提供了一种机制，通过它用户空间的程序可以与内核空间的数据结构进行交互，获取系统和硬件组件的信息，以及在某些情况下修改这些信息。
+
+#为什么使用 sysfs
+简化访问：
+通过 sysfs，提供了一种标准和简单的方式来访问内核提供的信息和服务，这些服务以前可能需要特殊的系统调用或复杂的编程接口来访问。
+
+统一接口：
+sysfs 为许多不同类型的内核结构提供了一个统一的文件系统接口，包括设备、驱动程序和内核模块等，这使得管理和查询这些结构更加一致和简单。
+
+动态性：sysfs 
+是动态生成的，它的内容反映了当前系统的状态。当硬件设备被添加或移除时，sysfs 中相应的条目会相应地出现或消失，这提供了一种实时反映系统状态的机制。
+```
+
+- <span style="color:tomato; font-weight:700;">扩展内容：检查和管理模块</span>
+```shell
+lsmod：列出当前加载的所有模块。
+
+modinfo：显示有关特定模块的详细信息。
+
+modprobe：智能地加载或卸载模块，包括处理模块依赖关系。
+
+insmod：加载一个模块到内核中，但不解决依赖关系。
+
+rmmod：从内核中卸载一个模块
+```
+
+- 创建设备文件
+```shell
+mknod /data/partition-sda1 b 8 1
+mount /data/partition-sda1 /mnt/
+```
+#### dd指令
+- 指令格式
+```shell
+dd if=输入文件 of=输出文件 [选项]
+
+# if=文件名：指定输入文件（input file），可以是设备文件（如磁盘分区 /dev/sda）或普通文件。
+# of=文件名：指定输出文件（output file），同样可以是设备文件或普通文件。
+# [选项]：dd 命令提供了多种选项，用于控制数据的读取、写入和转换过程。
+```
+
+- 常用选项
+    - bs=大小：设置块大小，例如 bs=512 表示每次读写512字节。bs 对性能有很大影响。
+    - count=数量：复制指定的块数量，与 bs 一起使用可以控制复制的总数据量。
+    - skip=数量：跳过输入文件开头的指定块数量。
+    - seek=数量：跳过输出文件开头的指定块数量，用于在指定位置开始写入。
+    - conv=转换选项：指定数据转换选项，如 conv=notrunc 避免截断输出文件，conv=noerror 在读取错误时继续处理。
+    - status=进度选项：控制进度报告的输出，status=progress 显示处理过程中的进度信息。
+
+- 示例
+```shell
+# 创建一个固定大小的文件
+dd if=/dev/zero of=文件名 bs=1G count=1
+
+# 备份和恢复硬盘分区
+dd if=/dev/sda1 of=/path/to/backup.img
+
+# 将备份文件恢复到分区
+dd if=/path/to/backup.img of=/dev/sda1
+
+# 复制光盘到ISO文件
+dd if=/dev/cdrom of=/path/to/cdimage.iso
+```
+
+#### 硬盘类型
+![alt text](images/image15.png)
+
+- 硬盘接口类型
+  - IDE：133MB/s，并型接口，早期家用服务器
+  - SCSI：640MB/s，并行接口，早期服务器
+  - SATA：6Gbps,SATA数据端口与电源端口是分开的，即需要两条线，一条数据线，一条电源线
+  - SAS: 6Gbps，SAS是一整条线，数据端口与电源端口是一体化的，SAS中是包含供电线的，而SATA中不包含供电线。SATA标准其实是SAS标准的一个子集，二者可兼容，SATA硬盘可以插入SAS主板上，反之不行
+  - USB: 480MB/s
+  - 注意：速度不是由单纯的接口类型决定，支持Nvme协议硬盘速度是最快的
+
+#### 硬盘存储术语
+![alt text](images/image16.png)
+- 硬盘存储术语CHS
+  - head：磁头；磁头数=盘面数
+  - track：磁道，磁道=柱面数
+  - sector：扇区，512bytes
+  - cylinder：柱面 1柱面=512*sector数/track*head数=512*63*255=7.84M
+
+- CHS(已基本淘汰)
+  - CHS采用24bit位寻址
+  - 其中前10位表示cylinder，中间8位表示head，后面6位表示sector
+  - 最大寻址空间8G（8G计算方式：2^24=16M，这个表示扇区的数量，一个扇区512byte,所以最大存储是16M*512=8G）
+  - 对于机械硬盘，外层磁道的数据，读取更快，因为单位时间内，外层磁头划过的更长，读取数据更多，<span style="color:tomato;">因此一种优化方式，是把数据尽量存放到外磁道扇区，对于机械硬盘，数字越小，扇区越靠外</span>
+
+- LBA（Logic block addressing）
+  - LBA是一个整数，通过转换成CHS格式完成磁盘具体寻址
+
+- 查看扇区信息
+```shell
+fdisk -l /dev/sda
+# 默认只有扇区信息
+Disk /dev/sda: 200 GiB, 214748364800 bytes, 419430400 sectors
+Disk model: VMware Virtual S
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt #（分区方式）
+Disk identifier: E6097981-0CC8-4229-AC57-CFFCAF3BC758
+
+Device       Start       End   Sectors  Size Type
+/dev/sda1     2048      4095      2048    1M BIOS boot
+/dev/sda2     4096   4198399   4194304    2G Linux filesystem
+/dev/sda3  4198400 419428351 415229952  198G Linux filesystem
+root@mystical:/dev#
+
+# 加参数可以得到更详细的信息
+fdisk -u=cylinder -l /dev/sda
+Disk /dev/sda: 200 GiB, 214748364800 bytes, 419430400 sectors
+Disk model: VMware Virtual S
+Geometry: 255 heads, 63 sectors/track, 26108 cylinders
+Units: cylinders of 16065 * 512 = 8225280 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: gpt
+Disk identifier: E6097981-0CC8-4229-AC57-CFFCAF3BC758
+
+Device     Start   End  Size Type
+/dev/sda1      1     1    1M BIOS boot
+/dev/sda2      1   262    2G Linux filesystem
+/dev/sda3    262 26109  198G Linux filesystem
+```
+
+
+### 分区类型
+- Linux中使用磁盘的过程
+  - 设备分区
+  - 创建文件系统
+  - 挂载该文件系统
+
+- 分区的原因
+  - 优化I/O性能
+    - 比如：1000G空间中找一个文件和40G中找一个文件，明显40G中搜索查找更容易
+  - 实现磁盘空间的配额限制
+  - 提高修复速度
+  - 隔离系统和程序
+  - 安装多个操作系统
+  - 采用不同的文件系统
+
+- 分区方式
+  - MBR
+  - GPT
+
+#### MBR分区
+- 定义：Master Boot Record，1982年，使用32位表示扇区数，分区不超过2T
+- 查询
+```shell
+fdisk -l /dev/sda
+# Disklabel type: dos (表示MBR分区)
+```
+
+- 0磁道0扇区：512byte
+  - 446bytes: boot loader启动想关
+  - 64bytes: 分区表，其中每16bytes表示一个分区
+  ```shell
+  # 分区表信息
+  fdisk -l /dev/sda
+  
+  # 这些为GPT分区表信息
+  Device       Start       End   Sectors  Size Type
+  /dev/sda1     2048      4095      2048    1M BIOS boot
+  /dev/sda2     4096   4198399   4194304    2G Linux filesystem
+  /dev/sda3  4198400 419428351 415229952  198G Linux filesystem
+  
+  # MBR分区表信息
+  Device     Boot   Start       End   Sectors  Size Id Type
+  /dev/sda1  *       2048   2099199   2097152    1G 83 Linux
+  /dev/sda2       2099200 419430399 417331200  199G 8e Linux LVM
+  # *（星号）表示该分区为活动分区，分区信息第一字节为80
+  ```
+  - 2bytes: 55AA标识符
+
+- MBR分区特点
+  - MBR分区中一个硬盘最多有4个主分区，也可以3个主分区+1个扩展（N个逻辑分区）
+  - MBR分区：主和扩展分区对应的1--4，/dev/sda1-4,逻辑分区从5开始，/dev/sda5(逻辑分区从扩展分区中分，但是sda4代表扩展分区，逻辑分区从sda5开始)
+  - <span style="color:tomato;font-weight:700">MBR最多4个分区的原因</span>
+  ```shell
+  因为分区表一共64字节，而一个分区16字节，因此MBR分区方式最多4个分区
+  ```
+  - <span style="color:tomato;font-weight:700">总分区不能超过2T的原因</span>
+  ```shell
+  一个分区的信息共16字节，其中4字节起始位置，4字节记录结束位置，（因为MBR中，使用32位，4字节记录分区地址），因此一共能记录的数量是2^32=4G个扇区数量，一个扇区512字节，因此，一个分区空间最多不能超过2T，否则分区表无法记录
+  ```
+
+  - <span style="color:tomato;font-weight:700">详解16字节分区表中分区信息</span>
+  ```shell
+  1. 第一个字节80表示活动分区，00表示非活动分区
+  2. 9-12字节，分区起始LBA地址
+  3. 13-16字节，分区结束LBA地址
+  
+  # 以80 04 01 04 83 fe c2 ff  00 08 00 00 00 00 20 00举例
+  80表示该分区为活动分区
+  
+  后面的数据表示磁盘扇区位置和内存逻辑位置的地址信息
+  ```
+  - <span style="color:tomato;font-weight:700">扩展分区记录逻辑分区的方式</span>
+  ```shell
+  在 MBR 的0扇区中，确实有64字节用于存储分区信息，这部分被分成4个分区条目，每个分区条目占用16字节。如果硬盘使用扩展分区，其中一个分区条目将用来定义扩展分区的起始位置（通常是在哪个扇区开始）。
+  
+  这16字节的扩展分区条目指向第一个 EBR（Extended Boot Record），这个 EBR 存在于扩展分区的起始位置。每个 EBR 也有自己的小型分区表，其中包括两个条目：
+  
+  第一个条目定义了一个逻辑分区的起始位置和大小。
+  第二个条目指向下一个 EBR（如果有的话），实际上是一个指向扩展分区中下一个逻辑分区的 EBR 的相对位置。
+  这样就形成了一种链表结构：
+  
+  MBR 的扩展分区条目指向第一个 EBR。
+  第一个 EBR 定义第一个逻辑分区，并指向下一个 EBR。
+  第二个 EBR 定义第二个逻辑分区，并指向下一个 EBR。
+  以此类推，直到最后一个 EBR，其通常不再指向任何 EBR，表示链表的结束。
+  ```
+
+![alt text](images/image17.png)
+![alt text](images/image18.png)
+- 详细解读
+  - 主引导程序（偏移地址0000H--0088H），它负责从活动分区中装载，并运行系统引导程序
+  - 出错信息数据区，偏移地址0089H--00E1H为出错信息，00E2H--01BDH全为0字节 
+  - 分区表（DPT,Disk Partition Table）含4个分区项，偏移地址01BEH--01FDH,每个分区表项长16个字节，共64字节为分区项1、分区项2、分区项3、分区项4
+  - 结束标志字，偏移地址01FE--01FF的2个字节值为结束标志55AA
+
+#### MBR分区表破坏与修复实验
+- MBR分区表破坏
+```shell
+# 备份分区表(将数据备份到mbrtb.img文件)
+dd if=/dev/sda of=/home/mystical/mbrtb.img bs=1 count=64 skip=446
+
+# 将备份数据放到远程服务器保存(保存到服务器10.0.0.150)
+scp 10.0.0.164:/home/mystical/mbrtb.img .
+
+# 将分区表的64byte部分，填充0
+dd if=/dev/zero of=/dev/sda bs=1 count=64 seek=446
+
+# Ubuntu分区修复
+1. 关闭服务器，进入Bios，使用CD-ROM drive加载引导程序
+
+2. 选择Try or Install Ubuntu Server进入安装界面
+3. 按ctrl+alt+f2 进入救援模式的命令行
+4. 将之前备份在远程服务器的备份文件复制到待修复的服务器中
+scp root@10.0.0.150:/home/mystical/mbrtb.img
+
+5. 加载过来后，将数据恢复重启即可
+dd if=mbrtb.img of=/dev/sda bs=1 count=64 seek=446
+fdisk -l /dev/sda # 看到分区表信息，即证明修复成功
+
+6 使用bios复原加载启动项，然后重启即可
+
+# ---------------------------------------------------------
+
+# Rocky分区修复
+
+# 从光驱启动进救援模式
+1. 使用CD-ROM drive启动，进入安装界面后，选择Troubleshooting
+2. 选择Rescue a Rocky Linux System
+3. 出现选择页面后，选择1，回车，再回车，拿到一个shell
+4. 当前没有网络，需要先配置网络，然后远程将分区备份拷贝过来
+ip address add 10.0.0.160/24 dev ens160
+scp root@10.0.0.157:/root/mbrtb.img
+
+5. 然后使用备份数据修复磁盘分区表后，调整加载启动项，重启即可
+```
+
+#### GPT分区
+- GPT：
+  - 定义：GUID（Globals Unique Identifiers）Partition table 支持128个分区，使用64位，支持8Z（512Byte/block）64Z(4096Byte/block)
+  - 使用128位UUID（Universally unique Identifires）表示磁盘和分区，GPT分区表自动备份在头和尾两份，并有CRC校验位
+  - UEFI（同一可扩展硬件接口）支持GPT，是的操作系统可以使用
+
+- GPT分区结构
+![alt text](images/image19.png)
+
+#### BIOS和UEFI
+- BIOS：BIOS是固化在电脑主板上的程序，主要用于<span style="color:tomato;">开机系统自检</span>和<span style="color:tomato;">引导操作系统</span>。目前新式的电脑基本上都是UEFI启动 
+
+### 管理分区
+- 列出块设备lsblk
+```shell
+lsblk
+
+# 列出设备和挂载地址的完整路径
+lsblk -p
+
+# 列出每个分区的操作系统
+lsblk -f
+
+# 常用字段
+NAME        # 设备名称
+MAJ:MIN     # 主设备号:次设备号
+RM          # 是否是可移动设备
+SIZE        # 设备容量大小
+RO          # 是否是只读设备
+TYPE        # 设备类型
+MOUNTPOINT  # 挂载点
+```
+
+- 创建分区的命令
+```shell
+fdisk         # 管理MBR分区
+gdisk         # 管理GPT分区
+parted        # 高级分区操作，可以是交互或非交互方式
+
+partprobe     # 重新设置内存中的内核分区表版本，适合除CentOS 6之外的其他版本
+```
+
+#### parted命令 
+- parted的操作都是实时生效的，没有交互式确认
+- 由于parted命令，回车后直接生效，比较危险，因此生产中使用的比较少
+- 格式：
+```shell
+parted [OPTION]... [DEVICE [COMMAND [PARAMETERS]...]...]
+
+# 常用选项
+-l | --list                             # 显示所有硬盘分区信息
+-s | --script                           # 不输出提示信息
+
+# 常用子命令
+help [COMMAND]                          # 显示命令帮助
+print                                   # 显示 
+quit                                    # 退出（交互式操作时使用）
+mklabel|mktable LABEL-TYPE              # 指定磁盘的分区类型gpt|msdos(mbr)
+mkpart PART-TYPE [FS-TYPE] START END    # 新建分区，指定分区类型，文件系统，开始结束位置（默认单位是M）
+rm NUMBER                               # 删除指定分区
+
+```
+
+- 示例：
+```shell
+root@ubuntu2204~# parted -l
+Model: VMware, VMware Virtual S (scsi)                                             
+Disk /dev/sda: 215GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End     Size    File system  Name  Flags
+ 1      1049kB  2097kB  1049kB                     bios_grub
+ 2      2097kB  2150MB  2147MB  ext4
+ 3      2150MB  215GB   213GB
+
+#----------------------------------------------------------------
+
+Error: /dev/sdb: unrecognised disk label
+Model: VMware, VMware Virtual S (scsi)                                    
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: unknown
+Disk Flags: 
+
+#----------------------------------------------------------------
+
+Model: Linux device-mapper (linear) (dm)
+Disk /dev/mapper/ubuntu--vg-ubuntu--lv: 106GB
+Sector size (logical/physical): 512B/512B
+Partition Table: loop
+Disk Flags: 
+
+Number  Start  End    Size   File system  Flags
+ 1      0.00B  106GB  106GB  ext4
+
+#----------------------------------------------------------------
+
+Warning: Unable to open /dev/sr0 read-write (Read-only file system).  /dev/sr0
+has been opened read-only.
+Error: /dev/sr0: unrecognised disk label
+Model: NECVMWar VMware SATA CD01 (scsi)                                   
+Disk /dev/sr0: 2133MB
+Sector size (logical/physical): 2048B/2048B
+Partition Table: unknown
+Disk Flags: 
+```
+
+- 创建分区
+```shell
+# 创建分区表种类（msdos|gpt）
+root@ubuntu2204~# parted /dev/sdb mklabel gpt
+Information: You may need to update /etc/fstab.
+# 只有将/etc/fstab文件同步更新，才能永久生效
+
+root@ubuntu2204~# parted /dev/sdb print                                   
+Model: VMware, VMware Virtual S (scsi)
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start  End  Size  File system  Name  Flags
+
+#------------------------------------------------------------
+
+# 创建分区
+root@ubuntu2204~# parted /dev/sdb mkpart primary 1 300
+Information: You may need to update /etc/fstab.
+
+root@ubuntu2204~# parted /dev/sdb print
+Model: VMware, VMware Virtual S (scsi)
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End    Size   File system  Name     Flags
+ 1      1049kB  300MB  299MB               primary
+# 这里从1M即1024KB开始，但实际从1049的原因：
+# parted 会默认对齐分区到硬盘的最优写入边界，这通常是硬盘的物理块大小的整数倍，或者对于更现代的硬盘来说，是最佳I/O性能的位置。这个对齐通常是为了性能考虑，确保分区边界与底层存储介质的物理布局相匹配，可以提高存取效率并减少潜在的读写错误。
+
+root@ubuntu2204~# parted /dev/sdb mkpart primary 301 500
+Information: You may need to update /etc/fstab.
+
+root@ubuntu2204~# parted /dev/sdb print
+Model: VMware, VMware Virtual S (scsi)
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start   End    Size   File system  Name     Flags
+ 1      1049kB  300MB  299MB               primary
+ 2      301MB   500MB  199MB               primary
+
+#-----------------------------------------------------------------
+
+# 删除分区
+root@ubuntu2204~# parted /dev/sdb rm 1
+Information: You may need to update /etc/fstab.
+
+root@ubuntu2204~# parted /dev/sdb print
+Model: VMware, VMware Virtual S (scsi)
+Disk /dev/sdb: 21.5GB
+Sector size (logical/physical): 512B/512B
+Partition Table: gpt
+Disk Flags: 
+
+Number  Start  End    Size   File system  Name     Flags
+ 2      301MB  500MB  199MB               primary
+```
+
+#### 分区工具fdisk,gdisk
+- fdisk
+```shell
+fdisk /dev/sdb
+
+# p 打印分区表
+Command (m for help): p
+Disk /dev/sdb: 20 GiB, 21474836480 bytes, 41943040 sectors
+Disk model: VMware Virtual S
+Units: sectors of 1 * 512 = 512 bytes
+Sector size (logical/physical): 512 bytes / 512 bytes
+I/O size (minimum/optimal): 512 bytes / 512 bytes
+Disklabel type: dos
+Disk identifier: 0xe3be2582
+
+# n 创建一个新的分区 
+
+# d 删除一个分区
+删除主分区，磁盘编号不变
+删除逻辑分区，磁盘编号可能会变，保证是从5往下依次顺延
+
+# t 更改分区类型
+
+# w 保存退出
+
+# q 不保存退出
+```
+
+- gdisk
+```shell
+gdisk和fdisk用法基本相同
+```
+
+- 如果出现分区表信息分区后未更新，执行partprobe
+```shell
+partprobe    # 更新分区表信息
+```
+
+- 非交互式创建分区
+```sehll
+echo "n\np\n\n\n+2G\nw" | fdisk /dev/sdb
+```
+
+### 管理文件系统
+- 文件系统
+  - 概念：文件系统是操作系统用于明确存储设备或分区上的文件的方法和数据结构；即在存储设备上组织文件的方法
+  - 操作系统中负责管理和存储文件信息的软件结构称为文件管理系统，简称文件系统
+  - 从系统角度来看，文件系统是对文件存储设备的空间进行组织和分配，负责文件存储并对存入的文件进行保护和检索的系统。具体地说，它负责为用户建立文件，存入、读出、修改、转储文件，控制文件的存取，安全控制，日志，压缩，加密等。
+
+- ext4和xfs文件系统的比较
+```shell
+ext4最大支持16GB到16TB的文件，分区最大支持1EB
+xfs最大支持8EB的文件，最大支持分区8EB
+# 指 XFS 文件系统可以理论上管理和存储的最大数据量。
+```
+
+- 查看当前内核支持的文件系统
+```shell
+# rokcy8.6
+ls /lib/modules/`uname -r`/kernel/fs
+
+# Ubuntu22.04
+ls /lib/modules/`uname -r`/kernel/fs
+```
+
+- 查看当前系统可用的文件系统
+```shell
+cat /proc/filesystems
+```
+
+- 当前系统支持的文件系统和当前系统可用的文件系统是两回事，modules 中的文件系统在编译时选择了才是可用的，而可用的文件系统包含了默认支持的文件系统，如果需要使用某个文件系统，而该文件系统又不在proc 中，则需要重新编译内核；
+```
+对这句话的详细解读：
+这个概念可以分为三个关键点：
+
+支持但不可用：如果 Linux 内核的源代码包含了文件系统A的支持，这意味着理论上内核可以处理文件系统A。然而，如果这个支持没有在您当前运行的内核版本中被编译进去（无论是作为内核的一部分，还是作为可以动态加载的模块），那么文件系统A虽然被支持，但在实践中是不可用的。
+
+添加模块和重新编译内核：为了使文件系统A在您的系统中可用，您需要确保内核编译过程中包括了文件系统A的模块。这通常意味着您需要获取内核的源代码，配置内核以包括文件系统A的支持（可以选择直接编译进内核，或者作为模块编译），然后重新编译并安装这个定制的内核。
+
+使用文件系统：一旦您的系统运行了包含了文件系统A支持的内核（无论是静态还是动态模块），您就可以正常创建、挂载和使用文件系统A了。
+```
+
+#### 文件系统类型
+- Linux常用文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color:white;">文件系统</th>
+    <th style="background:darkred; color:white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>ext2</td>
+      <td>Extended file system 适用于那些分区容量不是太大，更新也不频繁的情况，例如/boot 分 区</td>
+    </tr>
+    <tr>
+      <td>ext3</td>
+      <td>ext2 的改进版本，其支持日志功能，能够帮助系统从非正常关机导致的异常中恢复</td>
+    </tr>
+    <tr>
+      <td>ext4</td>
+      <td>ext 文件系统的最新版。有很多新的特性，包括纳秒级时间戳、巨型文件 (16TB)、最大1EB的文件系统，以及速度的提升</td>
+    </tr>
+    <tr>
+      <td>xfs</td>
+      <td>SGI，支持最大8EB的文件系统</td>
+    </tr>
+    <tr>
+      <td>swap</td>
+      <td>交换分区专用的文件系统</td>
+    </tr>
+    <tr>
+      <td>iso9660</td>
+      <td>光盘文件系统</td>
+    </tr>
+    <tr>
+      <td>btrfs</td>
+      <td>Oracle公司开发</td>
+    </tr>
+  </tbody>
+</table>
+
+- Windows常用文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>FAT32</td>/
+      <td>最多只能支持16TB的文件系统和4GB的文件</td>
+    </tr>
+    <tr>
+      <td>NTFS</td>
+      <td>最多只能支持16EB的文件系统和16EB的文件</td>
+    </tr>
+    <tr>
+      <td>extFAT</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- Unix常用文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>FFS(fast)</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>UFS(unix)</td>
+      <td>UFS是UNIX文件系统的简称，几乎是大部分UNIX类操作系统默认的基于磁盘的文件系统</td>
+    </tr>
+    <tr>
+      <td>JFS2</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- 网络文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>NFS</td>
+      <td>Network File System，即网络文件系统</td>
+    </tr>
+    <tr>
+      <td>CIFS</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- 集群文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>GFS2</td>
+      <td>基于X86_64，最大文件系统可到100TB</td>
+    </tr>
+    <tr>
+      <td>OCFS2(oracle)</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- 分布式文件系统
+<table>
+  <thead>
+    <th style="background:darkred; color: white;">文件系统</th>
+    <th style="background:darkred; color: white;">备注</th>
+  </head>
+  </tbody>
+    <tr>
+      <td>fastdFS</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>ceph</td>
+      <td>不仅仅是一个文件系统，还是一个有企业级功能的对象存储生态环境</td>
+    </tr>
+    <tr>
+      <td>mooseFS</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>mogileFS</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>glusterFS</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Lustre</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+- Raw
+  - 裸文件系统，未经处理或者未经格式化产生的文件系统
+
+- 文件系统的组成部分
+  - 内核中的模块：ext4,xfs,vfat
+  - Linux虚拟文件系统：VFS
+  - 用户空间的管理工具：mkfs.ext4, mkfs.xfs, mkfs.vfat
+
+- 详解文件系统的三个组成部分的功能
+  - 内核中的模块
+    - 这些模块实际上是文件系统的核心实现，它们直接在内核空间运行。<span style="color:tomato">每个模块支持特定的文件系统类型（如 ext4、xfs、vfat 等），处理实际的数据存储、目录结构、文件操作（打开、读写、关闭）、权限检查、元数据管理等。</span>这些模块使得内核能够理解和操作存储在磁盘或其他存储设备上的文件和目录结构。
+
+    - ext4：是目前Linux上广泛使用的日志文件系统，提供了高性能、大容量、文件系统恢复和扩展属性等特性。
+    - XFS：是一种高性能的日志文件系统，最初由Silicon Graphics为IRIX系统开发，特别适用于大文件处理和高并发环境。
+    - vfat：是FAT文件系统的扩展，兼容于早期的FAT16和FAT32，提供了长文件名支持，通常用于与Windows系统交换数据。
+
+  - Linux虚拟文件系统：VFS
+    - VFS 是一个抽象层，<span style="color:tomato">它为不同的文件系统提供一个统一的接口。这意味着无论底层使用的是哪种文件系统（ext4、XFS、vfat 或其他），上层应用和用户都使用相同的标准系统调用（如 open、read、write 等）来操作文件和目录。</span>VFS 负责将这些调用转发到相应的文件系统模块进行处理。它也处理文件描述符、挂载点、缓存等核心概念，确保文件系统操作的高效和一致性。
+
+    - VFS 的设计允许 Linux 系统同时支持多种文件系统，且能够灵活地挂载和使用它们，这是 Linux 系统灵活性和强大功能的基础之一。
+  - 用户空间的管理工具：mkfs.ext4, mkfs.xfs, mkfs.vfat
+    - <span style="color:tomato">这些工具运行在用户空间，为用户和管理员提供创建、检查、修复和调整文件系统的能力。每种文件系统类型通常都会有相应的管理工具。</span>这些工具使用内核提供的接口与特定的文件系统模块交互，执行各种管理任务。
+
+    - mkfs.ext4、mkfs.xfs、mkfs.vfat：这些是格式化工具，用于在磁盘或分区上创建新的文件系统。例如，mkfs.ext4 /dev/sda1 会在 /dev/sda1 分区上创建一个新的 ext4 文件系统。
+    - fsck 类工具：用于检查和修复文件系统错误。
+    - tune2fs、xfs_admin 等：用于调整文件系统参数和属性。
+
+#### 文件系统选择管理
+- 创建文件系统
+  - mkfs命令
+  ```shell
+  # 创建ext4
+  # mkfs.ext4 或者mkfs -t ext4
+  # 后接要指定硬盘分区
+  mkfs -t ext4 /dev/sdb1
+  
+  # 创建xfs
+  mkfs.xfs 或者mkfs -t xfs
+  mkfs.xfs /dev/sdb1
+  
+  # 示例
+  root@ubuntu2204~# mkfs.ext4 /dev/sdb1
+  mke2fs 1.46.5 (30-Dec-2021)
+  Creating filesystem with 524288 4k blocks and 131072 inodes
+  Filesystem UUID: 93003898-536c-4f9d-a1ba-6bdaaa3ac155
+  Superblock backups stored on blocks:
+          32768, 98304, 163840, 229376, 294912
+  
+  Allocating group tables: done
+  Writing inode tables: done
+  Creating journal (16384 blocks): done
+  Writing superblocks and filesystem accounting information: done
+  ```
+
+- 该内容的详细解读
+  - Creating filesystem with 524288 4k blocks and 131072 inodes：
+    - 这表明您创建的文件系统包含524,288个4KB大小的块，以及131,072个inode。每个块是文件系统存储数据的基本单位，而inode是文件系统用来存储文件元数据（如文件大小、权限、修改时间等）的数据结构。
+    总计存储空间为 524,288 \times 4KB = 2,097,152KB = 2GB524,288×4KB=2,097,152KB=2GB。
+  - Filesystem UUID: 93003898-536c-4f9d-a1ba-6bdaaa3ac155：
+    - 这是文件系统的全局唯一标识符（UUID），用于在系统中唯一地标识这个文件系统。
+  - Superblock backups stored on blocks: 32768, 98304, 163840, 229376, 294912：
+    - 这列出了一些包含超级块备份的块的位置。超级块是文件系统的一个重要部分，包含了文件系统的整体信息（如块的大小、块的总数、inode的总数、空闲块和inode的数目等）。
+    - 在多个不同位置存储超级块的备份，是为了在主超级块损坏时可以恢复文件系统。
+  - Allocating group tables: done：
+    - 分配组表完成。组表用于管理文件系统中的块和inode分组，有助于优化存储空间的使用和提高访问效率。
+  - Writing inode tables: done：
+    - 写入inode表完成。每个inode表包含了一组inode的信息，这对于文件系统来说是核心数据结构。
+  - Creating journal (16384 blocks): done：
+    - 创建了一个由16,384个块组成的日志（Journal）。ext4文件系统支持日志功能，可以通过记录对文件系统所做更改的日志，来提高文件系统的可靠性和恢复能力。
+  - Writing superblocks and filesystem accounting information: done：
+    - 写入超级块和文件系统的会计信息完成。这是在文件系统创建的最后阶段，确保所有重要的文件系统信息都被正确记录。
+
+- SuperBlack超级快概念
+  - 超级块是文件系统中的一个关键数据结构，它存储了描述整个文件系统状态的信息，如：
+    - <span style="color:tomato">块大小</span>
+    - <span style="color:tomato">文件系统中块和inode的总数</span>
+    - <span style="color:tomato">空闲块和inode的数目</span>
+    - <span style="color:tomato">文件系统的挂载状态</span>
+    - <span style="color:tomato">最后一次检查（fsck）的时间等</span>
+  - 每个文件系统都有一个超级块，位于文件系统的开始位置。由于超级块对文件系统的健康至关重要，因此在多个位置保留其备份是一种常见的做法，以防止数据损坏导致文件系统不可用。
+
+- 关于`Superblock backups stored on blocks: 32768, 98304, 163840, 229376, 29491`的解读
+  - 这表示文件系统创建时在指定的块位置保存了超级块的备份。这些位置是相对于文件系统开始处的块号。在这个例子中，超级块的备份被存储在块号 32768、98304、163840、229376 和 294912。
+  - 如何查看超级块的位置
+    - 块号：这些数字直接表示了存储超级块备份的块的位置。在文件系统中，一个块是数据存储的基本单位，其大小通常是 4KB（这个大小可以根据文件系统的创建时的设置而变化）。因此，当你看到块号 32768，这意味着备份超级块存储在从文件系统开始处的第 32768 个块的位置。
+
+    - 理解块号的意义：要理解这些块号的物理意义，你需要知道块的大小。如果块的大小是 4KB，那么块号 32768 实际上指的是距离文件系统开始 32768 × 4KB = 128MB 的位置。这意味着第一个备份超级块位于文件系统开始后的 128MB 处。 
+
+- 如何使用备份超级块
+  - 在某些情况下，如果主超级块受损，你可以使用这些备份超级块来恢复文件系统。例如，e2fsck 是一个检查和修复 ext 类文件系统的工具，可以指定备份超级块来执行文件系统检查，如
+  ```shell
+  e2fsck -b 32768 /dev/sda1
+  # 这条命令告诉 e2fsck 使用 /dev/sda1 分区上块号 32768 处的超级块备份来进行文件系统检查。
+  ```
+
+#### 查看和管理分区信息
+- blkid
+```shell
+# 查看块设备属性
+blkid [option]... [DEVICE]
+
+# 常用选项
+-U UUID       # 根据指定ID来查找对应设备
+-L LABEL      # 根据指定LABEL来查找对应设备
+```
+- e2label
+```shell
+# 管理ext4系列文件系统的LABEL
+e2label DEVICE [LABEL]    # 卷标，后面可以通过这个名称挂载，类似分区别名？
+
+# 清除label
+e2label DEVICE ""
+```
+
+- findfs
+```shell
+# 查找分区
+findfs [options] {LABEL,UUID,PARTUUID,PARTLABEL}=<value>
+
+# 示例；
+findfs UUID="XXXXX"
+findfs LABEL="XXXXX"
+```
+
+-tune2fs 
+```shell
+# 查看ext4文件系统信息，无法查看xfs
+tune2fs -l /dev/sdb1
+
+# 常用选项
+-l              # 查看指定文件系统信息
+-L              # 修改卷标
+-m N            # 修改预留root用户空间百分比，默认5% 
+```
+
+#### MBR分区和ext4文件系统的结构
+
+- 超级块和Inode table
+![alt text](images/image20.png)
+
+- 块组(BLOCK GROUP)
+  - 概念：将很多连续的块放到一个块组里
+  - 查看块组命令——dumpe2fs
+  ```shell
+  dumpe2fs /dev/sdb1
+  ```
+  - Boot Sector和MBR的区别
+  ```
+  Boot Sector，也称为启动扇区，是存储在存储设备上的一个特定区域，通常位于硬盘或分区的最开始部分。它包含了计算机启动时所需的一些基本代码和系统启动信息。对于启动过程来说，Boot Sector是至关重要的，因为它包含了启动加载程序（Bootloader），这是一个小程序，它的任务是加载操作系统。
+  
+  在一个物理存储设备中（如硬盘），可以有多个分区，每个分区可以被视为独立的逻辑存储区域。理论上，每个分区都可以有自己的Boot Sector，尤其是当它们被配置为可启动分区时。这意味着，如果你有一个硬盘被分成多个分区，并且每个分区上都安装了操作系统，那么每个分区的Boot Sector都包含了启动该分区上操作系统的引导代码。
+  
+  **主引导记录（MBR）**位于硬盘的最开始处，它包含了一个小程序和分区表。这个小程序负责读取分区表，找到被标记为活动（或可启动）的分区，然后执行该分区的Boot Sector中的代码。
+  分区的Boot Sector位于分区的开始处，它包含了启动分区上操作系统的具体代码。
+  因此，虽然每个分区的开始都可以有一个Boot Sector，但整个硬盘的最开始只有一个MBR，其中包含了指向可启动分区的引导代码。这意味着Boot Sector并非只在第一个分区上有；如果多个分区都被设置为包含操作系统，则它们各自都会有自己的Boot Sector。
+  
+  所以可以实现：在虚拟机的一个硬盘上安装多个Linux系统，每个系统独立于其他系统运行
+  ```
+  - 块组中的内容
+    - Super Block
+      - 超级块是文件系统中的一个关键数据结构，它存储了描述整个文件系统状态的信息（上文有详细说明）
+    - 块组描述符表（GDT）
+      - ext文件系统每一个块组信息使用32字节描述，这32个字节称为块组描述符，所有块组的块组描述符组成块组描述符表GDT(group descriptor table)。虽然每个块组都需要块组描述符来记录块组的信息和属性元数据，但是<span style="color:tomato">不是每个块组中都存放了块组描述符。将所有块组的块组信息组成一个GDT保存,并将该GDT存放于某些块组中，类似存放superblock和备份superblock的块</span>
+    - 块位图（Block Bitmap）
+      - 块位图是一个简单的数据结构，用一系列的位（bit）来表示块组中每个块的状态——即它是空闲的还是已被占用的。在块位图中：
+        - 一个“0”位表示相应的块当前是空闲的；
+        - 一个“1”位表示相应的块已经被占用。
+      - 这个位图使得文件系统能够快速查找到块组中的空闲块，当需要存储新数据时，文件系统可以迅速定位到一个空闲的块，并将其标记为已使用。
+    - Inode 位图（Inode Bitmap）
+      - 和块位图类似，inode位图也是一个位图数据结构，用来跟踪块组中的每个inode的状态。在inode位图中：
+        - 一个“0”位表示相应的inode是空闲的；
+        - 一个“1”位表示相应的inode已经被占用。
+      - 这使得文件系统能够迅速找到空闲的inode来存储新文件或目录的元数据信息。
+      - inode table
+      - Data Blocks
+      ```shell
+      # Inode表中数据块映射的原理和实现
+      小文件：对于小文件，它的数据通常直接存储在 inode 中指向的数据块中。如果这些数据块足够存放文件的内容，则这些数据块可能位于同一个块组中。
+      
+      大文件：对于较大的文件，文件内容可能会分布在多个数据块中，这些数据块可能位于不同的块组中。当文件内容超过直接块指针可以引用的大小时，文件系统会使用间接指针、二级间接指针，甚至三级间接指针来存储额外的数据块位置。这意味着一个大文件的数据块可以分散在文件系统的多个块组中。
+      ```
+    
+#### XFS文件系统结构
+![alt text](images/image21.png)
+- 在XFS文件系统中，每个分区（或更准确地说，每个XFS文件系统）由多个Allocation Groups (AGs) 组成。Allocation Group是XFS设计的核心概念之一，它将文件系统的存储空间划分为若干个较小、管理上相对独立的区块
+
+- Allocation Group(AG)
+  - Superblock
+    - AG Superblock：每个Allocation Group都有自己的superblock，它存储了关于该AG的元数据，比如AG的大小、空闲块数量、空闲inode数量等。这个AG级别的superblock是整个文件系统superblock的一个子集，它允许文件系统在需要时只访问特定AG的信息，提高效率。
+  - Inode Allocation Section
+    - Inode表：管理该AG内的文件和目录的inode。inode包含了文件的元数据，如文件大小、权限、所有者、时间戳以及实际数据块的位置信息。通过在每个AG中独立管理inode，XFS能够提高文件创建和访问的速度。
+  - Free Space Management
+    - 空闲空间索引：XFS使用两种主要的数据结构来管理AG内的空闲空间——空间树（Space Trees）和空闲列表（Free Lists）。这些结构帮助XFS快速地找到足够大的连续空闲块来存储新文件或文件扩展。
+  - Directory Block Allocation
+    - 目录块：AG中还包含了目录的数据块，这些块存储了文件系统中目录的结构和信息。XFS优化了目录操作的性能，特别是在包含大量文件和子目录的目录中。
+    ```shell
+    1. 目录项（Directory Entries）
+    每个目录项代表目录中的一个文件或子目录，包含以下信息：
+    名称：文件或目录的名称。
+    Inode号：指向文件或目录inode的指针，inode中存储了关于文件的元数据，如大小、权限、所有者、时间戳以及数据块的位置等。
+    
+    2. 目录块（Directory Blocks）
+    目录块是存储目录项的物理单位。XFS为每个目录维护一个或多个目录块，具体取决于目录项的数量和大小。为了高效管理，这些目录块可以按需增长或缩减。
+    
+    3. B树索引（B-tree Index）
+    对于包含大量目录项的目录，XFS使用B树或B+树索引来组织目录块，这样可以加速目录项的查找过程。这种索引机制允许XFS以对数时间复杂度进行目录项的查找、添加和删除操作。
+    
+    叶节点（Leaf Nodes）：包含实际的目录项数据。在B树中，所有的目录项都存储在叶节点中。
+    内部节点（Internal Nodes）：包含指向子节点的指针，用于导航B树。在较大的目录中，内部节点帮助快速定位到包含特定目录项的叶节点。
+    
+    4. Extents
+    目录数据（包括目录块）可能被存储在连续的磁盘块中，这些连续块被称为extents。使用extents可以减少磁盘寻址时间，并提高读写效率。
+    ```
+  - Extent Allocation Trees
+    - Extent树：文件和目录的实际数据是通过extents（一系列连续的块）来存储的。Extent分配树记录了文件数据块的分配情况，使文件系统能够有效地管理大文件的存储，同时减少碎片。
+
+- 关于xfs更多详细知识，以及数据修复
+  - https://zorrozou.github.io/docs/xfs/XFS%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F%E7%BB%93%E6%9E%84.html
+
+- 查看xfs信息
+```shell
+xfs_info /dev/sdb2 
+```
+
+#### 文件系统检测和修复
+- ext4检测和修复
+```shell
+# fsck,修复文件系统
+fsck [options] -- [fs-options] [<filesystem> ...]
+fsck.FS_type
+fsck -t FS_type
+
+# 示例
+fsck /dev/sdb1 -y 
+# -y自动按yes, ext4可选，fsck可以自动识别ext文件系统
+fsck.ext4 /dev/sdb1 -y
+
+
+# e2fsck 和fsck使用方法类似
+e2fsck /dev/sdb1 -y
+```
+
+- 破坏文件系统的超级块与修复
+```shell
+# 将格式化文件系统的分区挂载到指定目录
+mount /dev/sdb1 /mnt
+
+# 复制两个文件到该目录
+cp /etc/passwd /mnt/f1
+cp /etc/passwd /mnt/f2
+
+# 然后破坏文件系统
+dd if=/dev/zero of=/dev/sdb1 bs=1M count=1
+
+# 此时tunefs -l /dev/sdb1会提示超级块被破坏，目录下文件也丢失
+root@ubuntu2204/mnt# tune2fs -l /dev/sdb1
+tune2fs 1.46.5 (30-Dec-2021)
+tune2fs: Bad magic number in super-block while trying to open /dev/sdb1
+
+# 修复
+# 先取消挂载
+umount /mnt
+
+# 使用fsck修复
+fsck.ext4 /dev/sdb1 -y
+
+# 修复后，使用tune2fs -l /dev/sdb1可正常查看文件系统信息，修复成功
+
+# 重新挂载
+mount /dev/sdb1 /mnt
+
+# 即可在该目录下，找到源f1,f2文件（不保证每次都成功，存在数据丢失风险）
+```
+
+- xfs文件系统专用的检测修复工具 —— xfs_repair
+```shell
+xfs_repair /dev/sdb2
+```
+
+### 挂载设备
+- 挂载：将额外文件系统与根文件系统某现存的目录建立起关联关系，进而使得此目录做为其它文件访问入口的行为
+
+- 卸载：为解除此关联关系的过程
+
+- 挂载点下原有文件在挂载完成后会被临时隐藏，因此，挂载点目录一般为空，进程正在使用中的设备无法被卸载
+
+- 挂载规则
+  - 一个挂载点同一时间只能挂载一个设备
+  - 一个挂载点同一时间挂载了多个设备，只能看到最后一个设备的数据，其它设备上的数据将被隐藏
+  - 一个设备可以同时挂载到多个挂载点
+  - 通常挂载点一般是已存在空的目录
+
+
+#### 挂载文件系统mount
+```shell
+mount device dir(挂载路径)
+
+# -a 自动挂载fstab中的挂载配置，但是只在删除和新添时有效，对修改无效
+mount -a
+
+# --source选项值
+-L LABEL                # 同LABEL=label
+-U UUID                 # 同UUID=uuid
+--source device
+
+# -o选项值（option）
+ro/rw                   # 只读/读写
+remount                 # 重新挂载
+```
+
+#### 卸载
+```shell
+umount dir
+umount device 
+# 效果相同
+# 当有进程占有挂载空间时，无法卸载
+```
+
+#### 查看挂载
+```shell
+mount                 # 使用mount命令查看
+cat /etc/mtab         # 通过查看/etc/mtab文件显示当前已挂载设备
+cat /proc/mounts      # 查看内核追踪到的已挂载的所有设备
+```
+
+#### 查看挂载点情况
+```shell
+findmnt [options] <device> | <mountpoint>
+
+# 默认查看整个系统挂载树
+findmnt
+
+# 查看指定设备或挂载点
+findmnt <device> | <mountpoint>
+
+# 查看正在访问指定文件系统的进程
+lsof MOUNT_POINT 
+fuser -v MOUNT_POINT
+
+# 终止所有正在访问指定的文件系统的进程
+fuser -km MOUNT_POINT
+```
+
+#### 永久挂载
+- 直接`mount <device> <MOUNT_POINT>`挂载点重启后会丢失
+
+- 将挂载保存到 /etc/fstab 中可以下次开机时，自动启用挂载
+
+- 手动启动挂载的方式
+```shell
+# 对fstab新添或删除
+mount -a
+
+# 对挂载项进行修改
+mount -o remount MOUNT_POINT 
+```
+
+- /etc/fstab文件中的配置(一共六个字段)
+  - 要挂载的设备或伪文件系统设备文件(LABEL=label | UUID=uuid | /dev/sda1)
+  - 挂载点：必须是事先存在的目录
+  - 文件系统类型：ext4，xfs，iso9660，nfs，none
+  - 挂载选项：defaults ，acl，bind，ro，rw  等
+  > 现代操作系统大部分默认支持acl，不需要额外启用acl
+  > bind 选项用于将一个已存在的目录挂载到另一个位置，相当于做了一个镜像或链接。这在组织文件、兼容性调整或容器技术中非常有用
+  > 应用场景：当你需要在系统中的另一个位置访问某个目录内容时，可以使用bind挂载。这使得相同的内容可以在不同的路径下被访问，而无需复制数据。
+  > 代码示例：/var/www /home/user/www none bind 0 0
+  - 转储频率：0 不做备份;  1 每天转储;  2 每隔一天转储
+  > 现代Linux中，通产为0，不备份
+  - fsck检查的文件系统的顺序：0 不自检 ;  1 首先自检，一般只有rootfs才用；2 非rootfs使用0
+  > 在操作系统启动时，会自动执行fsck检测值为1的文件系统，通常是根文件系统
+
+
+
+### 管理swap空间
+#### SWAP介绍
+- SWAP交换分区是系统RAM的补充，swap 分区支持虚拟内存。当没有足够的 RAM 保存系统处理的数据时会将数据写入 swap 分区，当系统缺乏 swap 空间时，内核会因 RAM 内存耗尽而终止进程。
+<br>
+- SWAP交换分区实现过程
+  - 创建交换分区或文件
+  - 使用mkswap写入特殊签名
+  - 在/etc/fstab文件中添加适当的条目
+  - 使用swapon -a激活交换空间
+
+#### 创建SWAP
+- 启动SWAP
+```shell
+swapon [option]
+
+# 常用选项
+-a                    # 激活/etc/fstab中的所有交换区
+-s                    # 显示所有swap信息 
+```
+
+- 禁用SWAP
+```shell
+swapoff -a            # 禁用所有SWAP
+
+# swapoff -a ---> swapon -a   可以用来刷新swap
+```
+
+- 创建SWAP分区
+```shell
+# 创建swap文件系统
+mkswap /dev/sdb3
+
+# 修改/etc/fstab文件，添加swap行
+
+# 刷新，即禁用后再次启用
+swapoff -a ---> swapon -a 
+```
+
+- 查看swap分区
+```shell
+cat /proc/swaps
+swap -s
+```
+
+- 以文件作为swap分区
+
+- 永久禁用SWAP
+```shell
+#删除swap行
+[root@ubuntu2204 ~]# sed -i.bak '/swap/d' /etc/fstab
+ 
+#或注释swap行
+[root@ubuntu2204 ~]# sed -i.bak '/swap/s@^@#@' /etc/fstab
+
+#禁用swap，由于修改了配置文件，所以重启也不会有SWAP
+[root@ubuntu2204 ~]# swapoff -a
+```
+
+#### SWAP使用策略
+- /proc/sys/vm/swappiness 的值决定了当内存占用达到一定的百分比时，会启用swap分区的空间使用规则
+```shell
+当内存使用率达到100-swappiness时,会启用交换分区
+简单地说这个参数定义了系统对swap的使用倾向，此值越大表示越倾向于使用swap。
+可以设为0，这样做并不会禁止对swap的使用，只是最大限度地降低了使用swap的可能性
+```
+
+- 修改交换分区的使用策略
+```shell
+#修改
+[root@rocky86 ~]# vim /etc/sysctl.conf
+ vm.swappiness=0
+
+ #生效
+[root@rocky86 ~]# sysctl -p
+ vm.swappiness = 0
+
+# 手动修改该配置文件后也可以生效
+root@ubuntu2204 ~]# cat /proc/sys/vm/swappiness
+60
+```
+
+#### 光盘自动挂载
+- 手动挂载光盘
+```shell
+mount /dev/sr0 /mnt/
+```
+
+- 自动挂载
+```shell
+apt install autofs
+
+# 查看autofs服务的状态
+systemctl status autofs
+
+# 修改配置文件
+vim /etc/auto.master
+# 将auto.master中的/misc /etc/auto.misc注释取消
+
+# 重启autofs服务
+systemctl restart autofs
+
+# 此时在目录下就能看到自动挂载的光盘
+ls /misc/cd
+```
+
+### 磁盘常见工具
+#### 文件系统查看工具df
+```shell
+df [option]... [file]...
+
+# 常见选项
+-T          # 显示文件系统类型
+-h          # 显示文件系统大小
+-l          # 只显示本机的文件系统
+```
+
+#### 目录统计工具du
+```shell
+du [option]... [file]...
+
+# 常用选项
+-s          # 只显示外层目录
+-h
+```
+
+
+
+
+
+### RAID空间
+- 在操作系统之外，进行磁盘阵列组合
+- RAID-0
+  - 数据同时向两个磁盘写
+  - 大小为N*min
+- RAID-1
+  - 镜像备份
+- RAID-4
+  - 最少3个磁盘
+  - 其中一个磁盘是校验盘
+- RAID-5
+  - 最少3个磁盘
+  - 校验数据分布在每个磁盘
+- RAID-6
+  - 最少4个磁盘
+  - 双校验
+- RAID-10
+  - 先组RAID-1，再组RAID-0
+- RAID-01
+  - 先组RAID-0, 再组RAID-1
+- RAID-50
+- RAID-60
+- JBOD
+  - 单纯堆磁盘
+
+### LVM管理
+- LVM: Logical Volume Manager 可以允许对卷进行方便操作的抽象层，包括重新设定文件系统的大小， 
+允许在多个物理设备间重新组织文件系统
+- LVM可以弹性的更改LVM的容量
+
+- 实现
+  - 将设备指定为物理卷
+  - 用一个或者多个物理卷来创建一个卷组，物理卷是用固定大小的物理区域（Physical Extent,PE）来定义的
+  - 在物理卷上创建的逻辑卷，是由物理区域（PE）组成
+  - 可以在逻辑卷上创建文件系统并挂载
+  
+
+![alt text](images/image22.png)
+
+- 第一个逻辑卷对应设备名： /dev/dm-#
+- dm：device mapper，将一个或多个底层设备组织成一个逻辑设备的模块
+
+- 设备软连接：
+  - /dev/mapper/VG-LV_NAME
+  - /dev/VG_NAME/LV_NAME
+
+- 实现逻辑卷
+  - 下载相关工具
+  ```shell
+  apt install lvm2
+  ```
+  - <span style="color:">将指定设备创建为物理卷Physical Volumes
+    - 查看物理卷
+    ```shell
+    pvs                 # 简要pv信息显示
+    pvdisplay           # 显示详细信息
+    ```
+    - 创建物理卷
+    ```shell
+    pvcreate <device>   #将指定设备格式化为物理卷 
+    ```
+    - 删除物理卷
+    ```shell
+    pvremove <device>   # 删除pv
+    ```
+  - 卷组（Volume Group）管理
+    - 显示卷组
+    ```shell
+    vgs
+    vgdisplay
+    ```
+    - 创建卷组
+    ```shell
+    vgcreate [-s Size] vgname pv1 [pv2...]
+    # -s指定PE大小，类似于存储空间中的块的概念，
+    ```
+    - 管理卷组
+    ```shell
+    # 卷组扩容,往卷组中增加新的物理卷
+    vgextend vgname pv1 [pv2...] 
+    
+    # 从卷组中移出物理卷
+    vgreduce vgname pv1 [pv2...]
+    ```
+    - 删除卷组
+    ```shell
+    # 删除vg之前，要先把对应的pv解除绑定（pvmove）
+    vgremove vgname
+    ```
+  - lv（Logic volumes）管理工具
+    - 显示逻辑卷
+    ```shell
+    lvs
+    Lvdisplay
+    ```
+    - 创建逻辑卷
+    ```shell
+    lvcreate {-L N[mMgGtT] -l N} -n NAME VOlumeGroup
+    
+    # 常用选项
+    -L N          # 指定大小
+    -l N          # 指定PE大小，也可用百分比
+    -n NAME       # 逻辑卷名 
+    ```
+    - 扩展逻辑卷
+    ```shell
+    lvextend {-L N[mMgGtT] -l N} LV_NAME
+    
+    # 常用选项
+    -L [+]SIZE[mMgGtT]      # N个单位大小，也可以写成+10M
+    -l [+]Number[PE]        # N个PE，也可以写成+10，表示在原基础上加10个PE大小（+100%free）表示把剩下的空间都用完
+    -r | --resizefs         # 自动重置文件系统大小
+    ```
+    - 缩减逻辑卷  
+    ```shell
+    # 逻辑卷缩减的前提是取消挂载
+    lvreduce {-L N[mMgGtT] -l N} LV_NAME
+    # xfs只支持缩减，不支持扩容
+    
+    # 常用选项
+    -L|--size [-]SIZE[mMgGtT]   # N个单位大小，也可写成-10M
+    -l|--extents [-]NUMBER[PE]  # N个PE，也可以写成-10
+    ```
+    - 删除逻辑卷
+    ```shell
+    lvremove /dev/VG_NAME/LV_NAME
+    ```
+    - 重设文件系统大小
+    ```shell
+    # 修改了逻辑卷大小后，要同步文件系统
+    resize2fs [-f] [-F] [-p] [-P] [-M]    # 只支持ext4文件系统
+    xfs_growfs /mountpoint
+    ```
+    - 拆除卷组中的PC硬盘
+    ```shell
+    pv 
+    # 然后从卷组中取消
+    vgreduce <vgname> <device>
+    
+    # 然后从物理卷中取消
+    pvremove <device>
+    
+    # 然后就可以拔除硬盘 
+    ```
+
+
+### LVM快照
+#### 逻辑卷快照原理
+- 在生成快照时会分配给它一定的空间（小于等于原数据大小），但只有在原逻辑卷或快照有所改变时，才会使用这些空间（由于<span style="color:tomato">创建快照，最开始只是在卷组中分配一块空间，不会备份任何数据</span>）因此快照创建速度快，瞬间完成。
+
+- 快照的执行过程
+```
+逻辑卷快照是一种在特定时间点创建数据存储卷的副本的技术，通常用于备份或恢复目的。快照工作原理如下，以及对您提出的情况的解释：
+
+初始快照时刻： 当快照首次创建时，它会标记那一刻的文件系统状态，但不会立即复制数据。而是使用一种称为写时复制（Copy-On-Write, COW）的技术。这意味着快照初始时并不占用额外的空间。
+
+文件第一次改变（例如文件a）： 当原始逻辑卷中的文件（如文件a）在快照创建后第一次被修改时，快照机制会在将这些改动写入原始逻辑卷之前，将改动之前的原始数据（即文件a的原始状态）复制到快照空间中。这样，快照空间中保存了文件修改前的状态。
+
+后续改动同一文件（文件a）： 如果文件a在后续操作中继续被修改，快照空间不会更新。因为快照只保留了第一次修改之前的状态，即快照创建时或第一次修改前文件的状态。
+
+创建新文件（例如文件b）： 当在原始逻辑卷中创建新文件（如文件b）后，快照空间初始时不会改变，因为快照只关注快照创建时刻以前存在的数据。
+
+新文件后续更新（文件b）： 如果文件b在创建后发生了改动，且这是自文件b创建以来的第一次改动，则根据快照的工作原理，它的原始数据（即创建时的数据）会被复制到快照空间，因为这是对文件b的第一次修改。
+
+总结：快照空间会包含所有在快照创建后首次修改的文件的原始状态。对于在快照创建之后新增的文件（如文件b），如果这些文件在快照创建后发生了修改，它们的原始状态（创建时的数据）也会被备份到快照空间，但只有在第一次修改时。
+```
+
+#### 逻辑卷快照实现
+```shell
+# 前提条件：有一个逻辑卷/dev/testvg/lv3
+
+# 在该逻辑卷上创建文件系统
+mkfs.ext4 /dev/testvg/lv3
+
+# 创建目录
+mkdir /lv3{,_snapshot}
+
+# 挂载
+mount /dev/testvg/lv3 /lv3
+
+# 写文件
+向文件中写入文件
+
+# 为该逻辑卷创建快照，创建前保证卷组有足够的空间
+lvcreate -n lv3_snapshot -s -L 100M -p r /dev/testvg/lv3
+
+# 选项解读
+-n            # 指定逻辑卷快照的名称
+-s            # 表示创建的逻辑卷是快照
+-L            # 指定快照空间大小
+-p r          # 表示该卷只读
+
+# 挂载快照
+mount /dev/testvg/lv3_snapshot /lv3_snapshot
+
+# 利用快照恢复，逻辑卷快照是一次性的
+# 将快照和源都取消挂载
+umount /lv3; umount /lv3_snapshot
+
+# 从快照中恢复
+lvconvert --merge /dev/testvg/lv3_snapshot  
+
+# 将源逻辑卷挂载回去
+mount /dev/testvg/lv3 /lv3
+
+# 快照使用后，就没有了，一次性的
+```
+
+
+
+
 ## 网络协议和管理
  - OSI网络国际标准
    - 由ISO国际标准化组织定义
@@ -2054,7 +5117,11 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
 
 - VLan原理-虚拟局域网
   - 虚拟局域网VLAN是由一些局域网网段构成的与物理位置无关的逻辑组，实在在交换机内进行局域网隔离的效果
-
+  - IEEE802.1Q帧结构
+    - 作用：在多个交换机之间的trunk干道中的数据包，带有vlan的标识，使其可以跨交换机实现vlan布局
+    - 原理：在传统的以太网帧的里面添加一个vlan编号
+    ![alt text](images/image25.png)
+    - 在数据帧中，只预留了12位用来表示VLAN的编号，也就是说，最多可以创建4096个vlan，在当前的云环境中可能不够用，因此，出现了VXLAN技术
 - VXLAN
   - 云环境下，进行虚拟局域网隔离
 
@@ -2068,8 +5135,15 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
     - 查看当前正在使用的端口号
     ```shell
     <!-- 去检索 /etc/services -->
+    nc -l 1023
+    # nc: Permission denied
+    # 1023以内的端口，只有管理员可以使用
+    nc -l 1024
+    # 可以正常使用
+
     grep <端口号> /etc/services
-  
+    # /etc/services记录了著名程序使用的端口号
+    
     监听端口号的使用
     ss -tntl
     ```
@@ -2078,6 +5152,7 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
   - 确认号：
     - 表示接收方期望收到的发送方下一个报文段的第一个字节数据的编号
     - 通过序号和确认号，保证数据包可靠有序的发送
+    - 如果发送方A发出的数据包的序号为100，接收方B会响应该数据包，发给A的响应包中，确认号为101表示希望发送方A下次方的包的序号为101
   - 数据偏移(4bit)
     - 表示tcp头部的长度
   - 保留（6bit）：没用到的空间
@@ -2093,7 +5168,7 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
     - <font color=tomato>FIN</font>
 
 - 三次握手和四次挥手
-  - 三次握手（建立连接）
+  - <span style="color: red; font-weight:700">三次握手（建立连接）</span>
   ![Alt text](images/image03.png)
   - 第一次：客户端向服务端发送报文；此时，SYN=1，seq即序列号为x
   - 第二次：服务端收到报文，响应客户端，发送报文；此时，SYN=1，ACK=1，序列号seq=y，确认号ack=x+1
@@ -2119,7 +5194,55 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
       - SYN-RECV的观测方法：客户端不接受服务器端的响应,在服务器端在发送数据包后，由LISTEN状态变成SYN-RECV状态，后续由于没有收到客户端后续发送的数据包，因此维持下SYN-RECV的状态，不会向ESTAB转变
       - 上述过程，需要使用到iptables的命令工具
 
-  - 四次挥手（退出连接）
+- <span style="color: red; font-weight:700">三次握手过程中的窗口大小协商 </span>
+  - 初始化窗口大小被称为接收窗口，它指定了接收方愿意接收的数据量，即发送方在等待接收方确认之前可以发送的最大数据量
+  - 第一次握手（SYN）：当客户端向服务器发起连接请求时，它会发送一个SYN（同步序列编号）包。这个SYN包中不仅包含客户端的初始序列号，还可以包含客户端支持的最大窗口大小
+  ```
+  客户端 （SYN包）------> 服务器
+  
+  发送过程中，告诉服务器，我发的是第几个包，我能接收多少流量
+  ```
+  - 第二次握手（SYN-ACK）：服务器收到客户端的SYN包，会回复一个SYN-ACK包，确认收到客户端的连接请求。这个SYN-ACK包同样包含服务器的初始序列号，并且会包含服务器的窗口大小，告知客服端服务器端愿意接收的数据量。
+  ```
+  客户端 <--------- (SYN-ACK) 服务器
+
+  响应过程中，服务器告诉客户端
+  我需要第几个包
+  我的包是第几个
+  我能接收多少流量
+  ```
+  - 第三次握手（ACK）：客户端收到服务器的SYN-ACK包后，会发送一个ACK包作为响应，确认连接建立。这个ACK包也可以包含窗口大小的信息，但通常情况下，窗口大小是在前两个步骤中协调的
+  - 三次连接的意义
+    - 第一次，第二次握手，可以证明服务端可以响应客户端的数据
+    - 第二次，第三次握手，可以证明客户端可以响应服务端的数据
+
+- <span style="color: red; font-weight:700">TCP滑动窗口（TCP Sliding Window）机制是在TCP三次握手建立连接之后发生的。这个机制是TCP流量控制和拥塞控制的关键部分，旨在优化网络通信的效率和可靠性。</span>
+  - 实现原理：
+    - TCP滑动窗口机制使用了窗口的概念来控制在任意时刻可以发送多少数据（未被确认的数据）。这个“窗口”是指发送方和接收方基于当前网络状况协商的数据量，可以理解为接收方告诉发送方在没有收到进一步确认前能接收多少字节的数据
+  - 运行过程
+    - <span style="color:red">连接建立与窗口初始化：</span>在TCP三次握手过程中，发送方和接收方会初始化各自的发送和接收窗口大小。这个大小可以在后续的通信过程中根据网络条件进行调整
+    - <span style="color:red">数据传输：</span>发送方基于当前的窗口大小发送数据。窗口大小表示发送方在接收到接收方的下一个确认（ACK）之前可以发送的最大数据量
+    ```
+    数据传输：
+
+    客户端 ---------> 服务端
+    客户端发送数据大小是由初始窗口大小决定
+    ```
+    - <span style="color:red">窗口滑动：</span>当接收方收到数据后，他会发送一个确认（ACK）给发送方，并在确认消息中更新自己的接收窗口大小，告知发送方还可以接受多少新的数据。发送方在收到确认后，会根据接收方的窗口大小调整自己的发送窗口，并继续发送新的数据。这个过程中，窗口会根据确认的接收和新数据的发送“滑动”
+    - <span style="color:red">流量控制：</span>滑动窗口机制允许接收方控制发送方的数据发送速率，避免接收方的缓冲区被溢出。接收方可以通过调整其窗口大小（甚至将窗口设置为0）来减慢发送方发送的速度
+    ```
+    在流量控制中，关注的是接收方的能力，确保发送方不会发送超过接收方缓冲区大小的数据。
+    接收窗口大小（rwnd）是在TCP头部显示告知对方的，用于流量控制
+    ```
+    - <span style="color:red">拥塞控制：</span>除了基于接收方能力的流量控制外，TCP还实现了基于网络拥塞情况的窗口调整策略
+    ```
+    拥塞控制使用的拥塞窗口（CWND）大小不通过TCP头部直接传递给接收方。
+    发送方基于ACK返回的速率和可能出现的丢包等信号来评估网络状况，并调整cwnd的大小
+    ```
+    - <span style="color:red">实际发送窗口：</span>实际的发送窗口大小由流量控制的接收窗口和拥塞控制的拥塞窗口中的较小值决定。
+    ![alt text](images/image26.png)
+
+- 四次挥手（退出连接）
   ![Alt text](images/image04.png)
 
 - 半连接队列和全连接队列
@@ -2143,18 +5266,18 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
   - 全连接队列：在三次握手完成后，服务器会将连接已建立的状态的信息数据放入accept queue即全连接队列中，用户在3次握手建立连接后，第四次发送数据包请求时，服务器端有一个accept()函数，来接收用户请求，接收到之后，会将accept queue队列中之前缓存的连接建立状态的数据包清除掉，如果accept()没有接收到第四次客户的请求，建立连接状态的数据包就会一直在accept queue中排队
     ```
     连接泄露/连接耗尽攻击
-  
+    
     攻击者通过正常地进行三次握手与服务器建立连接，但在连接建立后不进行实质性的数据交换或请求，从而占用服务器的资源。当攻击者建立了大量这样的“空闲”连接后，服务器的 ACCEPT 队列可能会被填满，导致正常用户无法与服务器建立新的连接。
-  
+    
     简单地说，攻击者的策略是：
-  
+    
     正常执行三次握手，与服务器建立连接。
     在连接建立后，不进行实际的数据传输或请求，使连接保持空闲。
     重复上述步骤，创建大量空闲连接，从而耗尽服务器的资源或填满 ACCEPT 队列。
     这种策略的目的是耗尽服务器的资源（如文件描述符、内存）或填满 ACCEPT 队列，从而使得正常用户无法与服务器建立新的连接。与 SYN 洪水攻击不同，这种攻击已经完成了完整的三次握手，因此会被视为有效的连接，使得对其进行检测和防护更为困难。
-  
+    
     为了防范此类攻击，以下是一些建议：
-  
+    
     连接超时：为连接设置一个合理的超时，确保长时间未活跃的连接会被关闭。
     限制源 IP 的连接数：可以配置防火墙或其他安全设备，限制来自单一源 IP 的并发连接数量。
     监控：监控服务器的资源使用情况，如文件描述符、内存等。当资源使用接近上限时，可以及时采取措施。
@@ -2197,7 +5320,11 @@ ping 10.0.0.8
 ping -f -s <ip地址> -c1
 #-f 表示泛洪，就是最大功率无限制发送数据包
 #-s 指定发送包的大小，最大不能超过65507
+<<<<<<< HEAD
 #-c(num) ping的次数
+=======
+#-c(num) ping的次数 
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 ```
 
 ### ARP协议(Address Resolution Protocol)
@@ -2464,6 +5591,9 @@ IPv6相比IPv4更加先进和健壮，设计时考虑了未来的扩展性、安
   - 合并超网：将多个网络合并成一个大网，主机ID位向网络ID位借位，主要实现路由聚合功能
 
 - 动态主机配置协议DHCP
+  - 服务器端：67端口
+  - 客户端：68端口
+
 
 ### 网络配置
 - 基本网络配置
@@ -2471,7 +5601,7 @@ IPv6相比IPv4更加先进和健壮，设计时考虑了未来的扩展性、安
     - 主机名
     - IP/netmask
     - 路由：默认网关
-    - DNS服务器
+    - DNS服务器（名称解析 ）
       - 主DNS服务器
       - 次DNS服务器
       - 第三个DNS服务器
@@ -2510,13 +5640,22 @@ GRUB_CMDLINE_LINUX="... net.ifnames=0"
 -- 执行之后重启即可
 
 -- ubuntu的修改和centos7类似
+
 # vim /etc/default/grub
 GRUB_CMDLINE_LINUX="net.ifnames=0"
 --进入文件，这行最后，添加net.ifnames=0
 
 # grub-mkconfig -o /boot/grub/grub.cfg
 -- 执行之后重启即可
+```
 
+- grub2-mkconfig的用法
+```shell
+grub2-mkconfig -o <output_file>
+
+# grub2-mkconfig: 这是命令本身，用于生成GRUB2的配置文件
+# -o：这个选项后面跟着输出文件的路径，即生成的配置文件存放的位置
+# <output_file>：这里指定了输出文件的完整路径，即新的GRUB配置文件的位置
 ```
 
 - ip地址修改
@@ -2528,7 +5667,7 @@ Centos网卡配置文件：
 -- 进入网卡配置目录
 # ifcfg-eth0
 -- 找到这个文件或新建这个文件（内容自己写）-网卡接口配置文件
--- 文件名必须以ifcfg开头，横杠后叫什么无所谓，建议和网卡名一致
+-- 文件名必须以ifcfg-开头，横杠后叫什么无所谓，建议和网卡名一致  
 
 文件配置内容：
 
@@ -2550,7 +5689,15 @@ DNS2=100.76.76.76
 -- 百度的：180.76.76.76
 -- 移动的：114.114.114.114
 -- 谷歌的：8.8.8.8 
+<<<<<<< HEAD
 -- 验证DNS，查看文件/etc/resolv.conf
+=======
+-- 验证DNS，查看文件/etc/resolv.conf 
+
+DOMAIN=<要修改的后缀名>
+-- 默认ping www 后面自动补充一个域名，该域名是hostname的后缀，如果不想修改hostname后缀，可以在网卡配置文件中加入：
+
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 
 DOMAIN=<要修改的后缀名>
 -- 默认ping www 后面自动补充一个域名，该域名是hostname的后缀，如果不想修改hostname后缀，可以在网卡配置文件中加入：
@@ -2616,11 +5763,15 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
 
 - 路由route
   - route: 路由表管理命令
+<<<<<<< HEAD
   - 路由表:作用是导航，地图，不仅仅在路由器有，在任何通信的主机都有
+=======
+  - 路由表:作用是导航，地图，不仅仅在路由器有，<span style="color:red">在任何通信的主机都有</span>
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ```
   查看路由表
   # route -n
-
+  
   Kernel IP routing table
   Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
   0.0.0.0         192.168.56.2    0.0.0.0         UG    100    0        0 eth0
@@ -2628,21 +5779,27 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   192.168.56.0    0.0.0.0         255.255.255.0   U     100    0        0 eth0
   # 直连网段的路由会自动生成
   192.168.122.0   0.0.0.0         255.255.255.0   U     0      0        0 virbr0
-
+  
   每一行描述的是一个网络的路径
   Destination：表示需要达到的目标网络，Destination配合Genmask（子网掩码）表示具体网络地址
   0.0.0.0 表示未知网络
-
-  iface接口：如果要达到目标网络ID，需要从本机的哪个接口将数据包发出
-
+  
+  iface接口：如果要达到目标网络ID，需要从本机的哪个(网卡)接口将数据包发出 
+  
   Gateway网关：如果目标网络不直接相连，需要将数据包发送到下一个路由器邻近的接口的IP，即网关；如果网络和本主机直连，则无需网关 
-
+  
   网关的功能：让主机通过网关访问别的网段的机器，所以网关的接口地址，一定和主机网卡在同一网段
+<<<<<<< HEAD
 
   Metric(费用)；数值越低，优先级越高，路径越优；同一目标地址可能有多条路径，根据Metric的数值，可以看出最优路径
 
+=======
+  
+  Metric(费用)；数值越低，优先级越高，路径越优；同一目标地址可能有多条路径，根据Metric的数值，可以看出最优路径
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ---------------------------------------------------
-
+  
   给路由表添加信息（静态路由）
 
   # route add [-net|-host|default] target[netmask Nm] [gw Gw] [[dev] If]
@@ -2655,48 +5812,71 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   #route add -net 0.0.0.0 netmask 0.0.0.0 gw 172.16.0.1
   #route add default gw 172.16.0.1
   
+<<<<<<< HEAD
+=======
+  # route add [-net|-host|default] target[netmask Nm] [gw Gw] [[dev] If]
+  
+  实例：
+  仅主机路由
+  # route add -host 192.168.1.3 gw 172.16.0.1 dev eth0
+  
+  默认路由
+  #route add -net 0.0.0.0 netmask 0.0.0.0 gw 172.16.0.1
+  #route add default gw 172.16.0.1
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   网络路由
   # route add -net 179.20.0.0/16 gw 172.18.0.201 dev eth1
-
+  
   查看虚拟机转发功能状态，默认不开启，如果接收到的数据包，目标地址不是该主机，则直接抛弃，不会转发
-
+  
   # cat /proc/sys/net/ipv4/ip_forward
   0
-
+  
   0表示不开启数据包转发功能
   修改这个ip_forward文件可以临时开启数据转发
-
+  
   永久开启
-
+  
   修改文件sysctl.conf
-
+  
   # vim /etc/sysctl.conf
   在最后一行，添加：net.ipv4.ip_forward=1
   保存退出
   # sysctl -p 
   使文件sysctl.conf 生效 
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   使用mtr工具，可以查看主机到目标机器之间经过的路由
-
+  
   # mtr <目标ip>
-
+  
   使用tracepath 和traceroute，都能查看主机到目标经过的路由
   # tracepath <目标ip>
   # traceroute <目标ip>
-
+  
   配置动态路由（了解即可，后续有时间再深入了解）
-
+  
   通过守护进程获取动态路由
   安装quagga包，通过命令vtysh配置
   支持多种路由协议：RIP、OSPF和BGP
   RIP协议算法：经过的路由器越少（步跳），路线越优
   OSPF协议算法：除了路由数量，还会考虑带宽
+  
+  ----------------------------------------------------------
 
   netstat工具(和ss选项基本一致)
   netstat和ifconfig都来自于net-tools
   其中 ifconfig建议使用ip代替；netstat建议使用ss代替
   ip和ss都来自于iproute
+<<<<<<< HEAD
 
+=======
+   
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   常用选项
   -t：tcp协议相关
   -u：udp协议相关
@@ -2706,13 +5886,14 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   -n：以数字显示IP和端口
   -e：扩展格式
   -p：显示相关进车给及PID
-
+  
   常用组合
-
+  
   -tan
   -uan
   -tnl
   -unl
+<<<<<<< HEAD
 
   显示路由表，类似于route -n
 
@@ -2721,45 +5902,59 @@ ONBOOT=yes  --是否启动这个网卡，默认yes
   # netstat -Ieht0 
   -I和网卡名之间没有空格，作用和ifconfig -s 相同，用于查看网卡吞吐量
 
+=======
+  
+  显示路由表，类似于route -n
+  
+  # netstat -rn
+  
+  # netstat -Ieht0 
+  -I和网卡名之间没有空格，作用和ifconfig -s 相同，用于查看网卡吞吐量
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ---------------------------------------
-
+  
   ip 工具
-
+  
   链路层指令
-
+  
   # ip link    查看链路层，网卡的状态
-
+  
   # ip link set <网卡名> up/down    禁用/启动网卡
-
+  
   使用指令‘临时’修改网卡名
-
+  
   # ip link set <网卡名> down   --禁用网卡
   # ip link set <旧网卡名> name <新网卡名>  --更改网卡名
   # ip link set <新网卡名> up   -- 启用网卡
-
+  
   网络层指令
-
+  
   # ip address    显示网络层相关地址
-
+  
   # ip address add 10.0.0.100/24 dev eth0 label eth0:1
   建议加label标签，这样可以和ifconfig兼容
   新增网卡ip地址
-
+  
   # ip addr del 1.1.1.1/24 dev eth0   删除ip地址
-
+  
   # ip addr flush dev eth0    清空网卡下所有ip地址
   # nmcli connection up eth0 重新加载eth0的原始ip地址
-
+  
   # ip route  查看路由表，相当于route -n
-
+  
   # ip route add 路由表信息   新增路由网段
-
+  
   # ip route del 路由表信息   删除路由网段信息
   ```
 - 回环网卡：lo
   - 回环网卡的地址不会出现在路由表中
+<<<<<<< HEAD
   - 所有和回环网卡同一网啊的地址，都看作是本机之间的通讯
   - 回环地址默认不参与网络通信
+=======
+  - 所有和回环网卡同一网啊的地址，都看作 trewgkllfk环地址默认不参与网络通信
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   - 但是如果给回环网卡加上路由信息，也能实现网络通讯
 
 - ip地址的三种工作范围
@@ -2826,7 +6021,13 @@ BOOTPROTO=none
 IPADDR=10.0.0.100
 PREFIX=8
 # miimon指定链路监测时间间隔。如果miimon=100，那么系统每100ms监测一次链路连接状态，如果有一条线路不通就转入另一条线路
+<<<<<<< HEAD
 BONDING_OPTS="mode=1 miimon=100"
+=======
+BONDING_OPTS="mode=1 miimon=100" 
+# BONDING_OPTS="mode=3 miimon=100" 
+# 这里相当于使用Mode3,使用广播模式
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 
 /etc/sysconfig/network-scripts/ifcfg-eth0
 DEVICE=eth0
@@ -2840,7 +6041,11 @@ DEVICE=eth1
 BOOTPROTO=none
 MASTER=bond0
 SLAVE=yes
+<<<<<<< HEAD
 ONBOOT=yes
+=======
+ONBOOT=yes 
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 ```
 - 查看bond0状态：
   - `/proc/net/bonding/bond0`
@@ -2887,15 +6092,23 @@ ONBOOT=yes
   - nmcli命令
   ```shell
   nmcli connection  # 查看网卡连接
+<<<<<<< HEAD
 
   # 更改网卡名称(name)
   nmcli connection modify <旧网卡名> con-name <新网卡名> # 更改后自动生成配置文件
 
+=======
+  
+  # 更改网卡名称(name)
+  nmcli connection modify <旧网卡名> con-name <新网卡名> # 更改后自动生成配置文件
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 更改网卡配置
   nmcli connection modify <网卡名> ipv4.addresses <ip地址> ipv4.gateway <网关地址> ipv4.dns <dns地址> ipv4.method manual
   # 这里ipv4.method manual表示采用静态地址，默认不写是auto，表示动态地址
   # 示例：
   nmcli connection modify eth1-home ipv4.addresses 192.168.0.100/24 ipv4.gateway 192.168.0.1 ipv4.dns 233.6.6.6 ipv4.method manual
+<<<<<<< HEAD
 
   配置改好后，重新加载网卡，然后重新启用配置好的网卡
   nmcli connection reload
@@ -2922,6 +6135,37 @@ ONBOOT=yes
   cat /proc/net/bonding/bond0
   # 查看bond0的绑定情况
 
+=======
+  
+  配置改好后，重新加载网卡，然后重新启用配置好的网卡
+  nmcli connection reload
+  nmcli connection up eth1-home
+  
+  # 删除配置的网卡
+  nmcli connection delete <网卡名>
+  
+  # 使用nmcli看详细配置内容
+  nmcli connection show eth0
+
+  -----------------------------------------------------------------
+  使用nmcli实现bonding模式
+  
+  nmcli connection add con-name mybond0 ifname bond0 type bond mode active-backup
+  # 添加一个bond类型的虚拟网卡，起名为mybond0,mode定义bond模式
+  
+  nmcli connection add con-name mybond0 ifname bond0 type bond mode active-backup ipv4.addresses 10.0.0.100/24 ...
+  # 配置的时候添加ip地址，方式，网关等  
+  
+  nmcli connection add con-name mybond0-eth1 ifname eth1 type bond-slave master bond0
+  # 将eth1添加到bonding中
+  
+  nmcli connection delete <eth1之前的配置文件>
+  # 删掉之前的eth1的配置文件，自动启用新配置的绑定bonding的eth1
+  
+  cat /proc/net/bonding/bond0
+  # 查看bond0的绑定情况
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   ```
 
 - 网络组 NetWork Teaming
@@ -2937,11 +6181,16 @@ ONBOOT=yes
   ```shell
   # 创建网络组接口
   nmcli con add type team con-name CNAME ifname INAME [config JSON]
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   CNAME 连接名
   INAME 接口名
   JSON 指定runner方式，格式：'{"runner":{"name":"METHOD"}}'
   METHOD 可以是broadcast, roundrobin, activebackup, loadbalance, lacp
+<<<<<<< HEAD
 
   # 创建port接口
   nmcli con add type team-slave con-name CNAME ifname INAME master TEAM
@@ -2966,6 +6215,32 @@ ONBOOT=yes
   nmcli con up team0-eth1
   nmcli con up team0-eth2
 
+=======
+  
+  # 创建port接口
+  nmcli con add type team-slave con-name CNAME ifname INAME master TEAM
+  
+  CNAME 连接名，连接名若不指定，默认为team-slave-IFACE
+  INAME 网络接口名
+  TEAM 网络组接口名
+  
+  # 断开和启动
+  nmcli dev dis INAME
+  nmcli con up CNAME
+  
+  ----------------------------------------------------------------
+  网络组示例：
+  nmcli con add type team con-name myteam0 ifname team0 config '{"runner":{"name":"loadbalance"}}' ipv4.addresses 192.168.1.100/24 ipv4.method manual
+  
+  nmcli con add con-name team0-eth1 type team-slave ifname eth1 master team0
+  
+  nmcli con add con-name team0-eth2 type team-slave ifname eth2 master team0
+  
+  nmcli con up myteam0
+  nmcli con up team0-eth1
+  nmcli con up team0-eth2
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   查看team状态
   teamdctl team0 state
   ``
@@ -2976,6 +6251,7 @@ ONBOOT=yes
   ```shell
   # 下载bridge-utils CentOS 8 无此包
   yum -y install bridge-utils
+<<<<<<< HEAD
 
   # 查看网桥
   brctl show
@@ -2992,6 +6268,24 @@ ONBOOT=yes
   # 默认br0 是down，必须启用
   ifconfig br0 up
 
+=======
+  
+  # 查看网桥
+  brctl show
+  
+  # 查看CAM(content addressable memory 内容可寻址存储器)表
+  brctl showmacs br0
+  
+  # 添加和删除网桥
+  brctl addbr | delbr br0
+  
+  # 添加和删除网桥中的网卡
+  brctl addif | delif bro eth0
+  
+  # 默认br0 是down，必须启用
+  ifconfig br0 up
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 启用STP协议
   brctl stp br0 on
   ```
@@ -3043,7 +6337,11 @@ tcpdump ip host 10.0.0.101 and ! 10.0.0.1
 # 将tcpdump的数据包，重定向到一个文件中
 tcpdump -i eth0 -nn port ! 22 -w test.cap
 sz test.cap # 将虚拟机的文件传到本地
+<<<<<<< HEAD
 
+=======
+```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 ```
 
 ### curl工具
@@ -3104,6 +6402,7 @@ ubuntu1804.magedu.org
   GRUB_GMDLINE_LINUX="net.ifnames=0"
   # 或者sed修改
   sed -i.bak '/^GRUB_CMDLINE_LINUX=/s#"$#net.ifnames=0"#' /etc/default/grub
+<<<<<<< HEAD
 
   # 生效新的grub.cfg文件
   grub-mkconfig -o /boot/grub/grub.cfg # 本质上是修改grub.cfg文件，在上面添加 net.ifnames=0的信息
@@ -3114,18 +6413,39 @@ ubuntu1804.magedu.org
   # 或者使用
   update-grub # 作用等同于grub-mkconfig -o /boot/grub/grub.cfg
 
+=======
+  
+  # 生效新的grub.cfg文件
+  grub-mkconfig -o /boot/grub/grub.cfg # 本质上是修改grub.cfg文件，在上面添加 net.ifnames=0的信息
+  
+  # 本质：grub文件相当与一个修改模板，通过grub-mkconfig指令使其调用grub模板去更改grub.cfg文件
+  # 所以，实际上可以只修改grub.cfg文件，讲所有linux开头的行后添加net.ifnames=0，是一样的
+  
+  # 或者使用
+  update-grub # 作用等同于grub-mkconfig -o /boot/grub/grub.cfg
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   reboot # 最后重启生效
   ```
 
 - 网卡配置
   ```shell
   # ubuntu20.04的网卡配置文件采用yaml格式，要求各级缩进必须严格统一
+<<<<<<< HEAD
 
   # 官方文档参考：https//ubuntu.com/server/docs/network-configuration
 
   # ubuntu20.04网卡配置文件路径
   /etc/netplan/01-netcfg.yaml  # 配置文件命名格式：数字-netcfg.yaml
 
+=======
+  
+  # 官方文档参考：https//ubuntu.com/server/docs/network-configuration
+  
+  # ubuntu20.04网卡配置文件路径
+  /etc/netplan/01-netcfg.yaml  # 配置文件命名格式：数字-netcfg.yaml
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # 配置文件内容 (严格控制缩进)
   network:
     ethernets:
@@ -3133,10 +6453,17 @@ ubuntu1804.magedu.org
         dncp4:true   # 这个就是自动分配，动态网卡地址
     version:2
     renderer:networkd   # 选填
+<<<<<<< HEAD
 
   # 配置之后，需要执行命令生效：
   netplan apply   # NAT模式下生效，桥接模式，需要配置动态地址
 
+=======
+  
+  # 配置之后，需要执行命令生效：
+  netplan apply   # NAT模式下生效，桥接模式，需要配置动态地址
+  
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   # yaml格斯的常见数据结构：列表和字段
   # ubuntu20.04静态地址配置
   network:
@@ -3265,7 +6592,11 @@ netplan apply
 # 查看生成的bond信息文件
 cat /proc/net/bonding/bond0
 
+<<<<<<< HEAD
 ``` 
+=======
+```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 - 网络测试诊断工具
 
   - 测试网络连通性
@@ -3335,10 +6666,10 @@ cat /proc/net/bonding/bond0
   - Windows与Linux不兼容
     - ELF（Executable and Linkable Format）Linux
     - PE（Portable Executable）Windows
-    - 解释；在不同的系统中，二进制的格式是不同的，比如同一段二进制数据，可能含义不同，有的代指指令，有的指代数值。
+    - <span style="color:tomato">解释：在不同的系统中，二进制的格式是不同的，比如同一段二进制数据，可能含义不同，有的代指指令，有的指代数值。</span>
     ```
     查看软件的文件信息（包含二进制格式）
-
+    
     # file /bin/hostname
     ```
 
@@ -3377,7 +6708,7 @@ cat /proc/net/bonding/bond0
   gcc -S hello.i -o hello.s   # 对预处理文件进行编译，生成了汇编文件
   gcc -C hello.s -o hello.o   # 对汇编文件进行编译，生成了目标文件
   gcc hello.o -o hello    # 对目标文件进行链接，生成可执行文件
-
+  
   # 一步实现编译过程
   gcc hello.c -o hello  # 直接编译链接成可执行目标文件
   ```
@@ -3390,9 +6721,78 @@ cat /proc/net/bonding/bond0
     - 每个依赖文件是一个个独立文件，程序按需调用这些依赖文件
     ```
     查询文件所依赖的所有依赖库
-
+    
     # ldd <要查询的文件>
     ```
+
+- 操作系统执行命令加载动态库的过程
+  - <span style="color:red; font-weight:700">加载共享库：</span>当你运行一个动态链接的程序（如你的 hello）时，操作系统（如 Linux）负责加载程序所需的共享库。这是通过动态链接器（如 Linux 上的 ld-linux.so）来完成的，它是操作系统的一部分，负责在程序启动时解析出程序需要的共享库，并将它们加载到内存中。
+
+  - <span style="color:red; font-weight:700">查找共享库：</span>操作系统按照特定的规则查找这些共享库。这通常包括一些预设的目录（如 /lib，/usr/lib）和环境变量（如 LD_LIBRARY_PATH）指定的目录。
+
+  - 符号解析：在库被加载之后，动态链接器还需要解决符号引用的问题，即确定程序中的外部函数或变量调用对应到库中具体哪些函数或变量的地址。这个过程称为符号解析（Symbol Resolution）。
+
+- <span style="color:red; font-weight:700">动态链接器的运行时机</span>
+  - <span style="color:tomato">在程序运行时</span>，通过操作系统的动态链接器（dynamic linker）或动态加载器（dynamic loader）来加载和链接共享库（动态库）的。
+  - 大致过程如下
+    - <span style="color:red; font-weight:700">加载共享库到内存：</span>当程序启动时，动态链接器根据程序的需求，将所需的共享库加载到内存中。如果库已经由其他程序加载到内存，操作系统会允许这些程序共享同一内存中的库副本，以节省资源。
+    - <span style="color:red; font-weight:700">符号解析和重定位：</span>接着，动态链接器对程序进行“符号解析”（symbol resolution）和“重定位”（relocation）。符号解析是指将程序中的外部引用（如函数调用）与其在共享库中定义的实际地址匹配起来的过程。重定位是调整这些引用，确保它们指向正确的内存地址。
+    - <span style="color:red; font-weight:700">执行：</span>一旦所有必需的库都被加载并且所有的符号都被正确解析和链接，程序就可以执行了。这意味着，程序中对共享库函数的调用会跳转到这些函数在内存中的实际位置执行
+
+- 静态链接和动态链接的区别
+  - <span style="color:red; font-weight:700">静态链接</span>
+    - 在这种链接方式中，编译器会把所有需要的库函数的代码复制到最终的可执行文件中。这意味着这些代码被物理地嵌入到了可执行文件里。静态链接的优点是可执行文件包含了所有它需要的代码，因此它不依赖于系统上的外部库文件；缺点是这可能会导致最终的可执行文件非常大。
+  - <span style="color:red; font-weight:700">动态链接</span>
+    - 与静态链接不同，动态链接不会把库代码嵌入到可执行文件中。相反，它在可执行文件中保留对库文件的引用，这些库文件在程序运行时被加载（通常是操作系统完成的）。这样，多个程序可以共享同一个库文件的单个副本，节省空间。
+
+
+- 动态链接器与动态库详解
+  - <span style="color:red; font-weight:700">动态链接器：动态链接器（dynamic linker）或动态加载器（dynamic loader）</span>是负责在运行时将程序所需的动态库（shared libraries）加载到内存中，并解析程序对这些库中函数和变量的引用的系统程序。它确保了动态链接的可执行文件能够在运行时找到并使用它们所依赖的共享库文件。
+  - <span style="color:tomato">动态链接器本身不是共享库，而是操作系统提供的一个特殊程序，通常是系统的一部分。</span>在Linux系统中，动态链接器通常是ld-linux.so（对于32位系统是ld-linux.so.2，对于64位系统是ld-linux-x86-64.so.2等等）。这个程序在可执行文件开始执行时由操作系统自动调用，负责：
+
+    - 加载共享库：根据可执行文件的动态链接信息，动态链接器将所需的共享库加载到内存中。
+    - 符号解析：动态链接器解析程序中未定义的符号（如函数和变量的引用），并将这些符号绑定到加载到内存中的共享库提供的相应符号上。
+    - 重定位：调整代码和数据的地址引用，确保程序中的引用指向正确的内存地址。
+
+  - <span style="color:red; font-weight:700">动态库：</span>
+    - 是包含代码和数据的文件，这些代码和数据可以被多个程序同时使用。与静态库不同，动态库在程序运行时被加载到内存中，而不是在编译时被链接到每个程序中。动态库在Linux系统中通常有.so（shared object）扩展名，在Windows中是.dll（dynamic-link library）文件。
+    - <span style="color:red; font-weight:700">动态库与可执行文件的对比</span>
+      - 相似之处
+        - 格式相似：动态库和可执行文件在很多操作系统中都是遵循相同格式的，例如，在Linux和Unix-like系统中，它们通常都是ELF（Executable and Linkable Format）格式。这意味着操作系统的加载器可以使用相同或类似的机制来读取和处理这些文件。
+
+        - 都可以包含代码和数据：无论是动态库还是可执行文件，它们都可以包含代码段和数据段。
+
+      - 不同之处
+        - 用途不同：可执行文件包含了运行一个完整程序所需的所有指令和资源，而动态库包含的是可以被多个程序共享使用的代码和数据。动态库的主要目的是重用代码，减少程序的内存占用和磁盘空间使用。
+
+        - 启动方式不同：可执行文件可以被操作系统直接加载和执行。动态库则不能直接执行，它们是被其他程序调用时动态加载到内存中的。当一个程序启动时，如果它依赖于某些动态库，操作系统的动态链接器会负责加载这些库。
+
+        - 符号解析和重定位：动态库在被加载时，需要通过动态链接器进行符号解析和地址重定位。这一步骤是必需的，因为动态库中的函数和数据在不同程序中可能被加载到不同的内存地址。
+    - <span style="color:red; font-weight:700">动态库的实现</span>
+      - 假设我们有一个加法函数，我们希望将其编译为动态库。首先，创建一个名为 add.c 的源文件：
+      ```c
+      // add.c
+      int add(int a, int b) {
+          return a + b;
+      }
+      ```
+      - 编译动态库：使用GCC（GNU Compiler Collection）编译这个文件为动态库。打开终端或命令行界面，然后使用以下命令：
+      ```shell
+      # 对于linux或Unix系统
+      gcc -shared -fPIC -o libadd.so add.c
+
+      # 选项的含义
+      -shared       # 告诉编译器生成一个共享对象，即动态库。
+      -fPIC         # 表示生成位置无关代码（Position Independent Code），这对于动态库是必需的，因为它允许代码在内存中被任意位置加载
+      -o libadd.so  #指定输出文件的名称。在Linux系统中，动态库通常以 .so（共享对象）扩展名结尾。
+
+      # Windows系统编译动态库
+      gcc -shared -o add.dll add.c
+      # 在Windows上，动态库通常以 .dll（Dynamic Link Library）扩展名结尾。
+      ```
+    - <span style="color:red; font-weight:700">使用动态库</span>
+      - 生成动态库后，你可以在其他C程序中使用它。为了使用这个动态库，你需要在使用它的程序中声明add函数的原型，并在链接时指定动态库的位置。这里不详细展开如何调用动态库中的函数，因为这涉及到动态链接库的加载和符号解析，通常需要使用动态加载机制（如dlopen和dlsym在Unix-like系统中，LoadLibrary和GetProcAddress在Windows中）或在编译时链接动态库。
+
 
 ### 软件包和包管理器  
 - 软件包介绍：开源软件最初只提供了打包的源码文件，用户必须自己编译每个想在GNU/LINUX上运行的软件。用户急需系统能提供一种更加便利的方法来管理这些软件，当Debian诞生时，这样一个管理工具dpkg也就应运而生,可用来管理deb后缀的“包”文件。
@@ -3412,18 +6812,18 @@ cat /proc/net/bonding/bond0
   - 帮助文件
   ```
   范例：利用cpio工具查看包文件列表
-
+  
   # rpm2cpio 包文件|cpio -itv     预览包内文件
   # rpm2cpio 包文件|cpio -id "*.conf" 释放包内文件
-
+  
   在Rocky中，一般cpio和rpm2cpio都是安装好的
   ```
 
 - 程序包管理器
   - 功能：将编译好的应用程序的各组成文件打包一个或几个程序包文件，利用包管理器可以方便快捷地实现程序包的安装，卸载，查询，升级，校验等管理操作。
   - 主流的程序包管理器
-    - redhat:rpm文件，rpm包管理器
-    - debian:deb文件，dpkg包管理器
+    - redhat:rpm文件，<span style="color:red;font-weight:700">rpm包管理器</span>
+    - debian:deb文件，<span style="color:red;font-weight:700">dpkg包管理器</span>
 
 - 包命名
   - rpm包命名方式：
@@ -3504,41 +6904,42 @@ https://sourceforge.net/
   - 问题：一般来说，rpm管理器更多的是使用查询功能，而很少使用安装功能，因为rpm包管理器不支持包的依赖关系
   ```
   使用rpm包管理器 - 安装
-
+  
   # rpm -i <rpm包名>
   # rpm -ivh <rpm包名>  -- 能够看到安装过程
-
+  
   查询安装是否成功
-
+  
   # rpm -q <软件名>   -- 这里不是包名，仅仅是开头的软件名
+  # rpm -q 后面必须接完整的软件名，很不好用，建议用qa在过滤
   # rpm -qa | grep '软件名'
   -- 使用qa查询所有安装过的包，通过grep筛选确认是否安装成功
-
+  
   rpm管理器 - 卸载
-
+  
   # rpm -e <软件名>
   -- 还是因为依赖关系问题，所以一般不使用rpm管理器进行安装，卸载
-
+  
   重点：rpm管理器 - 查询
-
+  
   # rpm -ql <软件名>
   -- 查询这个软件包中包含的文件列表
-
+  
   # rpm -q --scripts <软件名>
   -- 查看这个软件包中的脚本文件
-
+  
   # rpm -qi <软件名>
   -- 查看软件包的详细信息
-
+  
   # rpm -qf <软件名>
   -- 可以查询到磁盘文件来源于哪个包
-
+  
   # rpm -qc <软件名>
   -- 只查看软件包里的配置文件
-
+  
   # rpm -qd <软件名>
   -- 只查看软件包里的文档
-
+  
   # rpm -qa --last
   -- 查看最近安装的所有包
   ```
@@ -3548,6 +6949,16 @@ https://sourceforge.net/
 # rpm -K <软件名>
 -- 查看软件的rpm包是否合法
 
+# 在查询合法性之前，必须导入所需公钥
+# 导入公钥(添加第三方软件仓库时尤其有用)
+rpm --import /etc/pki/rpm-gpg/RPM-XXXXXXXXXXX
+
+# 查看已导入的公钥
+rpm -qa "gpg-pubkey"
+
+# 查看公钥
+rpm -qi gpg-pubkey-XXXXXXXX
+
 # rpm -V <软件名>
 -- 查看软件在安装后，是否被改过
 
@@ -3555,6 +6966,38 @@ https://sourceforge.net/
 -- 系统所有包，安装后，被改过的都列出来
 ```
 
+#### 实验：误删除rpm命令（/usr/bin/rpm），如何修复
+```shell
+# 进入救援模式
+# 使用救援模式的rpm包进行安装，安装至/mnt/sysroot
+rpm -ivh /run/install/repo/BaseOS/Packages/r/rpm-4.XXXXXX --root=/mnt/sysroot --force
+
+# 检查是否安装成功
+ls /mnt/sysroot/usr/bin/rpm
+
+# 安装成功后重启
+```
+
+#### 数据库维护
+- rpm包安装时生成的信息,都放在rpm数据库中
+```shell
+/var/lib/rpm
+```
+- 可以重置数据库
+```shell
+rpm {--initdb|--rebuilddb}
+
+# 选项详解
+--initdb      # 初始化，如果事先不存在数据库，则新建之，否则不执行任何操作
+--rebuilddb   # 重建已安装的包头的数据库索引目录
+```
+
+#### 包更新日志
+```shell
+rpm -q --changelog <软件名>
+其实是一个doc软件包中的一个文件
+rpm -qd <软件名> 如果该软件有更新日志，则doc文件中含有changelog文件
+```
 ### yum和dnf
 - 作用：CentOS使用yum,dnf解决rpm的包依赖关系
 - YUM：Yellowdog Update Modifier，rpm的前端程序，可解决软件包相关依赖性，可在多个库之间定位软件包，up2date的替代工具，CentOS8用dnf代替了yum，不过保留了和yun的兼容性，配置也是通用的
@@ -3564,34 +7007,44 @@ https://sourceforge.net/
   - yum/dnf是基于C/S模式
     - yum 服务器存放rpm包和相关包的元数据库
     - yum 客户端访问yum服务器进行安装或查询等
-  - yum 实现过程：先在yum服务器上创建yum repository（仓库），在仓库中事先存储了众多rpm包（一般放在Packages目录下），以及包的相关的元数据文件（放置在特定目录repodata下），当yum客户端利用yum/dnf工具进行安装时，会自动下载repodata中的元数据，查询元数据是否存在相关的包及依赖关系，自动从仓库中找到相关包下载并安装。
+  - yum 实现过程：先在yum服务器上创建yum repository（仓库），在仓库中事先存储了众多rpm包（一般放在Packages目录下），以及包的相关的元数据文件（放置在特定目录repodata下），当yum客户端利用yum/dnf工具进行安装时，会自动下载repodata中的元数据，查询元数据是否存在相关的包及依赖关系，并再次访问yum服务器，自动从仓库中找到相关包下载并安装。
 - yum客户端配置
   - yum客户端配置文件
   ```txt
-
+  
   # /etc/yum.conf      为所有仓库提供公共配置
   # /etc/yum.repos.d/*.repo:    为每个仓库提供配置文件
-
+  
   每个仓库对应一个配置文件
   ```
+  - yum公共配置（yum.conf）
+  ```shell
+  gpgcheck=1        # 安装包前要做包的合法和完整性校验
+  installonly_limit=3     # 同时可以安装3个包，最小值为2，如设0或1，为不限制
+  clean_requirements_on_remove=True   # 删除包时，是否将不再使用的包删除
+  best=True             # 升级时，自动安装最新版，即使缺少包依赖
+  skip_if_unavailable=False     # 跳过不可用
+  ```
+
   - repo仓库配置文件内容
   ```shell
   [repositoryID]
   name=Some name for this repository
   baseurl=url://path/to/repository
-  enabled={1|0}   默认为1，0表示禁用该仓库
-  gpgcheck={1|0}  默认1，检查包是否合法,0表示不检查
-
+  enabled={1|0}   # 默认为1，0表示禁用该仓库
+  gpgcheck={1|0}  # 默认1，检查包是否合法,0表示不检查
+  
   gpgcheck必须配合gpgkey使用，否则就设置0，不检查
-
-  gpgkey=URL
-
-  注意：yum仓库指向路径一定必须是repodata目录所在目录
-
+  
+  gpgkey=URL  # 通过key的路径，来实现gpgcheck的检查
+  
+  # 注意：yum仓库指向路径一定必须是repodata目录所在目录
+  
   ----------------------------------------------
-
+  
   相关变量
-
+  
+  # 下面的变量是yum自身带的变量，linux脚本不支持
   yum的repo配置文件中可用的变量
   $releasever: 当前OS的发行版的主版本号，如：8，7，6
   $arch: CPU架构，如：aarch64,i586,i686,x86_64
@@ -3602,49 +7055,70 @@ https://sourceforge.net/
 
   - yum相关指令
   ```txt
+  # yum repolist    查看所有的yum源客户端仓库
+
+  # yum repolist -v   查看yum仓库的详细信息
+
+  # yum repolist [all | enabled | disabled]
+
+  # yum repolist --repoid=XXX -v  # 显示指定源  
+  ----------------------------------------------------------
+
   # yum install <软件名>    下载软件
-
+  
   # yum remove <软件名>     卸载软件
-
+  
   # yum list <软件名>     查询软件
   支持模糊查询，通配符，比如：msm* 表示msm开头的软件
   如果查询到的yum源前面有@，说明已经安装，反之，没安装
+  结果包含已安装的包，和源里的可用包
 
+  # yum list --installed 查询已安装过的包 
+
+  # yum list updates  显示所有本地可更新的包
+
+  # yum list --available --showduplicates <软件名>
+  列出该软件在当前源下所有版本的包
+  
   # yum provides <软件名路径>  查询硬盘上没安装的软件来自于哪个包
-
+  
   # yum -y install --downloadonly --downloaddir=路径 <软件名>
   下载某个软件的包到指定目录，但是不安装
-
+  
   # yum -y install /data/httpd/*.rpm
   使用yum下载目录下的所有rpm包
-
+  
   # yum info <软件名>
   查询软件说明，相当于rpm -qi
   
   # yum search [string1] 
   搜索和关键词相关的包
-
+  
   # dnf repoquery -l <软件包>
   查看未安装的软件包，安装后会在硬盘生成哪些文件
-
+  
   # dnf clean all
   清理软件包元信息缓存
-
+  # 作用场景
+  这个命令通常在遇到与包数据库相关的问题或者当系统长时间没有更新且想要确保软件列表完全更新时使用。清理后，第一次运行 DNF 命令可能会比较慢，因为需要重新下载元数据缓存
+  
   # yum history
   查看安装的历史
-
+  
   # yum history info <history的编号>
   根据编号查看历史下载的具体细节
-
-  # yum updatefinfo
+  
+  # yum updatefnfo
   查看互联网上新版本的软件信息
-
+  # yum updateinfo info 查看详细信息
+  # yum updateinfo info bugfix | newpackage|security
+  
   # yum grouplist
   查看包组
-
+  
   # yum groupinstall <包组名>
   安装包组
-
+  
   # yum groupremove <包组名>
   卸载包组
   ```
@@ -3654,17 +7128,314 @@ https://sourceforge.net/
   - yum 元数据过旧，清理缓存
   - yum 源出问题，或网络有问题
 
+- 包组
+  - 作用："包组"（Package Group）是一个方便的概念，它允许你将相关的软件包归纳为一个组进行管理。这样，用户可以通过安装单个包组来批量安装一组具有相似功能或相关依赖的软件包，而不需要逐一安装每个包。
+  - 包组的特点：
+    - 便捷性：包组使得安装具有相似用途或相关依赖的一系列软件包更加方便快捷。
+    - 管理简化：通过包组，系统管理员可以更容易地管理系统安装的软件，尤其是在进行初始系统设置或批量部署时。
+    - 可定制：某些发行版允许用户在安装过程中选择特定的包组进行安装，从而实现更加定制化的安装体验。
+    - 示例：
+    ```shell
+    sudo dnf groupinstall "Development Tools"
+    ```
+
 ### 实现私用yum仓库
 ```
-步骤一：安装阿帕奇httpd,使其拥有web共享功能
+步骤一：在yum server下搭建web服务，保证其他机器能通过web服务访问本机
 
-步骤二：web共享的目录在 /var/www/html 下
+步骤二：在yum server机上搭建yum仓服务（Packages repodate）
 
-步骤三：将需要的yum源下载到该目录下
+步骤三：在client机上将yum的repos源指向yum server机
 ```
+#### 服务端配置
+```shell
+# 安装web服务
+yum install -y httpd
+
+# 关闭防火墙
+systemctl disabled --now firewalld.service
+
+# 开启web服务
+systemctl enable --now httpd.service
+
+# 将阿里云的extras源的相关数据下载到本地，给客户端使用
+yum reposync --repoid=nju-extras --download-metadata -p /var/www/html
+
+# 将本地光盘中的内容CP到web目录中，给客户端使用
+mkdir /cdrom
+mount /dev/sr0 /cdrom
+cp -r /cdrom/BaseOS/* /var/www/html/BaseOS
+```
+
+#### yum仓同步工具
+```shell
+# CentOS 8 dnf 工具集成
+dnf reposync --repoid=REPOID --download-metadata -p /path 
+
+# CentOS 7 以前版本，reposync工具来自于yum-utils包
+reposync --repoid=REPOID --download-metadata -p /path
+```
+
+#### 创建YUM仓工具
+- 可以根据目录中的rpm生成repodata元数据
+```shell
+createrepo [Option] <directory_to_index>
+
+# 常用选项
+-v                      # 显示详细的操作信息
+-o|--outputdir          # 指定生成的仓库元数据的输出目录
+-d|--datebase           # 生成sqlite数据库文件，可以加快包管理器的处理速度，并支持一些高级查询功能
+--update                # 更新现有仓库元数据
+--excludes <pattern>    # 排除指定规则的文件
+--includepkgs           # 指定规则的包创建元数据，与excludes相反
+--compress-type <类型>   # 指定压缩类型，这会影响仓库元数据文件的压缩方式
+--workers <数量>        # 指定生成元数据时使用的进程数，可以加快元数据生成速度  
+```
+- 示例
+```shell
+# 创建仓库元数据
+createrepo /path/to/repository
+# 创建后会在指定目录下，生成一个repodata目录
+
+# 更新仓库
+createrepo --update /path/to/repository
+
+# 使用多进程创建仓库
+createrepo --workers 4 /path/to/repository
+
+# 在/etc/yum.repo.d/下，配置新创建的仓库*repo文件
+
+# 使用yum repolist --repid=myself_test -v 测试仓库是否配置成功
+
+# 如果出现进程占用的情况，使用yum clean all，可以清除缓存，解决问题
+```
+
+#### yum Troubleshooting
+```shell
+# yum的配置文件格式或路径有问题
+解决*.repo文件格式
+
+# yum cache
+yum clean all
+
+# 重新建立缓存
+yun makecache
+
+# 元数据缓存地址
+/var/cache/dnf
+/var/cache/yum
+
+# 网络不通
+网卡配置
+```
+
+### DNF介绍
+- DNF，是新一代RPM软件包管理器。DNF软件包采用python编写，yum程序在安装的过程中，如果被终止，下次在执行将无法解决依赖，DNF可解决此问题
+```shell
+# 配置文件
+/etc/dnf/dnf.conf
+
+# 仓库文件
+/etc/yum.repos.d/*.repo
+
+# 日志
+/var/log/dnf.rpm.log
+/var/log/dnf.log
+
+# 使用帮助
+man dnf
+```
+
+### Ubuntu软件管理
+- Debian 软件包通常为预编译的二进制格式的扩展名".deb",类似于rpm文件，因此安装快速，无需编译软件。包文件包括特定功能或软件所必须的文件、元数据和指令
+  - dpkg：package manager for Debian，类似于rpm，dpkg是基于Debian的系统的包管理器。可以安装，删除和构建软件包，但无法自动下载和安装软件包或其依赖性
+  - apt：Advanced Packaging Tool，功能强大的软件管理工具，甚至可升级整个Ubuntu的整个系统，基于客户/服务器（c/s）  
+  
+![alt text](images/image23.png)
+
+```shell
+# 判断软件是否已安装
+dpkg -V <软件包>
+# $?返回0，则安装成功
+
+# 安装
+dpkg -i XXXXXXX.deb
+
+# 列出安装详情
+dpkg -l XXXXXXX.deb
+
+# 可以接通配符
+dpkg -l <通配符>
+
+# 卸载
+dpkg -r <软件名>
+
+# 根据条件列出已安装的包
+dpkg --get-selections v*
+# 列出以v开头的包名的包
+
+# 显示所有可以安装的包
+dpkg -p 
+
+# 用于查询某个特定文件属于哪个已安装的软件包,dpkg -S 命令只能查询到已安装软件包的信息。 
+dpkg -S "XXXX"
+
+# 显示包的详细信息
+dpkg -s "XXX"
+
+# 列出已安装包的所有文件
+dpkg -L 应用程序名
+
+# 列出包内所有文件
+dpkg -L "XXXXX.deb "
+```
+
+#### dpkg -l 显示解读
+```shell
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name                     Version                Architecture Description
++++-========================-======================-============-===================================================================
+un  v4l2loopback-dkms        <none>                 <none>       (no description available)
+un  v4l2loopback-modules     <none>                 <none>       (no description available)
+ii  vim                      2:8.2.3995-1ubuntu2.16 amd64        Vi IMproved - enhanced vi editor
+un  vim-athena               <none>                 <none>       (no description available)
+ii  vim-common               2:8.2.3995-1ubuntu2.16 all          Vi IMproved - Common files
+un  vim-doc                  <none>                 <none>       (no description available)
+un  vim-gtk3                 <none>                 <none>       (no description available)
+un  vim-lua                  <none>                 <none>       (no description available)
+ii  vim-nox                  2:8.2.3995-1ubuntu2.16 amd64        Vi IMproved - enhanced vi editor - with scripting languages support
+un  vim-perl                 <none>                 <none>       (no description available)
+un  vim-python3              <none>                 <none>       (no description available)
+un  vim-ruby                 <none>                 <none>       (no description available)
+ii  vim-runtime              2:8.2.3995-1ubuntu2.16 all          Vi IMproved - Runtime files
+un  vim-scripts              <none>                 <none>       (no description available)
+un  vim-tcl                  <none>                 <none>       (no description available)
+ii  vim-tiny                 2:8.2.3995-1ubuntu2.16 amd64        Vi IMproved - enhanced vi editor - compact version
+un  virtualbox-guest-modules <none>                 <none>       (no description available)
+un  vsearch                  <none>                 <none>       (no description available)
+
+----------------------------------------------------------
+
+# 共7个字段
+Desired  Status  Err  Name  Version  Architecture Description
+
+# Desired 期望状态
+u       Unknown       # 没有安装过
+i       Install       # 请求安装
+r       Remove        # 请求卸载
+p       Purge         # 请求卸载并清理
+h       Hold          # 保持
+
+# Status 当前状态
+n       Not           # 软件没有安装
+i       Inst          # 安装完成并完成配置
+c       Conf-files    # 已卸载，但还有保留配置文件
+u       Unpacked      # 已解压缩，但没有配置
+f       half-conf     # 配置时出错
+h       Half-inst     # 安装时出错
+w       trig-await    # 触发器等待
+t       Trig-pend     # 触发器是未决状态
+
+# Err 错误状态
+空                    # 正常情况下为空
+h                     # 被锁定，有其他包对此依赖，无法升级
+r                     # 被损坏，需要重装才能使用
+x                     # 损坏且被锁定
+
+# NAME 包名
+# Version 版本
+# Architecture 平台架构
+# Description 包的描述信息
+
+# 前三列常见组合
+ii                    # 安装成功
+pn                    # 安装后卸载
+un                    # 没有安装过
+iu                    # 安装了但没有配置
+rc                    # 已卸载，但还有配置文件
+```
+
+#### apt命令用法
+```shell
+# 列出所有包
+apt list
+
+# 列出所有以安装的包
+apt list --installed
+
+# 列出所有可升级的包
+apt list --upgradeable
+
+# 指定包名，使用通配符进行模糊查询
+apt list *sql*
+
+#--------------------------------------------------------
+
+# 默认在包名和描述信息中搜索，支持正则
+apt search
+
+apt search --names-only <软件名>
+
+# 查询包的具体信息
+apt info <软件名>
+
+# 显示所有版本
+
+```
+
+#### apt包索引配置文件
+```shell
+# 配置系统默认编辑器的文件
+# Rocky/CentOS是通过环境变量$EDITOR来进行控制
+
+# select-editor命令可以用来配置系统默认编辑器文件
+```
+- apt配置文件位置
+```shell
+/etc/apt/sources.list
+/etc/apt/sources.list.d/
+# 该文件更新完后，要apt update进行更新软件包元数据
+
+# 在ubuntu中有两个重要目录，分别是dists和pool
+# dists目录中存放的时该仓库中的元数据
+# pool目录中存放的是具体的包文件
+```
+```shell
+deb URL section1 section2
+
+# 字段说明
+deb         # 固定开头，表示是二进制包的仓库，如果deb-src开头，则表示是源码库
+URL         # 库所在的地址，可以是网络地址，也可以是本地镜像地址
+section1    # Ubuntu版本的代号，可在os-release查看（VERSION CODENAME）
+            # section1              主仓
+            # section1-backports    后备仓，该仓中软件当前版本不一定支持
+            # section1-security     修复仓，主要用来打补丁，有重大漏洞需要在当前版本修复时，会放在此仓
+            # sections-updates      非安全性更新仓，不影响系统安全性的小版本迭代放在此仓
+            # section1-proposed     预更新仓，可理解为新软件的测试放在此仓
+section2    # 软件分类
+            # main完全自由软件
+            # restricted不完全自由的软件
+            # universe社区支持的软件
+            # multiverse非自由软件
+```
+#### 查看apt的安装历史
+```shell
+cat /var/log/dpkg.log
+```
+
+#### 查看yum的安装历史
+```shell
+yum history
+```
+
+### snap 工具
+- 默认snap应用格式包，专为物联网设备，嵌入式平台设计的迷你ubuntu
+
 ### 程序包编译
 - C、C++的源码编译：使用make项目管理器
-<br>configure脚本 --> Makefile.in --> Makefile
+  <br>configure脚本 --> Makefile.in --> Makefile
   - 相关开发工具
     - autoconf: 生成configure脚本
     - automake：生成Makefile.in
@@ -3673,6 +7444,19 @@ https://sourceforge.net/
 - 源码编译的好处
   - 可以实现软件功能的私人定制
   - 可以控制安装路径
+
+#### 编译安装准备
+```shell
+# CentOS
+yum install gcc make gcc-c++ glibc glibc-devel pcre pcre-devel openssl openssl
+devel systemd-devel zlib-devel vim lrzsz tree tmux lsof tcpdump wget net-tools 
+iotop bc bzip2 zip unzip nfs-utils man-pages
+
+# Ubuntu
+sudo apt update
+sudo apt install gcc make g++ libc6-dev libpcre3 libpcre3-dev libssl-dev libsystemd-dev zlib1g-dev vim lrzsz tree tmux lsof tcpdump wget net-tools iotop bc bzip2 zip unzip nfs-common manpages
+```
+
 - C语言源代码编译安装过程
 <br>利用编译工具，通常只需要三个大的步骤
   - ./configure
@@ -3681,7 +7465,7 @@ https://sourceforge.net/
   - make 根据Makefile文件，会检车依赖的环境，进行构建应用程序
   - make install 复制文件到相应路径
 
-- 编译安装实战案例（tree安装）：
+- 编译安装实战案例（tree安装）：  
 ```
 1. 到官网使用wget download_url，下载新版tree的源码到当前目录并解压
 
@@ -3723,6 +7507,40 @@ https://sourceforge.net/
 7.清除缓存
 
 # hash -r
+```
+
+#### 实验：编译安装nginx
+```shell
+# 下载nginx源码包
+wget http://nginx.org/download/nginx-1.23.0.tar.gz
+
+# 解压
+tar -xf nginx-1.23.0.tar.gz
+
+# 指定安装目录，同时开启http_ssl_module
+./configure --prefix=/lnmp/nginx --with-http_ssl_module
+
+# 如果中间失败，提示缺少依赖项，通过yum search 查找软件包名称，然后安装，安装后重新执行 ./configure ...
+
+# 经过补全依赖项后，成功编译，生成Makefile文件，执行make
+make
+
+# 使用make install 将文件按makefile规则转移到对应目录下
+make install
+
+# 安装成功后，修改nginx文件，修改/lnmp/nginx/conf/nginx.conf将user XXX; 改为 user root
+
+# 然后关闭防火墙
+systemctl stop ufw    # Ubuntu
+systemctl stop firewalld # CentOS|Rocky
+
+# 将/lnmp/nginx/sbin/nginx 创建软链接到PATH路径下
+ln -s /lnmp/nginx/sbin/nginx /usr/local/bin/nginx
+
+# 启动nginx
+nginx
+
+# 服务开启后测试，成功~~~~
 ```
 
 ### Ubuntu软件包管理工具
@@ -3803,7 +7621,7 @@ ubuntu软件源的下载地址，默认外网
   - grub2-mkconfig -o /boot/grub2/grub.cfg
   ```
   /etc/default/grub 默认配置文件参数
-
+  
   GRUB_TIMEOUT=5
   GRUB_DISTRIBUTOR="$(sed 's, release .*$,,g' /etc/system-release)"
   GRUB_DEFAULT=saved
@@ -3813,13 +7631,13 @@ ubuntu软件源的下载地址，默认外网
   (net.ifnames=0 是修改网卡名称eth0的参数设置)
   GRUB_DISABLE_RECOVERY="true"
   GRUB_ENABLE_BLSCFG=true
-
+  
   ----------------------------------------------
-
+  
   查看默认引导内核的版本号
   
   # grub2-editenv list
-
+  
   ```
 
 - 忘记root密码，如何重置
@@ -3844,13 +7662,13 @@ ubuntu软件源的下载地址，默认外网
     - ps(process status)
     ```
     查看所有进程的状态
-
+    
     # ps -e
-
+    
     查看所有进程状态的详细信息
     
     # ps -ef
-
+    
     示例：
     UID          PID    PPID  C STIME TTY          TIME CMD
     root           1       0  0 Aug27 ?        00:00:02 /usr/lib/systemd/systemd --switched-root --system --deserialize 31
@@ -3861,15 +7679,15 @@ ubuntu软件源的下载地址，默认外网
     root           6       2  0 Aug27 ?        00:00:00 [netns]
     root           8       2  0 Aug27 ?        00:00:00 [kworker/0:0H-events_highpri]
     root          10       2  0 Aug27 ?        00:00:00 [kworker/0:1H-events_highpri]
-
+    
     参数详解：
-
+    
     UID：有效用户id
     PID：进程id
     PPID：父进程id
-
+    
     查看线程情况
-
+    
     # ps -eLf
 
 
@@ -3878,14 +7696,14 @@ ubuntu软件源的下载地址，默认外网
     - top 更全面的看到进程的运行状态
     ```
     top的详解
-
+    
     示例：
     top - 10:58:20 up 19:40,  3 users,  load average: 0.00, 0.00, 0.00
     Tasks: 224 total,   1 running, 223 sleeping,   0 stopped,   0 zombie
     %Cpu(s):  0.0 us,  0.0 sy,  0.0 ni,100.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
     MiB Mem :   1750.8 total,    697.8 free,    531.6 used,    688.5 buff/cache
     MiB Swap:   2072.0 total,   2072.0 free,      0.0 used.   1219.2 avail Mem 
-
+    
     PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND                                                                                                 
     17 root      20   0       0      0      0 I   0.3   0.0   0:01.94 rcu_preempt                                                                                             
     836 root      20   0  241000  11256   7496 S   0.3   0.6   1:08.54 vmtoolsd                                                                                                
@@ -3893,42 +7711,42 @@ ubuntu软件源的下载地址，默认外网
     2 root      20   0       0      0      0 S   0.0   0.0   0:00.03 kthreadd                                                                                                
     3 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_gp                                                                                                  
     4 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_par_gp 
-
+    
     参数详解：
-
+    
     up 19:40：意味着系统已经运行了19小时40分钟。
-
+    
     3 users：表示当前系统有两个用户正在登录
-
+    
     load average：平均负载，后面跟3个值，分别表示1分钟，5分钟，15分钟的负载情况，1表示满负荷，用来查看系统的繁忙程度
-
+    
     Load Average 是如何计算的？
     load average的值反映了在特定时间段内的平均就绪进程数。"就绪"意味着进程要么正在运行，要么在等待CPU时间来运行。这也包括等待I/O的进程（例如，等待硬盘、网络等）
     
     如何解释 Load Average？
     解释这些数字最简单的方法是与你的CPU核心数进行比较。
-
+    
     如果你的系统只有一个CPU核心，那么load average为1意味着你的系统完全饱和。
     如果你有4个CPU核心，那么数字4.00意味着所有核心都被完全利用。
-
+    
     一些基本的解读规则：
-
+    
     如果1分钟的负载（第一个数字）远高于5或15分钟的负载，系统的负载可能正在增加。
     如果1分钟的负载（第一个数字）远低于5或15分钟的负载，系统的负载可能正在减少。
     负载高于你的CPU核心数可能意味着系统上有竞争或者某种瓶颈。
-
+    
     这个数字是好是坏？
     如果load average低于核心数，通常意味着系统有剩余的计算能力。
     如果load average和核心数大致相等，系统可能达到了它的最大吞吐量。
     如果load average远大于核心数，这可能意味着系统过载。
-
+    
     Tasks:224 total :表示共有224个进程在运行
-
+    
     %Cpu(s)：后面的数据表示Cpu资源使用和分配的百分比；（s）表示多核cpu的使用平均值，按数字1,可以分开显示每个cpu的使用情况
-
+    
     MiB Mem：表示内存的使用分配情况
     MiB Swap：表示swap虚拟内存的使用情况
-
+    
     默认每3s更新依次数据，按s键可以自定义输入更新的频率时间
 
 
@@ -3953,7 +7771,7 @@ ubuntu软件源的下载地址，默认外网
   - nice 范围从-20到19，值越小优先级越高，抢占资源越多
   ```
   更改进程执行的优先级
-
+  
   # nice -n 数值 ./程序名称
   ```
   - renice重新设置优先级
@@ -3961,27 +7779,27 @@ ubuntu软件源的下载地址，默认外网
   更改正在运行的进程执行的优先级
   
   # renice -n 数值 ./程序名称
-
+  
   ```
 - 进程的作业控制
   - jobs
   - &符号
   ```
   将进程调整为后台运行，这样前台的终端仍然能执行其他指令
-
+  
   # ./a.sh &
-
+  
   将后台的进程调回前台运行
-
+  
   # jobs      先查看后台运行的进程
   # fg 数值   这个数值是jobs查询后，进程前边的显示数值
-
+  
   将前台进程调回后台，同时停止
-
+  
   组合键：ctrl + z
-
+  
   重新启动停止的进程，并在后台运行（在前台运行是fg）
-
+  
   # bg 数值
   ```
 #### 进程的通信方式——信号
@@ -4053,37 +7871,37 @@ journalctl - 日志查看工具
   - systemctl CentOS 7之后
   ```
   systemctl 常见操作
-
+  
   # systemctl status service_name
-
+  
   # systemctl start service_name
-
+  
   # systemctl stop service_name
-
+  
   # systemctl restart service_name
-
+  
   # systemctl reload service_name
-
+  
   # systemctl enable service_name  //开机自动启动
-
+  
   # systemctl disable service_name
-
+  
   服务级别
-
+  
   配置文件：/lib/systemd/system/*.target
-
+  
   runlevel[0-6].target -> 不同的状态
-
+  
   查看当前服务的级别
-
+  
   # systemctl get-default
-
+  
   修改当前服务级别
   # systemctl set-default multi-user.target
   ```
 
-### 进程，系统性能和计划任务
-#### 进程和内存管理
+## 进程，系统性能和计划任务
+### 进程和内存管理
 - 内核功能：进程管理、内存管理、文件系统、网络功能、驱动程序、安全功能等
 - 什么是进程：
   - Process：运行中的程序的一个副本，是被载入内存的一个指令的集合，是资源分配的单位
@@ -4141,7 +7959,7 @@ journalctl - 日志查看工具
   - Page Frame：页框，给进程分配的内存最小单位
   ```
   查看page的大小
-
+  
   # getconf -a | grep -i size
   ```
 
@@ -4162,5 +7980,3664 @@ journalctl - 日志查看工具
       - BSS段：包含了程序中未初始化的全局变量，在内存中bss段全部置零
       - 堆(heap)：存放数组和对象，堆适用于存放进程运行中被动态分配的内存段，它的大小并不固定，可动态扩张或缩减。当进程调用malloc等函数分配内存时，新分配的内存就被动态添加到堆上；当利用free等函数释放内存时，被释放的内存从堆中被剔除
       - 栈：栈是用户存放程序临时创建的局部变量，也就是说我们函数括弧{}中定义的变量如：函数体中local声明的变量。除此之外，在函数被调用时，其参数也会被压入发起调用的进程栈中，并且待到调用结束后，函数的返回值也会被存放会栈中。由于栈的后进先出的特点，所以特别方便用来保存/恢复调用现场。可以把堆栈看成一个寄存、交换临时数据的内存区
-    ![Alt text](images/image13.png)
-    ![Alt text](images/image14.png)
+      ![Alt text](images/image13.png)
+      ![Alt text](images/image14.png)
+
+### 进程使用内存问题
+#### 内存泄漏：Memory Leak
+- 指程序中用malloc或new申请了一块内存，但是没有用free或delete将内存释放，导致这块内存一直处于占用状态
+
+#### 内存溢出：Memory Overflow
+- 指程序申请了10M的空间，但是在这个空间写入10M以上字节的数据，就是溢出
+
+#### 内存不足：OOM
+- OOM即Out Of Memory，"内存用完了"，的情况在java程序中比较常见。系统会选出一个进程将之杀死，在日志messages中看到类似下面的提示
+```shell
+Jul 10 10:20:30 kernel: Out of memory: Kill process 9527(java) score 88 or sacrifice child
+```
+- 当JVM因为没有足够的内存来为对象分配空间并且垃圾回收器也已经没有空间可回收时，就会抛出这个error，因为这个问题已经严重到不足以被应用处理。
+
+- 原因：
+  - 给应用分配内存太少：比如虚拟机本身可使用的内存（一般通过启动时的VM参数指定）太少。
+  - 应用用的太多，并且用完没释放，浪费了。此时就会造成内存泄漏或者内存溢出
+
+- 使用的解决办法：
+  - 限制java进程的max heap，并且降低java程序的worker数量，从而降低内存使用
+  - 给系统增加swap空间
+
+- 设置内核参数（不推荐），不允许内存申请过量：
+```shell
+echo 2 > /proc/sys/vm/overcommit_memory
+echo 2 > /proc/sys/vm/overcommit_ratio
+echo 2 > /proc/sys/vm/panic_on_oom
+```
+
+- 说明：
+  - Linux默认是允许memory overcommit的，只要你来申请内存我就给你，寄希望于进程实际上用不到那么多内存，但万一用到那么多呢？Linux<span style="color:red">设计了一个OOM killer机制挑选一个进程出来杀死，以腾出部分内存</span>，如果还不够就继续。也可<span style="color:red">通过设置内核参数vm.panic_on_oom使得发生OOM时自动重启系统。</span>这都是有风险的机制，重启可能造成业务中断，杀死进程也有可能导致业务中断。所以Linux2.6以后允许通过内核参数vm.overcommit_memory禁止memory_overcommit.
+  
+- vm.panic_on_oom 决定系统出现oom的时候，要做的操作。接受的三种取值如下：
+```shell
+0 - 默认值，当出现oom的时候，触发oom killer
+# 直接杀进程
+1 - 程序在有cpuset，memory policy，memcg的约束情况下的OOM，可以考虑不panic，而是启动OOM killer。其它情况触发 kernel panic,即系统直接重启
+# 根据情况杀进程或者重启
+2 - 当出现oom，直接触发kernel panic，即系统直接重启
+# 直接重启
+```
+
+- vm.overcommit_memory接受三种取值：
+```shell
+0 - Heuristic overcommit handling. 这是缺省值，它允许overcommit，但过于名目仗胆的overcommit会被拒绝，比如malloc一次性申请的内存大小就超过了系统总内存。Heuristic的意思是“试探式的”，内核利用某种算法猜测你的内存申请是否合理，它认为不合理就会拒绝overcommit。
+
+# kernel设有一个阈值，申请的内存总数超过这个阈值就算overcommit，在/proc/meminfo中可以看到这个阈值的大小
+
+1 - Always overcommit，允许overcommit，对内存申请来者不拒。内核执行无内存过量使用处理。使用这个设置会增大内存超载的可能性，但是也可以增强大量使用内存任务的性能
+
+2 - Don't overcommit,禁止overcommit。内存拒绝等于或大于总可用swap大小以及overcommit_ratio指定的物理RAM比例的内存请求。如果您希望减小内存过度使用的风险，这个设置就是最好的
+```
+
+- CommitLimit就是overcommit的阈值，申请的内存总数超过CommitLimit的话就算是overcommit。此值通过内核参数<span style="color:red">vm.overcommit_ratio</span>或vm.overcommit_kbytes间接设置的，公式如下：
+```shell
+CommitLimit= (Physical RAM * vm.overcommit_ratio / 100) + Swap
+```
+
+- vm.overcommit_ratio是内核参数，缺省值是50，表示物理内存的50%.如果你不想使用比率，也可以直接指定内存的字节数大小，通过另一个内核参数vm.overcommit_kbytes即可；
+- 如果使用了huge pages，那么需要从物理内存中减去，公式变成：
+```shell
+CommitLimit= ([total RAM] - [total huge TLB RAM]) * vm.overcommit_ratio / 100 + swap 
+```
+
+### 进程的状态切换
+#### 进程的基本状态
+![alt text](images/image27.png)
+-  创建状态：进程在创建时需要申请一个空白PCB（process control block进程控制块），向其中填写控制和管理进程的信息，完成资源分配。如果创建工作无法完成。比如资源无法满足，就无法被调度运行，把此时进程所处状态称为创建状态。
+
+- 就绪状态：进程已经准备好，已分配到所需资源，只要分配到CPU就能够立即运行
+
+- 执行状态：进程处于就绪状态被调度后，进程进入执行状态
+
+- 阻塞状态：正在执行的进程由于某些事件（I/O请求，申请缓存区失败）而暂时无法运行，进程受到阻塞。在满足请求时进入就绪状态等待系统调用
+
+- 终止状态：进程结束，或出现错误，或被系统终止，进入终止状态。无法再执行。
+
+#### 状态之间转换六种情况
+- 运行--->就绪：
+  - 主要是进程占用CPU的时间过长，而系统分配给该进程占用CPU的时间是有限的；
+
+  - 在采用抢先式优先级调度算法的系统中，当有更高优先级的进程要进行时，该进程就被迫让出CPU，该进程便由执行状态变为就绪状态
+
+- 就绪--->运行：
+  - 运行的进程的时间片用完，调度就转到就绪队列中选择合适的进程分配CPU
+
+- 运行--->阻塞：
+  - 正在执行的进程因发生某等待事件而无法执行，则进程由执行状态变为阻塞状态，如发生了I/O请求
+
+- 阻塞--->就绪：
+  - 进程所等待的事件已经发生，就进入就绪队列
+
+- 以下两种状态不可能发生：
+  - 阻塞--->运行：即使阻塞进程分配CPU，也无法执行，<span style="color:red">操作系统在进行调度时不会从阻塞队列进行挑选，</span>而是从就绪队列中选取
+  - 就绪--->阻塞：就绪态根本就没有执行，谈不上进入阻塞态
+
+#### 进程更多状态：
+
+- 运行态：running
+
+- 就绪态：ready
+
+- 睡眠态：分为两种，可中断：interruptable, 不可中断：uninterruptable
+
+- 停止态：stopped，暂停于内存，但不会被调度，除非手动启动
+
+- 僵死态：zombie，结束进程，父进程结束前，子进程不关闭
+  - 既不占有CPU资源，也仅占用极少的内存
+  - 进程列表中存在，重启时会从进程列表中清除
+  - 死的进程，无法再次杀死
+  - 实现
+  ```shell
+  echo $BASHPID
+  # 1436
+  bash
+  echo $BASHPID
+  # 1809
+  echo $PPID
+  # 1436
+
+  kill -19 1436 # 将父进程变为停止态 stat为T
+  kill -15 1809 # 给子进程发送后一个15信号，15信号为正常结束关闭进程
+  # 关闭进程后，回收该进程所有资源
+  # 正常关闭进程后，该进程应该在进程列表中清除，但是由于父进程为停止态，无法回收子进程的尸体，因此子进程变为了僵尸态 
+
+  kill -18 1436 # 激活父进程
+  # 由于父进程被激活，因此子进程的被回收，子进程从进程列表清除
+
+  # 强杀父进程的时候，可以将子进程也杀死
+  ```
+
+```shell
+ps aux 中的stat可以查看状态
+
+STAT：进程状态
+  R: running
+  S: interruptable sleeping（大部分进程处于睡眠态）
+  D: uninterruptable sleeping
+  T: stopped
+  Z: zombie
+  +: 前台进程
+  l: 多线程进程
+  L: 内存分页并带锁
+  N：低优先级进程
+  <：高优先级进程
+  s: session leader，会话发起者
+  I: Idle kernel thread, CentOS 8 新特性
+```
+
+### LRU算法
+- LRU: Least Recently Used 近期最少使用算法，释放内存
+- 计算机组成中详解
+
+
+### 进程间通信
+#### IPC:Inter Process Communication
+- 同一主机
+```shell
+pipe                  # 管道
+socket                # 套接字文件
+Memory-maped file     # 文件映射，将文件中的一段数据映射到物理内存，多个进程共享这片内存
+signal                # 信号
+Lock                  # 对资源上锁，如果资源已被某进程锁住，则其他进程想修改甚至读取这些资源，都将被阻塞，直到锁被打开
+semaphore             # 信号量，一种计数器
+```
+
+- 不同主机：socket=IP和端口号
+```shell
+RPC remote procedure call(远程过程调用)
+MQ 消息队列，生产者和消费者，如：Kafka，RabbitMQ,ActiveMQ
+```
+
+- 创建管道文件(单工，单向传输，只能一对一)
+```shell
+mkfifo /data/test.fifo
+
+cat > /data/test.fifo
+
+# 在另一个终端
+cat /data/test.fifo
+```
+
+### 进程优先级
+- 优先级范围（0-139）
+  - （0 - 99） 实时进程，内核中操作系统相关进程使用
+  - （100 - 139）非实时进程，用户进程使用 
+
+- CentOS 优先级 
+![alt text](images/image28.png)
+
+- 进程优先级
+  - realtime优先级：99 - 0， 值最大，优先级最高
+  - nice值：-20到19，对应系统优先级100 - 139
+
+- 进程优先级的执行过程（非Linux）
+```
+0 - 139个优先级，有140个优先级队列，数字越小，优先级越高
+
+假设当前只有100,101,102，3个队列中有进程排队
+100:p1, p2, p3
+101:p4, p5
+102:p6, p7
+
+由于p1在100优先级队列，优先级高，因此，cpu先给p1分配时间片，优先执行p1，
+
+如果在时间片消耗之后，p1仍未执行完毕，则剩余工作放入100优先级的就绪队列
+
+然后处于100优先级的运行队列中的p2被分配CPU时间片，运行，假设p2运行完毕
+
+100优先级队列中的p3被分配时间片，运行，此时100优先级队列中的进程数为空
+
+假设p3在时间片消耗完，也没有执行完毕，剩余进程进入100优先级的就绪队列，此时就绪队列有p1和p3,
+
+由于100优先级的运行队列中的进程为空，因此，100优先级的就绪队列变为运行队列，再执行p1, p3
+
+如此反复，当100优先级队列中的p1,p3彻底执行完毕后，运行优先级101的队列
+```
+- <span style="color:red">Linux内核使用的是完全公平调度器（CFS），其目标是确保CPU时间在所有进程间公平分享，而不是严格基于优先级调度。</span>
+
+```
+inux内核中的完全公平调度器（Completely Fair Scheduler, CFS）是自Linux 2.6.23版本开始引入的默认CPU调度器，它基于公平调度算法设计，旨在为运行在系统上的每个进程提供尽可能公平的CPU时间分配。CFS的核心思想是基于红黑树（一种自平衡二叉查找树）来动态管理和调度进程，从而实现公平性和高效性。下面是CFS实现的一些详细说明，以及nice值（优先级）是如何影响进程调度的。
+
+CFS的工作原理
+红黑树：CFS使用一棵红黑树来维护所有可运行的进程（即处于就绪状态，等待被调度到CPU上执行的进程）。红黑树的每个节点代表一个进程，按照进程的虚拟运行时间（vruntime）排序。vruntime是一个进程获得CPU时间的衡量，意图是反映每个进程使用CPU资源的量。
+
+选择下一个进程：当需要选择下一个要运行的进程时，CFS会选择红黑树最左侧的节点，即vruntime最小的进程，因为这代表了它相对于其他进程获得的CPU时间最少。
+
+时间片：CFS不固定分配时间片大小，而是根据系统负载和进程数动态调整。理论上，时间片的长度是与系统中就绪进程数量的倒数成比例的，意味着更多的就绪进程会导致更短的时间片，从而每个进程能更频繁地被调度。
+
+睡眠和唤醒：为了保证公平性，当进程从睡眠状态唤醒时，CFS会给予一定的时间补偿，确保长时间睡眠的进程在唤醒后能较快地获得CPU时间。
+
+nice值的影响
+在Linux中，nice值是一个介于-20到19的整数，用于调整进程的优先级。默认值为0，较低的nice值（负值）表示较高的优先级，而较高的nice值（正值）表示较低的优先级。
+
+在CFS中，nice值通过调整进程的vruntime来间接影响进程的调度优先级：
+
+负nice值（优先级高）：进程的vruntime增加得更慢，使得该进程更容易被调度。
+正nice值（优先级低）：进程的vruntime增加得更快，导致该进程相对较难获得CPU时间。
+这样，尽管CFS的目标是确保所有进程公平地分享CPU时间，nice值仍然允许系统管理员或用户调整特定进程的调度偏好，以反映出更高或更低的优先级需求。
+```
+
+### 进程分类
+- 守护进程：守护进程: daemon，在系统引导过程中启动的进程，和终端无关进程
+- 前台进程：跟终端相关，通过终端启动的进程
+
+- 按进程资源的使用分类
+  - CPU-Bound：CPU 密集型，非交互
+  - IO-Bound：IO 密集型，交互
+
+### I/O调度算法
+- 操作系统版本不同，I/O调度算法不同
+```shell
+cat /sys/block/sda/queue/scheduler
+```
+
+### 进程管理和性能相关工具
+#### 进程树 pstree
+- pstree
+```shell
+pstree [option] [PID | USER]
+```
+
+- 常用选项：
+```shell
+-p        # 显示PID
+-u        # 显示用户切换
+-H pid    # 高亮指定进程及其前辈进程
+-h        # 高亮显示当前进程及其前辈进程
+```
+
+#### 进程信息 ps
+- ps 即process state，可以显示进程当前状态的快照，默认显示当前终端中的进程，Linux系统各进程的相关信息均保存在`/proc/PID`目录下的各文件中
+
+- ps格式
+```shell
+ps [OPTION...]
+```
+
+- 支持三种选项
+  - UNIX选项：如：-A，-e
+  - BSD选项：如：a
+  - GNU选项：如：--help
+
+- 常用选项
+```shell
+a               # 选项包括所有终端中的进程
+x               # 选项包括不链接终端的进程
+u               # 选项显示进程所有者信息
+f               # 选项显示进程树，相当于 --forest
+k|--sort 属性   # 对属性排序，属性前加- 表示倒序
+o 属性...       # 显示定制信息：pid, cmd, %cpu, %mem...
+-U              # 显示指定RUID或用户的进程
+-u              # 显示指定EUID或用户的进程
+-f              # 显示完整格式程序信息
+-C              # 指定命令，多个命令用逗号分隔e
+```
+
+- 常用选项组合
+```shell
+ps aux
+
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.1 191184  3836 ?        Ss   Mar14   2:36 /usr/lib/systemd/systemd --switched-root --system --deserialize 22
+root         2  0.0  0.0      0     0 ?        S    Mar14   0:00 [kthreadd]
+root         4  0.0  0.0      0     0 ?        S<   Mar14   0:00 [kworker/0:0H]
+root         6  0.0  0.0      0     0 ?        S    Mar14   0:15 [ksoftirqd/0]
+root         7  0.0  0.0      0     0 ?        S    Mar14   0:08 [migration/0]
+root         8  0.0  0.0      0     0 ?        S    Mar14   0:00 [rcu_bh]
+root         9  0.0  0.0      0     0 ?        S    Mar14   6:41 [rcu_sched]
+root        10  0.0  0.0      0     0 ?        S<   Mar14   0:00 [lru-add-drain]
+root        11  0.0  0.0      0     0 ?        S    Mar14   0:05 [watchdog/0]
+root        12  0.0  0.0      0     0 ?        S    Mar14   0:04 [watchdog/1]
+root        13  0.0  0.0      0     0 ?        S    Mar14   0:08 [migration/1]
+root        14  0.0  0.0      0     0 ?        S    Mar14   0:14 [ksoftirqd/1]
+root        16  0.0  0.0      0     0 ?        S<   Mar14   0:00 [kworker/1:0H]
+root        18  0.0  0.0      0     0 ?        S    Mar14   0:00 [kdevtmpfs]
+
+# USER:    进程发起者
+# PID：    进程PID
+# %CPU：   占用CPU百分比
+# %MEM：   占用内存百分比
+# VSZ：    操作系统承诺的虚拟内存数量
+# RSS：    实际使用的内存大小
+# TTY：    终端
+# STAT：   状态信息
+# START：  什么时间启动的
+# TIME：   CPU时间片累加值
+# COMMAND：命令
+
+# 排序显示命令
+ps axo pid,cmd,%cpu,%mem k -%cpu
+```
+![alt text](images/image29.png)
+
+- 面试题：找到未知进程的执行程序文件路径
+```shell
+ls -l /proc/1272/exe
+# 通过查看proc/PID/exe的软链接指向
+```
+
+#### 查看进程信息prtstat
+- 可以显示进程信息，来自于psmisc包
+
+- 格式：
+```shell
+prtstat [options] PID ...
+```
+
+- 常用选项
+```shell
+-r   # 显示格式更容易观看
+```
+ 
+
+#### 设置和调整进程优先级
+- nice和renice只能调整非实时优先级
+
+- nice，翻译为友善度，这个术语源自于它决定了你对待系统的其他用户的友善度。友善度越高，越谦虚，优先级越低。友善度越低，说明你已经不打算让步了，则优先级越高
+
+- 详解实时优先级和非实时优先级的区别 
+```
+非实时优先级
+基于时间共享：非实时进程是基于时间共享（time-sharing）策略调度的，意味着这些进程按照一定的公平原则轮流使用CPU资源。操作系统调度器会尽量平等地分配CPU时间给每个进程，但也允许优先级调整以改变进程获取CPU时间的频率。
+nice值：在Linux中，非实时进程的优先级可以通过nice值来调整。nice值的范围通常是-20（最高优先级）到19（最低优先级）。默认情况下，进程的nice值为0。通过调整nice值，用户和系统管理员可以影响进程的调度优先级。
+适用场景：适用于大多数常规应用，如用户程序和系统后台服务。这些进程不需要严格的时间限制，可以接受在CPU调度上的延迟。
+
+实时优先级
+基于实时调度：实时进程根据实时调度策略运行，这意味着它们被赋予了更高的执行优先级，并且在被调度时，它们能够快速响应。实时进程旨在最小化响应时间，确保在指定的时间限制内完成任务。
+调度策略：Linux支持多种实时调度策略，如SCHED_FIFO（先入先出）、SCHED_RR（轮转轮询）和SCHED_DEADLINE（截止时间调度）。SCHED_FIFO和SCHED_RR进程有一个与之相关的实时优先级，范围通常是1到99，其中99代表最高优先级。
+实时优先级的设置：实时优先级通常由系统管理员设置，需要特定的权限。这是为了防止实时进程过多地占用CPU时间，影响系统的稳定性。
+适用场景：适用于需要快速确定性响应的应用，如音视频处理、工业控制和其他需要严格时间控制的应用。这些进程通常运行在高优先级，以确保它们能够及时完成任务。
+
+区别总结
+调度策略：实时优先级进程基于实时调度策略，而非实时优先级进程基于时间共享策略。
+优先级范围：实时进程优先级通常高于非实时进程，且优先级范围不同。
+响应时间：实时进程设计以保证最小响应时间，非实时进程则更侧重于公平性和资源共享。
+使用场景：实时进程用于对响应时间有严格要求的场景，而非实时进程用于一般的计算任务。
+正确配置和使用实时和非实时进程优先级是高效系统管理的关键部分，需要根据具体的应用场景和需求来调整。
+```
+
+- nice使用格式
+```shell
+nice -n -10 ping 127.0.0.1
+# 将ping命令以-10的友善度执行进程
+
+# -n 后面接具体数值（-20~19）,指定命令的友善度
+```  
+
+- 更改nice值
+```shell
+renice 命令
+
+# 可以调整正在执行中的进程的优先级
+renice -n -20 PID  
+```
+
+- <span style="color:red">pri与rtprio和nice的关系与对比</span>
+  - pri的范围是139 - 0，数值越高，优先级越高
+  - rtpri(实时优先级（系统优先级）) 范围是99 - 0
+    - rtpri的99对应pri的139，数值越高，优先级越高
+  - nice的范围是-20到19
+    - 对应pri的40 - 0， nice值越低，优先级越高
+
+#### 实现进程绑定指定CPU—— taskset
+- taskset
+- 格式：
+```shell
+taskset [options] mask command [argument...]
+taskset [options] -p [mask] pid
+```
+- mask是CPU亲和性掩码，用于指定进程可以运行的CPU核心。掩码是一个十六进制数，每一位代表一个CPU核心，最低位代表CPU0。位值为1表示进程可以在该CPU上运行，为0表示不可以。
+
+- `command [argument...]`是要启动的新进程及其参数。
+
+- `-p`选项用于操作已经运行的进程，后面跟着的是进程ID（PID）。
+
+- 示例：
+```shell
+# 假设有一个名为myapp的应用程序，你希望它只在第二个CPU（CPU1）上运行：
+taskset 0x2 myapp
+
+# 如果myapp已经在运行，其PID为1234，将其迁移到CPU1上：
+taskset -p 0x2 1234
+
+# 查询myapp的CPU亲和性设置
+taskset -p 1234
+```
+
+- 详解cpu亲和性掩码
+``` 
+# 示例:pid 1231725's current affinity mask: 3 
+
+在taskset使用的亲和性掩码中，每一位二进制数代表一个CPU核心，从右到左分别代表CPU0、CPU1、CPU2等。亲和性掩码是一个十六进制数，转换为二进制后，每个1表示进程可以在对应的CPU上运行，0表示不可以。
+
+亲和性掩码"3"转换为二进制是"11"。这意味着：
+
+最右边的位（第一位，值为1）表示进程可以在CPU0上运行。
+紧接着的第二位（值也为1）表示进程可以在CPU1上运行。
+因此，亲和性掩码"3"表示该进程可以在CPU0和CPU1上运行，而不是单独在CPU2上。如果要设置进程仅在CPU2上运行，亲和性掩码应该是"4"（二进制为"100"），这样第三位为1，表示进程可以在CPU2上运行。
+```
+
+#### 搜索进程 —— pgrep
+- 按条件搜索进程
+  - ps选项 | grep 'pattern' 灵活
+  - pgrep 按预定义的模式（过滤）
+  - /sbin/pidof 按确切的程序名称查看pid
+
+- pgrep命令格式
+```shell
+pgrep [option] pattern
+```
+
+- 常用选项
+```shell
+-u  uid:  effective user, 生效者
+-U  uid: real user, 真正发起运行命令者
+-t terminal: 与指定终端相关的进程
+-l：显示进程名
+-a：显示完整格式的进程名
+-P pid：显示指定进程的子进程
+```
+
+- pgrep示例
+```shell
+pgrep -lu wang
+# 注意l放在u的前面，u后面接wang
+
+pgrep -au wang
+
+# 显示指定进程的子进程
+pgrep -aP 2303 
+
+# 显示指定终端的进程
+pgrep -at pts/2
+```
+
+#### 查看进程编号（PID）
+- pidof
+
+- 格式：
+```shell
+pidof <command>
+
+# 示例：
+pidof ping  # 1987
+
+# 查看脚本文件
+pidof -x <脚本名称>
+
+# 示例
+pidof -x ping.sh
+```
+
+#### 负载查询 uptime 
+
+- `/proc/uptime` 包括两个值，单位s
+  - 系统启动时长
+  - 空闲进程的总时长（按总的CPU核数计算）
+  ```shell
+  cat /proc/uptime
+  # 13073.55  21437.56
+
+  # 系统空闲时间计算 21437.56 / 13073.5 * 2 
+  ```
+
+- uptime和w显示以下内容
+  - 当前时间
+  - 系统已启动的时间
+  - 当前上线人数
+  - 系统平均负载（1、5、15分钟的平均负载，一般不会超过1，超过5时建议警报）
+
+- 系统平均负载：指在特定时间间隔内运行队列中的平均进程数，通常每个CPU内核的当前活动进程数不大于3，那么系统性能良好，如果每个CPU内核的任务数大于5，那么此主机的性能由严重问题
+
+- uptime的显示和w的第一行一样
+
+#### 显示CPU相关统计 mpstat
+- 来自于sysstat包
+
+- 范例：
+```shell
+[root@localhost ~]# mpstat
+Linux 4.18.0-513.5.1.el8_9.x86_64 (localhost.localdomain)       04/08/2024      _x86_64_        (2 CPU)
+
+07:13:31 PM  CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle
+07:13:31 PM  all    5.68    0.06    7.18    0.31    1.05    0.34    0.00    0.00    0.00   85.38
+
+# 表示一秒执行一次
+mapstat 1
+
+# 表示一秒钟执行一次，收集6次退出
+mapstat 1 6
+``` 
+
+- 各字段含义
+```
+CPU：显示处理器编号。all 表示所有CPU的平均值。
+
+%usr：显示执行用户空间进程的时间百分比。用户空间进程是指那些不需要内核模式特权的进程。
+
+%nice：显示执行优先级较低的用户进程（被"nice"命令调整过优先级）的CPU时间百分比。
+
+%sys：显示在系统（内核）空间执行进程的时间百分比。系统空间进程是指那些需要内核模式特权的进程。
+
+%iowait：显示CPU等待输入输出操作完成时间的百分比。高的%iowait值表示磁盘IO可能是性能瓶颈。
+
+%irq：显示处理硬件中断请求时间的百分比。
+
+%soft：显示处理软件中断时间的百分比。软件中断通常由系统内部事件触发，而不是硬件中断。
+
+%steal：在虚拟化环境中，显示等待虚拟CPU的时间百分比，因为其他虚拟机占用了物理CPU时间。
+
+%guest：显示运行虚拟处理器的时间百分比。
+
+%gnice：显示运行带有nice优先级的虚拟处理器的时间百分比。
+
+%idle：显示CPU空闲时间的百分比，不包括等待I/O操作的时间。
+```
+
+#### 查看进程实时状态 top（常用）
+
+```shell
+top - 19:25:04 up 16 min,  1 user,  load average: 0.00, 0.02, 0.04
+Tasks: 151 total,   1 running, 150 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  0.2 us,  0.3 sy,  0.0 ni, 99.0 id,  0.0 wa,  0.3 hi,  0.2 si,  0.0 st
+MiB Mem :   1734.3 total,   1145.5 free,    237.6 used,    351.2 buff/cache
+MiB Swap:   2056.0 total,   2056.0 free,      0.0 used.   1340.4 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND                                                                                                                                                                                                          
+    923 root      20   0  352920  10804   9188 S   0.3   0.6   0:03.37 vmtoolsd                                                                                                                                                                                                         
+   1016 root      20   0  483004  31488  15372 S   0.3   1.8   0:05.64 tuned                                                                                                                                                                                                            
+   1769 root      20   0  126468   5508   4248 S   0.3   0.3   0:00.20 sshd                                                                                                                                                                                                             
+   2228 root      20   0   54364   4256   3556 R   0.3   0.2   0:00.06 top                                                                                                                                                                                                              
+      1 root      20   0  175432  13900   8512 S   0.0   0.8   0:07.06 systemd                                                                                                                                                                                                          
+      2 root      20   0       0      0      0 S   0.0   0.0   0:00.05 kthreadd                                                                                                                                                                                                         
+      3 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_gp                                                                                                                                                                                                           
+      4 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_par_gp                                                                                                                                                                                                       
+      5 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 slub_flushwq                                                                                                                                                                                                     
+      7 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker/0:0H-events_highpri                                                                                                                                                                                      
+     10 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 mm_percpu_wq                                                                                                                                                                                                     
+     11 root      20   0       0      0      0 S   0.0   0.0   0:00.00 rcu_tasks_rude_                                                                                                                                                                                                  
+     12 root      20   0       0      0      0 S   0.0   0.0   0:00.00 rcu_tasks_trace                                                                                                                                                                                                  
+     13 root      20   0       0      0      0 S   0.0   0.0   0:00.08 ksoftirqd/0                 
+```
+
+- 信息详解
+  - 第一行：uptime的命令结果，显示负载情况
+  - 第二行：显示进程的统计结果
+  - 第三行：CPU相关数据统计
+  - 第四行：内存相关数据统计
+  - 第五行：Swap相关数据统计
+
+- 快捷键：
+  - `M` 是按内存利用率排序
+  - `P` 是按CPU利用率排序
+  - `T` 是按累计时间片Time+排序
+
+- 首部信息显示
+  - `l` 显示隐藏uptime信息
+  - `t` 改变和显示隐藏tasks及cpu信息
+  - `1` cpu分别显示
+  - `m` memory信息
+  - `q` 退出命令
+  - `k` 终止指定进程
+  - `s` 修改刷新时间间隔
+  - `W` 保存文件
+
+#### 页面炫酷版top ---htop
+- Ubuntu中可以直接下载是使用
+
+#### 内存空间free
+```shell
+free -h
+```
+
+#### 进程对应的内存映射pmap
+- 格式
+```shell
+pmap PID
+
+# 显示进程中的内存映射
+# 相当于cat /proc/PID/maps
+```
+
+#### 查看程序运行时的系统调用 strace
+- 示例
+```shell
+strace ls
+```
+
+#### 显示程序运行时的库调用（C语言库） ltrace
+```shell
+ltrace ls
+```
+
+#### 显示虚拟内存信息 vmstat
+```shell
+root@ubuntu2204:/proc/1025$vmstat
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 0  0      0 2853204  27964 687760    0    0    15     9   62  119  0  0 99  0  0
+```
+
+- 这里的si, so, bi, bo，都是以内存为参照物
+  - 比如：从硬盘中读取数据到内存，此时是内存进，硬盘出，所以是bi增长
+
+- system字段
+  - in: interrupts 中断速率，包括时钟
+  - cs：context switch 进程切换速率
+
+- 示例：
+```shell
+# 内存信息汇总
+vmstat -s 
+
+# 2秒钟显示1次，显示5次 
+vmstat 2 5
+``` 
+
+#### 统计CPU和设备IO信息iostat
+- 此工具由sysstat包提供
+- 范例：
+```shell
+root@ubuntu2204:/proc/1025$iostat
+Linux 5.15.0-101-generic (ubuntu2204.mystical.org)      04/08/2024      _x86_64_        (2 CPU)
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           0.31    0.10    0.48    0.02    0.00   99.09
+
+Device             tps    kB_read/s    kB_wrtn/s    kB_dscd/s    kB_read    kB_wrtn    kB_dscd
+dm-0              1.13        24.58        20.33         0.00     515289     426148          0
+dm-1              0.03         0.65         0.00         0.00      13684          0          0
+loop0             0.01         0.11         0.00         0.00       2212          0          0
+loop1             0.00         0.05         0.00         0.00       1056          0          0
+loop2             0.04         1.52         0.00         0.00      31827          0          0
+loop3             0.00         0.02         0.00         0.00        344          0          0
+loop4             0.00         0.02         0.00         0.00        345          0          0
+loop5             0.00         0.05         0.00         0.00       1099          0          0
+loop6             0.00         0.00         0.00         0.00         10          0          0
+sda               0.77        25.10        20.33         0.00     526190     426288          0
+sdb               0.06         1.32         0.10         0.00      27634       2052          0
+sdc               0.03         0.37         0.00         0.00       7816          0          0
+sr0               0.02         0.60         0.00         0.00      12554          0          0
+```
+```shell
+# 2秒钟显示1次，显示5次
+iostat 2 5
+```
+
+#### 系统资源统计 dstat
+- dstat用于替代vmstat，iostat
+- 由pcp-system-tools包提供
+
+
+#### 监视磁盘I/O iotop
+- 可以看出具体导致I/O异常的进程或命令
+
+#### 显示网络带宽使用情况 iftop
+- 常用选项
+```shell
+-n         # 以ip形式显示主机
+-F         # 仅显示ipv4流量
+-P         # 显示流量端口号
+```
+#### 查看网络实时吞吐量nload
+```shell
+# 使用方向键切换网卡 
+```
+
+
+#### 远程综合监控glances
+- 可以在一台设备上，远程监控另一台设备的情况
+- 示例
+```shell
+# 在两台机器上同时安装glances
+
+# 其中需要监控的设备设置为服务端 glances -s
+
+# 另一个监控设备为客户端 glances -c <服务端ip>
+```
+
+#### 查看进程打开文件 lsof
+```shell
+lsof [option] 
+
+# 常用选项
+-i           # 后面接 ":端口号",查看监听该端口的进程
+-p            # 列出指定进程打开的文件
+-c cmd        # 列出指定进程打开的文件
+```
+
+- 范例：
+```shell
+#查看当前哪个进程正在使用此文件
+[root@ubuntu ~]# lsof /var/log/messages
+ COMMAND   PID USER   FD   TYPE DEVICE SIZE/OFF     NODE NAME
+ rsyslogd 1279 root    5w   REG  253,0  1882516 26487520 /var/log/messages
+
+#查看指定终端启动的进程
+[root@ubuntu ~]# lsof /dev/pts/1
+```
+
+### 信号发送 kill
+- kill：内部命令，可用来向进程发送控制信号，以实现对进程管理，每个信号对应一个数字，信号名称以SIG开头，不区分大小写
+- 显示当前系统可用信号
+```shell
+kill -l
+trap -l
+```
+
+- 常用信号
+```shell
+1. SIGHUB     # 无须关闭进程而让其重读配置文件
+2. SIGINT     # 中止正在运行在的进程，相当于Ctrl+c
+3. SIGQUIT    # 相当于ctrl+\
+9. SIGKILL    # 强制杀死正在运行的进程
+15. SIGTERM   # 终止正在运行的进程（kill命名默认信号 ）
+18. SIGCONT   # 继续运行（可激活停止态进程）（或者让前台进程进入后台运行）
+19. SIGSTOP   # 后台休眠（使进程强制进入T停止态）无法被忽略
+20. SIGTSTP   # 相当于ctrl+z，一个可以被进程捕获和忽略的停止信号
+```
+
+- 对指定进程发送信号
+```shell
+kill -1 
+```
+
+#### killall 
+- 来自于psmisc
+```shell
+killall [信号] 命令名称
+
+# 特殊信号 0
+该信号不会真的发送一个信号，但是会进行错误检查，检查进程的健康性
+观察echo $? 如果是0，说明没问题 
+
+# kill -0 不能检查出僵尸进程，对于僵尸进程的检测，$?的值也为0
+```
+
+### 能够多个命令联动使用
+```shell
+lsof (查看进程) --->  pstree(查看父进程) --->  kill信号控制进程
+```
+
+### 作业管理
+#### Linux的作业控制
+- 前台作业：通过终端启动，且启动后一直占据终端
+- 后台作业：可通过终端启动，但启动后即转入后台运行（释放终端）
+
+- 让作业运行于后台
+  - 运行中的作业：Ctrl+z（进入后台，并进入停止态）
+  - 尚未启动的作业：COMMAND &
+
+- 使用kill信号，让前台进程进入后台并保持运行态
+```shell
+kill -18 %1
+# 百分号后面是作业编号，可通过jobs查看
+```
+
+- fg 
+  - 把后台指令恢复到前台运行
+  ```shell
+  fg <作业编号>
+  ```
+
+- 关闭终端保证进程不死的两种方法
+  - nohup <command> 
+    - 会将标准输出输入到当前目录的一个文件中hup.out
+    - 可以通过nohup <command> &> /dev/null 解决
+
+  - 会话管理
+    - screen
+    - tmux
+
+#### 并行运行
+- 方法1
+```shell
+cat all.sh
+f1.sh&
+f2.sh&
+f3.sh&
+wait
+```
+
+- 方法2
+```shell
+(ping 127.1&);(ping 127.2&);(ping 127.3&)
+```
+
+- 方法3
+```shell
+ping 127.1& ping 127.2& ping 127.3&
+```
+
+- 方法4
+```shell
+# 多组命令实现并行访问
+{ ping -c3 127.1; ping 127.2; }& ;{ ping -c3 127.3; ping 127.4; }&
+```
+
+
+## 计划任务
+### 一次性任务
+#### at工具
+- 指定时间点，执行一次性任务
+- at 工具
+    - 由包at提供
+    - 依赖与atd服务，需要启动才能实现at任务
+    - at队列存放在/var/spool/at目录中
+
+- 使用前需要确认atd.service处于running状态
+```shell
+systemctl status atd.service
+```
+
+- at命令
+```shell
+at [option] TIME    # ctrl + D 结束并完成任务设置
+
+# 常用选项
+-l          # 列出未执行的一次性任务， 等价于atq命令
+-c <编号>    # 查看指定编号的计划任务的具体内容
+-d <编号>    # 删除指定编号的计划任务， 等价于atrm + 编号 
+-f file     # at -f a.txt 15:20 等机于at 15:20 < a.txt
+-m          # 当任务完成后，即使没有标准输出，也会给用户发邮件 
+
+# 非交互方式实现计划任务
+echo hello | at 14:30
+
+echo wall hello | at 14:30 # wall 命令是广播，会在所有终端屏幕上出现
+```
+
+- at 时间格式
+```shell
+HH:MM               # 若时刻以过，则明天的此时执行任务
+
+HH:MM  YYYY-MM-DD   # 规定某年某月 某天的特殊时刻执行该任务，不支持到秒，最小到分钟
+
+now+#{minutes, hours, days, OR weeks}
+
+```
+
+- 注意：
+    - 作业执行命令的结果中的标准输出和错误以执行任务的用户的身份，发邮件通知给root
+    - 默认CentOS8最小化安装没有安装邮件服务，需自行安装
+    ```shell
+    dnf install postfix -y
+    systemctl enable --now postfix
+
+    # 安装mail
+    sudo apt install mailutils
+    ```
+    - 创建的at任务，文件在`/var/spool/at`目录下 
+    - 执行任务时，PATH变量和当前定义任务的用户身份一致
+
+-  /etc/at.{allow, deny} 控制用户是否能执行at任务
+    - 白名单：/etc/at.allow , 默认不存在，只有该文件中的用户才能执行at命令
+    - 黑名单：默认存在，拒绝文件中的用户执行at命令
+    - 如果两个文件都不存在，则只有root能够执行at命令 
+    - 白名单的优先级高于黑名单
+
+
+
+#### batch
+- 系统自行选择空闲时间去执行此处指定的任务
+
+
+### 周期性计划任务cron
+- 周期性计划任务cron相关的程序包
+    - cronie：主程序包，提供crond守护进程及相关辅助工具
+    - crontabs：包含CentOS提供系统维护任务
+    - cronie-anacron:cronie的补充程序，用于监控cronie的任务执行状态，如：cronie中的任务在过去该运行的时间点未能正常运行，则anacron会随后启动一次任务
+
+- cron依赖于crond服务，确保crond守护处于运行状态
+
+#### CentOS中的cron
+- 有/etc/cron.deny，可以给cron设置黑名单 （Ubuntu默认没有该文件）
+- run-parts <dir>  立即执行目录中所有脚本，要求目录内脚本有执行权限 （Ubuntu默认没有该文件）
+
+- cron任务分为
+    - 系统cron任务：系统维护作业， /etc/crontab（总配置文件） /etc/cron.d/目录下，自行创建 (子配置文件 )
+    - 用户cron任务：保存在`/var/spool/cron/USERNAME`, 利用crontab命令管理
+    
+- 计划任务日志：`/var/log/cron` 
+
+- cron配置文件编辑
+```shell
+# Example of job definition:
+# .---------------- minute (0 - 59)
+# |  .------------- hour (0 - 23)
+# |  |  .---------- day of month (1 - 31)
+# |  |  |  .------- month (1 - 12) OR jan,feb,mar,apr ...
+# |  |  |  |  .---- day of week (0 - 6) (Sunday=0 or 7) OR sun,mon,tue,wed,thu,fri,sat
+# |  |  |  |  |
+# *  *  *  *  * user-name command to be executed
+17 *    * * *   root    cd / && run-parts --report /etc/cron.hourly
+25 6    * * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.daily )
+47 6    * * 7   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.weekly )
+52 6    1 * *   root    test -x /usr/sbin/anacron || ( cd / && run-parts --report /etc/cron.monthly )
+
+# 支持时间格式
+1. 逗号分隔
+2. 范围，eg：1-10
+3. 频率，eg：/5
+```
+
+#### 普通用户创建计划任务
+- 使用crontab命令
+```shell
+crontab -e 创建计划任务
+
+# 常用选项
+-l              # 列出所有任务
+-e              # 编辑任务
+-r              # 移除所有任务
+-i              # 同-r一同使用，已交互模式移除指定任务
+-u user         # 仅root可运行，指定用户管理cron任务
+```
+- 练习作业
+  - 每周的工作日1:30,将/etc/备份至/backup目录中，保存的文件名格式为"etcbak-yyyy-mm-dd-HH.tar.xz",其中日期是前一天的时间
+  - 每两小时取出当前系统/proc/meminfo文件中以S或M开头的信息追加至/tmp/meminfo.txt文件中
+  - 工作日时间，每10分钟执行一次磁盘空间检查，一旦发现任何分区利用率高于80%，就执行wall警报
+
+#### wall命令
+- 作用：wall（write all）是一个在Linux和Unix系统中用于向所有当前登录用户的终端发送消息的命令。这个命令对系统管理员特别有用，比如在重启服务器之前，管理员可以使用wall发送一条广播消息给所有用户，通知他们即将发生的重启。
+
+```shell
+echo message | wall
+
+wall message
+
+wall < filename
+```
+
+
+## Linux启动流程和内核管理
+
+### CentOS6 启动流程
+#### 硬件启动POST（Power-On-Self-Test）
+- BIOS加电自检
+  - BIOS是固化在主板ROM上的程序，主板上两个芯片，一个ROM，一个RAM，RAM上存储着BIOS程序的修改配置，由主板上的一颗纽扣电池供电
+    - 如果RAM上没电，则BIOS里面的设置项会恢复成出厂设置。
+
+
+#### GRUB启动阶段
+- stage 1：MBR前446字节（grub程序的一部分）这部分代码负载引导bootloader
+
+- stage 1.5：在MBR后续的扇区中（<span style="color:red">1扇区到2047扇区，也就是 存在于MBR和第一个分区之间的空间</span>），Stage 1.5 包含了一些文件系统的驱动，这允许它能够读取位于不同文件系统上的 /boot 分区,启动其中的配置文件，并进入stage2
+  - 在CentOS6中，它会启动配置文件`/boot/grub/grub.conf`,
+  - 在CentOS7以上版本，它会启动配置文件`/boot/grub2/grub.cfg`
+  - 在Ubuntu中，启动配置文件是`/boot/grub/grub.cfg`
+
+
+- stage2：通过配置文件中的内容，依次启动内核，和initramfs...img，
+  - 内核启动
+    - 内核被加载后，控制权从GRUB转移到内核。内核首先被解压（如果需要），然后开始执行。内核初始化硬件设备、驱动程序，并设置内存管理等系统基本结构
+    - <span style="color:red;font-weight:700">内核如何处理initramfs</span>
+      - 内核启动后，它被配置为使用 initramfs 作为其初始根文件系统。这不是由 Stage 1.5 中的文件系统驱动来处理的；而是内核自身，在被 GRUB 加载时，已经被告知 initramfs 的内存位置(<span style="color:red">GRUB 会将 initramfs 的加载位置作为启动参数传递给内核。</span>)。
+      - 内核具有必要的代码来“理解”和挂载 initramfs，并开始执行 initramfs 中的 /init 脚本或程序，以进行早期的系统设置和驱动加载。
+  - 使用initramfs（此时控制权在内核手中）：
+    - 内核随后使用加载到内存中的initramfs作为初始的根文件系统。initramfs中的初始化脚本开始执行，负责一系列启动前任务（例如检测硬件设备、加载必要的模块等，以确保内核能够访问真实的根文件系统。）。
+  - 切换到真实根文件系统：
+    - 细节：一旦initramfs中的脚本准备好了真实的根文件系统（比如通过挂载文件系统），系统会进行“切换根”操作（switch_root或pivot_root），从initramfs的临时根文件系统切换到真实的根文件系统上。这一步涉及到卸载旧的根文件系统（initramfs）并切换到新的根文件系统。
+  - 启动init或systemd
+    - 在真实的根文件系统中，内核会启动/sbin/init程序（这可能是一个指向如systemd或Upstart的符号链接），这是系统的第一个用户空间程序。
+
+![alt text](images/image30.png)
+
+- grub配置文件CentOS6
+```shell
+[root@c6 ~]# ll /etc/grub.conf 
+lrwxrwxrwx. 1 root root 22 Aug 29 05:50 /etc/grub.conf -> ../boot/grub/grub.conf
+ [root@c6 ~]# cat /boot/grub/grub.conf 
+# grub.conf generated by anaconda
+ #
+ # Note that you do not have to rerun grub after making changes to this file
+ # NOTICE:  You have a /boot partition.  This means that
+ #          all kernel and initrd paths are relative to /boot/, eg.
+ #          root (hd0,0)
+ #          kernel /vmlinuz-version ro root=/dev/mapper/vg_c6-lv_root
+ #          initrd /initrd-[generic-]version.img
+ #boot=/dev/sda
+ default=0
+ timeout=5
+ splashimage=(hd0,0)/grub/splash.xpm.gz
+ hiddenmenu
+ title CentOS (2.6.32-71.el6.x86_64)
+ root (hd0,0)
+ kernel /vmlinuz-2.6.32-71.el6.x86_64 ro root=/dev/mapper/vg_c6-lv_root 
+rd_LVM_LV=vg_c6/lv_root rd_LVM_LV=vg_c6/lv_swap rd_NO_LUKS rd_NO_MD rd_NO_DM 
+LANG=en_US.UTF-8 SYSFONT=latarcyrheb-sun16 KEYBOARDTYPE=pc KEYTABLE=us 
+crashkernel=auto rhgb quiet
+ initrd /initramfs-2.6.32-71.el6.x86_64.img
+```
+
+- CentOS的grub安装
+- 非交互式安装
+```shell
+grub-install --root-directory=DIR /dev/DISK
+```
+
+#### grub安全
+- 破解CentOS6中的root口令
+```shell
+1. 编辑grub菜单(选定要编辑的title，而后使用a 或 e 命令)
+2. 在选定的kernel后附加参数 1（s|S|single），此参数是用来进入单用户模式 
+3. 在kernel所在行，敲 b 键，以此配置启动，即可无密码以root身份进入系统
+```
+
+- 设置grub密码，防止破解系统root密码
+```shell
+grub-md5-crypt
+grub-crypt
+
+# 执行上述命令，生成口令后，按格式粘贴到grub配置文件中
+default=0
+timeout=5
+password --md5 $1$B0do8$z5jKhXah4sInKxPGQRQWE0
+title Centos6
+  root (hd0,0)
+  kernel /vmlinuz-2.6.32-71.el6.x86_64 ro root=/dev/mapper/vg_c6-lv_root
+  ...
+```
+
+
+
+#### 生成背景图片
+```shell
+convert -resize 640*480 -colors 14 winner.png splash.xpm
+# 生成splash.xpm.gz
+gzip splash.xpm
+mv splash.xpm.gz /boot/grub
+```
+
+### 加载内核
+#### kernel自身初始化过程
+- 探测可识别到的所有硬件设备
+- 加载硬件驱动程序（借助于ramdisk（initramfs）加载驱动）
+- 以只读方式挂载根目录
+- 运行用户空间的第一个应用程序：/sbin/init
+
+
+#### 内核特点
+- 支持模块化：.ko(内核对象)，如：文件系统，硬件驱动，网络协议等
+- 支持内核模块的动态装载和卸载
+
+#### 内核的组成
+- 核心文件：/boot/vmlinux-VERSION-release
+  - ramdisk:辅助的伪根系统，加载相应的硬件启动
+  
+- 模块文件：/lib/modules/VERSION-release
+
+
+### init初始化
+- init进程初始化文件
+  - init程序来自于upstart的包（仅CentOS6用 ）
+  - CentOS6： /etc/inittab
+```shell
+# inittab is only used by upstart for the default runlevel.
+#
+# ADDING OTHER CONFIGURATION HERE WILL HAVE NO EFFECT ON YOUR SYSTEM.
+#
+# System initialization is started by /etc/init/rcS.conf
+#
+# Individual runlevels are started by /etc/init/rc.conf
+#
+# Ctrl-Alt-Delete is handled by /etc/init/control-alt-delete.conf
+#
+# Terminal gettys are handled by /etc/init/tty.conf and /etc/init/serial.conf,
+# with configuration in /etc/sysconfig/init.
+#
+# For information on how to write upstart event handlers, or how
+# upstart works, see init(5), init(8), and initctl(8).
+#
+# Default runlevel. The runlevels used are:
+#   0 - halt (Do NOT set initdefault to this)
+#   1 - Single user mode
+#   2 - Multiuser, without NFS (The same as 3, if you do not have networking)
+#   3 - Full multiuser mode
+#   4 - unused
+#   5 - X11
+#   6 - reboot (Do NOT set initdefault to this)
+# 
+id:3:initdefault:   # 定义开机启动模式
+```
+- 如果不小心设置为默认模式6，无限重启，可以卡在操作系统选择界面，使用-a，修改grub，在最后输入3，进入多用户模式，将初始化文件改掉
+
+- CentOS6中的所有init相关配置文件
+  - /etc/init/control-alt-delete.conf (定义了同时按这3个按键会重启)
+  ```shell
+  # control-alt-delete - emergency keypress handling
+  #
+  # This task is run whenever the Control-Alt-Delete key combination is
+  # pressed.  Usually used to shut down the machine.
+  #
+  # Do not edit this file directly. If you want to change the behaviour,
+  # please create a file control-alt-delete.override and put your changes there.
+
+  start on control-alt-delete
+
+  exec /sbin/shutdown -r now "Control-Alt-Delete pressed"
+  # 将这行注释掉，可以让这三个按键不再有重启的效果
+  ```
+
+  - /etc/init/rc.conf
+  ```shell
+  start on runlevel [0123456]
+
+  stop on runlevel [!$RUNLEVEL]
+
+  task
+
+  export RUNLEVEL
+  console output
+  exec /etc/rc.d/rc $RUNLEVEL
+  # 这段脚本是执行/etc/rc.d/rc，这个shell脚本
+  ```
+  - /etc/rc.d/rc
+  ```shell
+  for i in /etc/rc$runlevel.d/K* ; do
+
+        # Check if the subsystem is already up.
+        subsys=${i#/etc/rc$runlevel.d/K??}
+        [ -f /var/lock/subsys/$subsys -o -f /var/lock/subsys/$subsys.init ] || continue
+        check_runlevel "$i" || continue
+
+        # Bring the subsystem down.
+        [ -n "$UPSTART" ] && initctl emit --quiet stopping JOB=$subsys
+        $i stop
+        [ -n "$UPSTART" ] && initctl emit --quiet stopped JOB=$subsys
+  done
+
+  # Now run the START scripts.
+  for i in /etc/rc$runlevel.d/S* ; do
+
+          # Check if the subsystem is already up.
+          subsys=${i#/etc/rc$runlevel.d/S??}
+          [ -f /var/lock/subsys/$subsys ] && continue
+          [ -f /var/lock/subsys/$subsys.init ] && continue
+          check_runlevel "$i" || continue
+                      
+          # If we're in confirmation mode, get user confirmation
+          if [ "$do_confirm" = "yes" ]; then
+                  confirm $subsys
+                  rc=$?
+                  if [ "$rc" = "1" ]; then
+                          continue
+                  elif [ "$rc" = "2" ]; then
+                          do_confirm="no"
+                  fi
+          fi
+
+          update_boot_stage "$subsys"
+          # Bring the subsystem up.
+          [ -n "$UPSTART" ] && initctl emit --quiet starting JOB=$subsys
+          if [ "$subsys" = "halt" -o "$subsys" = "reboot" ]; then
+                  export LC_ALL=C
+                  exec $i start
+          fi
+          $i start
+          [ -n "$UPSTART" ] && initctl emit --quiet started JOB=$subsys
+  done
+  [ "$do_confirm" = "yes" ] && rm -f /var/run/confirm
+  exit 0
+  ```
+  - 该脚本的作用是遍历初始化配置目录，将所有K开头的开机时关闭服务，所有S开头的开机时开启服务
+  - /etc/rc$runlevel.d/目录下的所有文件都是指向/etc/init.d/目录下的服务可执行文件的软连接，<span style="color:red">通过软链接名称的格式化，实现对多个服务的统一处理</span>
+
+- chkconfig命令管理服务（CentOS6）
+```shell
+chkconfig
+
+# 查看所有服务的开机启动
+chkconfig --list
+chkconfig --list <服务名>   # 查看指定服务的模式
+
+# 更改具体服务的开机启动项
+chkconfig --level [0-6]+ <服务名> <off|on>  # 不指定level，默认2，3，4，5
+
+# 实战示例：在CentOS6上关闭防火墙
+service iptables stop; chkconfig iptables off
+
+chkconfig --del <服务名> # 本质上是从/etc/rc$runlevel.d/目录下的软连接删掉
+```
+#### CentOS6中的服务脚本的书写格式
+```shell
+#!/bin/sh
+#
+# atd Starts/stop the "at" daemon
+#
+# chkconfig:   345 95 5
+# description: Runs commands scheduled by the "at" command at the time \
+#    specified when "at" was run, and runs batch commands when the load \
+#    average is low enough.
+
+### BEGIN INIT INFO
+# Provides: atd at batch
+# Required-Start: $local_fs
+# Required-Stop: $local_fs
+# Default-Start: 345
+# Default-Stop: 95
+# Short-Description: Starts/stop the "at" daemon
+# Description:      Runs commands scheduled by the "at" command at the time 
+#    specified when "at" was run, and runs batch commands when the load 
+#    average is low enough.
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+exec=/usr/sbin/atd
+prog="atd"
+config=/etc/sysconfig/atd
+
+[ -e /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
+
+lockfile=/var/lock/subsys/$prog
+
+start() {
+    [ -x $exec ] || exit 5
+    [ -f $config ] || exit 6
+    echo -n $"Starting $prog: "
+    daemon $exec $OPTS
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && touch $lockfile
+}
+
+stop() {
+    echo -n $"Stopping $prog: "
+    if [ -n "`pidfileofproc $exec`" ] ; then
+        killproc $exec
+                RETVAL=3
+    else
+        failure $"Stopping $prog"
+    fi
+    retval=$?
+    echo
+    [ $retval -eq 0 ] && rm -f $lockfile
+}
+
+restart() {
+    stop
+    start
+}
+
+reload() {
+    restart
+}
+
+force_reload() {
+    restart
+}
+
+rh_status() {
+    # run checks to determine if the service is running or use generic status
+    status $prog
+}
+
+rh_status_q() {
+    rh_status >/dev/null 2>&1
+}
+
+
+case "$1" in
+    start)
+        rh_status_q && exit 0
+        $1
+        ;;
+    stop)
+        rh_status_q || exit 0
+        $1
+        ;;
+    restart)
+        $1
+        ;;
+    reload)
+        rh_status_q || exit 7
+        $1
+        ;;
+    force-reload)
+        force_reload
+        ;;
+    status)
+        rh_status
+        ;;
+    condrestart|try-restart)
+        rh_status_q || exit 0
+        restart
+        ;;
+    *)
+        echo $"Usage: $0 {start|stop|status|restart|condrestart|try-restart|reload|force-reload}"
+        exit 2
+esac
+exit $?
+```
+
+- 重点：
+  - `# chkconfig:   345 95 5`
+  - 表示默认3，4，5模式下开机启动，S95，K5
+
+
+### <span style="color:red">init总结</span>
+- 内核显示执行 /sbin/init
+- /init 这个进程加载之后读取/etc/inittab这个文件
+  - 用来指定默认启动级别
+
+- 假设默认级别是3，那么就会进入/etc/rc3.d(rc$runlevel.d)/这个模式下，将S，K开头的服务，以一定的次序依次执行或关闭
+
+- /etc/init目录下的是所有的初始化配置脚本
+
+- `/etc/rc.d/rc.sysinit`里面是所有服务加载前的初始化的脚本（由`/etc/init/rcs.conf`调用该脚本）
+```shell
+1. 设置主机名
+2. 设置欢迎信息
+3. 激活udev和selinux
+4. 挂载/etc/fstab文件中定义的文件系统
+5. 检测根文件系统，并以读写方式重新挂载跟文件系统
+6. 设置系统时钟
+7. 激活swap设备
+8. 根据/etc/sysctl.conf文件设置内核参数
+9. 激活lvm及software raid设备
+10. 加载额外设备的驱动程序
+11. 清理操作
+```
+
+- `/etc/rc.d/rc`控制服务脚本呢的开机自动运行
+  - 脚本内容是调用etc/rc$runlevel.d/目录下的软连接
+
+- `etc/rc$runlevel.d/`目录下有一个特殊的文件`S99local->../rc.local`, 这个文件只有2-5有
+```shell
+#!/bin/sh
+#
+# This script will be executed *after* all the other init scripts.
+# You can put your own initialization stuff in here if you don't
+# want to do the full Sys V style init stuff.
+
+touch /var/lock/subsys/local
+```
+- 和普通服务格式不同，它的作用是在rc.local里的所有可执行文件都会开机启动
+  - 该文件下的可执行文件，都能被service执行
+  - centos7以后的版本也可以用这个文件进行开机启动，不过默认没有执行权限，需要自行添加
+
+### 独立和非独立服务管理
+
+- 一个服务，管理一系列不常使用的服务，负责监听，当某个服务被需要触发时，有该服务负责激活对应的服务，这种仿佛值班人的服务就是代理服务
+  - 在CentOS6上，该服务叫做超级守护服务（默认没有安装，需要自行下载）
+  ```shell
+  yum info xinetd
+  ```
+
+- 依赖超级守护服务的服务就叫做非独立服务
+```shell
+xinetd based services:
+        chargen-dgram:  off
+        chargen-stream: off
+        daytime-dgram:  off
+        daytime-stream: off
+        discard-dgram:  off
+        discard-stream: off
+        echo-dgram:     off
+        echo-stream:    off
+        rsync:          off
+        tcpmux-server:  off
+        time-dgram:     off
+        time-stream:    off
+```
+
+- xinetd管理的子服务都在/etc/xinetd.d的目录下
+- 更改自服务状态
+```shell
+# 通过命令改：
+chkconfig telnet off
+
+# 通过修改配置文件改
+vim /etc/xinetd.d/<文件名> # 修改disabled的值
+```
+
+### 实验：实现私人定义Linux
+#### 分区并创建文件系统
+```shell
+# 添加一个硬盘，然后分两个必要的分区
+fdisk /dev/sdb
+
+# /dev/sdb1对应 /boot   /dev/sdb2对应 根/
+mkfs.ext4 /dev/sdb1
+mkfs.ext4 /dev/sdb2
+```
+
+#### 挂载boot
+```shell
+mkdir /mnt/boot
+mount /dev/sdb1 /mnt/boot
+```
+
+#### 安装grub
+```shell
+# 重点：/mnt的下级目录，必须有boot目录
+# 因为默认在名字为boot的下级目录中创建grub子文件目录
+grub-install --root-directory=/mnt /dev/sdb
+```
+
+#### 准备内核和initramfs文件
+```shell
+cp /boot/vmlinux-2.6.32-642.el6.x86_64 /mnt/boot/
+cp /boot/initramfs-2.6.32-642.el6.x86_64.img /mnt/boot
+```
+
+#### 建立grub.conf
+```shell
+vim /mnt/boot/grub/grub.conf
+
+# 内容如下
+default=0
+timeout=6
+title mysticallinux
+root (hd0,0)
+# 禁用selinux,  root=/dev/sda2是因为装好系统后，将硬盘插到别的设备，作为第一个硬盘的名称会默认为sda
+kernel /vmlinux-2.6.32-642.el6.x86_64 root=/dev/sda2 selinux=0 init=/bin/bash
+initrd /nitramfs-2.6.32-642.el6.x86_64.img
+# -----------------------------------------
+
+```
+
+#### 准备根下面相关程序和库
+```shell
+mkdir /mnt/sysroot
+mount /dev/sdb2 /mnt/sysroot
+mkdir -pv
+/mnt/sysroot{etc,lib,lib64,bin,sbin,tmp,var,usr,sys,proc,opt,home,root,boot,dev,mnt,media}
+复制bash等命令和相关库文件，如：bash,ifconfig,insmod,ping,mount,ls,cat,lsblk,blkid,free,df,tree,ps,pstree,mkdir,vim,ip等
+```
+
+#### 复制相关命令需要写个脚本，脚本要求如下
+- 编写脚本/root/bin/copycmd.sh
+  - 提示用户输入一个可执行命令名称
+  - 获取此命令所依赖到的所有库文件列表
+  - 复制命令至某目标目录（例如/mnt/sysroot）下的对应路径下
+    - /bin/bash --> /mnt/sysroot/bin/bash
+    - /usr/bin/passwd --> /mnt/sysroot/usr/bin/passwd
+  - 复制此命令依赖到所有库文件至目标目录下的对应路径下：
+    - 如：/lib64/ld-linux-x86-64.so.2 --> /mnt/sysrooyt/lib64/ld-linux-x86-64.so.2
+  - 每次复制完成一个命令后，不要退出，而是提示用户键入新的要复制的命令，并重复完成上述功能，直到用户输入quit退出
+
+- 脚本如下
+```shell
+#!/bin/bash
+
+ch_root="/mnt/sysroot"
+[! -d $ch_root ] && mkdir $ch_root
+
+# 拷贝命令
+bincopy() {
+  if which $1 &> /dev/null; then
+    local cmd_path=`which --skip-alias $1`
+    local bin_dir=`dirname $cmd_path`
+    [ -d ${ch_root}${bin_dir} ] || mkdir -p ${ch_root}${bin_dir}
+    [ -f ${ch_root}${cmd_path} ] || cp ${cmd_paht} ${ch_root}${bin_dir}
+    return 0
+  else
+    echo "Command not found."
+    return 1
+  fi
+}
+
+# 拷贝依赖
+libcopy() {
+  ...
+}
+```
+
+#### 拷贝网卡驱动
+```shell
+# 查询网卡驱动名称
+ethtool -i eth0
+
+# 查看网卡驱动路径
+modinfo -n e1000
+
+# 将网卡驱动拷贝到指定的路径下
+cp `modinfo -n e1000` /mnt/sysroot/lib
+```
+
+#### 建议手动在/etc目录下创建fstab文件，手动指定挂载目录
+
+#### 尝试切根，查看效果
+```shell
+chroot /mnt/sysroot(切根)
+
+然后在自建的根下进行测试  
+```
+
+#### 将硬盘文件拿下来，然后新建虚拟机测试
+```shell
+进入自建的操作系统后，加载网卡驱动
+insmod /lib/c1000.ko
+```
+
+
+### /proc目录和内核参数管理
+- /proc目录：内核把自己内部状态信息及统计信息，以及可配置参数通过proc伪文件系统加入输出
+  - 帮助：man proc
+
+- 内核参数：
+  - 只读：只用于输出信息
+  - 可写：可接受用户指定"新值"来实现对内核某功能或特性的配置
+
+- /proc/sys设置
+  - sysctl命令用于查看或设定此目录中诸多参数
+  ```shell
+  sysctl -w path.to.parameter=VALUE
+
+  # 示例：
+  echo 1 > /proc/sys/net/ipv4/ip_forward
+
+  # 等价于
+  sysctl -w net.ipv4.ip_forward=1
+  ```
+  - 默认配置文件(永久保存内核参数)：/etc/sysctl.conf及以下文件
+  ```shell
+  # 总配置文件
+  /etc/sysctl.conf
+
+  # 示例：
+  echo "net.ipv4.ip_forward=1" >> /etc/sysctl.d/test.conf
+
+  # 使其立即生效
+  # 如果参数加载总配置文件/etc/sysctl.conf中则不用加文件地址
+  # 如果参数添加到其他配置文件，则需sysctl -p后面跟绝对路径信息
+  sysctl -p /etc/sysctl.d/test.conf
+
+  # 其他：
+  /run/sysctl.d/*.conf
+
+  # 推荐
+  /etc/sysctl.d/*.conf
+  /usr/local/lib/sysctl.d/*.conf
+  /usr/lib/sysctl.d/*.conf
+  /lib/sysctl.d/*.conf
+  /etc/sysctl.conf
+  ``` 
+  - sysctl命令
+  ```shell
+  # 列出各种正在生效的内核参数
+  sysctl -a
+  ```
+
+- 常用内核参数
+```shell
+net.ipv4.ip_forward
+net.ipv4.icmp_echo_ignore_all
+# 允许应用程序可以监听本地不存在的IP
+net.ipvr.ip_nonlocal_bind
+vm.drop_cache
+# 文件系统中文件最多能打开的个数
+fs.file-max=1020000
+```
+
+- fs.file-max的应用场景
+  - 用户访问网站，每个用户都会使该网站上打开一个socket文件，即文件描述符，如果有10w人同时访问网站，则此时服务器同时打开文件个数会是10w+，因此此时就需要优化该参数，使其可以承接这些流量
+
+- 关于nonlocal_bind内核参数的应用场景：
+  - 用户要访问一个大型互联网的IP，是一个VIP即虚拟IP，这个IP，并不是任何该互联网公司的设备IP
+  - 假设这个互联网公司，有两台设备，以主备的形式构建在该公司互联网的入口，用来接受用户请求，并将其发往后方
+  - 设备A作为主设备，日常用来接收用户请求，此时VIP和端口号绑定在设备A上，当设备A出现故障，设备B自动接任该工作
+  - 设备B上也应该绑定VIP和指定端口号，但是因为在A没有出现故障的时候，B并不工作你，但是也需要绑定VIP，防止意外，因此此时，VIP对于B来说就属于本地不存在的IP
+
+- 内核TCP参数优化
+```shell
+net.ipv4.tcp_fin_timeout = 2
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_tw_recycle = 1
+net.ipv4.tcp_syncookies = 1
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.ip_local_port_range = 2000 65000
+net.ipv4.tcp_max_syn_backlog = 16384
+net.ipv4.tcp_max_tw_buckets = 36000
+net.ipv4.route.gc_timeout = 100
+net.ipv4.tcp_syn_retries = 1
+net.ipv4.tcp_max_orphans = 16384
+net.core.somaxconn = 16384
+net.core.netdev_max_backlog = 16384
+```
+
+### /sys目录——伪文件系统（偏硬件）
+
+
+### 内核模块管理和编译
+- 单内核体系设计：但充分借鉴了微内核设计体系的优点，为内核引入模块化机制
+
+- 内核组成部分：
+  - kernel：内核核心，一般为bzimage，通常在/boot目录下，名称为vmlinuz-VERSION-RELEASE
+  - kernel object:内核对象，一般放置于/lib/modules/VERSION-RELEASE(一些不是必须的内核功能，模块，就放在该目录下)
+  - 辅助文件：ramdisk
+    - initrd
+    - initramfs
+
+#### <span style="color:red">查看各驱动文件路径</span>
+```shell
+modinfo -n ext4     # ext4文件系统的驱动路径
+ethtool -i eth0       # 查看网卡驱动名称
+modinfo -n e1000     # 网卡驱动路径
+```
+
+#### 内核版本
+- 运行中的内核：
+  - uname命令：
+  ```shell
+   
+  ```
+
+### 内核模块管理和编译
+#### 内核模块命令
+- lsmod命令
+    - 显示由核心已经装载的内核模块
+    - 显示的内容来自于：/proc/modules文件
+
+- modinfo命令
+    - 功能：管理内核模块
+    - 配置文件: /etc/modprobe.conf, /etc/modprobe.d/*.conf 
+    ```shell
+    -n          # 只显示模块文件路径
+    -p          # 显示模块参数
+    -a          # 作者
+    -d          # 描述
+    ```
+
+- modprobe命令
+    - 功能：加载或卸载内核模块
+    ```shell
+    
+    ```
+
+#### 内核编译与管理
+
+
+
+
+### systemd
+#### systemd特性
+- systemd：从CentOS7版本之后开始用systemd实现init进程，系统启动和服务器守护进程管理器，负责在系统启动运行时，激活系统资源，服务器进程和其他进程
+
+
+- systemd新特性
+    - 系统引导时，实现服务并行启动（并不是完全并行，有依赖关系的会有前后顺序）
+    - 按需启动守护进程
+    - 自动化的服务依赖关系管理
+    - 同时采用socket式与D-Bus总线式激活服务
+    - 向后兼容sysv，init脚本
+    - 使用systemctl命令管理，systemctl命令固定不变，不可扩展，非由systemd启动的服务，systemd无法与之通信和控制
+    - 系统状态快照
+
+#### systemd核心概念：unit
+- 查看unit类型
+```shell
+systemctl -t help
+
+#service unit,  文件扩展名为.service, 用于定义系统服务
+# Target unit，文件扩展名为.target, 用于模拟实现运行级别
+# Device unit，用于定义内核识别的设备
+# Mode unit， 定义文件系统挂载点
+# Socket unit， 定义进程间通信用的socket文件，也可在系统启动时，延迟驱动服务，实现按需分配
+# Snapshot， 管理系统快照
+# Swap 用于标识swap设备
+# Automount unit：automessage，文件系统的自动挂载点
+# Path unit ：.path,用于定义文件系统中的一个文件，或目录使用, 常用用于文件系统变化时，延迟激活服务，入伍微信，spool目录
+```
+
+- unit的配置文件
+```shell
+/usr/lib/systemd/system; # 每个服务最主要的启动脚本设置，类似于之前的/etc/init.d
+/lib/systemd/system      # ubuntu的对应目录
+/run/systemd/system； # 系统执行过程中所产生的服务脚本，比上面目录优先运行（内存中）
+/etc/systemd/system；   # 管理员建立的执行脚本，比上面目录优先运行
+```
+
+#### systemctl管理系统服务service unit
+- 命令：`systemctl COMAMND name.service`
+```shell
+# 启动，相当于service name start
+systemctl start name.service
+
+# 停止，相当于service name stop
+systemctl stop name.service
+
+# 重启，相当于service name restart
+systemctl restart name.service 
+
+# 查看状态，相当于service name status
+systemctl status name.service
+
+# 禁止自动和手动启动
+systemctl mask name.service
+
+# 取消禁止
+systemctl unmask name.service
+
+# 查看某服务当前激活与否的状态
+systemctl in-active name.service
+
+# 查看下会开机，是否自启
+systemctl is-enabled name.service
+
+# 查看所有已激活的服务
+systemctl list-units --type|-t service
+
+# 查看所有服务
+systemctl list-units --type service --all|-a
+
+# 设置某服务开机自启，相当于chkconfig name on
+systemctl enable [--now] name.service
+
+# 设置某服务开机禁止启动，相当于chkconfig name off
+systemctl disable [--now] name.service
+
+# 查看所有服务的开机自启状态
+systemctl list-units-files --type service
+
+# 重新加载systemctl的状态    
+systemctl daemon-reload
+
+# 列出失败的服务
+systemctl --failed --type=service
+
+# 查看服务的依赖关系
+systemctl list-dependencies name.service
+
+# 杀掉进程
+systemctl kill unitname
+```
+
+#### service unit文件格式
+```shell
+/etc/systemd/system       # 系统管理员和用户使用
+/usr/lib/systemd/system     # 发行版打包者使用
+```
+
+#### 实现Ubuntu开机启动
+- 创建可执行文件：/etc/rc.local
+- /etc/rc.local内的脚本程序，会实现开机直接运行
+
+- 注意：实现rc.local能够开机运行的服务：/lib/systemd/system/rc.local.service
+
+
+#### 运行级别
+- target units: 相当于CentOS6之前的runlevel， unit配置文件：.target
+```shell
+ls /usr/lib/systemd/system/*.target
+```
+
+- 查看不同级别target的下会加载的服务
+```shell
+systemctl list-dependencies graphical.target
+```
+
+- 级别切换
+```shell
+systemctl isolate name.target
+```
+
+- 设置开机进入的默认target
+```shell
+systemctl set-default name.target
+```
+
+- 查看当前的默认target
+```shell
+systemctl get-default
+```
+
+- 切换至紧急救援模式
+```shell
+systemctl rescue
+```
+
+- 禁用ctrl+alt+delete（重启快捷键）
+```shell
+systemctl mask ctrl_alt_del.target
+
+# 使其生效
+init q      # 等价于systemctl deamon reload
+```
+
+### CentOS7之后版本的引导顺序
+- 完整过程
+```shell
+1. UEFI或BIOS初始化，进行POST开机自检
+2. 选择启动设备
+3. 引导装载程序，CentOS7是grub2加载装载程序的配置文件：
+/etc/grub.d
+/etc/default/grub
+/boot/grub2/grub.cfg
+4. 加载initramfs驱动模块
+5. 加载内核选项
+6. 内核初始化，CentOS7使用systemd代替init
+7. 执行initrd.target所有单元，包括挂载/etc/fatab
+8. 从initramfs根文件系统切换到磁盘根目录
+9. systemd执行默认target配置，配置文件/etc/etc/systemd/default.target
+10. systemd执行sysinit.target初始化系统及basic.target准备操作系统
+11. systemd启动multi-user.target下的本机与服务器程序
+12. systemd执行multi-user.target下的/etc/rc.d/rc.local
+13. systemd执行multi-user.target下的getty.target及登陆服务
+14. systemd执行graphical需要的服务
+```
+
+- 通过systemd-analyze工具可以了解启动详情
+```shell
+systemd-analyze plot > boot.html 
+
+# 或者
+systemd-analyze blame
+```
+
+- 通过设置内核参数进入救援模式
+```shell
+启动时，到启动菜单，按e键，找到linux开头的行，后添加systemd.unit=rescue.target
+```
+
+#### 破解CentOS7，8的root密码
+```shell
+# 方法1
+在grub界面，按e进入编辑模式
+光标移动linux开始的行，添加内核参数rd.break
+按ctrl-x启动
+mount -o remount , rw /sysroot  # 因为当前的操作系统是只读，无法修改文件，因此需要重新挂载
+chroot /sysroot
+passwd root
+
+# 如果selinux启用，需添加下面的命令
+touch /.autorelabel
+
+# 方法2
+在linux开始的行，改为rw init=/sysroot/bin/sh
+按ctrl-x启动
+chroot  /sysroot
+passwd root
+```
+
+#### 实现grub2安全
+```shell
+添加grub密码 
+grub2-setpassword
+
+# 添加密码后会在/boot/grub2目录下，添加user.cfg文件，里面是密码
+echo "" > user.cfg      # 可以清空密码
+```
+
+#### 修复grub2
+- 主要配置文件：/boot/grub2/grub.cfg
+- 修复配置文件：grub2-mkconfig > /boot/grub2/grub.cfg
+
+- 修复grub
+```shell
+grub2-install /dev/sda  # BIOS环境
+grub2-install           # UEFI环境
+```
+
+- 设置默认启动内核
+```shell
+# 以下命令是修改 /boot/grub2/grubenv实现
+# 查看内核信息
+ls /boot/loader/entries/
+# 可以将需要设置的默认内核信息，添加替换至/boot/grub2/grubenv的saved_entry=后面，将它后面的替换掉 
+grub2-set-default 0
+# 或者
+vim /etc/default/grub
+GRUB_DEFAULT=0
+```
+
+- 实战案例1
+```shell
+# 破坏前446字节的引导信息
+dd if=/dev/zero of=/dev/sda bs=1 count=446 
+# 光盘进入救援模式
+grub2-install --root-directory=/mnt/sysimage /dev/sda
+```
+
+- 实战案例2
+```shell
+# 删除/boot/grub2/*所有内容，进行修复
+光盘进入救援模式
+chroot /mnt/sysimage
+grub2-install /dev/sda
+grub2-mkconfig -o /boot/grub2/grub.cfg
+```
+
+- 实战案例3
+```shell
+# 清空/boot下文件，进行修复
+光盘进入救援模式
+# 特别说明，CentOS8必须先grub，再安装kernel，否则安装kernel-core时会提示grub出错
+chroot /mnt/sysimage
+mount /dev/sr0 /mnt
+grub2-install /dev/sda
+
+2. 安装kernel
+rpm -ivh <安装包路径> --force
+
+3. 修复grub.cfg
+grub2-mkconfig -o /boot/grub2/grub.cfg
+
+4. 退出重启
+exit
+exit
+```
+
+
+
+# 服务
+## 域名系统DNS
+### 名称解析介绍和DNS
+- 实现此服务的方法
+  - 本地名称解析配置文件：hosts
+    - Linux：/etc/hosts
+    - windows: %WINDIR%/system32/drivers/etc/hosts
+      - windows中使用`set %WINDIR%`查看变量数值
+    ```shell
+    122.10.117.2 www.magedu.org
+    93.46.8.89 www.google.com
+    ```
+
+- DNS: Domain Name System 域名系统应用层协议，是互联网的一项服务，它作为将域名和IP地址相互映射的一个分布式数据库，能够使人更方便的访问互联网
+  - 基于C/S架构，<span style="color:red">服务端：53/udp, 53/tcp</span>
+
+- BIND: Bekerley Internet Name Domain，由ISC（www.isc.org）提供的DNS软件实现
+  - DHCP也是ISC负责维护管理的
+
+- <span style="color:red; font-weight:700">DNS重要思想：分布式管理</span>
+
+
+#### DNS域名结构
+- FQDN：全程域名 = 主机名 + 域名
+  - 域名 = 子域名 + 父域名
+
+- 域名结构
+  - 根域 . 13个
+  - 一级域名：Top Level Domain：com,edu,gov,org,io...
+    - 三类：组织域，国家域，反向域
+  - 二级域名：`magedu.com`
+  - 三级域名：`study.magedu.com`
+  - 最多可达到127级域名
+
+- ICANN(The Internet Corporation for Assigned Names and Numbers) 互联网名称与数字地址分配机构，负责在全球范围内对互联网通用顶级域名以及国家和地区顶级域名系统的管理，以及根服务器系统的管理
+
+#### DNS服务工作原理
+- 略
+
+#### DNS查询类型
+- 递归查询：最终结果，负责到底
+- 迭代查询：最好结果，不负责到底
+
+#### 解析类型
+- FQDN ---> IP 正向解析
+- IP ----> FQDN 反向解析
+- 注意：正反向解析是两个不同的名称空间，是两颗不同的树
+
+#### 完整的查询请求经过的流程
+```shell
+Client --> 
+hosts文件 --> 
+Client DNS Service Local Cache --> 
+DNS Server(Recursion 递归) --> 
+DNS Service Cache --> iteration(迭代) -->
+根 -->
+顶级域名DNS -->
+二级域名..
+```
+
+### DNS软件bind
+- DNS服务器软件：bind，powerdns（基于LAMP），unbound, coredns
+
+#### BIND相关程序包
+```shell
+yum list all bind*
+```
+- bind: 服务器
+- bind-libs: 相关库
+- bind-utils: 客户端
+- bind-chroot：安全包，将dns相关文件放至`/var/named/chroot`
+- 范例：安装bind软件
+```shell
+ 
+```
+
+#### BIND包相关文件
+- BIND主程序：`/usr/bin/named`
+- rndc使用953端口
+- 本地配置的DNS服务器文件`/etc/resolv.conf` 
+- 当安装并启动named的时候，此时并没有任何DNS配置，上面自带关于根域的记录，此时该DNS服务器叫做只缓存服务器，初次访问的所有域名都通过访问根，依次访问后几级域名，来实现DNS域名转换
+
+- `cat /var/named/named.ca`存放了13个根记录
+```shell
+#  /var/named/named.ca
+;; ANSWER SECTION:
+.                       518400  IN      NS      a.root-servers.net.
+.                       518400  IN      NS      b.root-servers.net.
+.                       518400  IN      NS      c.root-servers.net.
+.                       518400  IN      NS      d.root-servers.net.
+.                       518400  IN      NS      e.root-servers.net.
+.                       518400  IN      NS      f.root-servers.net.
+.                       518400  IN      NS      g.root-servers.net.
+.                       518400  IN      NS      h.root-servers.net.
+.                       518400  IN      NS      i.root-servers.net.
+.                       518400  IN      NS      j.root-servers.net.
+.                       518400  IN      NS      k.root-servers.net.
+.                       518400  IN      NS      l.root-servers.net.
+.                       518400  IN      NS      m.root-servers.net.
+
+;; ADDITIONAL SECTION:
+a.root-servers.net.     518400  IN      A       198.41.0.4
+b.root-servers.net.     518400  IN      A       199.9.14.201
+c.root-servers.net.     518400  IN      A       192.33.4.12
+d.root-servers.net.     518400  IN      A       199.7.91.13
+e.root-servers.net.     518400  IN      A       192.203.230.10
+f.root-servers.net.     518400  IN      A       192.5.5.241
+g.root-servers.net.     518400  IN      A       192.112.36.4
+h.root-servers.net.     518400  IN      A       198.97.190.53
+i.root-servers.net.     518400  IN      A       192.36.148.17
+j.root-servers.net.     518400  IN      A       192.58.128.30
+k.root-servers.net.     518400  IN      A       193.0.14.129
+l.root-servers.net.     518400  IN      A       199.7.83.42
+m.root-servers.net.     518400  IN      A       202.12.27.33
+a.root-servers.net.     518400  IN      AAAA    2001:503:ba3e::2:30
+b.root-servers.net.     518400  IN      AAAA    2001:500:200::b
+c.root-servers.net.     518400  IN      AAAA    2001:500:2::c
+d.root-servers.net.     518400  IN      AAAA    2001:500:2d::d
+e.root-servers.net.     518400  IN      AAAA    2001:500:a8::e
+f.root-servers.net.     518400  IN      AAAA    2001:500:2f::f
+g.root-servers.net.     518400  IN      AAAA    2001:500:12::d0d
+h.root-servers.net.     518400  IN      AAAA    2001:500:1::53
+i.root-servers.net.     518400  IN      AAAA    2001:7fe::53
+j.root-servers.net.     518400  IN      AAAA    2001:503:c27::2:30
+k.root-servers.net.     518400  IN      AAAA    2001:7fd::1
+l.root-servers.net.     518400  IN      AAAA    2001:500:9f::42
+m.root-servers.net.     518400  IN      AAAA    2001:dc3::35
+```
+- 每个根域名后面是一堆服务器，这里的IP是VIP虚拟IP
+
+- 通过`ss -ntulp`可以查看所有端口的信息
+```shell
+[root@localhost /etc/sysconfig/network-scripts] $ ss -tulpn
+Netid                     State                      Recv-Q                     Send-Q                                         Local Address:Port                                          Peer Address:Port                     Process                                                
+udp                       UNCONN                     0                          0                                                  127.0.0.1:53                                                 0.0.0.0:*                         users:(("named",pid=3286,fd=512))                     
+udp                       UNCONN                     0                          0                                                      [::1]:53                                                    [::]:*                         users:(("named",pid=3286,fd=513))                     
+tcp                       LISTEN                     0                          10                                                 127.0.0.1:53                                                 0.0.0.0:*                         users:(("named",pid=3286,fd=21))                      
+tcp                       LISTEN                     0                          128                                                  0.0.0.0:22                                                 0.0.0.0:*                         users:(("sshd",pid=1006,fd=3))                        
+tcp                       LISTEN                     0                          128                                                127.0.0.1:953                                                0.0.0.0:*                         users:(("named",pid=3286,fd=23))                      
+tcp                       LISTEN                     0                          10                                                     [::1]:53                                                    [::]:*                         users:(("named",pid=3286,fd=22))                      
+tcp                       LISTEN                     0                          128                                                     [::]:22                                                    [::]:*                         users:(("sshd",pid=1006,fd=4))                        
+tcp                       LISTEN                     0                          128                                                    [::1]:953                                                   [::]:*                         users:(("named",pid=3286,fd=24))     
+```
+- 发现，udp和tcp的53端口是监听在127.0.0.1这个端口上，也就是说，只能本机进行访问，无法对外提供服务，
+- 更改named上监听个端口需要修改配置文件(典型C语言风格的配置文件)
+  - `/etc/named.conf`
+```shell
+
+options {
+        # 更改这里
+        // listen-on port 53 { 127.0.0.1; };
+        listen-on port 53 { 127.0.0.1; 10.0.0.171;};
+        listen-on-v6 port 53 { ::1; };
+        directory       "/var/named";
+        dump-file       "/var/named/data/cache_dump.db";
+        statistics-file "/var/named/data/named_stats.txt";
+        memstatistics-file "/var/named/data/named_mem_stats.txt";
+        secroots-file   "/var/named/data/named.secroots";
+        recursing-file  "/var/named/data/named.recursing";
+        allow-query     { localhost; };
+
+        /* 
+         - If you are building an AUTHORITATIVE DNS server, do NOT enable recursion.
+         - If you are building a RECURSIVE (caching) DNS server, you need to enable 
+           recursion. 
+         - If your recursive DNS server has a public IP address, you MUST enable access 
+           control to limit queries to your legitimate users. Failing to do so will
+           cause your server to become part of large scale DNS amplification 
+           attacks. Implementing BCP38 within your network would greatly
+           reduce such attack surface 
+        */
+        recursion yes;
+
+        dnssec-enable yes;
+        dnssec-validation yes;
+
+        managed-keys-directory "/var/named/dynamic";
+
+        pid-file "/run/named/named.pid";
+        session-keyfile "/run/named/session.key";
+
+        /* https://fedoraproject.org/wiki/Changes/CryptoPolicy */
+        include "/etc/crypto-policies/back-ends/bind.config";
+};
+
+logging {
+        channel default_debug {
+                file "data/named.run";
+                severity dynamic;
+        };
+};
+
+zone "." IN {
+        type hint;
+        file "named.ca";
+};
+
+include "/etc/named.rfc1912.zones";
+include "/etc/named.root.key";
+```
+
+- 修改/etc/named.conf之后，使用named-checkconf进行该文件的语法检查
+```shell
+# 将/etc/named.conf中
+listen-on port 53 { 127.0.0.1; };
+# 改为
+listen-on port 53 { localhost; };
+# localhost是一个关键字在named中，表示本地所有的地址
+named-checkconf
+
+# 重启
+systemctl reload named
+rndc reload   # 等价
+
+# 问题排查期间使用的命令
+ss -ntupl
+
+tcpdump -i <网卡名> prot 端口
+
+# 更改下列字段，使其可以接受外界的传输
+allow-query { localhost; 10.0.0.0/24; };  # 这个位置可以写网段，表示这个网段内的所有设备都可以通过该DNS服务器实现域名查询
+allow-query { any;};   # any表示这台DNS是公共服务器，任何主机都可以通过它查询IP
+
+# 更简单的方法
+将allow-query和linsten-on 全部注释掉
+
+DNS默认允许任何设备从主服务器拉取信息
+# 严重安全问题补丁
+# 只允许从服务器进行区域传输(主服务器配置)
+allow-transfer { 从服务器IP; };
+
+# 不允许其他主机进行区域传输
+allow-transfer { none; }; （从服务器配置）
+```
+- 使用dig抓取信息的方法
+```shell
+dig -t axfr magedu.org @10.0.0.8
+```
+
+#### DNS服务器类型
+- 主DNS服务器
+  - 管理和维护所负责解析的域内解析库的服务器
+
+- 从DNS服务器
+  - 从主服务器或从服务器复制（区域传输）解析库副本
+    - 序列号：解析库版本号，主服务器解析库变化时，其序列递增
+    - 刷新时间间隔：从服务器从主服务器请求同步解析的时间间隔
+    - 重试时间间隔：从服务器请求同步失败时，再次尝试时间间隔
+    - 过期时间：从服务器联系不上主服务器时，多久会停止服务
+    - 通知机制：主服务器解析库放生变化时，会主动通知从服务器
+
+- 缓存DNS服务器（转发器）
+
+#### 区域传输
+- 完全传输：传输整个解析库
+- 增量传输：传递解析库变化的那部分内容
+
+#### 主DNS服务器实现
+- 要创建维护一个magedu.org的域，就要创建一个解析magedu.org的域的数据库
+  - 该数据库单独存放，这个数据库文件里面记录所有magedu.org为后缀的域以及IP的对应关系
+  - 一个区域数据库对应一个域
+  - 该区域数据库由一行一行的区域记录组合而成
+
+- 区域解析库：由众多RR组成
+  - 各种资源记录：RR（Resource Record）
+  - 记录类型：A，AAAA，PTR， SOA， NS， CNAME， MX
+  - SOA：Start Of Authority，起始授权记录：一个区域解析库有且仅有一个SOA记录，必须位于解析库的第一条记录
+  - A：Internet Addresses：作用：FQDN -> IP
+  - AAAA: FQDN -> IPv6
+  - PTR: IP -> FQDN
+  - NS：NAME Service，专用于标明当前区域的DNS服务
+  - CNAME：Canonical Name，别名记录
+  - MX：邮件交换器
+  - TXT：对域名进行标识和说明的一种方式
+
+- 资源记录定义的格式
+```shell
+name [TTL] IN rr_type value
+```
+- 注意：
+  - TTL可以从全局继承
+  - 使用@符号可用于引用当前区域的名字
+
+- SOA
+```shell
+$TTL 86400
+# 一个小时做一次拉取操作，如果失败了10分钟后重试，当从服务器和主服务器无法同步，一天之后，从主将无法对外提供服务，最后一个参数：错误结果缓存时间
+@ IN SOA ns1.magedu.org admin.magedu.org (123, 1h, 10m, 1D, 12h)
+ns1.magedu.org IN A 10.0.0.8
+
+#： ns1.magedu.org: 表示当前维护magedu.org这个域的服务器的名称（我是谁）
+
+#： 后面需要补一个
+ns1.magedu.org IN A 10.0.0.33  # 我在哪
+
+# admin.magedu.org: 域名服务器的管理员邮箱，指代admin@magedu.org
+
+# 123: 该数据库版本名称
+# 1h: 每隔一个小时从服务器从主服务器拉取数据，（是否更新的判断是版本号）
+# 10m: 如果同步失败，则每10分钟重新尝试一次
+# 1D：如果1天以上都无法实现同步，则从服务器数据失效
+# 12h: 错误访问记录的缓存有效期，即如果用户查找一个不存在数据库中的域名，则定一个缓存有效期，12个小时内，用户如果继续访问，则直接返回该记录不存在。（否定答案的TTL值 ）
+```
+- 主服务器和从服务器之间一般有两种操作：一种是推push，一种是拉pull
+  - 主服务器数据变了，主动把数据推送给从服务器
+  - 从服务器定时从主服务器 拉取数据，查看是否更新
+
+- NS：通过NS记录，判断当前数据库中，有哪些主从服务器
+  - 对NS记录而言，任何一个ns记录后面的服务器名称，都应该在后续有一个A记录
+```shell
+@ IN NS ns1       # 主服务器 
+@ IN NS ns2       # 从服务器
+ns1 IN NS ip_addr
+ns2 IN NS ip_addr
+```
+
+- 存放DNS数据库的路径`/var/named`
+- DNS数据库命名规范：所管理的域名+zone
+  - 示例：magedu.org.zone
+  - 新建DNS数据库的时候，可以复制之前的自带的文件，`cp -p 源文件`，将其权限等一同复制
+
+#### DNS客户端测试工具
+- host命令
+```shell
+host 域名
+# 测试该域名是否能够解析成功
+```
+
+- dig命令
+```shell
+dig 域名
+dig 域名 @DNS服务器IP   # @表示直接向该DNS服务器进行查询，而不是向默认服务器查询
+# 相比host,其信息显示更全 
+```
+
+- nslookup
+```shell
+nslookup 域名
+```
+
+- 使用CNAME实现流量分发(负载均衡)
+```shell
+@ IN SOA ns1 admin.magedu.org (123, ...)
+
+@ NS ns1
+ns1 A 10.0.0.8
+
+www    CNAME    websrv
+websrv    A      10.0.0.6
+websrv    A      10.0.0.7
+# 此时用户访问www，流量会被均摊到6,7两台服务器上，从而实现服务器性能的提升
+```
+
+
+#### 区域数据库写完后，通过配置文件让named服务加载区域数据库
+- 全局配置文件：`/etc/named.conf`（不推荐）
+```shell
+# 格式：
+zone "." IN {
+  type hint|master|slave;
+  file "named.ca";
+};
+```
+
+- `/etc/named.rfc1912.zones`(推荐)，将数据库信息加载至该文件
+```shell
+# 格式：
+zone "." IN {
+  type hint|master|slave;
+  file "named.ca";
+};
+
+# hint指示该服务器启动时应如何寻找根DNS服务器
+# hint类型的作用是在DNS查询过程开始时，提供一个初始的查询点
+
+zone "magedu.org" IN {
+  type master;
+  file "magedu.org.zone";
+  # 路径不用写，默认找/var/named，就是这么智能
+};
+```
+
+- 配好之后检查
+```shell
+# 配置文件语法检查
+named-checkconf
+
+# 区域数据库语法检查
+named-checkzone 域名 区域数据库路径
+```
+
+- 检查成功后，重新加载
+```shell
+systemctl reload named
+rndc reload
+```
+
+#### 解析邮件服务器
+```shell
+@   MX  10   mailsrv
+@   MX  20   mailsrv2
+mailsrv  A 10.0.0.6
+mailsrv  B 10.0.0.7
+```
+- 查询当前域中，谁是邮件服务器
+```shell
+dig -t mx magedu.org
+```
+
+#### 泛解析案例
+```shell
+# 使用 * 
+# 使用 @
+
+# $GENERATE 1-254 HOST$ IN  A  1.2.3.$ 相当于
+HOST1 IN A 1.2.3.1e
+HOST2 IN A 1.2.3.2
+...
+HOST254 IN A 1.2.3.254
+```
+
+
+#### 实现反向解析区域
+- 应用场景：邮件服务
+- 反向区域：即将IP反向解析为FQDN
+- 区域名称：网络地址反写in.addr.arpa
+```shell
+ 172.16.100. --> 100.16.172.in-addr.arpa.
+```
+
+- 定义区域
+```shell
+zone "ZONE_NAME" IN {
+  type {master | slave | forward};
+  file "网络地址.zone"; # eg:10.0.0.zone
+};
+```
+
+- 定义区域解析库文件
+  - 注意：不需要MX，以PTR记录为主
+
+- 区域数据库(10.0.0.zone)
+```shell
+$TTL 1D
+
+@ IN SOA ns1.magedu.org. admin.magedu.org. (1 12H 10M 3D 1D )
+
+      NS  ns1.magedu.org.
+
+7     PTR  websrv.magedu.org.
+123   PTR  mailsrv.magedu.com.
+```
+
+- 测试反向解析
+```shell
+dig -t ptr 7.0.0.10.in-addr.arpa
+# 等价于
+dig -x 10.0.0.7
+```
+
+
+#### 从服务器的实现
+- 实现过程
+  - 应该为一台独立的名称服务器
+  - 主服务器的区域解析库中必须有一条NS记录，指向从服务器
+  - 从服务器只需要定义区域，而不需提供解析库文件；解析库文件应该放置域/var/named/slaves目录中
+  - 主服务器得到允许从服务器做区域传输
+  - 主服务器时间应该同步，通过ntp进行
+  - bind程序的版本应该保持一致；否则，应该从高，主低
+
+- 定义从区域
+```shell
+zone "ZONE_NAME" IN {
+  type slave;
+  masters { MASTER_IP; };
+  file "slaves/ZONE_NAME.zone" ;
+}
+```
+
+- 主服务器增加NS记录
+```shell
+@  NS ns2
+ns2 A 10.0.0.18  #从服务器IP
+```
+
+
+#### 安全加固
+- 默认任何主机都可以从主服务器同步区域数据库，这有很大的安全风险
+- 解决方法
+```shell
+# 主从服务器添加配置信息
+allow-transfer {};
+# 主服务器
+allow-transfer { 从服务器IP; };
+# 从服务器
+allow-transter { none; };
+```
+
+### 实现子域
+```shell
+magedu.org 10.0.0.8 主DNS服务器
+
+# 用另一台设备来负责子域DNS服务
+sh.magedu.org 10.0.0.28
+```
+
+- 在10.0.0.28上实现
+```shell
+hostnamectl set-hostname shanghai
+
+# 在父的区域数据库中，增加子域记录
+sh  NS  ns3
+ns3 A 10.0.0.28
+
+# 在10.0.0.28配置
+/etc/named.conf
+
+注释：listen-on port 53...
+注释：allow-query { localhost; };
+
+allow-transfer { none; };
+
+# 添加数据库引用
+zone "sh.magedu.org" {
+  type master;
+  file "sh.magedu.org.zone"
+};
+
+# 在/var/named/创建sh.magedu.org.zone
+$TTL 1D
+@ IN SOA ns1 admin.magedu.org. (23, 1D, 1H, 1W, 3H)
+@ NS ns1
+ns1 A 10.0.0.28
+www CNAME websrv
+websrv A  10.0.0.66
+```
+
+- <span style="color:red">易错点：注意子域数据库的权限问题</span>
+
+
+### 实现DNS转发（缓存）服务器
+- DNS转发：利用DNS转发，可以将用户的DNS请求，转发至指定的DNS服务，而非默认的根DNS服务器，并将指定服务器查询的返回结果进行缓存，提高效率
+
+- 注意：
+  - 被转发的服务器需要能够为请求者做递归，否则转发请求不予进行
+  - 在全局配置中，关闭dnssec功能
+  ```shell
+  dnssec-enable no;
+  dnssec-validation no;
+  ```
+
+#### 全局转发
+- 对非本机所负责解析区域的请求，全转发给指定的服务器
+- 在全局配置块中实现：
+```shell
+Options {
+  forward first| only;
+  forwarders { ip; };
+}
+# first 表示如果转发给的DNS服务器上没有需要的记录，则自己去互联网查询
+# only 表示如果转发给的DNS服务器上没有需要的记录，直接返回失败，自己本身不去查询
+```
+
+#### 特定区域转发
+- 仅转发特定的区域请求，比全局转发优先级高
+```shell
+zone "ZONE_NAME" IN {
+  type forward;
+  forward first | only;
+  forwarders { ip; };
+}
+```
+
+
+### 智能DNS
+- 目的: 让网民访问网站的速度更快
+#### GSLB
+- GSLB：Global Server Load Balance 全局负载均衡； GSLB是对服务器和链路进行综合判断来决定哪个地点的服务器来提供服务，实现异地服务器群服务质量的保证；GSLB主要的目的是在整个网路范围内将用户的请求定向到最近的节点（或者区域）；
+
+- GSLB分为基于DNS实现，基于重定向实现，基于路由协议实现，其中最通用的是基于DNS解析方式
+
+- 范例：查询VIP（唯品会）使用网宿的CDN服务
+
+
+
+
+#### CDN（Content Delivery Network）内容分发网络
+- CDN服务商
+  - 服务商：阿里，腾讯，蓝汛，网宿，帝联等
+  - 智能DNS：dnspod， dns.la
+
+
+#### 智能DNS相关技术
+- bind中ACL：把一个或多个地址归并为一个集合，并通过一个统一的名称调用
+- 注意：只能先定义，后使用；因此一般定义在配置文件中，处于options的前面
+- 格式
+```shell
+acl acl_name {
+  ip;
+  net/prelen;
+};
+```
+- 范例：
+```shell
+acl beijingnet{
+  172.16.0.0/16;
+  10.10.10.10;
+  ...
+};
+```
+
+- bind有四个内置的acl
+  - none：没有一个主机
+  - andy：都是主机
+  - localhost：本机
+  - localnet：本机的IP同掩码运算后得到的网络地址
+
+
+- 访问控制的指令
+  - allow-query{}: 允许查询的主机：白名单
+  - allow-transfer{}: 允许区域传送的主机；白名单
+  - allow-recursion{}：允许递归的主机，建议全局使用
+  - allow-update{}; 允许更新区域数据库中的内容
+
+#### view视图
+- View：视图，将ACL和区域数据库实现对应关系，以实现只能DNS
+  - 一个bind服务器可以定义多个view，每个view中可定义一个或多个zone
+  - 每个view用来匹配一组客户端
+  - 多个view内可能需要对同一个区域进行解析，但使用不同的区域解析文件
+
+- 注意：
+  - 一旦启用了view，所有的zone都只能定义在view中
+  - 仅在允许递归请求的客户端所在view中定义根区域
+  - 客户端请求到达是，是自上而下检查每个view所服务的客户端列表
+
+
+- view格式
+```shell
+view VIEW_NAME {
+    match-clients { beijingnet; };
+    zone "magedu.org" {
+        type master;
+        file "magedu.org.zone.bj";
+    };
+    include "/etc/named.rfc1912.zones";
+};
+
+view VIEW_NAME {
+    match-clients { shanghainet; };
+    zone "magedu.org" {
+        type master;
+        file "magedu.org.zone.sh";
+    };
+};
+```
+#### 实战案例：利用view实现智能DNS
+- 实验目的：搭建DNS主存服务架构，实现DNS服务冗余
+
+- 环境要求：
+```shell
+需要五台主机
+DNS主服务器和web服务器1：192.168.8.8/24 172.16.0.8/16
+web服务器2：192.168.8.7/24
+web服务器3: 172.16.0.7/16
+DNS客户端1: 192.168.8.6/24
+DNS客户端2: 172.16.0.6/16
+```
+
+- 前提准备
+```shell
+关闭selinux
+关闭防火墙
+时间同步
+```
+
+#### 实现步骤
+
+- DNS服务器的网卡配置
+```shell
+# 配置两个IP地址
+# eth0: 192.168.8.8/24
+# eth1: 172.16.0.8/16
+```
+
+- 主DNS服务器配置文件实现view
+```shell
+yum install bind -y
+
+vim /etc/named.conf
+# 在文件最前面加下面行
+acl beijingnet {
+  192.168.8.0/24
+};
+
+acl shanghainet{
+  172.16.0.0/16
+};
+
+acl othernet {
+  any;
+};
+
+# 注释掉下面两行
+//listen-on-port 53...
+// allow-query...
+
+# 创建view
+view beijingview {
+    match-clients { beijingnet; };
+    include "/etc/named.rfc1912.zones.bj";
+};
+view shanghaiview {
+    match-clients { shanghainet; };
+    include "/etc/named.ref1912.zones.sh";
+};
+view otherview {
+    matchclients { othernet; };
+    include "/etc/named.rfc1912.zones.other"
+}
+include "/etc/named.root.key"
+```
+
+- 实现区域配置文件
+```shell
+vim /etc/named.rfc1912.zones.bj
+zone "." IN {
+  type hint;
+  file "named.ca";
+}
+
+zone "magedu.org" {
+    type master;
+    file "magedu.org.zones.bj";
+};
+
+vim /etc/named.rfc1912.zones.sh
+zone "." IN {
+  type hint;
+  file "named.ca";
+}
+
+zone "magedu.org" {
+    type master;
+    file "magedu.org.zones.sh";
+};
+
+vim /etc/named.rfc1912.zones.other
+zone "." IN {
+  type hint;
+  file "named.ca";
+}
+
+zone "magedu.org" {
+    type master;
+    file "magedu.org.zones.other";
+};
+
+chgrp named /etc/named.rfc1912.zones.bj
+chgrp named /etc/named.rfc1912.zones.sh
+chgrp named /etc/named.rfc1912.zones.other
+```
+
+- 创建区域数据库文件
+```shell
+vim /var/named/magedu.org.zones.bj
+$TTL 1D
+@ IN SOA master admin.magedu.org (...)
+      NS master
+master A 192.168.8.8
+websrv A 192.168.8.7
+www    CNAME websrv
+
+vim /var/named/magedu.org.zone.sh
+$TTL 1D
+@ IN SOA master admin.magedu.org (...)
+      NS master
+master A 192.168.8.8
+websrv A 172.16.0.7
+www    CNAME websrv
+
+vim /var/named/magedu.org.zone.other
+$TTL 1D
+@ IN SOA master admin.magedu.org (...)
+      NS master
+master A 192.168.8.8
+websrv A 127.0.0.1
+www    CNAME websrv
+
+chgrp named /var/named/magedu.org.zone.bj
+chgrp named /var/named/magedu.org.zone.sh
+chgrp named /var/named/magedu.org.zone.other
+
+systemctl start named   # 第一次启动
+rndc reload             # 不是第一次启动服务
+```
+
+- 实现位于不同区域的三个WEB服务器：略
+
+- 客户端测试
+
+
+#### 综合实验
+![alt text](images/image31.png)
+
+
+### Ubuntu中的systemd-resolved服务
+- 在ubuntu系统中，虽然在网卡中配置了DNS服务器的IP地址，但在使用相关命令进行DNS解析时，默认的DNS服务器使用的是127.0.0.53，而并不是我们在网卡上配置的DNS服务器地址
+![alt text](images/image35.png)
+
+- Ubuntu中的systemd-reloved服务为本地应用程序提供了网络名字解析服务，系统通过它对外进行dns请求
+```shell
+root@ubuntu2204:/etc$ll resolv.conf 
+lrwxrwxrwx 1 root root 39 Aug 10  2023 resolv.conf -> ../run/systemd/resolve/stub-resolv.conf
+# ubuntu中，resolv.conf是一个软连接，指向/run/systemd/resolve/stub-resolv.conf
+# 修改这个软链接的指向到/run/systemd/resolve/resolv.conf,而不是systemd-reloved
+
+ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf
+
+# 修改后，则会和网卡上配置的DNS对齐
+```
+- 设置全局DNS
+```shell
+vim /etc/systemd/resolved.conf
+...
+DNS=223.5.5.5
+```
+
+#### bind安装和配置
+- 配置文件 `/etc/bind/named.conf.default-zones`
+```shell
+root@ubuntu2204:/etc$cat /etc/bind/named.conf.default-zones 
+// prime the server with knowledge of the root servers
+zone "." {
+        type hint;
+        file "/usr/share/dns/root.hints";  # 记录了根域的信息
+};
+
+// be authoritative for the localhost forward and reverse zones, and for
+// broadcast zones as per RFC 1912
+
+zone "localhost" {
+        type master;
+        file "/etc/bind/db.local";
+};
+
+zone "127.in-addr.arpa" {
+        type master;
+        file "/etc/bind/db.127";
+};
+
+zone "0.in-addr.arpa" {
+        type master;
+        file "/etc/bind/db.0";
+};
+
+zone "255.in-addr.arpa" {
+        type master;
+        file "/etc/bind/db.255";
+};
+```
+- 主配置文件 `/etc/bind/named.conf`
+```shell
+// This is the primary configuration file for the BIND DNS server named.
+//
+// Please read /usr/share/doc/bind9/README.Debian.gz for information on the 
+// structure of BIND configuration files in Debian, *BEFORE* you customize 
+// this configuration file.
+//
+// If you are just adding zones, please do that in /etc/bind/named.conf.local
+
+include "/etc/bind/named.conf.options"; # bind配置项
+include "/etc/bind/named.conf.local";   # 基本不用
+include "/etc/bind/named.conf.default-zones"; # 中间配置文件，该文件中定义了域名和具体解析规则文件的对应关系
+```
+
+- bindp配置项文件`/etc/bind/named.conf.options`
+```shell
+options {
+    # 此配置表示DNS服务只监听了本机127.0.0.1的53端口，如果对外提供DNS服务，可以将此行注释或改为any
+    listen-on port 53 { 127.0.0.1; };
+
+    # 监听IPV6的53端口，配置方法同上
+    listen-on-v6 port 53 { ::1; };
+
+    # 此配置表示仅本机客户以使用DNS服务的解析查询功能，如果对外提供DNS服务，可以将此行注释或者值改为any
+    allow-query { localhost; };
+
+    # 是否启用加密验证，在使用转发的时候，将此项改为no
+    dnssec-validation auto;
+
+    # 转发服务器
+    forwards { 10.0.0.207; };
+
+    forward first; 
+}
+```
+
+
+
+
+
+## 加密安全
+### 重点1：综合加密和签名（面试题）
+- 签名的本质：即A使用私钥加密，B通过A的公钥去验证A的身份，同时里面的数据通过hash值保证数据的完整性
+![alt text](images/image32.png)
+
+### 重点2：Ca和证书原理
+- PKI：Public Key Infrastructure 公共密钥加密体系
+  - 签证机构：CA（Certificate Authority）
+
+- CA解决的问题：因为存在中间人攻击，导致双方的公钥无法得到信任，因此把公钥发给CA，由CA负责验证证书（公钥）的合法性
+
+- 过程：
+  - A把自己的公钥发送给CA，（CA也有自己的公钥和私钥），CA负责验证收到的公钥是否真实可靠，验证A的身份，
+  - 如果CA验证A的身份没有问题，CA就会用自己的私钥进行签名,然后将其生成证书
+    - 签名：把A的公钥用CA的私钥进行签名，同时添加ca的信息，有效期等其他信息
+    - 签名（CA私钥加密的A的公钥）+其他信息，构成证书
+  - CA将证书发给A
+  - A得到自己的证书后，就可以通过网路将证书发送给B，此时B就得到了A的证书
+    - B的到A的证书，目的就是安全可靠的得到A的公钥
+  - （前提B信任CA）B的到A的证书后，使用CA的公钥对证书进行解密，得到A的公钥
+  - 同样的逻辑，B向CA申请证书，然后将证书发给A，这样A就通过CA公钥解密证书，得到了B的公钥
+
+
+- CA1 和 CA2两个子CA机构要向root CA即根CA机构，验证自己的身份
+  - CA1将自己的公钥发给RootCA,RootCA也有自己的私钥和公钥
+  - RootCA使用自己的私钥加密CA1的公钥，加上根CA的信息+有效期等信息，生成CA1的证书，发给CA1
+  - CA2，同理，从RootCA那里得到CA2的证书（上面有RootCA私钥加密的CA2公钥的信息+RootCA信息+有效期等信息）
+   
+- CA1的用户向CA2的用户进行加密通讯，就需要互相得到对方的公钥，即CA2下的用户需要CA1的公钥，CA1下的用户需要CA2的公钥，此时需要向RootCA申请对方的证书，然后使用RootCA的公钥进行解密，得到对方的公钥
+
+
+- 所有电脑上默认保存着根CA的公钥
+![alt text](images/image33.png)
+
+- 根CA自己给自己办发证书（自签名的证书）
+```shell
+Srootca(Prootca) + Prootca + expire + other
+```
+
+- 为保证安全，根CA一般不联网
+
+- CRL分发点上面记录着被吊销的证书
+
+
+- 补充
+![alt text](images/image34.png)
+- 数字证书上的信息
+  - 信息摘要：
+    - 用户公钥
+    - 用户相关信息
+    - 证书颁发机构信息
+    - 证书有效期等
+  - 数字签名（将上面的所有数据算出一个hash算法，算一个hash值，然后使用CA私钥加密）
+  - 该hash值无法被中间人篡改，中间人只能篡改摘要信息，但是中间人更改了摘要信息，就会和数字签名中的信息不匹配，从而配判定不可信
+
+- 证书：里面有PK，可读不可改，并且不可伪造
+
+### 重点3：https简化原理
+- https单向认证，访问者要验证网站，而网站不能验证访问者
+
+- 整个过程
+```shell
+1. 客户端发起HTTPS请求
+用户在浏览器里面输入一个https网址，然后连接到服务器的443端口
+
+2. 服务端的配置
+采用HTTPS协议的服务器必须要有一套数字证书，可以自己制作，也可以向组织申请，区别就是自己办发的证书要客户端验证通过，才能继续访问，而使用受信任的公司申请的证书则不会弹出提示页面，这套证书起始就是一对公钥和私钥
+
+3. 传送服务器的证书给客户端
+证书里其实是公钥，并且还包含很多的信息，比如证书的颁发机构，过期时间等
+
+4. 客户端解析验证服务器证书
+这部分工作是由客户端的TLS来完成，首先会验证公钥是否有效，比如：颁发机构，过期时间等，如果发现异常，则会弹出一个提示，提示证书有问题，如果证书没问题，就会生成一个随机值，然后用证书的公钥对该随机值进行非对称加密
+
+5. 客户端加密信息传送服务器
+这部分传送使用证书加密后的随机值，目的就是让服务器得到这个随机值，以后客户端和服务器的通信就可以通过这个随机值进行对称加密 
+```
+
+- 总结：
+  - 就是客户端向服务端发起请求
+  - 服务端响应客户端并将证书发给客户端
+  - 客户端验证证书，如果验证没有问题，则产生一个随机值，并用公钥将其加密，并返回给服务端
+  - 服务端使用私钥将其解密，得到这个随机值，后续的通信，就可以用这个随机值作为密钥，进行对称加密
+  - 对称加密的好处就是简单高效，                                         效率高，性能好
+
+### base64编码原理
+- 一个ascll字符8bit
+- base64是将其进行6bit分割，然后查询base64的字符表，进行重组，如果最后不足6bit，每2bit用一个=补充
+
+### 重点4：openssl命令
+
+#### openssl单向哈希加密（摘要算法）
+- 查看所有摘要命令
+```shell
+openssl list -digest-commands
+```
+
+- 使用md5计算文件摘要值
+```shell
+openssl md5 fstab
+
+openssl dgst -md5 fstab
+
+md5sum fstab
+
+openssl dgst fstab 默认sha256 
+```
+
+- openssl passwd 生成用户密码
+
+### openssl命令
+
+- 查看openssl的版本
+```shell
+openssl version
+```
+
+#### openssl对称加密
+- 工具：`openssl enc, gpg`
+- 算法：`3des, aes, blowfish, twofish`
+- enc命令帮助：`man enc`
+```shell
+# 加密
+openssl enc -e -des3 -a -salt -in testfile -out testfile.cipher
+# -e 加密
+# -des3 对称加密算法
+# -a 使用base64输出可见字符
+# -salt 加盐（随机生成，默认）
+# - in 后面加要处理的文件
+# -out 将加密后的信息输出到指定文件
+
+# 解密
+openssl enc -d -des3 -a -salt -in testfile.cipher -out testfile 
+```
+
+#### openssl命令单向加密
+- 工具：openssl dgst
+- 算法：md5sum, sha1sum, sha224sum, sha256sum
+```shell
+openssl dgst -md5 /PATH/FILENAME
+md5sum /PATH/FILE
+```
+
+#### openssl生成用户密码
+```shell
+openssl passwd -l -salt SALT(最多8位)
+openssl passwd -6 -salt SALT value
+```
+
+#### openssl 生成随机数
+- 随机数生成器：伪随机数字，块终中断生成随机数
+- 调用：/dev/random； /dev/urandom
+```shell
+openssl rand -base64 8
+# 8 表示8个字节  
+
+openssl rand -base64 10 ｜ head -c10
+```
+
+#### openssl命令实现PKI
+- 公钥加密
+    - 算法：RSA, ELGama
+    - 工具：gpg, openssl rsautl
+- 生成私钥
+```shell
+openssl genrsa -out /PATH/TO/FILENAME [-des3 ] NUM_BITS # (默认2048位)
+
+#示例
+# 生成对称密钥加密的私钥
+(umask 077; openssl gensra -out test.key -des3 2048) # genrsa就是用rsa算法生成的私钥
+
+# 将加密对称密钥key解密
+openssl rsa -in test.key -out test2.key
+
+# 从私钥中提起出公钥
+openssl rsa -in PRIVATEKEYFILE -pubout -out PUBLICKEYFILE
+```
+
+### 建立私有CA实现证书申请颁发
+- 证书申请及签署步骤
+    - 生成申请请求
+    - RA核验
+    - CA签署
+    - 获取证书
+
+- openssl的配置文件
+```shell 
+/etc/pki/tls/openssl.cnf
+```
+
+- 三种策略
+    - match匹配、optional可选、supplied提供
+    - match：要求申请填写的信息跟CA设置信息必须一致
+    - optional：可有可无，跟CA设置信息可以不一致
+    - supplied：必须填写这项申请信息
+
+```shell
+cat /etc/pki/tls/openssl.cnf
+
+...
+# 一个设备可以创建多个CA，下面的是默认CA
+[ ca ]
+default_ca = CA_default         # the default ca section
+
+[ ca_default ]
+dir = /etc/pki/CA       # 所有创建CA相关文件都放在这里 ，如果该目录不存在，则需要手工创建
+certs = $dir/certs       # 存放发布的证书
+crl_dir = $dir/crl      # 证书的吊销列表
+database = $dir/index.txt       # 需要手工创建 
+
+new_certs_dir = $dir/newcerts       # 默认颁发的新证书放在这里
+certificate = $dir/cacert.pem       # 存放CA的证书（RootCA，自签名）
+serial = $dir/serial                # 证书的当前序号，下一个颁发证书的编号 
+crlnumber = $dir/crlnumber          # 吊销的编号
+
+crl = $dir/crl.pem                          # 吊销列表
+private_key = $dir/private/cakey.pem    # 自己的私钥
+RANDFILE = $dir/private/.rand
+
+x509_extensions = usr_cert
+
+name_opt = ca_default
+cert_opt = ca_default
+
+default_days = 365              # 默认有效期
+default_crl_days = 30
+default_md = sha256
+preserve = no
+
+policy = policy_match    # 证书颁发策略
+
+[ policy_match ]        # match意味着，CA信息和客户端向CA申请的信息必须一致
+countryName = match
+stateOrProvinceName = match
+OrganizationName = match
+OrganizationalUnitName = optional
+commonName = supplied           # 通常是网站域名
+emailaddress = optional
+
+[ policy_match ]        
+countryName = optional
+stateOrProvinceName = optional
+OrganizationName = optional
+OrganizationalUnitName = optional
+commonName = supplied           # 通常是网站域名
+emailaddress = optional
+```
+
+#### 创建私有CA
+- 创建CA所需的文件
+```shell
+# 生成证书索引数据库文件
+touch /etc/pki/CA/index.txt
+
+# 指定第一个颁发证书的系列号
+echo 01 > /etc/pki/CA/serial
+```
+
+- 生成CA私钥
+```shell
+cd /etc/pki/CA/
+
+(umask 066; openssl genrsa -out private/cakey.pem 2048)  # 文件名要和配置文件对上
+```
+
+- 生成CA自签名证书
+```shell
+openssl req -new -x509 -key /etc/pki/CA/private/cakey.pem -days 3650 -out /etc/pki/CA/cacert.pem
+
+# -new： 生成新证书签署请求
+# -x509：专用于CA生成自签证书
+# -key：生成请求时用到的私钥文件
+# -days：证书有效期
+# -out：证书的保存路径
+```
+- 国家代码：https://country-code.cl/（中国CN）
+
+- 以文本形式查看证书内容
+```shell
+openssl x509 -in /etc/pki/CA/cacert.pam -noout -text
+```
+
+#### 申请证书并颁发证书
+- 为需要使用证书的主机生成私钥
+```shell
+(umask 066; openssl genrsa -out /data/test.key 2048)
+```
+
+- 为需要使用证书的主机生成证书申请文件
+```shell
+openssl req -new -key /data/test.ky -out /data/test.csr
+
+使用标准输入重定向来非交互式生成申请证书
+openssl req -new -key /data/test.ky -out /data/test.csr << EOF
+CN
+beijing
+beijing
+magedu
+it
+...
+
+EOF
+```
+
+
+- 在CA签署证书并将证书颁发给请求者
+```shell
+openssl ca -in /tmp/test.csr -out /etc/pki/CA/certs/test.crt -days 100
+
+# 注意：默认要求国家，省，公司名称三项必须和CA一致
+```
+ 
+#### 查看/验证证书
+```shell
+验证指定编号证书的有效性
+openssl ca -status SERIAL
+```
+
+#### 最后将证书相关文件发送到用户端使用
+- 默认不允许同一个用户申请多个证书
+- 可以通过修改`/etc/pki/CA/index.txt.attr`
+```shell
+# 修改配置选项
+unique_subject = no   #原本是yes，仅允许唯一的目标，改为no则可以允许，同一用户申请多个证书
+```
+
+#### 吊销证书
+- 在客户端获取要吊销的证书的serial
+```shell
+openssl x509 -in /PATH/FROM/CERT_FILE -noout -serial -subject
+```
+
+- 在CA上，根据客户提交的serial与subject信息，对比验证是否与index.txt文件中的信息一致，吊销证书
+```shell
+openssl ca -revoke /etc/pki/CA/newcerts/SERIAL.pem
+```
+
+- 指定第一个吊销证书的编号，注意：第一次更新证书吊销列表前，才需要执行
+```shell
+echo 01 > /etc/pki/CA/crlnumber
+# /etc/pki/CA/crlnumber,手动出创建，是吊销证书的编号文件
+```
+
+- 更新证书吊销列表
+```shell
+openssl ca -gencrl -out /etc/pki/CA/crl.pem
+
+# 将此文件发送到windows，将后缀改为crl.pem.crl
+```
+
+- 查看crl文件
+```shell
+openssl crl -in /etc/pki/CA/crl.pem -noout -text
+```
+
+#### 作业：将申请证书的过程脚本自动化 
+
+
+### Ubuntu建立私有CA
+#### 安装包与配置文件
+```shell
+apt install libssl-dev
+
+# 配置文件路径
+cat /etc/ssl/openssl.cnf
+```
+
+#### 创建私有CA
+- 创建相关配置文件
+```shell
+mkdir -pv /etc/pki/CA/{certs,crl,newcerts,private}
+```
+
+- 生成CA私钥
+```shell
+cd /etc/pki/CA
+openssl genrsa -out private/cakey.pem 2048
+```
+
+- 生成CA自签名证书
+```shell
+openssl req -new -x509 -key /etc/pki/CA/private/cakey.pam -days 1000 -out /etc/pki/CA/cacert.pem
+```
+
+- 查看证书
+```shell
+openssl x509 -in /etc/pki/CA/cacert.pem -noout -text
+```
+
+
+
+## 时间同步服务
+- 多主机协作工作时，各个主机的时间同步很重要，时间不一致会造成很多重要应用的故障，如：加密协议，日志，集群等。
+- 利用NTP（Network Time Protocol）协议使各个网络中的各个计算机时间达到同步
+- 目前NTP协议属于运维基础架构中必备的基本服务之一。
+
+
+### chrony介绍
+- 实现NTP协议的自由软件
+- 可使系统时钟与NTP服务器，参考时钟（例如GPS接收器）以及使用手表和键盘的手动输入进行同步
+- 还可以作为NTPv4（RFC 5905）服务器和对等体运行，为网络中的计算机提供时间服务
+- 设计用于在各种条件下良好运行，包括间歇性和高度拥挤的网络连接，温度变化（计算机时钟对温度敏感），以及不能连续运行或在虚拟机上运行的系统。
+
+- CentOS8中以后得源中，只有chrony，且默认已经安装
+
+#### chrony的优势
+- 更快的同步只需要数分钟而非数小时时间，从而最大程度减少了时间和频率误差，对于并非全天24小时运行的虚拟计算机而言非常有用，能够更好地响应时钟频率的快速变化，对于具备了不稳定时钟的虚拟机或导致时钟频率发生变化的节能技术而言非常有用
+- 在初始同步后，它不会停止时钟，以防对需要系统时间保持单调的应用程序造成影响
+- 在应对临时非对称延迟时（例如，在大规模下载造成链接饱和时）提供了更好的稳定性
+- 无需对服务器进行定期轮询，因此具备间歇性网络连接的系统仍然可以快速同步时钟
+- 官方文档
+```shell
+https://chrony.tuxfamily.org/                             # 官方网站
+https:/.chrony.tuxfamily.org/documentation.html/          # 官方文档
+```
+
+#### chrony文件组成
+- 软件包
+```shell
+rpm -q chrony
+chrony-4.1-1.e18.x86_64
+```
+
+- 可执行程序
+```shell
+# 命令行用户工具，用于监控性能并进行多样化的配置。他可以在chrony实例控制的计算机上工作，也可在一台不同的远程计算机工作
+ll /usr/bin/chronyc
+
+# 后台运行的守护进程，用于调整内核中运行的系统时钟和时间服务器同步。它确定计算机增减时间的比率，并对此进行补偿
+ll /usr/bin/chronyd
+```
+
+- 服务unit文件
+```shell
+systemctl status chronyd.service
+```
+
+- 配置文件
+```shell
+root@ubuntu2204:~$tree /etc/chrony
+/etc/chrony
+├── chrony.conf       # 主配置文件
+├── chrony.keys
+├── conf.d
+│   └── README
+└── sources.d
+    └── README
+
+2 directories, 4 files
+```
+
+- 监听端口
+```shell
+服务端： 123/udp          # 其他机器通过此端口连接本机，将本机当做ntp服务器
+客户端：323/udp           # 本机通过此端口同步时间
+```
+
+
+#### 配置文件说明
+```shell
+https://chrony.tuxfamily.org/doc/3.5/chrony.conf.html
+
+man chrony.conf
+```
+
+
+#### 主配置文件内容与解读
+```shell
+# This will use (up to):
+# - 4 sources from ntp.ubuntu.com which some are ipv6 enabled
+# - 2 sources from 2.ubuntu.pool.ntp.org which is ipv6 enabled as well
+# - 1 source from [01].ubuntu.pool.ntp.org each (ipv4 only atm)
+# This means by default, up to 6 dual-stack and up to 2 additional IPv4-only
+# sources will be used.
+# At the same time it retains some protection against one of the entries being
+# down (compare to just using one of the lines). See (LP: #1754358) for the
+# discussion.
+#
+# About using servers from the NTP Pool Project in general see (LP: #104525).
+# Approved by Ubuntu Technical Board on 2011-02-08.
+# See http://www.pool.ntp.org/join.html for more information.
+pool ntp.ubuntu.com        iburst maxsources 4       # 指同步的服务器在哪
+pool 0.ubuntu.pool.ntp.org iburst maxsources 1
+pool 1.ubuntu.pool.ntp.org iburst maxsources 1
+pool 2.ubuntu.pool.ntp.org iburst maxsources 2
+
+# Use time sources from DHCP.
+sourcedir /run/chrony-dhcp
+
+# Use NTP sources found in /etc/chrony/sources.d.
+sourcedir /etc/chrony/sources.d
+
+# This directive specify the location of the file containing ID/key pairs for
+# NTP authentication.
+keyfile /etc/chrony/chrony.keys
+
+# This directive specify the file into which chronyd will store the rate
+# information.
+driftfile /var/lib/chrony/chrony.drift
+
+# Save NTS keys and cookies.
+ntsdumpdir /var/lib/chrony
+
+# Uncomment the following line to turn logging on.
+#log tracking measurements statistics
+
+# Log files location.
+logdir /var/log/chrony
+
+# Stop bad estimates upsetting machine clock.
+maxupdateskew 100.0
+
+# This directive enables kernel synchronisation (every 11 minutes) of the
+# real-time clock. Note that it can’t be used along with the 'rtcfile' directive.
+rtcsync
+
+# Step the system clock instead of slewing it if the adjustment is larger than
+# one second, but only in the first three clock updates.
+makestep 1 3
+
+# Get TAI-UTC offset and leap seconds from the system tz database.
+# This directive must be commented out when using time sources serving
+# leap-smeared time.
+leapsectz right/UTC
+```
+
+- 常用字段
+```shell
+server:         时钟服务器地址，加burst选项表示服务可用时，一次发送八个数据包，包间隔通常为2秒，可加快初始同步速度 （客户端配置）
+
+pool：          语法和指令与server字段相似，不同之处在于其指定的NTP服务可以解析多个地址
+
+allow:          指定可以使用本机服务的设备，格式可以是IP，子网，网段 （服务端配置）
+
+deny:           指定不可以使用本机服务的设备，格式可以是IP，子网，网段
+
+local stratum 10:  即使server指令中时间服务器不可用，也允许将本地时间作为标准时间授时给其他客户端
+```
+
+#### Chrony客户端工具
+- chronyc 可以运行在交互式和非交互式两种方式(c 表示client)
+
+- 交互式客户端有以下常用子命令
+```shell
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+^- prod-ntp-3.ntp1.ps5.cano>     2   9   377   280    -45ms[  -45ms] +/-  120ms
+^- prod-ntp-5.ntp1.ps5.cano>     2   9   377   473    -36ms[  -36ms] +/-  110ms
+^- prod-ntp-4.ntp1.ps5.cano>     2   9   377   470    -40ms[  -40ms] +/-  116ms
+^- alphyn.canonical.com          2   9   277   343    -18ms[  -17ms] +/-  140ms
+^+ 111.230.189.174               2   9   277   214  -5747us[-5747us] +/-   48ms
+^* time.neu.edu.cn               1   9   377   215    +11ms[  +12ms] +/-   25ms
+^- ntp1.flashdance.cx            2   8   377   281  -3051us[-2802us] +/-   78ms
+^+ 139.199.215.251               2   7   377    19  -6593us[-6593us] +/-   65ms
+
+# M                   NTP源，^表示服务器，=表示二级时钟， # 表示本地时钟
+# S                   NTP源状态，*此源已同步，+可接收的源，-合并算法排除的可接受的源，？没连上的源，x认为该源有错，~不确定的源 
+# Name / IP address   NTP服务器主机名后或ip地址或refid值
+# Stratum             层次，跳数，1.表示本地时钟，2.表示通过第一层级的服务器实现同步，依次类推
+# Poll                NTP源的轮询频率，以秒为单位，值为基数2的对数，6表示64秒进行一次同步
+# REACH               略
+```
+
+- 修改配置文件
+```shell
+vim /etc/chrony/chrony.conf
+
+# 注释pool行
+
+# 添加下列行
+server ntp.aliyun.com iburst (为高可用性，通常至少写两条)
+
+# 重启服务
+systemctl restart chronyd.service
+```
+
+- chrony是渐进式同步，如果差距过大，想立即同步完成，则可以重启服务
+```shell
+date +%F-%T
+
+systemctl restart chronyd.service
+```
+
+#### 常用公共NTP服务
+```shell
+ntp pool                cn.pool.ntp.org. 0-3.cn.pool.ntp.org
+阿里云公共NTP            ntp.aliyun.com, ntp1-7.aliyun.com time.pool.aliyun.com(windows)
+腾讯公共NTP              time1-5.cloud.tencent.com
+北京邮电大学NTP          s1a.time.edu.cn
+清华大学NTP              s1b.time.edu.cn
+北京大学NTP              s1c.time.edu.cn
+国家授时中心服务器        210.72.145.44
+美国标准技术院            time.nist.gov  
+```
+
+#### 使用timedatectl开关chrony.service
+```shell
+timedatectl set-ntp 0
+timedatectl set-ntp 1
+```
+
+#### 实现私有时间服务
+- 在同一网络内，如果有多个需要进行时间同步的服务器，则我们可以在内网自建NTP Server，这样可以节约访问外网的网路资源；另一方面，如果外网不可用，则至少可以保证，内网的NTP服务还是可用的 
+
+
+- 服务端配置
+```shell
+vim /etc/chrony/chrony.conf
+
+allow 10.0.0.0/24           # 允许10.0.0.0网段的主机将本机作为时间同步服务器
+local stratum 10            # 允许本机在不能与外网同步的情况下，还能提供服务
+
+# 重启服务
+systemctl restart chrony.service
+
+# 关闭防火墙
+systemctl stop firewalld.service
+```
+
+- chronyd
+  - 服务端监听使用123端口
+  - 客户端访问使用323端口
+
+- 客户端配置
+```shell
+# 添加server，生产环境下至少两台，保证高可用
+vim /etc/chrony.conf
+server 10.0.0.206 iburst    # 之前配置的服务端NTP的IP
+
+重启服务
+systemctl restart chrony
+```
+
+
+
+## Web服务
+### Web访问响应模型（Web I/O）
+- 单进程I/O模型：启动一个进程处理用户请求，而且一次只处理一个，多个请求被串行
+- 多进程I/O模型：并行启动多个进程，每个进程响应一个链接请求
+- 复用I/O模型：启动一个进程，同时响应N个请求
+- 复用的多进程I/O模型：启动M个进程。每个进程响应N个连接请求，同时接受M*N个请求
+
+### Apache经典的Web服务端
+### Apache三种工作模式（面试题）
+- MPM：multi-processing modules 有三种工作模式
+#### Apache Prefork模型
+- 预派生模式，有一个主控制进程，然后生成多个子进程，每个子进程有一个独立的线程响应用户请求，相对比较占用内存，但是比较稳定，可以设置最大和最小进程数，是最古老的一种模式，也是最稳定的模式，适用于访问量不大的场景
+
+- 优点：稳定
+
+- 缺点：每个用户请求需要对应开启一个进程，占用资源较多，并发性差，并不适用于高并发场景
+![alt text](images/image36.png)
+
+
+#### Apache worker模型
+- 一种多进程和多线程混合的模型，有一个控制进程，启动多个子进程，每个子进程里面包含固定的线程，使用线程来处理请求，当线程不够使用的时候会再启动一个新的子进程，然后在进程里面再启动线程处理请求，由于其使用了线程处理请求，因此可以承受更高的并发
+
+- 优点：相比prefork占用的资源较少，可以同时处理更多的请求
+
+- 缺点：使用keepalive的长连接方式，某个线程会一直被占据，即便没有传输数据，也需要一直等待到超时才会被释放，如果过多的线程，被这样占据，也会导致再高并发场景下的无服务线程可用（该问题在prefork模式下，同样会发生）
+
+![alt text](images/image37.png)
+
+#### Apache event模型
+- Apache中最新的模式，2012年发布的apache2.x系列正式支持event模型，属于事件驱动模型，每个进程响应多个请求，在现在版本里的已经是稳定可用的模型。它和work模型很像，最大的区别在于，它解决了keepalive场景下，长期被占用的线程的资源浪费问题（某些线程因为被keepalive，空挂在那里等待，中间几乎没有请求过来，甚至等到超时），event MPM中，会有一个专门的线程来管理这些keepalive类型的线程，当有真实请求过来的时候，请求传递给服务线程，执行完毕后，有允许它释放，这样增强了高并发场景下的请求处理能力。
+
+- 优点：单线程响应多请求，占据更少的内存，高并发下表现更优秀，会有一个专门的线程来管理keep-alive类型的线程，当有真实请求过来的时候，将请求传递给服务线程，执行完毕后，有允许它释放。
+
+- 缺点：没有线程安全控制
+
+![alt text](images/image38.png)
+
+
+### Nginx 高性能的Web服务端
+ 
+#### 影响用户体验的因素
+```shell
+# 客户端
+客户端硬件配置
+客户端网络速率
+客户端与服务端距离
+
+# 服务端
+服务端网络速率
+服务端硬件设备
+服务端架构设计
+服务端应用程序工作模式
+服务端并发数量
+服务端应文件大小及数量buffer cache
+服务端I/O压力
+```
+
+#### 服务端I/O流程
+
+- 磁盘I/O
+
+- 网络I/O
+网络通信就是网络协议栈到用户空间进程的IO就是网络IO
+
+- 网络IO过程
+```shell
+客户端通过浏览器与服务端建立连接，发送请求，服务端接收请求
+
+服务器通过网卡接收数据的请求，网卡收到请求后，使用DMA技术（直接内存访问），将收到的数据Copy到内存空间（内核缓冲区），该过程不需要CPU参与
+
+内核收到数据后，Copy数据到Web服务器的进程（用户空间），Nginx收到请求
+
+此时，web服务进程无法直接从硬盘读取数据，因为用户空间没有能力直接访问硬件
+
+因此Web服务进程，发请求给内核，内核收到请求后（内核拥有特权指令），内核可以将硬盘上的数据Copy到内核缓冲区， 然后再copy一份到web服务进程（用户空间）
+
+Web服务进程拿到数据后封装响应报文头，然后copy一份发给内核空间
+
+内核空间封装IP，tcp头等，然后从网卡发给客户端
+```
+
+#### IO模型
+- IO模型相关概念
+  - 同步和异步（消息通知机制）：
+    - 同步：syncchronous, 被调用者并不提供事件的处理结果相关的通知信息，需要调用者主动询问事情是否处理完成 
+    - 异步：asynchronous, 被调用者通过状态，通知或回调机制主动通知调用者被调用者的运行状态
+  
+  - 阻塞和非阻塞
+    - 阻塞：blocking，指IO操作需要彻底完成后才返回到用户空间，调用结果返回之前，调用者被挂起，干不了别的事情
+    - 非阻塞：nonblocking，指IO操作被调用后，立即返回给用户一个状态值，而无需等待IO操作完成，在最终的调用结果返回之前，调用者不会被挂起，可以去做别的事情。
+  
+- 网路IO模型
+  - 阻塞型，非阻塞型，复用型，信号驱动型，异步
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

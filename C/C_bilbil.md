@@ -1521,6 +1521,11 @@ void test3() {
 ```C
 void test3() {
   int a[5] = {0}; // 对数组中的所有数组初始化为0
+<<<<<<< HEAD
+=======
+  // 第一个元素是指定的数值0.后面为初始化的值，自动赋值为0
+  // 如果是a[5] = {1}，则结果是{1, 0, 0, 0, 0}
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   for (int i = 0; i < 5; i++) {
       printf("a[%d] = %d\n", i, a[i]);
   } 
@@ -1573,6 +1578,47 @@ int main() {
 // &a[6] = 0x7ffe85700c98
 ```
 
+<<<<<<< HEAD
+=======
+#### 数组补充知识
+- 可以通过sizeof(arr)， 数组的总大小，和数组类型计算出数组的长度
+```C
+#include<stdio.h>
+
+int main() {
+    int arr[4] = {1};
+    printf("%zu\n", sizeof arr);
+    // sizeof生产的是size_t类型的值
+    // 直接使用%u或%d可能会让编译器告警
+    // 使用%zu可以消除警告
+    int count = sizeof(arr) / 4;
+    printf("%d\n", count);
+    return 0;
+}
+```
+
+- 数组练习
+```C
+#include<stdio.h>
+
+double sum(double *arr, int size) {
+    // 这里虽然传递的数组， 但是在函数中会看做指针处理
+    double sum = 0.0;
+    for (int i = 0; i < size; i++) {
+        sum += arr[i];
+    }
+    return sum;
+}
+
+int main() {
+    double values[] = {2.1, 2.4, 4.2, 3.4, 9.3, 0.3};
+    int size = sizeof(values)/sizeof(values[0]); 
+    printf("%.2lf\n", sum(values, size));
+    return 0;
+}
+```
+
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 #### 扩展算法-素数筛
 - 基本思想：
   - 标记一个范围内的数组是否是合数，没有被标记的则为素数
@@ -1810,6 +1856,85 @@ int main() {
 char str[] = "hello world"; // 根据初始化的内容，确定数组大小
 cahr str[size] = {'h','e','l','l','o'};
 ```
+<<<<<<< HEAD
+=======
+- C11可选函数
+  - 查看是否支持可选函数
+  ```C
+  #include <stdio.h>
+
+  int main() {
+  #if defined __STDC_LIB_EXT1__
+    printf("Optional functions are defined.\n");
+  #else
+    printf("Optional functions are not defined.\n");
+  #endif
+    return 0;
+  }
+  // 如果支持就返回Optional functions are defined
+  ```
+  - 开启可选函数(支持可选函数的前提下)
+  ```C
+  #define __STDC_WANT_LIB_EXT1__ 1
+  #include <stdio.h>
+  #include <string.h>
+
+  int main() {
+    // TODO
+    return 0;
+  }
+  ```
+  - strnlen_s()
+    - 返回字符串长度
+    - 参数1: 字符串地址， 参数2：数组的大小（若字符串没有结尾的\0字符，函数可以避免访问最后一个元素后面的内存）
+    ```C
+    char str[][70] = {
+      "...",
+      "...",
+      "...",
+    };
+    unsigned int strCount = sizeof(str) / sizeof(str[0]);
+    for (unsigned int i = 0; i < strCount; i++) {
+      printf("The string: \n  \"%s\"\n contains %zu characters.\n", str[i], strnlen_s(str[i], sizeof(str[i])));
+    }
+    ```
+  - strcpy_s()
+    - 把一个字符串变量的内容赋予另一个字符串。
+    - 返回值：一切正常，返回0；否则返回非0整数
+    - 参数1：指定复制目标；参数2：指定第一个参数的大小；参数3：源字符串
+    - 指定第一个参数大小的目的：使函数避免覆盖目标字符串中最后一个字符后面的内存
+    ```C
+    char source[] = "Only the mediocre are always at their best.";
+    char destination[50];
+    if (strcpy_s(destination, sizeof(destination), source)) {
+        printf("An error occurred coping the string.\n");
+    }
+    ```
+  
+  - strncpy_s()
+    - 把源字符串的一部分复制到目标字符串中
+    - 对比strcpy_s,多一个第四参数：指定从第三个参数的元字符串中复制的最大字符数
+    ```C
+    char source[] = "Only the mediocre are always at their best.";
+    char destination[50];
+    if (strcpy_s(destination, sizeof(destination), source, 17)) {
+        printf("An error occurred coping the string.\n");
+    }
+    ```
+  
+  - strcat_s
+    - 拼接字符串
+    - 返回值：一切正常返回0，不正常返回非0
+    - 两个方面确保操作安全
+      - 目标字符串的可用空间是否足够，不会覆盖其他数据
+      - 连接得到的字符串末尾有\0字符
+    - 参数1：要添加新字符串的字符串地址；参赛2：第一个参数可以存储的最大字符长度；参数3：要添加到第一个字符串中的字符串地址
+    ```C
+    char str1[50] = "To be, or not to be, ";
+    char str2[] = "that is the question.";
+    int retval = strcat_s(str1, sizeof(str1), str2);
+    ```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 - 字符串相关操作
   - 头文件：string.h
   - `strlen(str)` : 计算机字符串长度，以\0作为结束符
@@ -1819,6 +1944,21 @@ cahr str[size] = {'h','e','l','l','o'};
     printf("string = %d, sizeof = %d\n", strlen(str), sizeof(str));
     // string = 3, sizeof = 4
     ```
+<<<<<<< HEAD
+=======
+    - 注意区分字符数组大小和字符串长度之间的区别
+    ```C
+    #include<string.h>
+
+    int main() {
+        char str[] = "Hello\0 World";
+
+        printf("strlen : %zu\n", strlen(str));            // strlen: 5
+        printf("sizeof string : %lu\n", sizeof(str));     // sizeof(str): 13
+        return 0;
+    }
+    ```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   - `strcmp(str1, str2);` : 字符串比较
     - 从第一个字符开始比较，依次向后，知道能比较出结果为止
     ```C
@@ -1845,7 +1985,25 @@ cahr str[size] = {'h','e','l','l','o'};
     // after str1 = world
     ```
   - `strncmp(str1, str2, n);` : 安全的字符串比较
+<<<<<<< HEAD
   - `strncpy(str1, str2, n);` : 安全的字符串拷贝
+=======
+  - `strncpy(str1, str2, n);` : 
+    - 安全的字符串拷贝
+    ```c
+    #include<stdio.h>
+    #include<string.h>
+    int main() {
+      char str1[] = "mystical";
+      char str2[10];
+      strncpy(str2,  str1, 4);
+      str2[4] = '\0';
+      printf("str2 = %s\n", str2);
+      
+      return 0;
+    }
+    ```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
   - `memcpy(str1, str2, n);` ： 内存拷贝
   - `memcmp(str1, str2, n);` : 内存比较
   - `memset(str1, c, n);` : 内存设置
@@ -1882,6 +2040,104 @@ cahr str[size] = {'h','e','l','l','o'};
     
     ```
 
+<<<<<<< HEAD
+=======
+#### 字符串搜索
+- strchr()
+  - 作用：在字符串中搜索给定的字符。
+  - 返回值：在字符串中找到的第一个给定字符的地址，如果没有找到给定字符，返回NULL
+  - 参数1：要搜索的字符串；参数2：要查找的字符
+  ```C
+  char str[] = "The quick brown fox";
+  char ch = 'q';
+  char *pGot_char = NULL;
+  pGot_char = strchr(str, ch);
+  ```
+
+- strstr()
+  - 作用：在字符串中查找子字符串
+  - 返回值：找到的子字符串的位置指针，如果找不到匹配的子字符串，返回NULL
+  - 参数1：要搜索的字符串；参数2：要查找的子字符串
+  ```C
+  #include<stdio.h>
+  #include<string.h>
+
+  int main() {
+      char str[] = "hello this is a dog, i like dog.";
+      char str2[] = "dog";
+      int count = 0;
+      char *Find = strstr(str, str2);
+      while (Find != NULL) {
+          count++;
+          Find = strstr(Find + strlen(str2), str2);
+      }
+      printf("%d\n", count);
+      return 0;
+  }
+  ```
+
+#### 单元化字符串
+- strtok()
+  - 作用：把句子分解为单词
+  - 返回值：指向当前分割得到的子字符串（token）的指针；如果没有更多的子字符串可以分割，strtok 将返回 NULL
+  - 工作原理：
+    - strtok 会在遇到 delim 参数中的任何字符时，把它替换为 '\0'（null 字符）并返回指向当前分割得到的子字符串的指针。
+    - 在后续的调用中，您应该将第一个参数设置为 NULL，以指示 strtok 继续处理上次调用的剩余部分。
+    - strtok 会继续查找并分割子字符串，直到遍历完整个原始字符串。
+  - 参数1：要单元化的字符串；参数2：包含所有可能的界定符的字符串。
+  ```C
+  #include <stdio.h>
+  #include <string.h>
+
+  int main() {
+      char str[] = "Hello, world! Welcome to C programming.";
+      const char *delim = " ,.!"; // 分隔符为空格、逗号、句号和感叹号
+
+      char *token = strtok(str, delim);
+      while (token != NULL) {
+          printf("%s\n", token);
+          token = strtok(NULL, delim); // 继续处理剩余的字符串
+      }
+
+      return 0;
+  }
+  ```
+
+#### 分析和转换字符串
+- 分析字符串
+  - 头文件：<ctype.h>
+  - 为真返回非0值，为假范围0
+  - 函数：islower() ; isupper() ; isalpha() ; isalnum() ; isdigit() ; isspace()
+
+- 转换字符串
+  - 头文件：<ctype.h>
+  - toupper() 和 tolower()
+  ```C
+  #include<stdio.h>
+  #include<ctype.h>
+
+  int main() {
+      char id[] = "mystical";
+      for (int i = 0; (id[i] = (char)toupper(id[i])) != '\0'; i++);
+      printf("%s\n", id);
+      return 0;
+  }
+  ```
+
+- 将字符串转换为数值
+  - 函数：atof() ; atoi() ; atol() ; atoll
+  ```C
+  #include<stdio.h>
+  #include<stdlib.h>
+
+  int main() {
+      char str[] = "12.454";
+      double num = atof(str);
+      printf("%lf\n", num);
+      return 0;
+  }
+  ```
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 #### 数组的存储
 - 存储方式
   - 行序优先：一行一行存（大多是行序优先）
@@ -2421,6 +2677,10 @@ int main() {
 ```
 进程
 概念：进程是计算机中的程序关于某数据集合上的一次运行活动，是系统进行资源分配和调度的一个独立单位。
+<<<<<<< HEAD
+=======
+总结：操作系统分配资源的最基本单位
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 
 作用与功能：
 
@@ -2437,6 +2697,10 @@ int main() {
 作用与功能：
 
 线程是执行指令的最小单位。
+<<<<<<< HEAD
+=======
+线程：CPU计算的最基本单位
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
 它比进程更轻量级，拥有自己的执行堆栈和程序计数器等状态信息，但共享所属进程的其他资源，如内存和文件。
 联系：
 

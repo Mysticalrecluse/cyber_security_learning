@@ -106,4 +106,46 @@ According to Chen, during the Double Eleven shopping festival, users can receive
 
 With such <b title="合作">partnerships</b>, Chen hopes to double his company's sales volumes this year.
 
+<<<<<<< HEAD
 Major e-commerce platforms are adopting similar <b title="策略">strategies</b>. This year, Taobao launched an AI shopping assistant specifically designed for the elderly. The tool allows seniors to easily compare prices and select the best-selling products within a category by simply speaking to the AI assistant.
+=======
+Major e-commerce platforms are adopting similar <b title="策略">strategies</b>. This year, Taobao launched an AI shopping assistant specifically designed for the elderly. The tool allows seniors to easily compare prices and select the best-selling products within a category by simply speaking to the AI assistant.
+
+## DATA: 2024/01/10
+### Article
+<h3>Room to Grow: Shanghai's Housing Solution for <mark style="background-color: tomato" title="农民工"><b title="移民者，流浪的">Migrant</b> Workers</mark></h3>
+
+Deep in <b title="债务">debt</b> and with just 1000 yuan(<b title="那时">then</b> around $152) in his pocket, Liu Qiang arrived in Shanghai in 2016 // with a dream and a mission: either die in a strange land or return home in <b title="荣耀">glory</b>, perhaps driving a <b title="奢华，豪华">luxury</b> car or living in a <b title="豪宅">mansion</b>.
+
+However, on his very first day, Liu fell <b title="受害者">victim</b> to a job <b title="诈骗">scam</b>, in which a <b title="中介">middleman</b> <b title="剥夺">stripped</b> him of half his already <b title="微薄的">meager</b> savings, <b title="离开">left</b> him without work, and <b title="强迫">forced</b> him to sleep in a <b title="地铁站">metro station</b>.
+
+"Back then, I just wanted to <b title="生存">survive</b> and live a <b title="体面">decent</b> lift in Shanghai," says Liu, who <b title="漂泊">drifted</b> from city to city, working in factories and at street <b title="摊位">stalls</b>, before moving to Shanghai.
+
+## DATA: 2024/01/11
+### Article
+After his <b title="灾难般的">disastrous</b> start, Liu finally <b title="seek,寻找，谋取； seek help 寻求帮助">sought help</b> from friends, who helped him <b title="land sth:得到一个积极正向的东西">land</b> a job at a security <b title="公司">firm</b>. Over the next six years, he <mark style="background-color: tomato" title="步步攀升">made his way up</mark> and is now a project manager at the same company. Though a significiant <b title="跨越">leap</b> from his days as a <b title="巡逻">patrol</b> officer, his wife and children still live in his hometown of Handan in the northern Hebei province.
+
+Today, Liu's <b title="野心">ambitions</b> extend beyond professional achievements. His most <b title="紧迫的">pressing</b> goal is to buy an apartment in Shanghai, a <b title="恐怖的，可怕的">formidable</b> task <b title="鉴于">given</b> the city's high <b title="产业，财产">property</b> prices. Even away from the city center, housing costs can reach 30,000 yuan ($4,200) per square meter - far out of reach for Liu, who earns 8,000 yuan a month, and many like him.
+
+## DATA: 2024/01/15
+### Article
+Recognizing this, the Shanghai municipal government has launched a housing project aimed at providing <mark style="background-color: tomato" title="经济适用房"><b title="承担得起的，支付得起的">affordable</b> living spaces</mark>for its <b title="膨胀的，激增的">burgeoning</b> population. <mark style="background-color: tomato" title="目前为止">So far</mark>, the project is <b title="展开">spread</b> across 188 projects in various neighborhoods, form <b title="繁忙的">busting</b> downtown areas to quieter <b title="郊区">suburbs</b>.
+
+And by 2025, the Shanghai government plans to  increase to total <b title="租的">rental</b> units to 600,000 to address the <b title="紧迫的">urgent</b> need for housing that <b title="满足">caters</b> to low- and middle-income <b title="居民">residents</b> like Liu.
+
+Liu currently lives in one such unit, the "Home of the New Era City Managers, " a new affordable rental housing <b title="方案，计划">scheme</b> launched in july in Shanghai's Minhang <b title="区">District</b>. This particular scheme, managed by  China Resources Land, is designed to support workers in <b title="行业">sectors</b> such as <b title="建筑">construction</b>, <b title="快递，送货">delvery</b>, <b title="清洁类">sanitation</b>, security, and <b title="家政服务">domestic help</b>.
+
+## DATA: 2024/01/16
+### Article
+In November, Liu and three colleagues moved from a company <b title="宿舍">dormitory</b> to this housing project, where they currently share a four=person room. Liu's employer covers his <b title="房租，租金">rent</b>, which ranges from 500 yuan a month for a four-person room to 900 yuan for a double room.
+
+However, the challenges of <b title="定居">settling</b> in Shanghai aren't just about <b title="金融的，经济的">financial</b> <b title="担忧">concerns</b>. Li Xiaohui, a 33-years-old gardener from Datong, in the northern Shanxi province, <mark style="background-color: tomato" title="和...斗争">grapples with</mark> personal <b title="困难，特指进退两难，很难做的困难">dilemmas</b>
+
+He deeply ragrets missing family events - his father had a <b title="中风">stroke</b> in 2021 and his grandmother passed away = due to work commitments and <b title="交通">transportation</b> issues. While he has considered moving his family to Shanghai, the <b title="过度">transition</b> is <b title="复杂化">complicated</b> by his parent's <b title="依恋">attachment</b> to their hometown's lifestyle.
+
+## DATA: 2024/01/19
+### Article
+The ease the pressure, Li bought a car for <b title="紧急事件">emergencies</b>. Yet, he faces societal pressures, like the <b title="期待">expectation</b> to own the home for marriage in his hometown. "I doubt I can earn quickly enough to fulfill my parents' expectations, given my current job and housing costs," says Li, adding that he's considering returning to his hometown if marriage becomes <b title="即将发生，迫在眉睫">imminent</b>.
+
+Meanwhile Liu is determined to stay in Shanghai. As a migrant worker with limited formal education, he's now <b title="攻克">pursuing</b> a college <b title="学位">degree</b> through adult education, often studying after hours in his dormitory. His goal is to reach the 120-point <b title="门槛">threshold</b> to <b title="获取">obtain</b> a Shanghai <b title="户籍">household registration</b>, or the hukou, which will allow his children to take the local <mark style="background-color: tomato" title="高考">college entrance exam</mark> and have better opportunities.
+>>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
