@@ -1,0 +1,133 @@
+<mxfile host="Electron" modified="2024-04-19T11:56:53.059Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.2.5 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="xUWoGy6q3Gbm0fBIbmJW" version="24.2.5" type="device">
+  <diagram name="第 1 页" id="c6nMiKpPeQTMGGTEMv0i">
+    <mxGraphModel dx="2567" dy="1980" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;endArrow=none;endFill=0;fillColor=#d5e8d4;strokeColor=#82b366;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-1" target="V30fz-DR-y6Hy02jXBQA-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-1" value="chrony" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#008a00;strokeColor=#005700;fontStyle=1;fontColor=#ffffff;fontSize=19;" vertex="1" parent="1">
+          <mxGeometry x="-75" y="120" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-50" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#82b366;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#d5e8d4;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-2" target="V30fz-DR-y6Hy02jXBQA-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-51" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#82b366;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#d5e8d4;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-2" target="V30fz-DR-y6Hy02jXBQA-5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-2" value="实现私有时间服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-65" y="210" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-31" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-4" target="V30fz-DR-y6Hy02jXBQA-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-34" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-4" target="V30fz-DR-y6Hy02jXBQA-33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-4" value="服务端配置" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-205" y="339" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-43" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#dae8fc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-5" target="V30fz-DR-y6Hy02jXBQA-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-5" value="客户端配置" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="395" y="339" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-30" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-6" target="V30fz-DR-y6Hy02jXBQA-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-6" value="监听123/udp端口" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="-445" y="419" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-44" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#dae8fc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-9" target="V30fz-DR-y6Hy02jXBQA-40">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-9" value="监听323/udp端口" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="375" y="419" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-28" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-10" target="V30fz-DR-y6Hy02jXBQA-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-29" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-10" target="V30fz-DR-y6Hy02jXBQA-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-10" value="修改配置文件&lt;div&gt;/etc/chrony/chrony.conf&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="-445" y="519" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-39" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-13" target="V30fz-DR-y6Hy02jXBQA-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-13" value="&lt;div&gt;指定时钟同步服务器&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="-635" y="619" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-14" target="V30fz-DR-y6Hy02jXBQA-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-14" value="&lt;div&gt;添加下列行&lt;/div&gt;&lt;div&gt;server ntp.aliyun.com iburst&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=3" vertex="1" parent="1">
+          <mxGeometry x="-660" y="699" width="210" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-25" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-15" target="V30fz-DR-y6Hy02jXBQA-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-26" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-15" target="V30fz-DR-y6Hy02jXBQA-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-15" value="&lt;div&gt;其他配置&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="-225" y="619" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-16" value="&lt;div&gt;阿里云公共NTP&lt;/div&gt;&lt;div&gt;ntp.aliyun.com&lt;/div&gt;&lt;div&gt;ntp1-7.aliyun.com&lt;/div&gt;&lt;div&gt;腾讯云公共NTP&lt;/div&gt;&lt;div&gt;time1-5.cloud.tencent.com&lt;/div&gt;&lt;div&gt;北京邮电大学NTP&lt;/div&gt;&lt;div&gt;s1a.time.edu.cn&lt;/div&gt;&lt;div&gt;清华大学NTP&lt;/div&gt;&lt;div&gt;s1b.time.edu.cn&lt;/div&gt;&lt;div&gt;北京大学&lt;/div&gt;&lt;div&gt;s1c.time.edu.cn&lt;/div&gt;&lt;div&gt;国家授时中心服务器&lt;/div&gt;&lt;div&gt;210.72.145.44&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="-635" y="789" width="160" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-18" target="V30fz-DR-y6Hy02jXBQA-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-18" value="/etc/apache2/.htpasswd" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=3" vertex="1" parent="1">
+          <mxGeometry x="-385" y="699" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-20" value="允许10.0.0.0网段的主机将本机作为时间同步服务器" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="-455" y="789" width="300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-24" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;curved=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-21" target="V30fz-DR-y6Hy02jXBQA-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-21" value="&lt;div&gt;local stratum 10&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=3" vertex="1" parent="1">
+          <mxGeometry x="-55" y="699" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-22" value="允许本机在不能与外网同步的情况下，还能提供服务" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="-135" y="789" width="300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-37" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-33" target="V30fz-DR-y6Hy02jXBQA-35">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-38" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#d6b656;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#fff2cc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-33" target="V30fz-DR-y6Hy02jXBQA-36">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-33" value="使用timedatectl开关chrony.service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="5" y="419" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-35" value="timedatectl set-ntp 0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="-85" y="519" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-36" value="timedatectl set-ntp 1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="145" y="519" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-45" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#dae8fc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-40" target="V30fz-DR-y6Hy02jXBQA-41">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-40" value="修改配置文件&lt;div&gt;/etc/chrony/chrony.conf&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="375" y="519" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-46" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#6c8ebf;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;fillColor=#dae8fc;" edge="1" parent="1" source="V30fz-DR-y6Hy02jXBQA-41" target="V30fz-DR-y6Hy02jXBQA-42">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-41" value="同步服务端NTP的IP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="375" y="619" width="160" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="V30fz-DR-y6Hy02jXBQA-42" value="&lt;div&gt;添加下列行&lt;/div&gt;&lt;div&gt;server 10.0.0.206 iburst&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=3" vertex="1" parent="1">
+          <mxGeometry x="350" y="694" width="210" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

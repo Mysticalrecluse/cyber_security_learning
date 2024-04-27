@@ -1244,5 +1244,52 @@ dd if=/dev/cdrom of=/path/to/cdimage.iso
 
 
 
+## 日常案例收集
+- 关于${1:-}的使用
+```shell
+# 源自/lib/lsb/init-functions
+
+log_daemon_msg () {
+    if [ -z "${1:-}" ]; then
+        return 1
+    fi
+    log_daemon_msg_pre "$@"
+
+    if [ -z "${2:-}" ]; then
+        echo -n "$1:" || true
+        return
+    fi
+
+    echo -n "$1: $2" || true
+    log_daemon_msg_post "$@"
+}
+
+# ${1:-}的含义：
+# 用于提供位置参数的默认值或替代值
+test () {
+    echo ${1:-"hello"}
+}
+test "world"
+
+# 如果$1有值，则$1为原本的值
+# 如果$1为空，则$1为后面的默认值"hello"
+```
+
+
+- 关于{ :; }的使用
+```shell
+# 源自/lib/lsb/init-functions
+log_daemon_msg_pre () { :; }
+```
+
+- `:` 是一个内置命令，通常被称为空命令或no-op（无操作）。其功能类似于 Shell 的内置命令 true，因为它不执行任何操作，但总是返回退出状态 0，表示成功。这个命令经常在脚本中被用来作为占位符或者确保命令序列不为空。
+
+
+- 应用场景
+  - <span style="color:green;font-weight:700">占位符：</span>在某些情况下，如果语法要求必须有一个命令，但实际上又不需要执行任何操作时，可以使用 : 作为占位符。例如，在if语句中可能只需要在条件成立时不执行任何操作，但又需要语法上的完整。
+  - <span style="color:green;font-weight:700">函数桩：</span>在开发中，: 可用作函数体的临时占位符，这样的函数也被称为“桩”。这允许开发者在整体应用架构搭建期间先行定义函数接口，具体实现可以随后添加。
+  - <span style="color:green;font-weight:700">保持接口一致性：</span>在脚本或程序中，如果某些情况下不需要执行任何操作，但为了保持接口的一致性或代码的可读性，可能会使用 :。
+
+
 
 
