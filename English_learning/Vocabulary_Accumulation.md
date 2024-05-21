@@ -106,9 +106,6 @@ According to Chen, during the Double Eleven shopping festival, users can receive
 
 With such <b title="合作">partnerships</b>, Chen hopes to double his company's sales volumes this year.
 
-<<<<<<< HEAD
-Major e-commerce platforms are adopting similar <b title="策略">strategies</b>. This year, Taobao launched an AI shopping assistant specifically designed for the elderly. The tool allows seniors to easily compare prices and select the best-selling products within a category by simply speaking to the AI assistant.
-=======
 Major e-commerce platforms are adopting similar <b title="策略">strategies</b>. This year, Taobao launched an AI shopping assistant specifically designed for the elderly. The tool allows seniors to easily compare prices and select the best-selling products within a category by simply speaking to the AI assistant.
 
 ## DATA: 2024/01/10
@@ -148,4 +145,3 @@ He deeply ragrets missing family events - his father had a <b title="中风">str
 The ease the pressure, Li bought a car for <b title="紧急事件">emergencies</b>. Yet, he faces societal pressures, like the <b title="期待">expectation</b> to own the home for marriage in his hometown. "I doubt I can earn quickly enough to fulfill my parents' expectations, given my current job and housing costs," says Li, adding that he's considering returning to his hometown if marriage becomes <b title="即将发生，迫在眉睫">imminent</b>.
 
 Meanwhile Liu is determined to stay in Shanghai. As a migrant worker with limited formal education, he's now <b title="攻克">pursuing</b> a college <b title="学位">degree</b> through adult education, often studying after hours in his dormitory. His goal is to reach the 120-point <b title="门槛">threshold</b> to <b title="获取">obtain</b> a Shanghai <b title="户籍">household registration</b>, or the hukou, which will allow his children to take the local <mark style="background-color: tomato" title="高考">college entrance exam</mark> and have better opportunities.
->>>>>>> 7a794a713a1b043c1041182895a874450d05bad6
