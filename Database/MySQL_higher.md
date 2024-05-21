@@ -5412,7 +5412,7 @@ SHOW VARIABLES LIKE 'innodb_file_per_table';
 系统表空间的结构和独立表空间基本类似，只不过由于整个MySQL进程只有一个系统表空间，在系统表空间中会额外记录一些有关整个系统信息的页面，这部分是独立表空间中没有的
 
 
-## 索引的创建与设计原则
+## 索引的创建
 
 ### 索引的声明与使用
 #### 索引分类
@@ -5623,5 +5623,278 @@ CREATE TABLE ts1(
 
 #### 隐藏索引
 
+在MySQL5.7版本及以前，只能通过显式的方式删除索引。此时，如果删除索引后出现错误，又只能通过显式创建索引的方式将删除的索引创建回来。如果数据表中的数据量非常大，或者数据表本身比较大，这种操作就会消耗系统过多的资源，操作成本非常高
 
-### 索引设计原则
+从MySQL8.0开始支持`隐藏索引(invisible Indexes)`，只需要将待删除的索引设置为隐藏索引，使查询优化器不再使用这个索引(即使使用force index(强制使用索引)，优化器也不会使用该索引)，确认将索引设置为隐藏索引后系统不受任何响应，就可以删除索引。`这种通过先将索引设置为隐藏索引，再删除索引的方式就是软删除`
+
+同时，如果你想验证这个索引删除之后的`查询性能影响`，就可以暂时先隐藏该索引
+
+```
+注意:
+主键不能被设置为隐藏索引。当表中没有显示主键时，表中第一个唯一非空索引会成为隐式主键，也不能设置隐藏索引
+```
+
+索引默认是可见的，在使用CREATE TABLE，CREATE INDEX或者ALTER TABLE等语句时可以通过`VISIBLE`或者`INVISIBLE`关键词设置索引的可见性
+
+#### 创建表时之间创建
+```sql
+CREATE TABLE tablename(
+    propname1 type1[CONSTRAINT1],
+    propname2 type2[CONSTRAINT2],
+    ...
+    propnamen typen[CONSTRAINTn],
+    INDEX [indexname] (propname1 [length]) INVISIBLE
+);
+```
+
+示例
+```sql
+CREATE TABLE book7 (
+    book_id INT,
+    book_name VARCHAR(100),
+    AUTHORS VARCHAR(100),
+    info VARCHAR(100),
+    COMMENT VARCHAR(100),
+    year_publication YEAR,
+    -- 创建不可见的索引
+    INDEX idx_cmt(COMMENT) invisible
+);
+
+SHOW INDEX FROM book7;
+```
+
+#### 创建表以后
+```sql
+ALTER TABLE book7
+ADD UNIQUE INDEX uk_idx_bname(book_name) invisible;
+
+CREATE INDEX idx_year_pub ON book7(year_publicationi) invisible;
+```
+
+#### 修改索引的可见性
+```sql
+ALTER TABLE book7 ALTER INDEX idx_year_pub invisible;
+
+EXPLAIN SELECT * FROM book7 WHERE year_publication = '2002';
+```
+
+注意：
+
+当索引被隐藏时，它的内容仍然是和正常索引一样实时更新的。如果一个索引需要长期被隐藏，那么可以将其删除，因为索引的存在会影响插入，更新和删除的性能。
+
+## 索引设计原则
+
+### 数据准备
+
+第一步：创建数据库、数据表
+```sql
+CREATE DATABASE atguigudb1;
+
+USE atguigudb1;
+
+-- 创建学生表和课程表
+CREATE TABLE student_info (
+    id INT(11) NOT NULL AUTO_INCREMENT,
+    student_id INT NOT NULL,
+    name VARCHAR(20) DEFAULT NULL,
+    course_id INT NOT NULL,
+    class_id INT(11) DEFAULT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY(id)
+) ENGINE=INNODB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+CREATE TABLE course (
+    id INT(11) NOT NULL AUTO_INCREMENT,
+    course_id INT NOT NULL,
+    course_name VARCHAR(40) DEFAULT NULL,
+    PRIMARY KEY(id)
+) ENGINE=INNODB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+```
+
+第二步：创建模拟数据必备的存储函数
+```sql
+-- 是自定义函数可以被创建
+SET GLOBAL log_bin_trust_function_creators = 1;
+
+-- 函数1：创建随机产生字符串函数
+DELIMITER //
+CREATE FUNCTION rand_string(n INT)
+    RETURNS VARCHAR(255) -- 该函数会返回一个字符串
+BEGIN
+    DECLARE chars_str VARCHAR(100) DEFAULT
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    DECLARE return_str VARCHAR(255) DEFAULT '';
+    DECLARE i INT DEFAULT 0;
+    WHILE i < n DO
+    SET return_str = CONCAT(return_str,SUBSTRING(chars_str,FLOOR(1+RAND() * 52), 1));
+    SET i = i + 1;
+    END WHILE;
+    RETURN return_str;
+END //
+DELIMITER ;
+
+-- 函数2： 创建随机函数
+DELIMITER //
+CREATE FUNCTION rand_num (from_num INT, to_num INT) RETURNS INT(11)
+BEGIN
+DECLARE i INT DEFAULT 0;
+SET i = FLOOR(from_num + RAND() * (to_num - from_num + 1));
+RETURN i;
+END //
+DELIMITER ;
+```
+
+第三步：创建插入模拟数据的存储过程
+```sql
+-- 存储过程1：创建插入课程表存储过程
+DELIMITER //
+CREATE PROCEDURE insert_course(max_num INT)
+BEGIN
+DECLARE i INT DEFAULT 0;
+SET autocommit = 0; -- 设置手动提交事务
+REPEAT -- 循环
+SET i = i + 1; -- 赋值
+INSERT INTO course (course_id, course_name) vALUES (rand_num(10000,10100), rand_string(6));
+UNTIL i = max_num
+END REPEAT;
+COMMIT; -- 提交事务
+END //
+DELIMITER ;
+
+-- 存储过程2：创建插入学生信息表存储过程
+DELIMITER //
+CREATE PROCEDURE insert_stu(max_num INT)
+BEGIN
+DECLARE i INT DEFAULT 0;
+SET autocommit = 0; -- 设置手动提交事务
+REPEAT -- 循环
+SET i = i + 1;
+INSERT INTO student_info (course_id, class_id, student_id, NAME) vALUES (rand_num(10000,10100), rand_num(10000,10200), rand_num(1,200000), rand_string(6));
+UNTIL i = max_num
+END REPEAT;
+COMMIT; -- 提交事务
+END //
+DELIMITER ;
+```
+
+第四部：调用存储过程
+```sql
+CALL insert_course(100);
+
+CALL insert_stu(1000000);
+```
+
+
+### 哪些情况适合创建索引
+
+#### 1.字段的数值有唯一性的限制
+
+索引本身可以起到约束的作用，比如唯一索引，主键索引都可以起到唯一性约束的，因此在我们的数据表中，如果`某个字段是唯一的`，就可以直接`创建唯一性索引`， 或者`主键索引`。这样可以更快地通过该索引来确定某条记录、
+
+例如：学生表中`学号`是具有唯一性的字段，为该字段建立唯一性索引可以很快确定某个学生的信息，如果使用`姓名的话`，可能存在同名现象，从而降低查询速度
+
+```
+业务上具有唯一特性的字段，即使是组合字段，也必须建成唯一索引（来源：Ali）
+说明：
+不要以为唯一索引影响了insert速度，这个速度损耗可以忽略，但提高查找速度是明显的。
+```
+
+#### 2. 频繁作为WHERE查询条件的字段
+
+某个字段在SELECT语句的WHERE条件中经常被使用到，那么就需要给这个字段创建索引了。尤其是在数据量大的情况下，创建普通索引就可以大幅度提升数据查询的效率
+
+比如：student_info数据表(含100万条数据)，假设我们想要查询student_id=123110的用户信息。
+如果我们没有对student_id字段创建索引，进行如下查询
+```sql
+SELECT course_id, class_id, name, create_time, student_id
+FROM student_info
+WHERE student_id = 123110; -- 花费0.911v sec
+
+-- 给student_id添加索引
+ALTER TABLE student_info
+ADD INDEX idx_sid(student_id);
+
+-- 查看索引是否添加成功
+show index from student_info;
+
+-- 成功后，再次查询
+SELECT course_id, class_id, name, create_time, student_id
+FROM student_info
+WHERE student_id = 123110; -- 花费0.002 sec
+```
+
+#### 3. 经常GROUP BY和ORDER BY的列
+
+索引就是让数据按照某种顺序进行存储或检索，因此当我们使用GROUP BY对数据进行分组查询，或者使用ORDER BY对数据进行排序的时候，就需要对`分组或者排序字段进行索引`。如果待排序的列有多个，那么可以在这些列上建立组合索引
+
+比如：按照student_id对学生修选课的课程进行分组，显示不同的student_id和课程数量，显示100个即可。
+
+如果我们不对student_id创建索引，执行下面的SQL语句
+```sql
+-- 删除之前添加的索引，查看无索引时的查询速度
+drop index idx_sid ON student_info;
+-- 查询
+SELECT student_id, count(*) as num FROM student_info GROUP BY student_id LIMIT 100; -- 8.797 sec
+
+-- 给student_id添加索引
+ALTER TABLE student_info
+ADD INDEX idx_sid(student_id);
+
+-- 查询
+SELECT student_id, count(*) as num FROM student_info GROUP BY student_id LIMIT 100; -- 0.002 sec
+
+-- 再次测试，同时检索GROUP BY和ORDER BY
+-- 并添加单列索引，查看效果
+ALTER TABLE student_info
+ADD INDEX idx_sid(student_id);
+
+ALTER TABLE student_info
+ADD INDEX idx_cre_time(create_time);
+
+-- 修改sql_mode值
+
+SELECT @@sql_mode;
+
+SET sql_mode = 'STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+
+SELECT student_id, COUNT(*) AS num FROM student_info
+GROUP BY student_id
+OLDER BY create_time DESC
+LIMIT 100; -- 8.719，效果很差
+
+-- 创建联合主键，并使用8.0d的新特性
+ALTER TABLE student_info
+ADD INDEX indx_sid_cre_time(student_id, create_time DESC);
+
+-- 再次测试
+SELECT student_id, COUNT(*) AS num FROM student_info
+GROUP BY student_id
+ORDER BY create_time DESC
+LIMIT 100; -- 0.976s 提升很多
+```
+
+#### UPDATE、DELETE的WHERE条件列
+
+当我们对某条数据进行UPDATE或者DELETE操作的时候，是否也需要对WHERE的条件创建索引？
+
+测试一下
+```sql
+-- 未创建索引
+UPDATE student_info SET student_id = 10002
+WHERE name = '462eed7ac6e791292a79'
+-- 运行结果：Affected rows: 0 运行时间：2.562s
+```
+
+效率不高，但是如果对name字段创建了索引，然后执行
+```sql
+-- 创建索引
+ALTER TABLE student_info
+ADD INDEX idx_name(name);
+
+UPDATE student_info SET student_id = 10002
+WHERE name = '462eed7ac6e791292a79'
+-- 运行结果：Affected rows: 0 运行时间：0.001 sec
+```
+
+效率有了大幅的提升
+
