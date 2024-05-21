@@ -799,11 +799,7 @@ typedef struct Node {
     struct Node *next;
 } Node;
 
-typedef struct Queue {
-    int count;
-    Node *head;
-    Node *tail;
-} Queue;
+ 
 
 
 Queue *initQueue() {
