@@ -1,0 +1,175 @@
+<mxfile host="Electron" modified="2024-05-07T02:07:30.077Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.2.5 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="l7KhJp_Mymk5Rxcj5vyU" version="24.2.5" type="device">
+  <diagram name="第 1 页" id="p-_X9yyB5Ny2MtwzjN8K">
+    <mxGraphModel dx="1902" dy="1398" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-1" value="Tomcat基本使用" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0050ef;fontColor=#ffffff;strokeColor=#001DBC;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="270" y="40" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-56" value="" style="group" vertex="1" connectable="0" parent="1">
+          <mxGeometry x="-760" y="180" width="2320" height="1121" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-12" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-2" target="h2VIEQUBgTQc3Tr8gH1n-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-2" value="wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.87/bin/apache-tomcat-9.0.87.tar.gz" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry y="100" width="510" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-13" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-3" target="h2VIEQUBgTQc3Tr8gH1n-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-3" value="tar xf apache-tomcat-9.0.87.tar.gz -C /usr/local/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="105" y="200" width="300" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-14" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-4" target="h2VIEQUBgTQc3Tr8gH1n-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-4" value="cd /us/local &amp;amp;&amp;amp; ln -sv apache-tomcat-9.0.87/ tomcat" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="97.5" y="300" width="315" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=0;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-5" target="h2VIEQUBgTQc3Tr8gH1n-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-5" value="Tomcat安装" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="194.5" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-15" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-6" target="h2VIEQUBgTQc3Tr8gH1n-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-6" value="ln -sv /usr/local/tomcat/bin/* /usr/local/bin/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="123.5" y="404.5" width="263" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-16" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-7" target="h2VIEQUBgTQc3Tr8gH1n-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-7" value="&lt;div&gt;useradd -r -s /sbin/nologin tomcat&lt;/div&gt;&lt;div&gt;chown -R tomcat.tomcat /usr/local/tomcat&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="123.5" y="510" width="263" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-17" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-8" target="h2VIEQUBgTQc3Tr8gH1n-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-8" value="&lt;div&gt;创建服务脚本&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="181.5" y="610" width="147" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-19" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-9" target="h2VIEQUBgTQc3Tr8gH1n-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-9" value="&lt;div&gt;[Unit]&lt;/div&gt;&lt;div&gt;Description=Tomcat&lt;/div&gt;&lt;div&gt;After=syslog.target.network.target&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;[Service]&lt;/div&gt;&lt;div&gt;Type=forking&lt;/div&gt;&lt;div&gt;Environment=Java_HOME=/usr/lib/jvm/jdk-11-oracle-x64/&lt;/div&gt;&lt;div&gt;ExecStart=/usr/local/tomcat/bin/startup.sh&lt;/div&gt;&lt;div&gt;ExecStop=/usr/local/tomcat/bin/shutdown.sh&lt;/div&gt;&lt;div&gt;PrivateTmp=true&lt;/div&gt;&lt;div&gt;User=tomcat&lt;/div&gt;&lt;div&gt;Group=tomcat&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;[Install]&lt;/div&gt;&lt;div&gt;WantedBy=multi-user.target&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0;align=left;spacingLeft=20;" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="92.5" y="710" width="325" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-18" value="&lt;div&gt;systemctl daemon-reload&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="155.75" y="1071" width="198.5" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-41" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-20" target="h2VIEQUBgTQc3Tr8gH1n-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-42" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-20" target="h2VIEQUBgTQc3Tr8gH1n-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-43" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-20" target="h2VIEQUBgTQc3Tr8gH1n-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-44" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-20" target="h2VIEQUBgTQc3Tr8gH1n-25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-45" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-20" target="h2VIEQUBgTQc3Tr8gH1n-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-46" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-20" target="h2VIEQUBgTQc3Tr8gH1n-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-20" value="Tomcat组成" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1020" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-28" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-21" target="h2VIEQUBgTQc3Tr8gH1n-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-21" value="bin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="560" y="100" width="97" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-30" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-22" target="h2VIEQUBgTQc3Tr8gH1n-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-22" value="conf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="693" y="100" width="97" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-34" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-23" target="h2VIEQUBgTQc3Tr8gH1n-33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-23" value="logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="970" y="100" width="97" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-32" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-24" target="h2VIEQUBgTQc3Tr8gH1n-31">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-24" value="lib" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="830" y="100" width="97" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-36" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-25" target="h2VIEQUBgTQc3Tr8gH1n-35">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-25" value="webapps" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1110" y="100" width="97" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-39" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-26" target="h2VIEQUBgTQc3Tr8gH1n-37">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-26" value="work" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1281.5" y="100" width="97" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-27" value="&lt;span style=&quot;font-weight: 400;&quot;&gt;管理脚本文件目录&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="550" y="200" width="117" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-29" value="&lt;span style=&quot;font-weight: 400;&quot;&gt;配置文件目录&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="683" y="200" width="117" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-31" value="&lt;span style=&quot;font-weight: 400;&quot;&gt;库文件目录&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="820" y="200" width="117" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-33" value="&lt;span style=&quot;font-weight: 400;&quot;&gt;日志目录&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="960" y="200" width="117" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-35" value="&lt;span style=&quot;font-weight: 400;&quot;&gt;应用程序目录&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1100" y="200" width="117" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-40" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-37" target="h2VIEQUBgTQc3Tr8gH1n-38">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-37" value="&lt;span style=&quot;font-weight: 400;&quot;&gt;Jsp编译后结果文件&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;建议提前预热访问&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1240" y="200" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-38" value="&lt;span style=&quot;font-weight: 400;&quot;&gt;设计应用后&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-weight: 400;&quot;&gt;删除此目录数据才能更新&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1240" y="300" width="180" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-50" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-47" target="h2VIEQUBgTQc3Tr8gH1n-48">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-51" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-47" target="h2VIEQUBgTQc3Tr8gH1n-49">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-47" value="常用配置文件结构" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1800" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-53" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-48" target="h2VIEQUBgTQc3Tr8gH1n-52">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-48" value="/usr/local/tomcat/conf/web.xml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1510" y="100" width="220" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-55" style="edgeStyle=orthogonalEdgeStyle;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=none;endFill=0;" edge="1" parent="h2VIEQUBgTQc3Tr8gH1n-56" source="h2VIEQUBgTQc3Tr8gH1n-49" target="h2VIEQUBgTQc3Tr8gH1n-54">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-49" value="/usr/local/tomcat/conf/server.xml" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="2040" y="100" width="220" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-52" value="&lt;div&gt;&amp;lt;!-- mime类型 --&amp;gt;&lt;/div&gt;&lt;div&gt;&amp;lt;mime-mapping&amp;gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;...&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;lt;/mime-mapping&amp;gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&amp;lt;mime-mapping&amp;gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&amp;lt;extension&amp;gt;zirz&amp;lt;/extension&amp;gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&amp;lt;mime-type&amp;gt;application/vnd.zul&amp;lt;/mime-type&amp;gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;lt;/mime-mapping&amp;gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&amp;lt;mime-mapping&amp;gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;...&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;lt;/mime-mapping&amp;gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;...&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&amp;lt;!-- 默认主页--&amp;gt;&lt;/div&gt;&lt;div&gt;&amp;lt;welcome-file-list&amp;gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;lt;welcome-file&amp;gt;index.html&amp;lt;/welcome-file&amp;gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;lt;welcome-file&amp;gt;index.htm&amp;lt;/welcome-file&amp;gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;lt;welcome-file&amp;gt;index.jsp&amp;lt;/welcome-file&amp;gt;&lt;/div&gt;&lt;div&gt;&amp;lt;/welcome-file-list&amp;gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&amp;lt;!-- 错误页面，后续详解--&amp;gt;&lt;/div&gt;&lt;div&gt;&amp;lt;error-page&amp;gt;&lt;/div&gt;&lt;div&gt;&amp;lt;/error-page&amp;gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0;align=left;spacingLeft=20;" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1463.75" y="200" width="312.5" height="390" as="geometry" />
+        </mxCell>
+        <mxCell id="h2VIEQUBgTQc3Tr8gH1n-54" value="&lt;div&gt;&lt;b&gt;&amp;lt;server port=&quot;&quot; shutdown=&quot;&quot;&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;blockquote style=&quot;margin: 0 0 0 40px; border: none; padding: 0px;&quot;&gt;&lt;div&gt;&lt;b&gt;&amp;lt;listener className=&quot;&quot; /&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;lt;GlobalNamingResources&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&amp;lt;Resource key=&quot;value&quot; key=&quot;value&quot;&amp;gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;lt;/GlobalNamingResources&amp;gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;lt;service&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#ff8000&quot;&gt;#&amp;nbsp;元素定义了Tomcat中的一个服务（实例），一个tomcat服务器可以开多个实例，不同实例可以监听不同的端口，使用不同的配置和部署不同的Web应用程序，每个实例被定义成一个Service，一个Service可以包含多个连接器和多个虚拟主机&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#ff8000&quot;&gt;#&amp;nbsp;&amp;lt;Executor&amp;gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; 用于配置Service的共享线程池&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;lt;Executor /&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#ff8000&quot;&gt;#用于配置Tomcat的连接器，负责处理客户端与Tomcat之间的通信，一个service中可以有多个connector,每个connector定义了一个端口和协议的组合，允许Tomcat在不同的端口上监听不同的网络协议或配置不同的连接器属性&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;lt;Connector ... /&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;lt;Engine&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#ff8000&quot;&gt;#&amp;nbsp;用于配置Tomcat的连接器，负责处理客户端与Tomcat之间的通信，一个service中可以有多个connector,每个connector定义了一个端口和协议的组合，允许Tomcat在不同的端口上监听不同的网络协议或配置不同的连接器属性&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&amp;nbsp;&lt;b&gt; &amp;nbsp; &amp;lt;Host &amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;font color=&quot;#ff8000&quot;&gt;#用来定义虚拟主机&lt;/font&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;b&gt;&amp;lt;Valve&amp;gt;&lt;/b&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;font color=&quot;#ff8000&quot;&gt;# 定义特定功能组件&lt;/font&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;b&gt;&amp;lt;/Valve&amp;gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;lt;/Host&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;lt;Context&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;font color=&quot;#ff8000&quot;&gt;# 配置WEBAPP的上下文&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#ff8000&quot;&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;&lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;# 类似location / {}&lt;/font&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &lt;b&gt;&amp;nbsp; &amp;lt;/Context&amp;gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;lt;/Engine&amp;gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;lt;/service&amp;gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;/blockquote&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;lt;/server&amp;gt;&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=0;align=left;spacingLeft=20;spacingRight=10;" vertex="1" parent="h2VIEQUBgTQc3Tr8gH1n-56">
+          <mxGeometry x="1980" y="200" width="340" height="820" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

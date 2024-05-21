@@ -62,7 +62,11 @@ mysqld --initialize-insecure --user=mysql --datadir=/data/mysql
 
 # 加启动脚本
 cp /usr/local/mysql/support-files/mysql.server /etc/init.d/mysqld
+<<<<<<< HEAD
 chkconfig --add mysqld
+=======
+chkconfig
+>>>>>>> fa69fbdd72bbff1a091e4408ad363a8a6d9fc8d6
 
 # 启动服务
 systemctl start mysqld
@@ -96,9 +100,111 @@ pid-file=/mysql/3306/pid/mysql.pid
 
 sed 's/3306/3307/' /mysql/3306/etc/my.cnf > /mysql/3307/etc/my.cnf
 sed 's/3306/3308/' /mysql/3306/etc/my.cnf > /mysql/3308/etc/my.cnf
+<<<<<<< HEAD
 
 配置启动脚本
 
 ```
 
 ## MySQL的组成和常用工具
+=======
+```
+
+配置启动脚本
+```shell
+#!/bin/bash
+
+PORT=3306
+USER="root"
+PWD="Magedu-m52"
+CMD_PATH="/usr/bin"
+BASE_DIR="/mysql"
+SOCKET="${BASE_DIR}/${PORT}/socket/mysql.sock"
+
+mysql_start(){
+    if [ ! -e "$SOCKET" ];then
+        echo "Starting MySQL..."
+        ${CMD_PATH}/mysqld_safe --defaults-file=${BASE_DIR}/${PORT}/etc/my.cnf &>/dev/null &
+    else
+        echo "MySQL is running..."
+        exit
+    fi
+}
+
+mysql_stop(){
+    if [ ! -e "$SOCKET" ];then
+        echo "MySQL is stoped..."
+        exit
+    else
+        echo "Stop MySQL..."
+        ${CMD_PATH}/mysqladmin -u ${USER} -p${PWD} -S ${SOCKET} shutdown
+    fi
+}
+
+mysql_restart(){
+    echo "Starting MySQL..."
+    mysql_stop
+    leep 2
+    mysql_start
+}
+
+case $1 in
+    start)
+        mysql_start
+        ;;
+    stop)
+        mysql_stop
+        ;;
+    restart)
+        mysql_restart
+        ;;
+    *)
+        echo "Usage: ${BASE_DIR}/${PORT}/bin/mysqld {start|stop|restart}"
+esac
+```
+
+```shell
+# 加可执行权限
+chmod +x /mysql/3306/bin/mysqld
+
+# 启动
+/mysql/3306/bin/mysqld start
+
+# 进入mysql
+mysql -S /mysql/3306/socket/mysql.sock
+
+# 配置密码：
+mysqladmin -uroot -S /mysql/3306/socket/mysql.sock password 'Magedu-m58'
+
+# 再次连接，需要输入密码
+mysql -S /mysql/3306/socket/mysql.sock -p
+
+# 加开机启动项
+vim /etc/rc.d/rc.local
+
+for i in {3306..3308}; do
+    /mysql/$i/bin/mysqld start;
+done
+
+chmod a+x /etc/rc.d/rc.local
+```
+
+
+## MySQL的组成和常用工具
+
+### MySQL主要组成
+
+mysql基于C/S模式提供服务，主要由客户端程序和服务端程序组成，另外还有一些管理工具
+
+服务端主要组成
+- mysqld_safe
+  - 安全启动脚本
+- mysqld
+  - 服务端程序，是mysql服务的核心程序
+- mysqld_multi
+  - 多实例工具
+
+
+客户端主要组成
+- 
+>>>>>>> fa69fbdd72bbff1a091e4408ad363a8a6d9fc8d6
