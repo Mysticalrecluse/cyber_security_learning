@@ -6929,3 +6929,134 @@ START TRANSACTION;
 
 - 其他的一些语句
   - `ANALYZE TABLE`、`CACHE INDEX`、`CHECK TABLE`、`FLUSH`、`LOAD INDEX INTO CACHE`、`OPTIMIZE TABLE`、`REPAIR TABLE`、`RESET`等语句也会隐式提交前边语句所属事务
+
+
+## 事务的隔离级别
+
+MySQL是一个`客户端/服务器`架构的软件，对于同一个服务器来说，可以有若干个客户端与之连接，每个客户端与服务器连接上之后，就可以称为一个会话(session)。每个客户端都可以在自己的会话中向服务器发出请求语句，一个请求可能是某个事务的一部分，也就是对于服务器来说可能同时处理多个事务。事务有`隔离性`的特性，理论上在某个事务`对某个数据进行访问`时，其他事务应该进行`排队`，当该事务提交之后，其他事务才可以继续访问这个数据。但是这样对`性能影响太大`，我们既想保持事务的隔离性，又想让服务器在处理访问同一数据的多个事务时`性能尽可能高些`，那就看二者如何权衡取舍了
+
+### 数据准备
+```sql
+CREATE TABLE student (
+    studentno INT,
+    `name` VARCHAR(20),
+    class VARCHAR(20),
+    PRIMARY KEY (studentno)
+) ENGINE=InnoDB CHARSET=utf8;
+```
+
+然后想这个表插入一条数据
+```sql
+INSERT INTO student VALUES(1, '小谷','1班');
+```
+
+### 数据并发问题
+
+针对事务的隔离性和并发性，我们怎么做取舍？先看下访问相同数据的事务在`不保证串行执行`的情况下，可能出现哪些问题
+
+#### 脏写（Dirty Write）
+
+对于两个事务SessionA、SessionB，如果事务SessionA`修改了`另一个`未提交`事务SessionB`修改过`的数据，那就意味着发生了脏写
+![alt text](images/image25.png)
+
+SessionA和SessionB各开启了一个事务，SessionB中的事务先将studentno列为1的记录的name列更新为李四
+
+然后SessionA中的事务接着又把这条studentno列为1的记录的name列更新为“张三，如果之后SessionB中的事务进行了回滚，那么SessionA中的更新也将不复存在，这种现象就称之为脏写。
+
+这时SessionA的事务就没有效果了，明明把数据更新了，最后也提交了事务，但是最后看到的数据什么变化也没有。
+
+这里大家对事务的隔离级别比较了解的话，会发现默认隔离级别下，上面SessionA中的更新语句会处于等待状态，这里只是说明脏写的现象
+
+#### 脏读（Dirty Read）
+
+对于两个事务SessionA、SessionB，SessionA`读取`了已经被SessionB更新但还`没有被提交`的字段。之后若Session`回滚`，SessionA`读取`的内容就是`临时且无效`的。
+
+![alt text](images/image26.png)
+
+
+#### 不可重复读(Non-Repeatable Read)
+
+对于两个事务SessionA、SessionB，SessionA`读取`了一个字段，然后SessionB`更新`了该字段，之后SessionA再次读取同一个字段，值就不同了。那就意味着发生了不可重复读。
+
+![alt text](images/image27.png)
+
+
+#### 幻读(Phantom)
+
+对于两个事务SessionA、SessionB，SessionA从一个表中`读取`了一个字段，然后SessionB在该表中`插入`了一些新的行，之后，如果SessionA再次读取同一个表，就会多出几行，这就意味着发生了幻读。
+
+![alt text](images/image28.png)
+
+SessionA中事务先根据条件studentno > 0这个条件查询表student，得到name列值为'张三'的记录，之后SessionB中提交了一个`隐式事务`，该事务向表student中插入一条记录，之后SessionA中的事务在根据相同的条件studentno > 0 查询表student，得到的结果集中包含SessionB中的事务新插入的那条记录，这种现象也被称之为`幻读`。我们把新插入的那些记录称之为`幻影记录`。
+
+注意：幻读强调的是一个事务按照某个相同条件多次读取记录时，后读取时读到了之前`没有读到的记录`。
+
+
+### SQL中的四种隔离级别
+
+上述几种并发事务执行过程中可能遇到的一些问题，这些问题有轻重缓急之分，我们给这些问题按照严重性来排序
+
+```sql
+脏写 > 脏读 > 不可重复读 > 幻读
+```
+
+我们愿意舍弃一部分隔离性来换取一部分性能在这里就体现在：设立一些隔离级别，隔离级别越低，并发问题发生的越多。`SQL标准`中设立了4个隔离级别
+
+- `READ UNCOMMITTED`：读未提交，在该隔离级别，所有事务都可以看到其他未提交事务的执行结果。不能避免脏读，不可重复读，幻读。
+
+- `READ COMMITTED`：读已提交，它满足了隔离的简单定义：一个事务只能看见已经提交事务所做的改变。这是大多数数据库默认的隔离级别（但不是MySQL默认的）。可以避免脏读，但不可重复读，幻读问题仍然存在
+
+- `REPEATABLE READ`：可重复读，事务A在读到一条数据之后，此时事务B对该数据进行了修改并提交，那么事务A再读该数据，读到的还是原来的内容。可以避免脏读，不可重复读，但幻读问题仍然存在，这是MySQL默认级别
+
+- `SERIALIZABLE`：可串行化，确保事务可以从一个表中读取相同的行。在这个事务持续期间，禁止其他事务对该表进行插入、更改和删除操作。所有的并发问题都可以避免，但性能十分低下。能避免脏读，不可重复读和幻读。
+
+
+### MySQL支持的四种隔离级别
+
+MySQL在`REPEATABLE READ`隔离级别下，是可以禁止幻读问题的发生的，禁止幻读的原因，后续谈
+
+MySQL默认隔离级别为`REPEATABLE READ`，手动修改事务的隔离级别
+
+```sql
+-- 查看隔离级别
+mysql> SHOW VARIABLES LIKE 'transaction_isolation';
++-----------------------+-----------------+
+| Variable_name         | Value           |
++-----------------------+-----------------+
+| transaction_isolation | REPEATABLE-READ |
++-----------------------+-----------------+
+1 row in set (0.01 sec)
+```
+
+
+#### 设置事务的隔离级别
+
+通过下面的语句修改事务的隔离级别
+```sql
+SET [GLOBAL|SESSION] TANSACTION ISOLATION LEVEL 隔离级别；
+-- 或者
+SET [GLOBAL|SESSION] | TRANSACTION_ISOLATION = `隔离级别`；
+```
+
+#### 关于设置时使用GLOBAL或SESSION影响
+
+- 使用`GLOBAL`关键字(SERIALIXABLE)
+```sql
+SET GLOBAL TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+-- 或
+SET GLOBAL TRANSACTION_ISOLATION = 'SERIALIABLE';
+-- 当前已经存在的会话无效
+-- 只对执行完该语句之后产生的会话起作用
+``` 
+
+
+- 使用`SESSION`关键字（会话范围影响）
+```sql
+SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+-- 或
+SET SESSION TRANSACTION_ISOLATION = 'SERIALIABLE';
+-- 对当前会话的所有后续的事务有效
+-- 如果在事务之间执行，则对后续的事务有效
+-- 该语句可以在已经开启的事务中间执行，但不会影响当前正在执行的事务
+```
+
