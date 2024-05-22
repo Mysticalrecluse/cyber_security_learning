@@ -5873,7 +5873,7 @@ ORDER BY create_time DESC
 LIMIT 100; -- 0.976s 提升很多
 ```
 
-#### UPDATE、DELETE的WHERE条件列
+#### 4. UPDATE、DELETE的WHERE条件列
 
 当我们对某条数据进行UPDATE或者DELETE操作的时候，是否也需要对WHERE的条件创建索引？
 
@@ -5898,3 +5898,1034 @@ WHERE name = '462eed7ac6e791292a79'
 
 效率有了大幅的提升
 
+#### 5. DISTINCT 字段需要创建索引
+
+有时候我们需要对某个字段去重，使用DISTINCT，那么对这个字段创建索引，也会提高查询效率
+
+比如，我们想要查询课程表中不同的student_id都有哪些，如果我们没有对student_id创建索引，执行SQL语句
+```sql
+SELECT DISTINCT(student_id) FROM student_info;
+-- 0.785sec
+```
+
+如果我们对student_id创建索引，再执行SQL语句
+```sql
+SELECT DISTINCT(student_id) FROM student_info;
+-- 0.005sec
+```
+
+#### 6. 多表JOIN连接操作时，创建索引注意事项
+
+首先，`连接表的数量尽量不要超过3张`，因为每增加一张表就相当于增加了一次嵌套的循环，数量级增长会非常快，严重影响查询效率。
+
+其次，`对WHERE条件创建索引`，因为WHERE才是对数据条件的过滤。如果在数据量非常大的情况下，没有WHERE条件过滤是非常可怕的
+
+最后，`对用于连接的字段创建索引`，并且该字段在多张表中的类型必须一致。比如course_id在student_info表和course表中都为int(11)类型，而不能一个为int,另一个为VARCHAR类型。
+
+```sql
+SELECT student_info.course_id, `name`, student_info.student_id, course_name
+FROM student_info JOIN course
+ON student_info.course_id = course.course_id
+WHERE `name` = '462eed7ac6e791292a79';
+-- 0.213sec
+```
+
+```sql
+-- 为name字段创建索引
+ALTER TABLE student_info
+ADD INDEX idx_name(`name`);
+
+SELECT student_info.course_id, `name`, student_info.student_id, course_name
+FROM student_info JOIN course
+ON student_info.course_id = course.course_id
+WHERE `name` = '462eed7ac6e791292a79';
+-- 0.001sec
+```
+
+#### 7. 使用列的类型小的创建索引
+
+我们这里说的`类型大小`指的就是该类型表示的数据范围的大小
+
+- 数据类型越小，在查询时进行的比较操作越快
+- 数据类型越小，索引占用的存储空间越少，在一个数据页内就可以`放下更多的记录`,从而减少磁盘I/O带来的性能损耗，也就意味着可以把更多的数据页缓存在内存中，从而加快读写效率
+
+这个建议对于表的`主键来说更加适用`，因为不仅是聚簇索引中会存储主键值，其他所有的二级索引的节点处都会存储一份记录的主键值，如果主键使用更小的数据类型，也就以意味着节省更多的存储空间和更高效的IO
+
+#### 8. 使用字符串前缀创建索引
+
+假设我们的字符串很长，那存储一个字符串就需要占用很大的存储空间。在我们需要为这个字符串列建立索引时，那就意味着在对应的B+树中有那么两个问题
+
+- B+树索引中的记录需要把该列的完整字符串存储起来，更费时。而且字符串越长，在索引中占用的存储空间越大
+
+- 如果B+树索引中索引列存储的字符串很长，那么在做字符串`比较时会占用更多的时间`
+
+
+使用前缀(字符)创建索引的示例
+```sql
+CREATE TABLE shop(address VARCHAR(120) not null);
+
+ALTER TABLE shop ADD INDEX(address(12));
+```
+
+问题：截取多少？截取的多了，达不到节省索引存储空间的目的；截取的少了，重复内容太多，字段的散列度会很低。`怎么计算不同的长度的选择性呢？`
+
+先看一下字段在全部数据中的选择度
+```sql
+select count(distinct address) / count(*) from shop;
+```
+
+通过不同长度去计算，与全表的选择性对比
+公式：
+```sql
+count(distinct left(列名, 索引长度)) / count(*)
+```
+
+例如：
+```sql
+select count(distinct left(address, 10)) / count(*) as sub 10, -- 截取前10个字符的选择度
+count(distinct left(address, 15)) / count(*) as sub 11, -- 截取前10个字符的选择度
+count(distinct left(address, 20)) / count(*) as sub 12, -- 截取前10个字符的选择度
+count(distinct left(address, 25)) / count(*) as sub 13, -- 截取前10个字符的选择度
+from shop
+
+-- 越接近1或者越接近字段在全部数据中的选择度越好
+```
+```
+【扩展】Alibaba《Java开发手册》
+【强制】在VARCHAR字段上建立索引时，必须指定索引长度，没必要对全字段建立索引，根据实际文本区分度决定索引长度
+
+说明：索引的长度与区分度是一对矛盾体，一般对字符串类型数据，长度为20的索引，区分度会“高达90%以上”，可以使用count(distinct left(列名, 索引长度)) / count(*)的区分度来确定
+```
+
+注意：使用前缀构建所以得方式，无法支持`索引排序`
+
+#### 9. 区分度高(散列性高)的列适合作为索引
+
+`列的基数`指的是某一列中不重复数据的个数，比方说某个列包含值`2,5,8,2,5,8,2,5,8`，虽然有9条记录，但该列的基数却是3，也就是说，`在记录行数一定的情况下，列的基数越大，该列中的值越分散，列的基数越小，该列的值越集中`。这个列的基数指标非常重要，直接影响我们是否能够有效的利用索引。最好为列的基数大的列建立索引，为基数太小列的建立索引，效果可能不好
+
+使用公式`select count(distinct a) / count(*) from t1`计算区分度，越接近1越好，一般超过33%就算是比较高效的索引了
+
+【扩展】：联合索引把区分度高（散列性高）的列放在前面
+
+#### 10. 使用最频繁的列放在联合索引的左侧
+
+- 最左前缀原则
+
+#### 11. 在多个字段都要创建索引的情况下，联合索引优于单值索引
+
+
+### 限制索引数目
+
+在实际工作中，要注意平衡，索引的数目不是越多越好。我们需要限制每张表上索引数量，建议单表索引数量`不超过6个`，原因：
+
+- 每个索引都需要占用`磁盘空间`，索引越多，需要的磁盘空间越大
+- 索引会影响`INSERT, UPDATE, DELETE等语句的性能`，因为表中的数据更改的同时，索引也会进行调整和更新，会造成负担
+- 优化器会选择如何优化查询时，会根据统一信息，对每一个可以用到的`索引进行评估`，已生成一个最好的执行计划，如果同时有多个索引都可以用于查询，会增加MySQL优化器生成执行计划的时间，降低查询性能
+
+
+### 哪种情况不适合创建索引
+
+#### 1. 在where中使用不到的字段，不要设置索引
+
+
+#### 2. 数据量小的表最好不要使用索引
+
+- 比如数据量低于1000
+
+#### 3. 有大量重复数据的列上不要创建索引
+
+- 总结：当数据重复度大，比如高于10%的时候，就不需要对这个字段使用索引
+
+#### 4. 避免对经常更新的表创建过多索引
+
+#### 5. 删除不再使用或者很少使用的索引
+
+#### 6. 不建议用无序的值作为索引
+
+- 如果使用无序的值创建索引，插入数据是会频繁触发页分裂和平衡调整
+  
+#### 7. 不要定义冗余或重复的索引
+
+
+## 性能分析工具的使用
+
+在数据库调优中，我们的目标是`响应速度快，吞吐量大`。利用宏观的监控工具和微观的日志分析可以帮我们快速找到调优的思路和方式
+
+### 数据库服务器优化步骤
+
+整个流程划分为`观察(Show status)`和`行动Action`。
+
+- 首先观察服务器状态
+  - 是否存在周期性波动
+
+- 如果存在周期性波动
+  - 尝试加缓存更改缓存失效策略
+  - 看是否解决
+
+- 如果仍有不规则延迟或卡顿
+  - 开启慢查询
+  - 使用`EXPLAIN`或`SHOW PROFILING`
+    - 观察是SQL等待时间过长
+    - 还是SQL执行时间过长
+
+- 如果是MYSQL等待时间过长
+  - 调优服务器参数
+
+
+- 如果是MySQL执行时间过长
+  - 索引设计优化
+  - JOIN表过多，需要优化
+  - 数据表设计优化
+
+
+- 如果经过上述调优都没有解决问题
+  - 考虑是否是SQL查询到达瓶颈
+
+- 如果是SQL查询到达瓶颈
+  - 读写分离(主从架构)
+  - 分库分表(垂直分库，垂直分表，水平分表)
+
+### 查看系统性能参数
+
+在MySQL中，可以使用`SHOW STATUS`语句查询一些MySQL数据库服务器的`性能参数`、`执行频率`。
+
+SHOW STATUS语句语法如下
+```sql
+SHOW [GLOBAL|SESSION] STATUS LIKE '参数';
+```
+
+一些常用性能参数如下
+- Connections：连接MySQL服务器的次数
+- Uptime：MySQL服务器的上线时间
+- Slow_queries：慢查询的次数
+- Innodb_rows_read：Select查询返回的行数
+- Innodb_rows_inserted：执行INSERT操作插入的行数
+- Innodb_rows_updated：执行UPDATE操作更新的行数
+- Innodb_rows_deleted：执行DELETE操作删除的行数
+- Com_select：查询操作的次数
+- Com_insert：插入操作的次数（对于批量插入的INSERT操作，只累加一次）
+- Com_update：更新操作次数
+- Com_delete：删除操作的次数
+
+
+### 统计SQL的查询成本：Last_query_cost
+
+- Last_query_coat：指的是最近查询中，加载的页数
+
+使用场景：它对于比较开销是非常有用的，特别是我们有好几种查询方式可选的时候
+
+SQL查询是一个动态的过程，从页加载的角度来看，我们可以得到以下两点结论：
+- 位置决定效率
+  - 如果页就在数据库缓冲池中，那么效率是最高的，否则还需要从`内存`或者`磁盘`中进行读取
+
+- 批量决定效率
+  - 如果我们从磁盘中对单一页进行随机读，效率很低（差不多10ms），而采用顺序读取的方式，批量对页进行读取，平均一页的读取效率就会提升很多，甚至要快于单个页面的内存中的随机读取
+
+所以我们首先要考虑数据存放的位置，如果是经常使用的数据，就要尽量放到`缓冲池`中，其次我们可以充分利用磁盘的吞吐能力，一次性批量读取数据，这样单个页的读取效率也会得到提升
+
+
+### 定位执行慢的SQL：慢查询日志
+
+MySQL的慢查询日志，用来记录在MySQL中`响应时间超过阈值`的语句，具体指运行时间超过`long_query_time`值的SQL，会被记录到慢查询日志中。`long_query_time`的默认值为10，意思是运行10秒以上（不含10秒）的语句，认为是超出了我们的最大忍耐时间值
+
+慢日志的具体用法：比如一条sql执行超过5秒，我们就算慢sql，希望能收集超过5秒的sql，结合`explain`进行全分析
+
+默认情况下，MySQL数据库`没有开启慢查询日志`，需要我们手动来设置这个参数。`如果不是调优需要的话，一般不建议开启该日志`，因为开启慢查询会或多或少来带一定的性能影响
+
+#### 开启慢查询日志参数
+
+查看慢查询日志是否已经开启
+```sql
+SHOW VARIABLES LIKE '%slow_query_log';
+```
+
+我们能看到`slow_query_log=OFF`，我们可以把慢查询日志打开，注意设置变量值的时候需要使用global，否则会报错
+```sql
+mysql> SET GLOBAL slow_query_log = 'ON';
+
+mysql> SHOW VARIABLES LIKE '%slow_query_log%';
++---------------------+--------------------------------+
+| Variable_name       | Value                          |
++---------------------+--------------------------------+
+| slow_query_log      | ON                             |
+| slow_query_log_file | /data/mysql/localhost-slow.log |
++---------------------+--------------------------------+
+2 rows in set (0.00 sec)
+```
+
+#### 修改log_query_time阈值
+
+```sql
+mysql> SHOW VARIABLES LIKE '%long_query_time%';
++-----------------+-----------+
+| Variable_name   | Value     |
++-----------------+-----------+
+| long_query_time | 10.000000 |
++-----------------+-----------+
+1 row in set (0.00 sec)
+```
+
+如果想把时间缩短，比如设置1秒，可以这样设置
+```sql
+-- 测试发现，设置global的方式对当前session的long_query_time失效。对新连接的客户端有效。所以可以一并执行下述语句
+SET GLOBAL long_query_time = 1;
+
+SET long_query_time = 1;
+```
+
+永久设置（写到配置文件）
+
+```sql
+-- 修改my.cnf文件
+[mysqld]
+slow_query_log=ON   -- 开启慢查询日志的开关
+slow_query_log_file=/var/lib/mysql/atguigu-slow.log
+-- 慢查询日志的目录和文件名信息
+long_query_time=3 -- 设置慢查询阈值为3秒
+log_output=FILE
+```
+
+如果不指定存储路径，慢查询日志将默认存储到MySQL数据库的数据文件夹下。如果不指定文件名，默认文件名为hostname.show.log
+
+
+#### 查看慢查询数目
+
+查看当前系统中有多少慢查询记录
+```sql
+SHOW GLOBAL STATUS LIKE '%Slow_queries%';
+```
+
+#### 案例演示
+
+步骤1：建表
+```sql
+CREATE TABLE student (
+    id INT(11) NOT NULL AUTO_INCREMENT,
+    stuno INT NOT NULL,
+    `name` VARCHAR(20) DEFAULT NULL,
+    age INT(3) DEFAULT NULL,
+    classID INT(11) DEFAULT NULL,
+    PRIMARY KEY (id)
+) ENGINE=INNODB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+```
+
+步骤2：设置参数log_bin_trust_function_creators
+
+```sql
+-- 使其允许创建自定义函数
+SET GLOBAL log_bin_trust_function_creators=1;
+```
+
+步骤3：创建函数（同“索引设计原则 --> 数据准备”）
+
+步骤4：创建存储过程（同“索引设计原则 --> 数据准备”）
+```sql
+DELIMITER //
+CREATE PROCEDURE insert_stu1(START INT, max_num INT)
+BEGIN
+DECLARE i INT DEFAULT 0;
+SET autocommit=0;
+REPEAT
+SET i = i + 1;
+INSERT INTO student(stuno, `name`, age, classId) VALUES
+((START + i), rand_string(6),rand_num(10, 100), rand_num(10, 1000));
+UNTIL i = max_num
+END REPEAT;
+COMMIT;
+END //
+DELIMITER ;
+```
+
+步骤5：调用存储过程
+```sql
+CALL insert_stu(100001,4000000);
+```
+ 
+#### 测试及分析
+
+执行查询，都超过1s
+```sql
+-- 将慢查询阈值设置为1s
+SET GLOBAL long_query_time = 1;
+
+SET long_query_time = 1;
+
+-- 两次查询都超过1s
+SELECT * FROM student WHERE stuno = 3125586;
+
+SELECT * FROM student WHERE `name` = 'heaOTc';
+```
+
+#### 慢查询日志分析工具：mysqldumpslow
+
+```sql
+-- 找到慢日志路径
+mysql> SHOW VARIABLES LIKE '%slow_query_log%';
++---------------------+--------------------------------+
+| Variable_name       | Value                          |
++---------------------+--------------------------------+
+| slow_query_log      | ON                             |
+| slow_query_log_file | /data/mysql/localhost-slow.log |
++---------------------+--------------------------------+
+2 rows in set (0.00 sec)
+```
+
+```shell
+[root@localhost /data/mysql] $mysqldumpslow -s t -t 5 /data/mysql/localhost-slow.log
+
+# 这里where后面的值做了抽象用S和N表示
+# 使用-a可以把具体字符串而后数值显示出来
+# -t num 表示展示前面的num条
+# -s t 表示按查询时间排序
+Reading mysql slow query log from /data/mysql/localhost-slow.log
+Count: 1  Time=244.97s (244s)  Lock=0.00s (0s)  Rows=0.0 (0), root[root]@[10.0.0.1]
+  CALL insert_stu1(N,N)
+
+Count: 1  Time=1.80s (1s)  Lock=0.00s (0s)  Rows=23.0 (23), root[root]@[10.0.0.1]
+  select * from student where `name` = 'S' LIMIT N, N
+
+Count: 1  Time=1.78s (1s)  Lock=0.00s (0s)  Rows=1.0 (1), root[root]@[10.0.0.1]
+  select * from student where stuno = N LIMIT N, N
+```
+
+#### 关闭慢查询日志
+
+MySQL服务器停止慢查询日志功能的两种方法
+
+- 方法1：永久性方式
+  - 修改`my.cnf`或者`my.ini`文件，把[mysqld]组下的slow_query_log值设置为OFF，修改保存后，再重启MySQL服务器，即可生效
+  ```shell
+  [mysqld]
+  slow_query_log=OFF   # 也可以注释掉，或删除
+
+  # 重启服务器
+  ```
+
+
+- 方法2：临时方式：
+  - 修改变量
+  ```sql
+  SET GLOBAL slow_query_log=off
+  ```
+
+#### 删除慢查询日志
+
+```shell
+# 手动删除文件即可
+rm -f /data/mysql/localhost-slow.log
+
+# 重建初始化的慢查询日志
+# 指定slow，会只重置慢查询日志
+# 不加slow，会重置所有日志，如果需要旧的日志，就必须备份后再执行这条命令
+# 如果慢查询是关闭状态，则不会生成新的文件
+mysqladmin -uroot -p flush-logs slow
+```
+
+### 查看SQL执行成本：SHOW PRIFILE
+
+Show Profile是MySQL提供的可以用来分析当前回话中SQL做了什么，执行的资源消耗情况的工具，可用于sql调优的测量，`默认情况下是关闭状态`，并保存最近15次的运行结果
+
+我们可以在会话级别开启这个功能
+```sql
+SHOW VARIABLES LIKE 'profiling';
+```
+
+启动该功能
+```sql
+set profiling='ON';
+```
+
+测试
+```sql
+SELECT * FROM student WHERE stuno = 3125586;
+
+SELECT * FROM student WHERE `name` = 'heaOTc';
+
+SHOW PROFILE;
+
+SHOW PROFILES; -- 可以查看查询语句的序号，然后后面根据需要可以查询具体的参数
+-- show profile cpu, block io for query <num>;
+```
+
+也可以查看指定的QUERY ID开销，比如`show profile for query 2`查询结果是一样的。在SHOW PROFILE中我们可以查看不同部分的开销，比如`cpu、block.io`等
+```sql
+show profile cpu, block io for query 2;
+```
+
+日常开发需注意的结论：
+
+- `converting HEAP to MyISAM`: 查询结果太大内存不够，数据往磁盘上搬了
+- `Creating tmp table`: 创建临时表，先拷贝数据到临时表，用完后再删除临时表
+- `Copying to tmp table on disk`：把内存中临时表复制到磁盘上，警惕！
+- `locked`
+
+如果在`show profile`诊断结果中出现了以上4条结果中的任何一条，则sql语句需要优化
+
+注意
+```
+SHOW PROFILE命令将被弃用，我们可以从information_schema中的profiling数据表进行查看。
+```
+
+### 分析查询语句 EXPLAIN
+
+#### 基本语法
+
+EXPLAIN语句形式如下
+```sql
+EXPLAIN SELECT select_options
+
+-- 示例
+-- 字段前面标*的表示重要
+mysql> explain select 1\G
+*************************** 1. row ***************************
+           id: 1           -- 在一个大的查询语句中每个SELECT关键字都对应一个“唯一id
+  select_type: SIMPLE      -- SELECT关键字对应的查询类型
+        table: NULL        -- 表名
+   partitions: NULL        -- 匹配的分区信息
+        *type: NULL        -- 针对单表的访问方法
+possible_keys: NULL        -- 可能用到的索引
+          key: NULL        -- 实际用到的索引
+     *key_len: NULL        -- 实际使用到的索引长度（联合索引）
+          ref: NULL        -- 当使用索引列等值查询时，与索引列进行等值匹配的对象信息
+        *rows: NULL        -- 预估的需要读取的记录数
+     filtered: NULL        -- 某个表经过搜索条件过滤后剩余记录数的百分比
+       *Extra: No tables used -- 一些额外信息
+1 row in set, 1 warning (0.00 sec)
+```
+
+#### 数据准备
+
+```sql
+CREATE TABLE s1 (
+    id INT AUTO_INCREMENT,
+    key1 VARCHAR(100),
+    key2 INT,
+    key3 VARCHAR(100),
+    key_part1 VARCHAR(100),
+    key_part2 VARCHAR(100),
+    key_part3 VARCHAR(100),
+    common_field VARCHAR(100),
+    PRIMARY KEY(id),
+    INDEX idx_key1 (key1),
+    UNIQUE INDEX idx_key2 (key2),
+    INDEX idx_key3 (key3),
+    INDEX idx_key_part(key_part1, key_part2, key_part3)
+) ENGINE=INNODB CHARSET=utf8;
+```
+```sql
+CREATE TABLE s2 (
+    id INT AUTO_INCREMENT,
+    key1 VARCHAR(100),
+    key2 INT,
+    key3 VARCHAR(100),
+    key_part1 VARCHAR(100),
+    key_part2 VARCHAR(100),
+    key_part3 VARCHAR(100),
+    common_field VARCHAR(100),
+    PRIMARY KEY (id),
+    INDEX idx_key1 (key1),
+    UNIQUE INDEX idx_key2 (key2),
+    INDEX idx_key3 (key3),
+    INDEX idx_key_part(key_part1, key_part2, key_part3)
+) ENGINE=INNODB CHARSET=utf8;
+```
+
+设置参数log_bin_trust_function_creators
+```sql
+SET GLOBAL log_bin_trust_function_creators=1
+```
+
+
+创建函数
+```sql
+DELIMITER //
+CREATE FUNCTION rand_string1(n INT)
+    RETURNS VARCHAR(255) -- 该函数返回一个字符串
+BEGIN
+    DECLARE chars_str VARCHAR(100) DEFAULT
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIGKLMNOPQRSTUVWXYZ';
+    DECLARE return_str VARCHAR(255) DEFAULT '';
+    DECLARE i INT DEFAULT 0;
+    WHILE i < n DO
+        SET return_str=CONCAT(return_str, SUBSTRING(chars_str, FLOOR(1+RAND()*52),1));
+        SET i = i + 1;
+    END WHILE;
+    RETURN return_str;
+END //
+DELIMITER ;
+```
+
+创建存储过程
+```sql
+DELIMITER //
+CREATE PROCEDURE insert_s1 (IN min_num INT (10), IN max_num INT (10))
+BEGIN
+    DECLARE i INT DEFAULT 0;
+    SET autocommit=0;
+    REPEAT
+    SET i = i + 1;
+    INSERT INTO s1 VALUES(
+        (min_num + i),
+        rand_string1(6),
+        (min_num + 30 * i + 5),
+        rand_string1(6),
+        rand_string1(10),
+        rand_string1(5),
+        rand_string1(10),
+        rand_string1(10));
+    UNTIL i = max_num
+    END REPEAT;
+    COMMIT;
+END //
+DELIMITER ;
+```
+
+```sql
+DELIMITER //
+CREATE PROCEDURE insert_s2 (IN min_num INT (10), IN max_num INT (10))
+BEGIN
+    DECLARE i INT DEFAULT 0;
+    SET autocommit=0;
+    REPEAT
+    SET i = i + 1;
+    INSERT INTO s2 VALUES(
+        (min_num + i),
+        rand_string1(6),
+        (min_num + 30 * i + 5),
+        rand_string1(6),
+        rand_string1(10),
+        rand_string1(5),
+        rand_string1(10),
+        rand_string1(10));
+    UNTIL i = max_num
+    END REPEAT;
+    COMMIT;
+END //
+DELIMITER ;
+```
+
+调用存储过程
+```sql
+-- s1表数据的添加：加入1万条记录
+CALL insert_s1(10001,10000);
+
+-- s2表数据的添加：加入1万条记录
+CALL insert_s2(10001,10000);
+```
+
+#### EXPLAIN各列作用
+
+<span style="font-weight:700">1. table</span>
+
+查询的每一行记录都对应着一个单表
+```sql
+mysql> EXPLAIN SELECT * FROM s1\G
+*************************** 1. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: s1
+   partitions: NULL
+         type: ALL
+possible_keys: NULL
+          key: NULL
+      key_len: NULL
+          ref: NULL
+         rows: 10152
+     filtered: 100.00
+        Extra: NULL
+1 row in set, 1 warning (0.00 sec)
+```
+
+```sql
+-- s1: 驱动表， s2: 被驱动表
+mysql> EXPLAIN SELECT * FROM s1 INNER JOIN s2\G
+*************************** 1. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: s1
+   partitions: NULL
+         type: ALL
+possible_keys: NULL
+          key: NULL
+      key_len: NULL
+          ref: NULL
+         rows: 10152
+     filtered: 100.00
+        Extra: NULL
+*************************** 2. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: s2
+   partitions: NULL
+         type: ALL
+possible_keys: NULL
+          key: NULL
+      key_len: NULL
+          ref: NULL
+         rows: 10152
+     filtered: 100.00
+        Extra: Using join buffer (hash join)
+2 rows in set, 1 warning (0.01 sec)
+```
+
+<span style="font-weight:700">2. id</span>
+
+在一个大的查询语句中每个`SELECT`关键字都对应一个唯一的id
+
+```sql
+mysql> EXPLAIN SELECT * FROM s1 WHERE key1 IN (SELECT key1 FROM s2) OR key3 = 'a'\G
+*************************** 1. row ***************************
+           id: 1
+  select_type: PRIMARY
+        table: s1
+   partitions: NULL
+         type: ALL
+possible_keys: idx_key3
+          key: NULL
+      key_len: NULL
+          ref: NULL
+         rows: 10152
+     filtered: 100.00
+        Extra: Using where
+*************************** 2. row ***************************
+           id: 2
+  select_type: SUBQUERY
+        table: s2
+   partitions: NULL
+         type: index
+possible_keys: idx_key1
+          key: idx_key1
+      key_len: 303
+          ref: NULL
+         rows: 10152
+     filtered: 100.00
+        Extra: Using index
+2 rows in set, 1 warning (0.00 sec)
+```
+
+在子查询或者联合查询中，存在一个查询语句嵌套或使用多个`select`，每个select对应1个id值
+
+特殊情况
+```sql
+-- 一个查询语句中，有多个select,却使用1个id
+-- 原因：查询优化器可能涉及子查询的查询语句进行重写
+mysql> EXPLAIN SELECT * FROM s1 WHERE key1 IN (SELECT key2 FROM s2 WHERE common_field = 'a')\G 
+*************************** 1. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: s1
+   partitions: NULL
+         type: ALL
+possible_keys: idx_key1
+          key: NULL
+      key_len: NULL
+          ref: NULL
+         rows: 10152
+     filtered: 100.00
+        Extra: Using where
+*************************** 2. row ***************************
+           id: 1
+  select_type: SIMPLE
+        table: s2
+   partitions: NULL
+         type: eq_ref
+possible_keys: idx_key2
+          key: idx_key2
+      key_len: 5
+          ref: atguigudb1.s1.key1
+         rows: 1
+     filtered: 10.00
+        Extra: Using index condition; Using where
+2 rows in set, 2 warnings (0.00 sec)
+```
+
+Union去重，会创建一个临时表
+```sql
+mysql> EXPLAIN SELECT * FROM s1 UNION SELECT * FROM s2\G
+*************************** 1. row ***************************
+           id: 1
+  select_type: PRIMARY
+        table: s1
+   partitions: NULL
+         type: ALL
+possible_keys: NULL
+          key: NULL
+      key_len: NULL
+          ref: NULL
+         rows: 10152
+     filtered: 100.00
+        Extra: NULL
+*************************** 2. row ***************************
+           id: 2
+  select_type: UNION
+        table: s2
+   partitions: NULL
+         type: ALL
+possible_keys: NULL
+          key: NULL
+      key_len: NULL
+          ref: NULL
+         rows: 10152
+     filtered: 100.00
+        Extra: NULL
+*************************** 3. row ***************************
+           id: 3
+  select_type: UNION RESULT
+        table: <union1,2>
+   partitions: NULL
+         type: ALL
+possible_keys: NULL
+          key: NULL
+      key_len: NULL
+          ref: NULL
+         rows: NULL
+     filtered: NULL
+        Extra: Using temporary
+3 rows in set, 1 warning (0.01 sec)
+```
+
+小结：
+- id如果相同，可以认为是一组，自上往下顺序执行
+- 在所有组中，id值越大，优先级越高，越先执行
+- 关注点：id号每个号码，表示一趟独立的查询，一个sql的查询趟数越少越好
+
+<span style="font-weight:700">3. select_type</span>
+
+一条大的查询语句里边可以包含若干个SELECT关键字，`每个SELECT关键字代表一个小的查询语句`，而每个SELECT关键字的FROM子句中都可以包含若干张表（这些表用来做连接查询），`每一张表都对应着执行计划输出中的一条记录`，对于在同一个SELECT关键字来说，它们的id是相同的
+
+MySQL为每个SELECT关键字代表的小查询都定义了一个称之为 `select type`的属性，我们只要知道了某个小查询的`select_type属性`，就知道了这个`小查询在整个大查询中扮演了一个什么角色`
+
+select_type的取值
+
+- SIMPLE
+  - 查询语句中不包含`UNION`或者子查询的查询都算作是SIMPLE类型
+- PRIMARY
+  - 对于包含`UNION`或者`UNION ALL`的大查询，它是由几个小查询组成，其中最左边的叫`PRIMARY`
+- UNION
+  - 其余的小查询的`select_type`值就是`UNION`
+- UNION RESULT
+  - MySQL选择使用临时表来完成`UNION`查询的去重工作，针对该临时表的查询的`select_type`就是`UNION RESULT`
+- SUBQUERY
+  - 如果包含子查询的查询语句不能转为对应的`semi-join`的形式，并且该子查询是`不相关子查询`
+  - 该子查询的第一个`SELECT`关键字代表的那个查询的`select type`就是`SUBQUERY`
+  ```sql
+  EXPLAIN SELECT * FROM s1 WHERE key1 IN (SELECT key1 FROM s2) OR key3 = 'a';
+  ```
+- DEPENDENT SUBQUERY
+  - 如果包含子查询的查询语句不能转为对应的`semi-join`的形式，并且该子查询是`相关子查询`
+  - 该子查询的第一个`SELECT`关键字代表的那个查询的`select type`就是`DEPENDENT SUBQUERY`
+  ```sql
+  EXPLAIN SELECT * FROM s1
+  WHERE key1 IN (SELECT key1 FROM s2 WHERE s1.key2 = s2.key2) OR key3 = 'a';
+  -- select_type为DEPENDENT SUBQUERY的查询可能会被执行多次
+  ```
+
+- DEPENDENT UNION
+  - 在包含`UNION`或者`UNION ALL`的大查询中，如果每个小查询都依赖于外层查询的话，那除了最左边的那个小查询之外，其余的小查询的`select_type`的值就是`DEPENDENT UNION`
+  ```sql
+  EXPLAIN SELECT * FROM s1
+  WHERE key1 IN (SELECT key1 FROM s2 WHERE key1 = 'a' UNION SELECT key1 FROM s1 WHERE key1 = 'b');
+  -- 这里之所以有DEPENDENT SUBQUERY
+  -- 根本原因是优化器进行重构，将IN替换为EXISTS，引用了外部查询，因此是DEPENDENT SUBQUERY和DEPENDENT UNION
+  ```
+
+- DERIVED
+  - 对于包含`派生表`的查询，该派生表对应的子查询的`select_type`就是`DERIVED`
+  ```sql
+  EXPLAIN SELECT * 
+  FROM (SELECT key1, COUNT(*) AS c FROM s1 GROUP BY key1)
+  AS derived_s1 WHERE c > 1;
+  -- 将一个查询结果作为一个表，再次进行查询，即为派生表
+  ```
+
+- MATERIALIZED
+  - 当查询优化器在执行包含子查询的语句时，选择将子查询物化之后与外层查询进行连接查询时
+  - 该子查询对应的`select_type`属性就是`MATERIALIZED`
+  ```sql
+  EXPLAIN SELECT * FROM s1 WHERE key1 IN (SELECT key1 FROM s2); -- 子查询被转为了物化表
+  ```
+
+<span style="font-weight:700">4. partitions(暂略)</span>
+
+<span style="font-weight:700">5. type</span>
+
+执行计划的一条记录就代表着MySQL对某个表的`执行查询时的访问方法`，又称“访问类型”，其中的`type`列就表明了这个访问方法是啥，是较为重要的一个指标。比如，看到`type`列的值是ref,表名MYSQL即将使用ref访问方法来执行对s1表的查询
+
+完整的访问方法如下（越靠前越好）
+```sql
+system, const, eq_ref, ref, fulltext, ref_or_null, index_merge, unique_subquery, index_subquery, range, index, ALL(全表遍历)
+```
+
+# 事务基础知识
+
+## 数据库事务概述
+
+事务是数据库区别于文件系统的重要特性之一，当我们有了事务就会让数据库始终保持`一致性`，同时我们还能通过事务的机制`恢复到某个时间点`，这样可以保证已提交到数据库的修改不会因为系统崩溃而丢失
+
+### 存储引擎支持情况
+ 
+查看当前MYSQL支持的存储引擎都有哪些，以及对事务的支持情况
+```sql
+SHOW ENGINES
+-- 在mysql中，只有InnoDB支持事务
+```
+
+### 基本概念
+
+事务：一组逻辑操作单元，使数据从一种状态变化为另一种状态
+
+事务处理原则：保证所有事务都作为`一个工作单元`来执行，即使出现了故障，都不能改变这种执行方式。当在一个事务中执行多个操作时，要么所有的事务都被提交`commit`，那么这些修改就永久保存下来，要么数据管理系统将`放弃`所做的所有`修改`,整个事务回滚`rollback`到最初状态
+
+
+### 事务的ACID特性
+
+- <span style="color:red;font-weight:700">原子性(atomicity)</span>
+
+原子性是指事务是一个不可分割的工作单位，要么全部提交，要么全部回滚
+
+- <span style="color:red;font-weight:700">一致性(consistency)</span>
+
+一致性是指事务执行前后，数据从一个`合法性状态`变换到另外一个`合法性状态`.这种状态是`语义上`的，而不是语法上的，跟具体业务有关。
+
+什么是合法性：即满足`预定的约束`的状态就叫合法的状态。通俗一点，自定义约束，在数据执行前后，都满足这个约束，如果不满足就回滚到满足的状态，就加一致性
+
+- <span style="color:red;font-weight:700">隔离性(isloation)重要</span>
+
+事务的隔离性是指一个事务的执行`不能被其他事务干扰`，即一个事务内部的操作及使用的数据对并发的其他事务是隔离的，并发执行的各个示例之间不能相互干扰
+
+- <span style="color:red;font-weight:700">持久性(durability)</span>
+
+持久性是指一个事务一旦被提交，它对数据库中数据的改变就是`永久性的`，接下来的其他操作和数据库故障不应对其有任何影响
+
+持久性是通过`事务日志`来保证的。日志包括了`重做日志`和`回滚日志`。
+
+当我们通过事务对数据进行修改的时候，首先会将数据库的变化信息记录到重做日志中，然后再对数据库中对应的行进行修改。这样做的好处是，即使数据库系统崩溃，数据库重启后也能找到没有更新到数据库系统中的重做日志，重新执行，从而使事务具有持久性。
+
+总结
+```
+ACID是事务的四大特性，在这四个特性中，原子性是基础，隔离性是手段，一致性是约束条件，而持续性是目的
+```
+
+### 事务的状态
+
+- <span style="color:red;font-weight:700">活动的(active)</span>
+  - 事务对应的数据库操作正在执行过程中时，我们就说事务处在活动的状态
+
+- <span style="color:red;font-weight:700">部分提交的(partially Committed)</span>
+  - 当事务中的最后一个操作执行完，但由于操作都在内存中执行，所造成的影响并没有刷新到磁盘时，我们就说该事务处在部分提交的状态
+
+- <span style="color:red;font-weight:700">失败的(failed)</span>
+  - 当事务处在`活动的`或者`部分提交的`状态时，可能遇到了某些错误（比如断电）,而无法继续执行，或人为停止当前事务的执行，我们就说该事务处于`失败的`状态
+
+- <span style="color:red;font-weight:700">中止的(aborted)</span>
+  - 如果事务执行了一部分而变为失败的状态，那么就需要把已经修改的事务中的操作还原到事务执行前的状态。即`回滚`。当`回滚`执行完毕时，也就是数据库恢复到了执行事务之前的状态，我们就说该事务处在了`中止的`状态。
+
+
+- <span style="color:red;font-weight:700">提交的(committed)</span>
+  - 当一个处在`部分提交的`状态的事务将修改的数据都`同步到磁盘`上之后，我们就可以说该事务处在了`提交的`状态。
+
+![alt text](images/image24.png)
+
+图中可见，只有当事务处于`提交的`或者`中止的`状态时，一个事务的生命周期才算是结束了。对于已经提交的事务来说，该事物对数据库所做的修改将永久生效，对于处于中止状态的事务，该事务对数据库所做的所有修改都会被回滚到没有执行该事务之前的状态
+
+
+## 使用事务
+
+- 事务的完成过程：
+  - 步骤1：开启事务
+  - 步骤2：一系列DML操作
+  - 步骤3：事务结束状态：提交状态(COMMIT)或中止状态(ROLLBACK)
+
+
+### 显式事务
+
+#### 开启事务
+
+```sql
+START TRANSACTION [read only|read write|with consistent snapshot]
+
+BEGIN
+```
+
+- READ ONLY：标识当前事务是一个`只读事务`，也就是属于该事务的数据库操作只能读取数据，而不能修改数据
+  - 只读事务可以对`临时表`进行增、删、改操作
+
+- READ WRITE(默认)：标识当前事务是一个`读写事务`也就是属于该事务的数据库操作既可以读取数据，也可以修改数据
+
+- WITH CONSISTENT SNAPSHOT: 启动一致性读
+
+示例
+```sql
+-- 开启一个只读事务
+START TRANSACTION READ ONLY;
+-- 开启只读事务和一致性读
+START TRANSACTION READ ONLY, WITH CONSISTENT SNAPSHOT;
+```
+
+#### 提交事务或中止事务（即回滚事务）
+```sql
+-- 提交事务，当提交事务后，对数据库的修改是永久性的
+COMMIT;
+-- 回滚事务，即撤销正在进行的所有没有提交的修改
+ROLLBACK;
+-- 将事务回滚到某个保存点
+ROLLBACK TO [SAVEPOINT]
+```
+
+#### 保存点(savepoint)
+
+```sql
+-- 在事务中创建保存点，方便后续针对保存点进行回滚，一个事务可以有多个保持点
+SAVEPOINT 保存点名称;
+
+-- 删除某个保存点
+RELEASE SAVEPOINT 保存点名称;
+```
+
+### 隐式事务
+
+#### 关键字：autocommit
+```sql
+set autocommit = false; -- 默认是ON
+```
+
+autocommit变量默认是on，表示执行的每条SQL语句都默认提交，落盘
+
+
+#### 关闭自动提交autocommit
+
+```sql
+-- 方法1：只针对DML操作有效，针对DDL无效
+set autocommit = false;
+
+-- 方法2：在autocommit=on的情况下，使用START TRANSACTION或BEGIN开启事务，那么DML操作就不会自动提交数据
+START TRANSACTION;
+```
+
+### 隐式提交数据的情况
+
+- 数据定义语言DDL
+  - 当我们使用CREATE、ALTER、DROP等语句去修改数据库对象时，就会隐式的提交前边语句所属于的事务
+  ```sql
+  BEGIN;
+  SELECT ...  -- 事务中的一条语句
+  UPDATE ... -- 事务中的一条语句
+
+  CREATE TABLE ...  -- 此语句会隐式的提交前边语句所属于的事务
+  ```
+
+- 隐式使用或修改mysql数据库中的表
+  - 当我们使用`ALTER USER`、`CREATE USER`、`DROP USER`、`GRANT`、`RENAME USER`、`REVOKE`、`SET PASSWORD`等语句时也会隐式的提交前边语句所属于的事务
+
+- 事务控制或关于锁定的语句
+  - 当我们在一个事务还没提交或者回滚时，就又使用`BEGIN`开启另一个事务，会`隐式提交`上一个事务   
+  - 当前的autocommit变量为OFF，手动改为ON时，也会隐式提交所属事务
+  - 使用`LOCK TABLES`、`UNLOCK TABLES`等关于锁定的语句也会`隐式的提交`前边语句所属事务
+
+- 加载数据的语句
+  - 使用`LOAD DATA`语句批量往数据库导入数据时，也会`隐式提交`前边的事务
+
+- 关于MySQL复制的一些语句
+
+- 其他的一些语句
+  - `ANALYZE TABLE`、`CACHE INDEX`、`CHECK TABLE`、`FLUSH`、`LOAD INDEX INTO CACHE`、`OPTIMIZE TABLE`、`REPAIR TABLE`、`RESET`等语句也会隐式提交前边语句所属事务

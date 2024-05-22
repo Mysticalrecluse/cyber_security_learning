@@ -316,7 +316,6 @@ Node *insert(Node *head, int pos, int val) {
   ![Alt text](images\image05.png)
   - 第一个节点的pre和最后一个节点的next都指向null
 
-<<<<<<< HEAD
 ### 反转链表
 - 解题思路1：
   - 用指针遍历链表中的每一个节点，然后将其插入到新链表的头部，实现链表反转
@@ -1861,8 +1860,6 @@ void myCircularQueueFree(MyCircularQueue* obj) {
     return ;
 }
 ```
-=======
->>>>>>> fa69fbdd72bbff1a091e4408ad363a8a6d9fc8d6
 
 ## 树与二叉树
 ### 树-结构定义
