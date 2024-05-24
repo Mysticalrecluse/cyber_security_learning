@@ -7086,6 +7086,7 @@ InnoDB存储引擎是以`页为单位`来管理存储空间的。在真正访问
 
 但是如果实时将数据写入磁盘会因为频繁IO导致性能变差，所以可以仅将更改后的日志实时写入磁盘，这样IO的量变小，又能保证性能。
 
+InnoDB引擎的事务采用了WAL技术(Write-Ahead Loggin)，这种技术的思想就是先写日志，再写磁盘，只有日志写入成功，才算事务提交成功，这里的日志就是redo log。当发生宕机且数据未刷新到磁盘的时候，可以通过redo log来恢复，保证ACID中的D，就是redo log的作用
 
 ### REDO日志的好处、特点
 
@@ -7095,27 +7096,595 @@ InnoDB存储引擎是以`页为单位`来管理存储空间的。在真正访问
 
 - redo日志占用的空间非常小
 
+- redo日志是物理磁盘真实存在的文件
+
 存储表空间的ID、页面、偏移量以及需要更新的值，所需的存储空间是很小的，刷盘快
 
 #### 特点
 
 - redo日志是顺序写入存盘的
+  - 在执行事务的过程中，每执行一套语句，就可能产生若干条redo日志，这些日志是按照顺序写入磁盘的，也就是顺序IO，效率比随机IO快
 
 - 事务执行过程中，redo log不断记录
 
 
-redo log根bin log的区别，redo log是`存储引擎层`产生的，而bin log是`数据库层`产生的。
+redo log跟bin log的区别，redo log是`存储引擎层`产生的，而bin log是`数据库层`产生的。
+
+假设一个事务，对表做10万行的记录插入，在这个过程中，一直不断的往redo log顺序记录，而bin log不会记录，直到这个事务提交，才会一次写入到bin log文件中
 
 
 ### redo的组成
 
 Redo log可以简单的分为以下两个部分
 
-- 重做日志的缓冲(redo log fauther)
+- 重做日志的缓冲(redo log fauther)，保存在内存中，是易失的。
+  - 在服务器启动时就向系统申请了一大片称之为redo log buffer的`连续内存`空间，翻译成中文就是redo日志缓冲区。这片内存空间被划分为若干个连续的`redo log block`。一个redo log block占用`512字节`大小
+  - 参数设置：innodb_log_buffer_size
+  ```sql
+  -- 默认10M,或67108864字节
+  SHOW VARIABLES LIKE '%innodb_log_buffer_size%';
+  ```
 
+- 重做日志文件(redo log file)，保存在硬盘中，是持久的
+  - REDO日志文件，其中的`ib_logfile0`和`ib_logfile1`即为REDO日志
+
+
+### redo log的整体流程
+以一个更新事务为例，redo log流转过程
+
+![alt text](images/image28.png)
+
+- 第一步：先将原始数据从磁盘中读入内存（Buffer-Pool）中来，修改数据的内存拷贝
+- 第二部：生成一条重做日志并写入redo log buffer，记录的是数据被修改后的值
+- 第三部：当事务commit时，将redo log buffer中的内容刷新到redo log file。对redo log file采用追加写的方式
+- 第四部：定义将内存中修改的数据刷新到磁盘
+
+```
+Write-Ahead Log（预先日志持久化）：在持久化一个数据页之前，先将内存中相应的日志页持久化
+```
 
 ### redo log的刷盘策略
 
 redo log的写入并不是直接吸入磁盘的，InnoDB引擎会在写redo log的时候，先写`redo log buffer`，之后以`一定的频率`刷入奥真正的`redo log file`中
+
+问题：什么时候经redo_Log_Buffer中的数据刷到文件（即硬盘中）
+
+注意：redo log buffer刷盘到redo log file的过程并不是真正的刷到磁盘中去，只是刷入到`文件系统缓存`(page cache)中去（这是现代操作系统为了提高文件写入效率做的一个优化），真正的写入会交个系统自己去决定，那么对于InnoDB来说存在一个问题，如果交给系统来同步，如果系统宕机，那么数据也就丢失了（系统宕机的概率比起数据库宕机的概率要低）
+
+针对这种情况，InnoDB给出`innodb_flush_at_trx_commit`参数，该参数控制commit提交事务时，如何将redo_log_buffer中的日志刷新到redo_log_file中。它支持三种策略
+
+- 设置为0：表示每次事务提交时不进行刷盘操作（系统默认`master thread`每隔1s进行一次重做日志的同步）
+- 设置为1：表示每次事务提交时都将进行同步，刷盘操作（`默认值`）
+- 设置为2：表示每次事务提交时都只是把redo log buffer内容写入page cache，不进行同步。由OS自己决定什么时候同步到磁盘
+```sql
+SHOW varirables LIKE 'innodb_flush_log_at_trx_commit';
+```
+![alt text](images/image30.png) 
+
+另外，InnoDB存储引擎有一个后台线程，每个1s，就会把`redo log buffer`中的内容写到文件系统缓存(page cache)。然后调用刷盘操作
+
+也就是说，一个没有提交事务的`redo log`记录，也可能会刷盘(`参数为0`)。因为事务执行过程redo log记录是会写入`redo log buffer`中，这些redo log记录会被`后台线程`刷盘
+
+
+### 不同刷盘策略演示
+
+流程图
+
+![alt text](images/image31.png)
+
+- 不管参数为多少，redo.log都会实时将记录写入redo log buffer
+  - 然后后台线程会自动每个1s将redo log buffer中的内容写到`page cache`，然后调用fsync刷盘。
+
+- `innodb_flush_log_at_trx_commit=1`
+  - 实质上是，在提交的时候，主动刷盘，将redo_log_buffer中的日志写入文件系统缓存，并立即将文件系统缓存写入磁盘(刷盘)。这样只要提交日志后，不管是Mysql宕机还是操作系统宕机，都不会影响数据。
+
+![alt text](images/image32.png)
+
+- `innodb_flush_log_at_trx_commit=2`
+  - 实质上是，提交事务后，立即将日志从`redo_log_buffer`写入文件系统缓存(page cache)
+  - 但是从文件系统缓存到磁盘，由后台线程每隔1s自动同步
+  - 也就是说，如果宕机，可能会丢失1s数据
+
+- 总结：也就是说，事务提交后，如果仅仅`MySQL`挂了，不会有任何数据丢失，因为此时数据已经被同步到文件系统缓存。但是如果操作系统宕机，可能会丢失1s数据，但是效率高
+
+
+- `innodb_flush_log_at_trx_commit=0`的时候
+  - 提交事务，并不会影响数据流向，什么时候将数据写入redo log buffer完全由后台线程`master thread`决定，每隔一秒进行一次重做日志fsync操作
+  - 因此实例crash最多都是1s内的事务。
+
+
+### redo log buffer的写入过程（后续补充）
+
+#### redo log block的结构图
+
+
+
+### redo log file
+
+#### 相关参数设置
+
+- `innodb_log_group_home_dir`：指定redo log文件组所在的路径，默认为./，表示在数据库的数据目录下。Mysql的默认数据库下默认有两个名为`ib_logfile0`和`ib_logfile1`的文件，log_buffer中的日志默认情况下就是刷新到这两个磁盘文件中。此位置可以修改
+
+- `innodb_log_files_in_group`：指定redo log file的个数，命名方式入如下：ib_logfile0, iblogfile1...,iblogfilen。默认2个，最大100个
+
+- `innodb_flush_log_at_trx_commit`：控制redo log刷新到磁盘的策略，默认是1
+
+- `innodb_log_file_size`：单个redo log文件设置大小，默认值为48M（每个文件48M）。最大512G，注意最大值指的是整个redo log系列文件值之和
+
+#### 日志文件组
+
+从上边的描述中可以看到，磁盘上的redo日志文件不止一个，而是以一个`日志文件组`的形式出现的，这些文件以`ib_logfile[n]`的形式命名，每个redo日志文件大小都一样
+
+在将redo日志写入日志文件组时，是从ib_logfile0开始写，如果ib_logfile0写满了，就接着写1，直到最后一个ib_logfilen写满，就重新转到ib_logfile0覆盖写
+
+![alt text](images/image33.png)
+
+### checkpoint
+
+在整个日志组中还有两个重要的属性：分别是write pos，checkpoint
+
+- write pos：是当前记录的位置，一边写一边后移
+- checkpoint:是当前要擦除的位置，一边写一边往后推移
+
+![alt text](images/image34.png)
+
+整体过程就是
+- redo_log写入文件，write_pos向后推移相应的位置，此时checkpoint不动
+- 当这些数据被从缓冲池加载到磁盘中，checkpoint会往后移动，
+  - 表明这些数据已经落盘，无需再维护日志
+- 因此checkpoint到write_pos之间的数据就是已经产生redo_log日志，但这些事务操作并没有落盘的数据
+- 如果write_pos和checkpoint重合，则证明此时文件写满，无空余位置。
+
+### Undo日志
+
+![alt text](images/image35.png)
+
+redo log是事务持久性的保证，undo log是事务原子性的保证。在事务中`更新数据`的`前置操作`其实是要先写入一个`undo log`
+
+#### 如何理解Undo日志
+
+每当我们要对一条记录做改动时，（这里的改动可以指INSERT、DELETE、UPDATE），都需要“留一手” ——把回滚所需的东西记录下来
+
+- 插入一条记录：
+  - 至少要把这条记录的主键值记录下来，之后回滚的时候只需要把这个主键值对应的`记录删掉`就好了（对于每个INSERT，Innodb存储引起会完成一个DELETE）
+
+- 删除一条记录
+  - 至少要把这条记录的内容记录下来，这样之后回滚时再把由这些内容组成的记录`插入`到表中就好了（对于每个DELETE，Innodb存储引擎会执行一个INSERT）
+
+- 修改了一条记录
+  - 至少要把这条记录前的旧值记录下来，这样之后回滚时再把这条记录`更新为旧值`就好了（对于每个UPDATE，Innodb存储引擎会执行一个相反的UPDATE，将修改前的行放回去）
+
+Mysql把这些为了回滚而记录的这些内容称为 `撤销日志`或者`回滚日志`。注意，由于查询操作并不会修改任何用户记录，所以查询操作执行时，`不需要记录`相应的undo日志
+
+此外，undo log会产生redo log，也就是undo log的产生会伴随着redo log的产生，这是因为undo log也需要持久性的保护
+
+
+#### Undo日志的作用
+
+- 作用1：回滚数据
+
+用户对undo日志可能有`误解`：Undo用于将数据库物理的恢复到执行语句或事务之前的样子。但`事实并非如此`!
+
+Undo是`逻辑日志`，因此只是将数据库逻辑地恢复到原来的样子。所有修改都被逻辑地取消了，但数据结构和页本身在回滚之后可能大不相同
+
+这是因为多用户并发系统中，可能会有数十、数百甚至数千个并发事务。数据库的主要任务就是协调对数据记录的并发访问。比如一个事务在修改当前一个页中的几条记录，同时还有别的事务在对同一个页中另外几条记录进行修改。因此，不能将一个页回滚到事务开始的样子，`解决方案就是：仅回滚当前事务对应的操作`。
+
+- 作用2：MVCC（多版本并发控制）
+
+Undo的另一个作用是MVCC，即在InnoDB存储引擎中MVCC的实现是通过Undo来完成的，当用户读取一行记录时，若该记录已经被其他事务占用，当前事务可以通过undo读取之前的行版本信息，以此实现非锁定读取
+
+
+#### Undo的存储结构
+
+1. 回滚段与Undo页
+
+InnoDB对undo log的管理采用段的方式，也就是回滚段(rollback segment)。每个回滚段记录了1024个`undo log segment`而在每个`undo log segment`段中记性undo页的申请
+
+- 在`InnoDB1.1版本之前(不包括1.1版本)`，只有一个rollback segment，因此支持同时在线的事务限制为1024，虽然对绝大多数的应用来说，已经够用了
+
+- 从1.1版本开始InnoDB支持`最大128个rollback segment`，故其支持同时在线的事务限制提高到了`128*1024`
+
+```sql
+SHOW VARIABLES LIKE 'innodb_undo_logs';
+```
+
+虽然InnoDB1.1版本支持128个rollback segment, 但是这些rollback segment都存储于共享表空间`ibdata`中。从InnoDB1.2版本开始，可以通过参数对rollback segment做进一步的设置
+
+- `innodb_undo_directory`：设置rollback segment文件所在的路径。这意味着rollback segment可以存放在共享表空间以外的位置，即可以设置为独立表空间，该参数的默认值为'.'，表示当前InnoDB存储引擎的目录
+
+- `innodb_undo_logs`：设置rollback segment的个数，默认值为128.在InnoDB1.2版本中，该参数用来替换之前版本的参数innodb_rollback_segments。
+
+- `innodb_undo_tablespaces`：设置构成rollback segment文件的数量，这样rollback segment可以较为平均地分布在多个文件中。设置该参数后，会在路径innodb_undo_directory看到undo为前缀的文件，该文件就代表rollback segment文件。
+
+
+#### Undo页的重用
+
+当事务提交时，并不会立即删除undo页。因为重用
+
+
+### 整体过程
+
+![alt text](images/image36.png)
+
+
+### 详细生成过程
+
+- `DB_TRX_ID`：每个事务都会分配一个事务ID，当对某条记录发生变更时，就会将这个事务的事务ID写入trx_id中
+
+- `DB_ROLL_PTR`：回滚指针，本质上就是指向undo log的指针
+
+
+当我们执行INSERT时
+```sql
+begin:
+INSERT INTO user (name) VALUES ('tom');
+```
+
+- 插入的数据都会生成一条insert undo log,并且数据的回滚指针会指向它。undo log会记录undo log的序号，插入主键的列和值...,那么在进行rollback时，通过主键值直接把对应的数据删除即可
+  
+![alt text](images/image37.png)
+
+当我们执行UPDATE时
+
+对于更新的操作会产生update undo log，并且会分更新主键和不更新主键的，假设现在执行
+```sql
+UPDATE user SET name = 'Sun' WHERE id = 1;
+```
+![alt text](images/image38.png)
+
+
+
+注意：如果更新的是主键，会把原来的数据delete_mark标识打开，这时并没有真正的删除数据，真正的删除数据会交给清理线程区判断，然后在后面插入一条新的数据，新的数据也会产生undo log，并且undo log的序号会递增
+
+![alt text](images/image39.png)
+
+可以发现每次对数据的变更都会产生一个undo log，当一条记录被变更多次时，那么会产生多条undo log，undo log记录的是变更前的日志，并且每个undo log的序号是递增的，那么当要回滚的时候，按照序号依次向前，就可以找到我们的原始数据了
+
+
+### undo log的删除
+
+- 针对于insert undo log
+
+因为insert操作的记录，只对事务本身可见，对其他事务不可见。故该undo log可以在事务提交后直接删除，不需要进行purge操作
+
+- 针对于update undo log
+
+该undo log可能需要提供MVCC机制，因此不能再事务提交时就进行删除。提交时放入undo log链表，等待purge线程进行最后的删除
+
+```
+补充：
+
+purge线程有两个作用：
+
+清理Undo页和清除page里带有Delete_Bit标识的数据行。
+在InnoDB中，事务中的Delete操作实际上并不是真正的删除掉数据行，而是一种Delete Mark操作，在记录上标识Delete_Bit，而不是删除记录。是一种"假删除"，只是做了个标记，真正的删除工作需要后台purge线程去完成。
+```
+
+# 锁
+
+事务的隔离性由锁实现
+
+## 概述
+
+`锁`是计算机协调多个进程或线程`并发访问某一资源`的机制
+
+在数据库中，除了传统的计算资源（CPU，RAM，I/O等）的争用以外，数据也是一种供许多用户共享的资源。为保证数据的一致性，需要对`并发操作进行控制`，因此产生了`锁`。同时`锁机制`也是实现MySQL的各个隔离级别提供了保证。`锁冲突`也是影响数据库`并发访问性能的`一个重要因素。
+
+
+## MySQL并发事务访问相同记录
+
+### 读-读情况
+
+`读-读`情况，即并发事务相继`读取相同的记录`。读取操作本身不会对记录有任何影响，所以允许这种情况发生
+
+### 写-写情况
+
+`写-写`情况，即并发事务相继对相同的记录做出改动
+
+这种情况下会发生`脏写`的问题，任意一种隔离级别都不允许这种问题的发生所以在多个未提交事务相继对一条记录做改动时，需要让它们`排队执行`，这个排队的过程其实是通过`锁`来实现的。这个所谓的锁其实是一个内存中的结构，在事务执行前本来时没有锁的，也就是一开始是没有锁结构和记录进行关联的
+
+当事务想对这条记录做改动时，首先会看看内存中有没有与这条记录关联的`锁结构`，当没有的时候就会在内存中生成一个`锁结构`与之关联。
+
+![alt text](images/image40.png)
+
+在`锁结构里`有很多信息，为了简化理解，只有两个比较重要的属性拿出来：
+- `trx信息`：代表这个锁结构是哪个事务生成的
+- `is_waiting`：代表当前事务是否在等待
+
+当事务T1改动了这条记录后，就生成了一个`锁结构`与该记录关联，因为之前没有别的事务为这条记录加锁，所以is_waiting属性就是false，我们把这个场景就称之为`获取锁成功`，或者`加锁成功`，然后就可以继续执行操作
+
+```
+锁结构与事务相关联，与记录数量无关，有几个事务，就有几个锁结构
+```
+
+在事务T1提交之前，另一个事务也想对该记录做改动，那么先看看有没有`锁结构`与这条记录关联，发现有一个`锁结构`与之关联，然后也生成了一个锁结构与这条记录关联，不过锁结构的`is_waiting`属性值为`true`，表示当前事务需要等待，我们把这个场景称之为`获取锁失败`，或者加锁失败
+
+![alt text](images/image41.png)
+
+ 在事务T1提交后，就会把该事物生成的`锁结构释放`掉,然后看看还有没有别的事务在等待获取锁，发现了事务T2还在等待获取锁，所以把事务T2对用的锁结构的`is_waiting`属性设置为`false`，然后把该事物对用的线程唤醒，让它继续执行，此时事务T2就算获取到锁了
+
+![alt text](images\image42.png)
+### 读-写或写-读情况
+
+`读-写或写-读`，即一个事务进行读取操作，另一个进行改动操作。这种情况下可能发生`脏读`、`不可重复读`、`幻读`的问题
+
+各个数据库厂商对`SQL标准`的支持都可能不一样。比如MySQL在`REPEATABLE READ`隔离级别上就已经解决了`幻读`的问题
+
+
+### 并发问题的解决方案
+
+- 方案1：读使用MVCC，写加锁
+
+- 方案2：读写都加锁
+
+
+
+## 锁的分类
+
+### 从数据操作的类型划分：读锁/写锁
+
+- 读锁：也称为`共享锁(Shared Lock)`，英文用`S`表示。针对同一份数据，多个事务的读操作可以同时进行而不会相互影响，相互不阻塞
+
+- 写锁：也称为`排它锁(Exclusive Lock)`,英文用`X`表示。当前写操作没有完成前，它会阻断其他写锁和读锁。这样就能确保在给定的时间里，只有一个事务能执行写入，并防止其他用户读取正在写入的同一资源
+
+
+
+#### 锁定读
+
+在采用`加锁`方式解决`脏读`、`不可重复读`、`幻读`这些问题时，读取一条记录时需要获取该记录的S锁，其实不严谨的（尤其对于解决幻读来说），有时候需要在读取记录时就获取记录的`X锁`，来禁止别的事务读写该记录，为此MySQL提出了两种比较特殊的`SELECT`语句
+
+- 对读取的记录加`S锁`
+```sql
+SELECT ... LOCK IN SHARE MODE;
+# 或
+SELECT ... FOR SHARE
+```
+
+- 对读取的记录加`X锁`
+```sql
+SELECT ... FOR UPDATE;
+```
+
+
+演示1
+- 终端1和终端2同时开启事务，读取并添加共享锁在同一个表上，没有问题
+```sql
+-- 终端1：
+mysql> begin;
+mysql> select * from student for share;
++------+----------+------+------+--------+-------+
+| id   | name     | age  | sex  | height | class |
++------+----------+------+------+--------+-------+
+|    1 | tom      |   18 | M    |   1.81 |     2 |
+|    2 | jerry    |   22 | F    |   1.73 |     1 |
+|    3 | kobe     |   29 | M    |   1.96 |     3 |
+|    4 | feng     |   28 | M    |   2.28 |     1 |
+|    5 | lisa     |   22 | F    |   1.69 |     3 |
+|    6 | xiaowang |   25 | M    |   1.66 |     2 |
++------+----------+------+------+--------+-------+
+6 rows in set (0.00 sec)
+
+-- 终端2：
+mysql> begin;
+mysql> select * from student for share;
++------+----------+------+------+--------+-------+
+| id   | name     | age  | sex  | height | class |
++------+----------+------+------+--------+-------+
+|    1 | tom      |   18 | M    |   1.81 |     2 |
+|    2 | jerry    |   22 | F    |   1.73 |     1 |
+|    3 | kobe     |   29 | M    |   1.96 |     3 |
+|    4 | feng     |   28 | M    |   2.28 |     1 |
+|    5 | lisa     |   22 | F    |   1.69 |     3 |
+|    6 | xiaowang |   25 | M    |   1.66 |     2 |
++------+----------+------+------+--------+-------+
+6 rows in set (0.00 sec)
+```
+
+- 终端3上开启事务，并且添加X锁并读取student表，就会阻塞
+```sql
+mysql> begin;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> select * from student for update;
+-- 阻塞中......
+```
+
+- 将终端1和终端2的事务结束，释放S锁后，终端3的X锁的方式读取student表才结束阻塞，成功读取
+```sql
+-- 终端1：
+commit;
+
+-- 终端2：
+commit;
+
+-- 终端3：
+mysql> select * from student for update;
++------+----------+------+------+--------+-------+
+| id   | name     | age  | sex  | height | class |
++------+----------+------+------+--------+-------+
+|    1 | tom      |   18 | M    |   1.81 |     2 |
+|    2 | jerry    |   22 | F    |   1.73 |     1 |
+|    3 | kobe     |   29 | M    |   1.96 |     3 |
+|    4 | feng     |   28 | M    |   2.28 |     1 |
+|    5 | lisa     |   22 | F    |   1.69 |     3 |
+|    6 | xiaowang |   25 | M    |   1.66 |     2 |
++------+----------+------+------+--------+-------+
+6 rows in set (42.09 sec)
+```
+
+- 在终端3获取X锁读取表后，终端1也试图获取X锁读取表，就会发生阻塞
+```sql
+-- 终端1：
+mysql> begin;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> select * from student for update;
+-- 阻塞中...
+```
+
+- 当终端3获取X锁读表时，终端2试图获取S锁读表，也会发生阻塞
+```sql
+mysql> select * from student for share;
+ERROR 1205 (HY000): Lock wait timeout exceeded; try restarting transaction
+```
+
+- 总结：
+  - 只有读锁和读锁兼容
+  - 读锁和写锁，写锁和读锁，写锁和写锁都不兼容
+
+
+- MySQL8.0新特性
+
+在5.7及之前的版本，SELECT...FOR UPDATE,如果获取不到锁，会一直等待，直到innodb_lock_wait_timeout超时。
+
+在8.0版本中，`SHARE...FOR UPDATE`，`SHARE...FOR SHARE`添加`NOWAIT`、`SKIP LOCKED`语法，跳过锁等待，或者跳过锁定
+
+- 通过添加`NOWAIT`、`SKIP LOCKED`语法，能够立即返回。如果查询的行已经加锁
+  - 那么NOWAIT会立即报错返回
+  - 而SKIP LOCKED也会立即返回，只是返回的结果中不包含被锁定的行
+
+示例：
+
+```sql
+-- 终端1：给表student加X锁
+mysql> select * from student for update;
+
+-- 终端2：
+-- nowait立即报错返回
+mysql> select * from student for share nowait;
+ERROR 3572 (HY000): Statement aborted because lock(s) could not be acquired immediately and NOWAIT is set.
+
+-- 返回没有锁的行，
+mysql> select * from student for share skip locked;
+Empty set (0.00 sec)
+```
+
+#### 写操作
+
+平常所用到的`写操作`无非是`DELETE`、`UPDATE`、`INSERT`这三种
+
+- DELETE 
+  - 对一条记录做DELETE操作的过程其实是先在B+树中定位这条记录的位置，然后获取这条记录的X锁，再执行`delete mark`操作。我们也可以把这个定位待删除记录在B+树中位置的过程看成是一个获取`X锁`的`锁定读`
+
+- UPDATE
+  - 情况1：未修改该记录的键值，并且被更新的列占用的存储空间在修改前后未发生变化。则先在B+树中定位到这条记录的位置，然后再获取一下记录的`X锁`，最后在原纪录的位置进行修改操作。我们也可以把这个定位待修改记录在B+树中位置的过程看成是一个获取`X锁`的`锁定读`。
+  - 情况2：未修改该记录的键值，并且至少有一个被更新的列占用个存储空间在修改前后发生变化。则先在B+树中定位到这条记录的位置，然后获取一下记录的`X锁`，将该记录彻底删除掉（就是把记录彻底移入垃圾链表），最后再插入一条新纪录。这个定位待修改记录在B+树中位置的过程看成是一个获取`X锁`的`锁定读`，新插入的记录由`INSERT`操作提供的`隐式锁`进行保护
+  - 情况3：修改了该记录的键值，则相当于在原纪录上做`DELETE`操作之后再来一次`INSERT`操作，加锁操作就需要按照`DELETE`和`INSERT`的规则进行了。
+
+- INSERT
+  - 一般情况下，新插入一条记录的操作并不加锁，通过一种称之为`隐式锁`的结构来保护这条新插入的记录在本事务提交前不被别的事务访问
+
+
+### 从数据操作的颗粒度划分：表级锁、页级锁，行级锁
+
+#### 表锁（Table Lock）
+
+该锁是锁定整张表，它是MySQL中最基本的锁策略，并不依赖存储引擎
+
+- 查看是否表中是否使用锁
+
+```sql
+show open tables;
+-- 观察In_user字段
+```
+
+- 给表加读锁
+```sql
+lock table mylock read;
+-- 自己可读
+-- 自己不可写
+-- 自己不可操作其他表
+-- 他人可读
+-- 他人不可写
+```
+
+
+- 给表加写锁
+```sql
+lock table mylock write;
+-- 自己可读
+-- 自己可写
+-- 自己不可操作其他表
+-- 他人不可读
+-- 他人不可写
+```
+
+
+总结：
+- MyISAM在执行查询语句(select)前，会给设计的所有表加读锁，在执行增删改操作前，会给设计的表加写锁
+- InnoDB存储引擎是不会为这个表添加表级别的`读锁`或者`写锁`的
+
+#### 意向锁（intention lock）
+
+InnoDB支持`多颗粒度(multiple granularity locking)`，它允许`行级锁`与`表级锁`共存，而意向锁就是其中的一种表锁
+
+1. 意向锁的存在是为了协调行锁和表锁的关系，支持多颗粒度锁的共存
+2. 意向锁是一种`不与行级锁冲突表级锁`这一点非常重要
+3. 表明"某个事务正在某些行持有了锁或该事务准备去持有锁"
+
+意向锁要解决的问题
+
+现在有两个事务，分别是T1和T2，其中T2试图在该表级别上应用共享锁或排它锁，如果没有意向锁存在，那么T2就需要去检查各个页或行是否存在锁；如果存在意向锁，那么此时就会受到由T1控制的`表级别意向锁的阻塞`。T2在锁定该表前不必检查各个页或行锁，而只需检查表上的意向锁。`简单来说，就是给更大一级别的空间示意里面是否已经上过锁
+
+在数据表的场景中，如果我们给某一行数据加上了排它锁，数据库会自动给更大一级的空间，比如数据页或数据表加上意向锁，告诉其他人这个数据页或者数据表已经有人上过排他锁了
+
+- 如果事务想要获得数据表中某些记录的共享锁，就需要在数据表上`添加意向共享锁`
+- 如果事务想要获得数据表中某些记录的排它锁，就需要在数据表上`添加意向排它锁`
+
+- 意向共享锁
+```sql
+-- 事务要获取某些行的S锁，必须先获得表的IS锁
+SELECT column FROM table ... LOCK IN SHARE MODE;
+```
+
+- 意向排他锁
+```sql
+-- 事务要获取某些行的X锁，必须先获得表的IX锁
+SELECT column FROM table ... FOR UPDATE;
+```
+
+意向锁是由存储引擎`自己维护的`，用户无法手动操作意向锁，在为数据行加共享/排他锁之前，InnoDB会先获取该数据行所在数据表的对应意向锁
+
+- 意向锁之间的兼容性
+
+![alt text](images/image43.png)
+
+
+#### 自增锁(AUTO-INC锁)（了解即可）
+
+#### 元数据锁（MDL锁）
+
+- 当对一个表做增删改查的时候，加MDL读锁
+- 当对一个表做结构变更操作的时候，加MDL写锁
+
+读锁之间不互斥，因此可以有多个线程同时对一张表增删改查。读写锁之间，写锁之间是互斥的，用来保证变更表结构操作的安全性，解决DML和DDL操作的一致性问题。`不需要显式使用`，在访问一个表的时候会被自动加上
+
+
+### InnoDB中的行锁
+
+行锁也称为记录锁，MySQL服务器层并没有实现行锁机制，行锁只在存储引擎层实现
+
+- 优点：锁定力度小，发生`锁冲突概率低`，可以实现的`并发度高`
+- 缺点：对`锁的开销比较大`，加锁会比较慢，容易出现`死锁`
+
+![alt text](images/image44.png)
+
+记录锁是有S锁和X锁之分
+- 当一个事务获取了一条记录的S型记录锁后，其他事务也可以继续获取该记录的S型记录锁，但不可以继续获取X型记录锁
+- 当一个事务获取了一条记录的X型记录锁后，其他事务既不可以获取该记录的S型记录锁，也不可以继续获取X型记录锁
+
+
+#### 间隙锁(Gap Lock)
+
+Gap锁的提出仅仅是为了防止插入幻影记录而提出的
+
+
+#### 临键锁(Next-Key Lock)
+
+相当于记录锁 + 间隙锁
+
+Next-Key-Lock是在存储Innodb，事务级别在`可重复读`的情况下使用的数据库锁，innodb默认的锁就是Next-key Lock。
+
+#### 插入意向锁
 
 
