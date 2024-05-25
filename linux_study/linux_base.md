@@ -9781,11 +9781,19 @@ exit
 - ICANN(The Internet Corporation for Assigned Names and Numbers) 互联网名称与数字地址分配机构，负责在全球范围内对互联网通用顶级域名以及国家和地区顶级域名系统的管理，以及根服务器系统的管理
 
 #### DNS服务工作原理
-- 略
+
+![alt text](images/image61.png)
 
 #### DNS查询类型
-- 递归查询：最终结果，负责到底
-- 迭代查询：最好结果，不负责到底
+- 递归查询：
+  - 是指DNS服务器在收到用户发起的请求时，必须向用户返回一个准确的查询结果。如果DNS服务器本地没有存储与之对应的信息，则该服务器需要询问其他服务器，并将返回的查询结果提交给用户。
+  - 一般客户机和本地DNS服务器之间属于递归查询，即当客户机向DNS服务器发出请求后，若DNS服务器本身不能解析，则会向另外的DNS服务器发出查询请求，得到最终的肯定或否定的结果后转交给客户机。
+  - 此查询的源和目标保持不变，为了查询结果只需要发起一次查询。
+  - 客户端向LocalDNS发起域名查询-->localDNS不知道域名对应的IP-->但它知道谁知道->他代为帮客户端去查找-->最后再返回最终结果。
+
+- 迭代查询：
+  - 是指DNS服务器在收到用户发起的请求时，并不直接回复查询结果，而是告诉另一台DNS服务器的地址，用户再向这台DNS服务器提交请求，这样依次反复，直到返回查询结果。
+  - 一般情况下(有例外)本地的DNS服务器向其它DNS服务器的查询属于迭代查询，如：若对方不能返回权威的结果，则它会向下一个DNS服务器(参考前一个DNS服务器返回的结果)再次发起进行查询，直到返回查询的结果为止。此查询的源不变，但查询的目标不断变化，为查询结果一般需要发起多次查询。
 
 #### 解析类型
 - FQDN ---> IP 正向解析
@@ -9804,6 +9812,101 @@ DNS Service Cache --> iteration(迭代) -->
 二级域名..
 ```
 
+#### DNS缓存
+
+- Windows系统中显示DNS缓存
+```shell
+ipconfig/displaydns # 正斜杠，这里没写错
+```
+
+- Windows系统中清除DNS缓存
+```shell
+ipconfig/flushdns
+```
+
+- CentOS系统中查看DNS缓存
+
+nscd（Name Service Cache Daemon）是一个用于缓存各种名称服务请求的守护进程，比如用户和组信息、主机名、服务等
+
+```shell
+# 下载nscd
+yum install -y nscd
+
+# 启动nscd
+nscd
+
+# 查看DNS缓存
+nscd -g
+
+hosts cache:
+
+yes  cache is enabled
+yes  cache is persistent
+yes  cache is shared
+211  suggested size
+# 缓存数据池的总大小（以字节为单位）。这个数据池用于存储缓存的主机名解析结果。
+216064  total data pool size
+# 当前已使用的数据池大小（以字节为单位）。表示目前没有缓存的数据被存储。
+0  used data pool size
+# 正面条目的生存时间（TTL，单位为秒）。表示成功解析的主机名缓存 3600 秒（1 小时）后过期。
+3600  seconds time to live for positive entries
+# 负面条目的生存时间（TTL，单位为秒）。表示未能解析的主机名缓存 20 秒后过期
+20  seconds time to live for negative entries
+# 正面条目的缓存命中次数。表示从缓存中成功获取到解析结果的次数。
+0  cache hits on positive entries
+# 负面条目的缓存命中次数。表示从缓存中成功获取到未能解析结果的次数。
+0  cache hits on negative entries
+1  cache misses on positive entries
+1  cache misses on negative entries
+# 缓存命中率。表示命中次数在总查询次数中的比例，目前为 0%。
+0% cache hit rate
+# 当前缓存的条目数量。表示当前缓存中没有任何条目
+0  current number of cached values
+2  maximum number of cached values
+0  maximum chain length searched
+0  number of delays on rdlock
+0  number of delays on wrlock
+0  memory allocations failed
+yes  check /etc/hosts for changes
+
+# 清除缓存
+nscd -i hosts
+```
+
+- Ubuntu系统中查看DNS缓存
+```shell
+# systemd-resolved的配置文件
+vim /etc/systemd/resolved.conf
+
+systemctl restart systemd-resolved
+
+# 查看DNS缓存
+resolvectl statistics
+
+# 清空DNS缓存
+resolvectl reset-statistics
+```
+
+- 使用systemd-resolved服务需要提前准备的事情
+  - 将之前的`/etc/resolve.conf`删掉
+  ```shell
+  rm /etc/resolve.conf
+  ```
+  - 建立链接路径正确的软链接文件
+  ```shell
+  ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+  ```
+  - 确保`[Resolve]`部分包含以下内容，并且没有被注释
+  ```shell
+  [Resolve]
+  DNS=114.114.114.114 180.76.76.76
+  DNSStubListener=yes
+  ```
+  - 重启服务
+  ```shell
+  systemctl restart systemd-resolved
+  ```
+
 ### DNS软件bind
 - DNS服务器软件：bind，powerdns（基于LAMP），unbound, coredns
 
@@ -9817,7 +9920,7 @@ yum list all bind*
 - bind-chroot：安全包，将dns相关文件放至`/var/named/chroot`
 - 范例：安装bind软件
 ```shell
- 
+yum install -y bind
 ```
 
 #### BIND包相关文件
