@@ -9929,7 +9929,7 @@ yum install -y bind
 - 本地配置的DNS服务器文件`/etc/resolv.conf` 
 - 当安装并启动named的时候，此时并没有任何DNS配置，上面自带关于根域的记录，此时该DNS服务器叫做只缓存服务器，初次访问的所有域名都通过访问根，依次访问后几级域名，来实现DNS域名转换
 
-- `cat /var/named/named.ca`存放了13个根记录
+- `cat /var/named/named.ca`存放了13个根记录（Ubuntu中是`/usr/share/dns/root.hints`）
 ```shell
 #  /var/named/named.ca
 ;; ANSWER SECTION:
