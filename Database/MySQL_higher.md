@@ -7360,6 +7360,101 @@ purge线程有两个作用：
 在InnoDB中，事务中的Delete操作实际上并不是真正的删除掉数据行，而是一种Delete Mark操作，在记录上标识Delete_Bit，而不是删除记录。是一种"假删除"，只是做了个标记，真正的删除工作需要后台purge线程去完成。
 ```
 
+
+### 错误日志
+
+MySQL中错误日志中记录的主要内容
+- mysqld启动和关闭过程中输出的事件信息
+- mysqld运行中产生的错误信息
+- event scheduler运行一个event产生的日志信息
+- 在主从复制架构中的从服务器上启动从服务器线程时产生的信息
+
+查看错误日志的文件位置
+```sql
+mysql> select @@log_error
+    -> ;
++--------------------------+
+| @@log_error              |
++--------------------------+
+| /var/log/mysql/error.log |
++--------------------------+
+1 row in set (0.00 sec)
+```
+
+在配置文件中修改错误日志的路径
+```shell
+vim /etc/my.cnf
+[mysqld]
+log-error=/data/mysqld.log
+```
+
+定义错误日志记录的级别
+```sql
+mysql> select @@log_error_verbosity;
++-----------------------+
+| @@log_error_verbosity |
++-----------------------+
+|                     2 |
++-----------------------+
+1 row in set (0.00 sec)
+
+-- 1: ERROR
+-- 2: ERROR, WARNING
+-- 3: ERROR, WARNING, INFORMATION
+```
+
+### 通用日志：略
+
+
+### 二进制日志
+
+二进制日志(Binary Log)也可以叫做变更日志(Updata Log)，是Mysql中非常重要的日志。主要用于记录数据库的变化情况，即SQl语句的DDL和DML语句，但不包含查询操作语句，因为查询语句并不会改变数据库的数据
+
+如果MYSQL数据库意外停止，可以通过二进制日志文件来查看用户执行了哪些操作，对数据库服务器文件做了哪些修改，然后根据二进制日志文件中的记录来恢复数据库服务器
+
+自MySQL8.0开始，默认开启了二进制日志功能，之前版本默认是关闭二进制日志的
+
+#### 事务日志和二进制区别
+- 事务可以看作是在线日志，二进制日志可以看作是离线日志
+- 事务日志记录事务执行的过程，包括提交和未提交，二进制日志只记录提交的过程
+- 事务日志只支持InnoDB存储引擎，二进制支持InnoDB和MyISAM存储引擎
+
+#### 二进制日志记录三种格式
+- Statement：基于语句的记录模式，日志中会记录原生执行的SQL语句，对于某些函数或变量，不会替换
+- Row：基于行的记录模式，会将SQL语句中的变量和函数进行替换后再记录
+- Mixed：混合记录模式，在此模式下，MySQL会根据具体的SQL语句来分析采用哪种模式记录日志。
+
+```sql
+-- 原始SQL语句
+insert into t1(age,add_time)values(10,now());
+-- 2023-12-01 17:57:10
+
+-- statement日志
+insert into t1 (age, add_time) values(10, now());
+
+--- Row日志，now()函数被解析
+insert into t1 (age, add_time) values(10, '2023-12-01 17:57:10')
+
+-- Statement 比较节约磁盘空间，但无法百分百还原场景
+-- Row相当于Statement占用空间较大
+```
+
+#### 相关配置和服务器变量
+```sql
+sql_log_bin = 1|0  -- 是否开启二进制日志，可动态修改，是系统变量，而非服务器变量
+log_bin=/path/file_name -- 是否开启二进制日志，两项都要开启才能表示开启，此项是服务器详项，指定的是日志文件路径
+-- 在[mysqld]下，写log_bin,相当于将前缀换成`hostname`
+log_bin_basename=/path/log_file_name  -- binlog文件前缀
+log_bin_index=/path/filename      -- 索引文件路径
+binlog_format=STATEMENT|ROW|MIXED -- Log文件格式
+max_binlog_size=1073741824  -- 单文件大小，默认1G，超过大小会自动生成新的文件
+```
+
+每次Mysql服务重启，都会新生成一个二进制日志文件，所以虽然系统设置上是超过1G才会生成新文件。但后台却又很多小的二进制文件的原因
+
+
+
+
 # 锁
 
 事务的隔离性由锁实现
@@ -7774,4 +7869,52 @@ MVCC(Multiversion Concurrency Control)，多版本并发控制。顾名思义，
 换言之，就是为了查询一些正在被另一个事务更新的行，并且可以看到他们被更新之前的值。这样做查询的时候不用等待另一个事务释放锁
 
 
+# 错误记录
+
+## Mysql实验
+
+### Ubuntu上更改配置文件上的log_bin，重启mysql后始终显示权限不足
+
+```shell
+# 更改配置文件
+vim /etc/mysql/mysql.conf.d/mysqld.conf
+
+# 添加
+log_bin=/mysql/log/ubuntu
+
+# 新建目录
+mkdir -pv /mysql/log
+
+# 加权限
+chown mysql.mysql /mysql/log
+
+# 更改apparmor使其mysql能够有读取指定路径的权限
+vim /etc/apparmor.d/usr.bin.mysqld
+
+# 在里面插入需要权限的目录
+/mysql/log/** rw
+/mysql/log/ rw
+
+# 重新加载apparmor
+apparmor_parser -r /etc/apparmor.d/usr.sbin.mysqld
+
+# 重启mysql服务
+systemctl restart mysql
+```
+
+
+### Mysql忘记密码后，如何重置密码
+```shell
+# 删除整个数据目录
+rm -rf /var/lib/mysql/*
+
+# 将数据目录重新初始化
+ mysqld --initialize --user=mysql --datadir=/var/lib/mysql
+
+# 在错误日志中，找到临时密码
+less /var/log/mysql/error.log
+
+# 登录后修改密码
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_secure_password';
+```
 

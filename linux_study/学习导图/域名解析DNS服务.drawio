@@ -1,6 +1,6 @@
-<mxfile host="Electron" modified="2024-05-25T20:05:01.788Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.0.2 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="olmCOeCul_Rc939aCdSo" version="23.0.2" type="device">
+<mxfile host="Electron" modified="2024-05-26T04:31:18.150Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.2.5 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="HuxR-GwtK4Q3O1UU6bkO" version="24.2.5" type="device">
   <diagram name="第 1 页" id="NMcdNb8Kv9cpoHteDPAA">
-    <mxGraphModel dx="3641" dy="853" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="4555" dy="1197" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -421,7 +421,7 @@
         <mxCell id="OMMxllmkutY53vAn99gH-154" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#005700;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#008a00;" parent="OMMxllmkutY53vAn99gH-286" source="OMMxllmkutY53vAn99gH-147" target="OMMxllmkutY53vAn99gH-152" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="OMMxllmkutY53vAn99gH-286" source="OMMxllmkutY53vAn99gH-158" target="OOJH4FYgQAY023cvIcuH-1">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="OMMxllmkutY53vAn99gH-286" source="OMMxllmkutY53vAn99gH-158" target="OOJH4FYgQAY023cvIcuH-1" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="OMMxllmkutY53vAn99gH-158" value="TTL 86400&amp;nbsp; &amp;nbsp;#定义全局TTL，定义之后具体记录可以省略此字段&lt;br&gt;@&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; IN&amp;nbsp; &amp;nbsp; SOA&amp;nbsp; &amp;nbsp;linux-magedu-dns.&amp;nbsp; admin.linux-magedu.com. ( 123 1h 10m 1D 12h )&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; NS&amp;nbsp; &amp;nbsp;dns1&lt;br&gt;dns1&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; A&amp;nbsp; &amp;nbsp; &amp;nbsp; 10.0.0.206&lt;br&gt;www&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; A&amp;nbsp; &amp;nbsp; &amp;nbsp; 10.0.0.210&amp;nbsp;&lt;br&gt;&lt;br&gt;&lt;br&gt;#&amp;nbsp;123: 该数据库版本名称&lt;br&gt;#&amp;nbsp;1h: 每隔一个小时从服务器从主服务器拉取数据，（是否更新的判断是版本号）&amp;nbsp;&lt;br&gt;#&amp;nbsp;10m: 如果同步失败，则每10分钟重新尝试一次&amp;nbsp;&lt;br&gt;#&amp;nbsp;1D：如果1天以上都无法实现同步，则从服务器数据失效&lt;br&gt;#&amp;nbsp;12h: 错误访问记录的缓存有效期，即如果用户查找一个不存在数据库中的域名，则定一个缓存有效期，12个小时内，用户如果继续访问，则直接返回该记录不存在。（否定答案的TTL值 ）&lt;br&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;&amp;nbsp;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;" parent="OMMxllmkutY53vAn99gH-286" vertex="1">
@@ -526,7 +526,7 @@
         <mxCell id="OMMxllmkutY53vAn99gH-200" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#005700;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#008a00;" parent="OMMxllmkutY53vAn99gH-286" source="OMMxllmkutY53vAn99gH-188" target="OMMxllmkutY53vAn99gH-199" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-1" value="配置文件灵魂3问：&lt;br&gt;我是谁(SOA)&lt;br&gt;我作为这个域名服务器叫什么(NS)&lt;br&gt;这台域名服务器具体IP是谁(A)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;spacingLeft=0;" vertex="1" parent="OMMxllmkutY53vAn99gH-286">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-1" value="配置文件灵魂3问：&lt;br&gt;我是谁(SOA)&lt;br&gt;我作为这个域名服务器叫什么(NS)&lt;br&gt;这台域名服务器具体IP是谁(A)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=center;spacingLeft=0;" parent="OMMxllmkutY53vAn99gH-286" vertex="1">
           <mxGeometry x="4260" y="770" width="240" height="110" as="geometry" />
         </mxCell>
         <mxCell id="OMMxllmkutY53vAn99gH-161" value="&lt;b&gt;主从DNS服务器&lt;br&gt;&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=0" parent="1" vertex="1">
@@ -595,10 +595,10 @@
         <mxCell id="OMMxllmkutY53vAn99gH-216" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" parent="1" source="OMMxllmkutY53vAn99gH-213" target="OMMxllmkutY53vAn99gH-213" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-90" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="OMMxllmkutY53vAn99gH-217" target="OOJH4FYgQAY023cvIcuH-86">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-90" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" parent="1" source="OMMxllmkutY53vAn99gH-217" target="OOJH4FYgQAY023cvIcuH-86" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-91" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="OMMxllmkutY53vAn99gH-217" target="OOJH4FYgQAY023cvIcuH-87">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-91" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" parent="1" source="OMMxllmkutY53vAn99gH-217" target="OOJH4FYgQAY023cvIcuH-87" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="OMMxllmkutY53vAn99gH-217" value="zone &quot;ZONE_NAME&quot; IN {&lt;br&gt;  &lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;type slave;&lt;br&gt;  &lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;masters { MASTER_IP; };&lt;br&gt;  &lt;span style=&quot;white-space: pre;&quot;&gt;&#x9;&lt;/span&gt;file &quot;slaves/ZONE_NAME.zone&quot; ;&lt;br&gt;}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;spacingLeft=8;" parent="1" vertex="1">
@@ -769,28 +769,28 @@
         <mxCell id="OMMxllmkutY53vAn99gH-282" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontColor=default;endArrow=none;endFill=0;" parent="1" source="OMMxllmkutY53vAn99gH-278" target="OMMxllmkutY53vAn99gH-281" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-89" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="OOJH4FYgQAY023cvIcuH-82" target="OOJH4FYgQAY023cvIcuH-84">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-89" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" parent="1" source="OOJH4FYgQAY023cvIcuH-82" target="OOJH4FYgQAY023cvIcuH-84" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-82" value="mkdir /ec/bind/slaves&lt;br&gt;chmod g=rwx slaves" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" vertex="1" parent="1">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-82" value="mkdir /ec/bind/slaves&lt;br&gt;chmod g=rwx slaves" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" parent="1" vertex="1">
           <mxGeometry x="-1635" y="2180" width="220" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-84" value="# 在19行后添加如下两条&lt;br&gt;vim /etc/apparmor.d/usr.sbin.named&lt;br&gt;/etc/bind/slave/** rwk,&lt;br&gt;/etc/bind/slave/&amp;nbsp; rwk," style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" vertex="1" parent="1">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-84" value="# 在19行后添加如下两条&lt;br&gt;vim /etc/apparmor.d/usr.sbin.named&lt;br&gt;/etc/bind/slave/** rw,&lt;br&gt;/etc/bind/slave/&amp;nbsp; rw," style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" parent="1" vertex="1">
           <mxGeometry x="-1635" y="2290" width="220" height="65" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-88" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="OOJH4FYgQAY023cvIcuH-86" target="OOJH4FYgQAY023cvIcuH-82">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-88" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" parent="1" source="OOJH4FYgQAY023cvIcuH-86" target="OOJH4FYgQAY023cvIcuH-82" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-86" value="Ubuntu" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" vertex="1" parent="1">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-86" value="Ubuntu" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" parent="1" vertex="1">
           <mxGeometry x="-1580" y="2090" width="110" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-93" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="OOJH4FYgQAY023cvIcuH-87" target="OOJH4FYgQAY023cvIcuH-92">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-93" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" parent="1" source="OOJH4FYgQAY023cvIcuH-87" target="OOJH4FYgQAY023cvIcuH-92" edge="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-87" value="CentOS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" vertex="1" parent="1">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-87" value="CentOS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" parent="1" vertex="1">
           <mxGeometry x="-1360" y="2090" width="110" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="OOJH4FYgQAY023cvIcuH-92" value="无其他复杂操作" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" vertex="1" parent="1">
+        <mxCell id="OOJH4FYgQAY023cvIcuH-92" value="无其他复杂操作" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;spacingLeft=0;" parent="1" vertex="1">
           <mxGeometry x="-1380" y="2180" width="150" height="65" as="geometry" />
         </mxCell>
       </root>
