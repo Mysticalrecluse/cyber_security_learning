@@ -7721,8 +7721,527 @@ create database NBA;
 source /root/NBA-bak.sql
 ```
 
+#### 备份数据库结构和数据
+```shell
+mysqldump -p123456 -h10.0.0.151 -B NBA > NBA-bak.sql
+
+# 将数据传到备份机器
+scp NBA-bak.sql 10.0.0.152:
+
+# 还原
+# 另一台机器上
+source /root/NBA-bak.sql
+```
+
+#### 备份所有数据库
+
+备份所有数据库是指备份有物理数据的数据库，并不包括从内存中映射的数据库(information_schema,performance_schema,sys)
+
+```shell
+mysqldump -uroot -h 10.0.0.151 -p123456 -A > /data/all-bak.sql
+
+# 还原方法同上
+```
+
+#### 实现数据库备份脚本
+```shell
+UNAME=root
+PWD=123456
+HOST=10.0.0.151
+IGNORE='Database|information_schema|preformance_schem|sys'
+YMD=`date +%F`
+
+if [ ! -d /backup/${YMD} ]; then
+    mkdir -pv /backup/${YMD}
+fi
+
+DBLIST=`mysql -u${UNAME} -p${PWD} -h${HOST} -e "show databases;" 2 > /dev/null | grep -Ewv "$IGNORE"`
+
+# 截止到这里
+# echo $DBLIST --->
+# NBA mysql performance_schema
+
+for db in ${DBLIST}; do
+    mysqldump -u${UNAME} -p${PWD} -h${HOST} -B $db 2>/dev/null 1>/backup/${YMD}/${db}_${YMD}.sql
+
+    if [ $? -eq 0 ]; then
+        echo "${db}_${YMD} backup success"
+    else
+        echo "${db}_${YMD} backup fail"
+done
+
+# 加定时任务
+crontab -e
+PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/root/bin
+
+15 0 * * * /root/0104/backupv2.sh
+```
+
+#### 保存二进制日志位置信息
+
+在备份日志中记录备份时的二进制日志信息，后续通过此备份进行恢复，还是会缺少一部分数据，这一部分数据，则可以通过当前的二进制日志与备份文件中的二进制信息进行对比得到
+
+```shell
+mysqldump -uroot -p123456 -h10.0.0.151 --source-data=2 -B NBA > NBA-bakv2.sql
+
+vim NBA-bakv2.sql
+
+#下面是部分重要内容
+-- Position to start replication or point-in-time recovery from
+--
+# 这里记录了备份的二进制文件的结尾地址信息
+-- CHANGE MASTER TO MASTER_LOG_FILE='rocky.000002', MASTER_LOG_POS=1652;
+```
+
+范例：利用备份中的记录的二进制POS信息选择性恢复
+
+场景：
+- 上午9点执行了完全备份
+- 上午10点误操作删除了数据库中的某张表
+- 上午11点发现该表被误删除，现要求恢复数据
+
+```解决方案
+1. 先导入9.sql, 恢复到9点，该日志中有记录二进制日志信息，
+
+2. 从该9.sql中记录的二进制记录结尾位置，即MASTER_LOG_POS='num' 往后扣，导出来，再删掉del时间，再倒回去
+```
+
+```shell
+# 开始恢复
+systemctl stop mysqld
+
+# 查看完全备份中的CHANGE信息,找到备份最后的二进制日志位置,假设是123456
+cat /data/testdb-bak.sql | grep 'CHANGE'
+
+# 导出之后的binlog中的数据
+mysqlbinlog --start-position=123456 /mysql/log/binlog.000004 > /backup/logbin.sql
+
+# 可以看到DROP语句，还原的时候去掉就可以了
+grep -i "DROP" /backup/logbin.sql
+
+#拷贝到远程主机还原
+scp /data/test-bak.sql /backup/logbin.sql root@10.0.0.152:/root/backup/
+
+#备份的时候，可以临时禁用主机上的二进制日志
+set sql_log_bin=0;
+
+#导入完全备份
+source /root/backup/test-bak.sql
+
+# 在使用修改好的二进制日志文件恢复剩余内容
+```
+
+### Xtrabackup备份工具
+
+#### Xtrabackup介绍
+
+Xtrabackup是percona公司开发的一款MySQL数据库备份工具，支持对InnoDB和XtarDB引擎进行热备
+
+XtraDB存储引擎是由percona公司开发的一款MySQL数据库的高性能存储引擎，其目的是用来替代InnoDB存储引擎，可用于需要更高性能的环境 
+
+rpm包安装
+```shell
+# 下载rpm包
+wget https://downloads.percona.com/downloads/Percona-XtraBackup-8.0/Percona-XtraBackup-8.0.35-30/binary/redhat/8/x86_64/percona-xtrabackup-80-8.0.35-30.1.el8.x86_64.rpm
+
+# 使用yum安装，可以顺便解决依赖问题
+yum install ./percona-xtrabackup-80-8.0.35-30.1.el8.x86_64.rpm
+
+# 查看
+yum info "percona*"
+```
+
+XtraBackup 特点
+- 备份还原过程快速，可靠
+- 备份过程不会打断正在执行的事务
+- 能够基于压缩等功能节约磁盘空间和流量
+- 自动实现备份检验
+- 开源，免费
 
 
+#### xtrabackup备份和还原实现
+
+开始备份
+```shell
+# 创建目录
+mkdir /backup
+
+# 开始备份(完全备份)
+xtrabackup --user root --host 10.0.0.151  --backup --target-dir=/backup/base
+```
+
+在远程主机还原
+```shell
+# 远程主机需要安装相同版本的xtrabackup,相同版本的MySQL
+
+# 将数据拷贝到待还原的机器上
+scp -r /backup 10.0.0.152:
+
+# 执行还原前的整理，将备份时没提交的事务进行回滚
+xtrabackup --prepare --target-dir=/root/backup/base
+
+# 停止mysqld服务
+systemctl stop mysqld
+
+# 清空数据目录
+rm -rf /var/lib/mysql/*
+
+# 开始还原
+xtrabackup --copy-back --target-dir=/root/backup/base --datadir=/var/lib/mysql
+
+# 后面如果遇到问题，根据报错一步步更改即可，贼简单
+```
+
+#### xtrabackup 实现增量备份和还原
+
+数据还原时注意，还原顺序一定要正确，先还原完全备份的数据，再还原第一次增量备份的数据，再还原第二次增量备份的数据，如果有多个增量备份，也就是按照此规则进行还原。另外，在还原时，只有最后一次的备份文件还原时需要进行事务回滚，之前的都不用回滚
+
+```shell
+# 第一次增量备份，基于/backup/base做增量备份，（前面一定有一次全量备份）
+xtrabackup --user root --host 10.0.0.151 -p123456 --backup --target-dir=/backup/inc1 --incremental-basedir=/backup/base
+
+# 第二次增量备份，基于/backup/inc1做增量
+xtrabackup --user root --host 10.0.0.151 -p123456 --backup --target-dir=/backup/inc2 --incremental-basedir=/backup/inc1
+
+# 远程同步到其他机器
+scp -r /backup/* 10.0.0.152:
+```
+
+在远程主机上还原
+```shell
+# 还原前整理
+# 整理全量备份，不回滚
+xtrabackup --prepare --apply-log-only --target-dir=/root/backup/base
+
+# 整理第一次增量备份数据，不回滚
+xtrabackup --prepare --apply-log-only --target-dir=/root/backup/base --incremental-dir=/root/backup/inc1
+
+# 整理第二次赠量备份数据，需要回滚（最后一次回滚）
+xtrabackup --prepare --target-dir=/root/backup/base --incremental-dir=/root/backup/inc2
+
+# 停掉mysqld服务
+systemctl stop mysqld
+
+# 清空数据目录
+rm -rf /var/lib/mysql/*
+
+# 还原数据
+xtrabackup --copy-back --target-dir=/root/backup/base --datadir=/var/lib/mysql/
+
+# 修改文件权限
+chown -R mysql.mysql /var/lib/mysql/*
+
+# 启动服务
+systemctl start mysqld
+```
+
+#### xtrabackup实现单表备份和还原
+```shell
+xtrabackup --user root --host 10.0.0.151 -p123456 --backup --target-dir=/backup/db1_stu --databases='db1' --tables='stu'
+```
+
+
+# MySQL集群
+
+## MySQL主从复制
+
+### 主从复制架构和原理
+
+在实际生产环境中，为了解决MySQL服务的单点和性能问题，使用MySQL主从复制架构是非常常见的一种方案
+
+在主从复制架构中，将MySQL服务器分为主服务器(Master)和从服务器(Slave)两种角色，主服务器负责数据写入(insert, update, delete, create等)，从服务器负责提供查询服务（Select等）
+
+MySQL主从架构数据向外扩展方案，主从节点都有形同的数据集，其基于二进制日志的单项复制来实现，复制过程是一个异步的过程
+
+### 主从复制的优点
+- 负载均衡读操作：将读操作进行分流，由另外一台或多台服务器提供查询服务，降低MySQL负载，提升响应速度
+- 数据库备份：主从节点都有相同的数据集，从而实现了数据库的备份
+- 高可用和故障切换：主从架构由两个或多个服务器节点构成，在某个节点不可用的情况下，可以进行转移和切换，保证服务可用
+- MySQL升级：当MySQL服务需要升级时，由于主从架构中有多个节点，可以逐一升级，而不停止服务
+
+### 主从复制的缺点
+- 数据延迟：主节点的数据需要经过复制之后才能同步到从节点上，这个过程需要时间，从而造成主从节点之间的数据不一致
+- 性能消耗：主从复制需要开启单独线程，会消耗一定资源
+- 数据不对齐：如果主从复制服务终止，而且又没有第一时间内恢复，则从节点的数据一直无法更新
+
+### 主从复制工作原理
+
+MySQL的主从复制架构中主要由三个线程：Master节点上的`binlog dump thread`线程,Slave节点上的`I/O thread`线程和`SQL thread`线程
+
+Master节点上会为每一个Slave节点上的I/O thread启动一个dump thread, 用来向其提供本机的二进制事件
+
+Slave节点的I/O thread线程向Master节点请求该节点上的二进制事件，并将得到的内容写到当前节点上的replay log中
+
+Slave节点上的SQL thread实时监测replay log内容是否有更新，如果更新，则将该文件中的内容解析成SQL语句，还原到Slave节点上的数据库中去，这样来保证主从节点之间的数据同步
+
+总结：3个线程，两个日志
+- binlog dump thread(Master)
+- I/O thread(Slave)
+- SQL thread(Slave)
+- binlog(Master)
+- relay log(Slave)
+
+![alt text](images/image45.png)
+
+相关文件
+```shell
+master.info  #用于保存slave连接至master时的相关信息，例如账号、密码、服务器地址              
+
+relay-log.info  #保存在当前slave节点上已经复制的当前二进制日志和本地relay log日志的对应关系         
+
+mysql-relay-bin.00000N #中继日志,保存从主节点复制过来的二进制日志,本质就是二进制日志     
+
+#MySQL8.0 取消 master.info 和 relay-log.info文件
+```
+
+
+### 主从复制配置
+
+主节点配置
+
+```shell
+# 修改配置文件
+[mysqld]
+log_bin=/data/logbin/mysql-bin   # 启用二进制日志
+server-id=N                      # 为当前节点设置全局唯一ID 
+# 通常唯一id写主机ip的最后一位
+# 如果从节点为0，所有master都将拒绝此slave的连接
+```
+
+查看从二进制日志的文件和位置开始进行复制
+```sql
+show master status;
+```
+
+创建有复制权限的用户账号
+```sql
+GRANT REPLICATION SLAVE on *.* TO 'repluser'@'HOST' IDENTIFIED BY 'replpass';
+
+-- mysql8.0分两步实现
+create user repluser@'10.0.0.%' identified by '123456'
+grant replication slave on *.* to repluser@'10.0.0.%';
+```
+
+从节点配置
+
+```shell
+[mysqld]
+serve_id=N
+log-bin
+read_only=ON
+relay_log=relay-log
+relay_log_index=relay-log.index
+```
+使用有复制权限的用户账号连接至主服务器，并启动复制线程
+
+```sql
+-- 在从节点上执行下列SQL语句，提供主节点地址和连接账号，用户名，密码，开始同步的二进制文件和位置等
+
+CHANGE MASTER TO MASTER_HOST='masterhost',  -- 指定master节点
+MASTER_USER='repluser',                     -- 连接用户
+MASTER_PASSWORD='replpass',                 -- 连接密码
+MASTER_LOG_FILE='mariadb-bin.xxxx',         -- 从哪个二进制文件开始复制
+MASTER_LOG_POS=123,                         -- 指定同步开始的位置
+MASTER_DELAY=interval                       -- 可指定延迟复制实现防误操作，单位秒，这里可以用作延时同步，一般用于备份
+
+START SLAVE [IO_THREAD | SQL_THREAD];       -- 启动同步线程
+STOP SLAVE                                  -- 停止同步
+RESET SALVE ALL                             -- 清除同步信息
+
+SHOW SLAVE STATUS;                          -- 查看从节点状态
+SHOW RELAYLOG EVENTS in 'relay-bin.0000x'   -- 查看relaylog事件
+
+-- 可以利用MASTER_DELAY参数设置从节点延迟同步，作用主从备份，比如设置1小时延时，则主节点上的误操作，要一个小时后才会同步到从服务器，可以利用时间差保存从节点数据
+```
+
+### 全新一主一从实现
+
+主节点配置
+```shell
+# 创建目录
+mkdir -pv /data/mysql/logbin
+
+# 修改属主属组
+chown -R mysql.mysql /data/mysql
+
+# 修改mysql配置
+vim /etc/my.cnf
+[mysqld]
+server-id=151
+log_bin=/data/mysql/logbin/mysql-bin
+
+# 创建账号并授权
+create user repluser@'10.0.0.%' identified by '123456';
+
+grant replication slave on *.* to repluser@'10.0.0.%';
+```
+
+从节点配置
+
+```shell
+# 创建目录
+mkdir -pv /data/mysql/logbin
+
+chown -R mysql.mysql /data/mysql/
+
+#修改配置文件
+vim /etc/my.cnf
+[mysqld]
+server-id=152
+read-only
+log_bin=/data/mysql/logbin/mysql-bin
+
+#配置主从同步
+CHANGE MASTER TO MASTER_HOST='10.0.0.158', MASTER_USER='repluser', MASTER_PASSWORD='123456', MASTER_PORT=3306, MASTER_LOG_FILE='mysql-bin.000001',MASTER_LOG_POS=157
+
+#查看从节点配置信息
+show slave status/G
+
+# 开启从节点
+START SLAVE
+
+# 查看线程
+show processlist;
+...
+*************************** 3. row ***************************
+     Id: 9
+   User: system user
+   Host: connecting host
+     db: NULL
+Command: Connect
+   Time: 8015
+  State: Waiting for source to send event   # IO线程
+   Info: NULL
+*************************** 4. row ***************************
+     Id: 10
+   User: system user
+   Host: 
+     db: NULL
+Command: Query
+   Time: 8015
+  State: Replica has read all relay log; waiting for more updates # SQL线程 
+   Info: NULL
+```
+
+
+### 现有数据一主一从实现
+
+将现在单机服务变化主从服务
+
+如果数据库在运行了一段时间后，已经产生了大量数据，或者重置了二进制日志，刷新了二进制日志的情况下，我们要配置主从，则要保证将已有的数据先备份出来，导入到从节点之后，再开启主从同步
+
+```sql
+-- 重置二进制日志，如果从当前使用位置开始同步，则原有数据无法同步
+reset master;
+
+show master logs;
++------------------+-----------+-----------+
+| Log_name         | File_size | Encrypted |
++------------------+-----------+-----------+
+| mysql-bin.000001 |       157 | No        |
++------------------+-----------+-----------+
+1 row in set (0.00 sec)
+```
+
+```shell
+# 全量导出旧的数据
+mysqldump -A -F --source-data=1 --single-transaction > all.sql
+
+# 将all.sql传到slave服务器
+# 将all.sql文件中的下面的语句补齐
+# CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000002', MASTER_LOG_POS=157;
+vim all.sql
+CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000003', MASTER_LOG_POS=157,MASTER_HOST='10.0.0.151',MASTER_USER='repluser', MASTER_PASSWORD='123456',MASTER_PORT=3306;
+
+# 将数据导入
+mysql < all.sql
+
+# 开启从服务器，连接主服务器
+start slave;
+```
+
+### 一主多从
+
+将数据从主服务器导出来一份给新加的从服务器，然后从最新的二进制日志的结尾位置开始同步
+```shell
+mysqldump -A -F --source-data=1 --single-transaction > all.sql
+
+# 将all.sql文件中的下面的语句补齐
+# CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000002', MASTER_LOG_POS=157;
+vim all.sql
+CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000002', MASTER_LOG_POS=157,MASTER_HOST='10.0.0.151',MASTER_USER='repluser', MASTER_PASSWORD='123456',MASTER_PORT=3306;
+
+# 将日志导入mysql
+mysql < all.sql
+
+# 开启从服务器
+start slave;
+```
+
+
+### 级联复制
+
+在级联同步架构中，有一个中间节点的角色，该节点从主节点中同步数据，并充当其他节点的数据源，所以在此情况下，我们需要保证中间节点从主节点中同步过来的数据，同样也要写二进制日志，否则后续节点无法获取数据
+
+在此架构中，中间节点要开启log_slave_updates选项，保证中间节点复制过来的数据也能写入二进制日志，为其它节点提供数据源
+
+修改中间节点配置
+```shell
+# mysql8.0以后默认开启了此项，其他版本或mariadb需要手动开启
+# 中间节点要保证：1.开启二进制日志，2.从主节点上同步过来的数据，要能写到二进制日志中
+mysql > select @@log_slave_updates;
++---------------------+
+| @@log_slave_updates |
++---------------------+
+|                   1 |
++---------------------+
+1 row in set, 1 warning (0.00 sec)
+
+cat /etc/my.cnf
+[mysqld]
+server-id=152
+read-only
+log_slave_updates
+log_bin=/data/mysql/logbin/mysql-bin
+
+# 注意事项：
+# 中间节点开放端口
+[mysqld]
+bind-address = 0.0.0.0
+```
+
+### 主主复制实现
+
+根据前面的实验，master-2已经是master-1的从节点了，此处只需要把 master-1 配置为 master-2 的从节点即可。
+
+过程就是在同上，这里就不写了
+
+
+### 半同步复制
+
+mysql中的复制
+
+应用程序或客户端向主节点写入数据，主节点给客户端返回写入成功或失败状态，从节点同步数据，这几个事情的步骤和执行顺序不一样，意味着不同的同步策略，从而对MySQL的性能和数据安全性有着不同的影响
+
+- 异步复制
+
+默认情况下，MySQL中的复制是异步的，当客户端程序向主节点写入数据后，主节点中数据罗盘，写入binlog日志，然后将binlog日志中的新事件发送给从节点，便向客户端返回写入成功，而`并不验证从节点是否接受完毕，也不等待从节点返回同步状态`。
+
+这意味着客户端只能确认想主节点的写入是成功的，并不能保证刚写入的数据成功同步到了从节点。此复制策略下，如果主从同步出现故障，则有可能出现主从节点之间数据不一致的问题。甚至，如果在主节点写入数据后没有完成同步。主节点服务器宕机，则会造成数据丢失。
+
+异步复制不要求数据能够成功同步到从节点，只要主节点完成写操作，便立即向客户端返回结果。
+
+- 同步复制
+
+当客户端程序向主节点中写入数据后，主节点中数据落盘，写入binlog日志，然后将binlog日志中的新事件发送给从节点，`等待所有从节点向主节点返回同步成功之后，主节点才会向客户端返回写入成功`。此复制策略能最大限度的保证数据安全和主从节点之间的数据一致性，但此复制策略性能不高，`需要在所有从节点上完成数据同步之后，客户端才能获得返回结果。`
+
+此同步策略又称为同步复制
+
+- 半同步复制
+
+当客户端程序向主节点写入数据后，主节点中数据落盘，写入binlog日志，然后将binlog日志中的新事件发送给从节点，  `等待所有从节点中有一个节点返回同步成功之后，主节点就向客户端返回写入成功`。此复制策略尽可能保证至少有一个从节点中有同步到数据，也能尽早的向客户端返回写入状态。
+
+但此复制策略并不能百分百保证数据有成功的同步至从节点，因为可以在策略下设至同步超时时间，`如果超过等待时间，即便没有任何一个从节点返回同步成功的状态，主节点也会向客户端返回写入成功`。
 
 
 
@@ -8190,3 +8709,11 @@ less /var/log/mysql/error.log
 ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_secure_password';
 ```
 
+### 在Rocky中，使用yum安装mysql-server之后，无法读取配置文件
+```shell
+# 自建一个/etc/my.cnf的配置文件
+vim /etc/my.cnf
+
+# 在my.cnf中写
+!includedir /etc/my.cnf.d/
+```
