@@ -8243,6 +8243,134 @@ mysql中的复制
 
 但此复制策略并不能百分百保证数据有成功的同步至从节点，因为可以在策略下设至同步超时时间，`如果超过等待时间，即便没有任何一个从节点返回同步成功的状态，主节点也会向客户端返回写入成功`。
 
+在mysql8.0之后的半同步策略配置中，客户端的写操作先不提交事务，而是先写二进制日志，然后向从库同步数据，由于在主节点上的事务还没提交，所以此时其他进程查不到当前的写操作，不会出现幻读的问题，而且主节点要确认至少一个从节点的数据同步成功了，再会提交事务，这样也保证了主从之间的数据一致性，不会存在丢失的情况 
+
+总结就是：先写二进制日志，确定从节点同步后，再提交事务落盘，从而确保主库落盘的数据是从库同步成功的。防止主从不一致
+
+### 在MySQL8.0实现半同步复制
+
+在MySQL8.0中配置半同步需要安装插件支持
+
+master节点配置
+```sql
+-- 查看当前MySQL服务插件，如果没有semisync_master,则需要手动安装
+-- 查看插件
+show plugins;
+
+-- 在master节点安装插件
+INSTALL PLUGIN rpl_semi_sync_master SONAME 'semisync_master.so';
+
+-- 再次查看即可看到，所谓安装，其实在mysql库中的plugin表中插入一条数据
+| rpl_semi_sync_master            | ACTIVE   | REPLICATION        | semisync_master.so | GPL     |
++---------------------------------+----------+--------------------+--------------------+---------+
+
+-- 安装之后，还需要手动开启插件
+select @@rpl_semi_sync_master_enabled;
+
+-- 创建主从复制账号，并授权
+mysql> create user repluser@'10.0.0.%' identified by '123456';
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> grant replication slave on *.* to repluser@'10.0.0.%';
+Query OK, 0 rows affected (0.01 sec)
+```
+```shell
+# 修改配置文件
+vim /etc/my.cnf.d/mysql-server.cnf
+[mysqld]
+server-id=8
+rpl_semi_sync_master_enabled
+log_bin=/data/mysql/logbin/mysql-bin
+
+# 在相关文件目录都创建好的情况下
+# 重启mysqld
+systemctl restart mysqld
+```
+
+从节点配置
+```sql
+-- 安装从节点插件
+INSTALL PLUGIN rpl_semi_sync_slave SONAME 'semisync_slave.so';
+```
+```shell
+# 手动开启插件
+vim /etc/my.cnf.d/mysql-server.cnf
+[mysqld]
+rpl_semi_sync_slave_enabled
+
+# 重启服务
+systemctl restart mysqld
+```
+
+在数据对齐的情况下，建立主从复制
+```sql
+CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000002', MASTER_LOG_POS=157,MASTER_HOST='10.0.0.151',MASTER_USER='repluser', MASTER_PASSWORD='123456',MASTER_PORT=3306;
+
+start slave;
+
+show slave status\G
+```
+查看插件状态
+```sql
+show global variables like '%semi%';
+```
+
+### 复制过滤器
+
+复制过滤器是指让从节点仅复制指定的数据库，或指定数据库的指定表
+
+复制过滤器的实现有两种方式
+- 在master节点上使用服务器选项配置实现，在master节点上配置进项二进制日志中写入特定数据库相关的事件
+- 在slave节点上使用服务器选项或者是全局变量配置来实现，在slave节点上配置在读取relay log时仅处理指定的数据库或表
+
+在master节点上配置实现
+- 优点：只需要在master节点上配置一次即可，不需要在slave节点上操作，减少了二进制日志中的数据量，能减少磁盘IO和网路IO
+- 缺点：二进制日志中记录的数据不完整，如果当前节点出现故障，将无法使用二进制还原
+
+相关配置项
+```shell
+[mysqld]
+binlog-do-db=db1              # 数据库白名单列表，不支持同时指定多个，如果想实现多个数据库需多行实现
+binlog-do-db=db2
+
+binlog-ignore-db=db3          # 数据库黑名单列表，不支持同时指定多个，如果想实现多个数据库需多行实现
+binlog-ignore-db=db3
+```
+
+主节点配置
+```shell
+[mysqld]
+server-id=8
+rpl_semi_sync_master_enabled
+log_bin=/data/mysql/logbin/mysql-bin
+binlog-ignore-db=db1
+binlog-ignore-db=db2
+```
+
+在数据库查看白名单和黑名单的具体信息
+```sql
+show master status;
+```
+
+slave节点配置
+```shell
+vim /etc/my.cnf.d/mysql-server.cnf
+[mysqld]
+replicate-do-db=db1
+replicate-do-db=db2
+replicate-wild-do-table=db%.stu
+
+# 重启服务
+systemctl restart mysqld
+```
+
+复制过滤可能会出现跨库时同步失败的问题，设置过滤规则一定要考虑业务，防止连表，垮裤操作失败，要把业务覆盖全
+
+### GTID复制
+
+GTID(global transaction ID)：全局事务ID
+
+
 
 
 
