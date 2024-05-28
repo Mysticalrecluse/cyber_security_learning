@@ -18228,4 +18228,519 @@ iptables -t filter -X WEB_CHAIN
 # 如果自定义链中还有规则，无法删除
 ```
 
+## VPN服务OpenVPN
+
+VPN技术网关通过对数据包的加密和数据包目标地址的转换实现远程访问。VPN可通过服务器、硬件、软件等多种方式实现
+
+### OpenVPN实现
+
+OpenVPN是Linux下开源的VPN应用，它提供了良好的性能和友好的用户GUI
+
+OpenVPN是一个基于OpenSSL库的应用层VPN实现。和传统VPN相比，它的优点是简单易用。
+
+OpenVPN提供了多种身份验证方式，用以确认参与连接双方的身份，包括
+- 共享私钥
+  - 最简单，但只能用于建立点对点的VPON
+- 基于PKI的第三方证书
+  - 提供了最完善的功能，但是需要额外的精力去维护一个PKI证书体系
+- 用户密码组合
+  - 可以省略客户端证书，但是仍有一份服务器证书需要被用作加密
+
+配置说明：
+
+在阿里云购买三台主机，设置为同一个内网网段，模拟公司内网，其中一台添加一个公网IP，在该机器上部署OpenVPN服务，以便让不在公司内网的远程主机可以连进公司内网的目地
+
+- 主机：
+  - 192.168.0.101 --- 模拟马哥北京校区，配置OpenVPN Client，通过VPN网络以内网校色链接阿里云主机
+  - 172.30.0.66 --- 阿里云主机，配置OpenVPN Server，需要公网IP
+  - 172.30.0.100 --- 阿里云主机
+  - 172.30.0.200 --- 阿里云主机
+
+
+### 部署流程
+
+#### 准备阿里云主机，其中一台配置公网IP
+
+- 在阿里云部署专有网络VPC
+
+![alt text](images/image62.png)
+
+![alt text](images/image63.png)
+
+![alt text](images/image64.png)
+
+（记得选择服务器所在地域，创建专有网络）
+
+![alt text](images/image65.png)
+
+![alt text](images/image66.png)
+
+![alt text](images/image67.png)
+
+![alt text](images/image68.png)
+
+![alt text](images/image69.png)
+
+![alt text](images/image70.png)
+
+返回购买界面，刷新后选择配置，操作系统，充钱购买即可
+
+![alt text](images/image71.png)
+
+![alt text](images/image72.png)
+
+![alt text](images/image73.png)
+
+![alt text](images/image74.png)
+
+![alt text](image-2.png)
+
+将三台实例依次改为172.30.0.66, 172.30.0.100, 172.30.0.200
+
+购买弹性公网ip
+
+![alt text](images/image75.png)
+
+![alt text](images/image76.png)
+
+购买后，回到ECS实例页面绑定IP
+
+![alt text](images/image77.png)
+
+![alt text](images/image78.png)
+
+![alt text](images/image79.png)
+
+绑定后，将停止的3台实例全部启动，然后登录控制台
+
+![alt text](images/image80.png)
+
+![alt text](images/image81.png)
+
+点击登录 ---> 输入密码，登录后台
+
+![alt text](images/image82.png) 
+
+#### 在阿里云安全组中放行1194端口
+
+![alt text](images/image83.png)
+
+#### 在有公网IP的阿里云主机上部署OpenVPN Server
+
+#### 在Magedu内网主机上部署OpenVPN Client
+
+#### 测试OpenVPN网络
+
+### 配置OpenVPN证书
+
+#### 安装相关软件
+```shell
+# ssh远程连接绑定公网ip的实例
+# 安装OpenVPN，安装证书管理工具
+apt update; apt install openvpn easy-rsa
+
+root@vpn-server:~# dpkg -l openvpn
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version                Architecture Description
++++-==============-======================-============-=================================
+ii  openvpn        2.5.9-0ubuntu0.22.04.2 amd64        virtual private network daemon
+
+root@vpn-server:~# dpkg -l easy-rsa
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version        Architecture Description
++++-==============-==============-============-=================================
+ii  easy-rsa       3.0.8-1ubuntu1 all          Simple shell based CA utility
+
+root@vpn-server:~# tree /etc/openvpn
+/etc/openvpn
+├── client
+├── server
+└── update-resolv-conf
+
+2 directories, 1 file
+```
+
+#### 配置CA证书
+准备证书环境
+```shell
+# 准备证书环境，让证书和openvpn配置处于一个目录，方便迁移
+cp -r /usr/share/easy-rsa/ /etc/openvpn/
+
+cd /etc/openvpn/easy-rsa
+
+root@vpn-server:/etc/openvpn/easy-rsa# ls
+easyrsa  openssl-easyrsa.cnf  vars.example  x509-types
+
+mv vars.example vars
+```
+
+#### 初始化证书目录
+```shell
+root@vpn-server:/etc/openvpn/easy-rsa# ./easyrsa init-pki
+
+Note: using Easy-RSA configuration from: /etc/openvpn/easy-rsa/vars
+
+init-pki complete; you may now create a CA or requests.
+Your newly created PKI dir is: /etc/openvpn/easy-rsa/pki
+
+# 查看目录
+root@vpn-server:/etc/openvpn/easy-rsa# tree pki/
+pki/
+├── openssl-easyrsa.cnf
+├── private
+├── reqs
+└── safessl-easyrsa.cnf
+
+2 directories, 2 files
+```
+```
+自己给自己签发一个证书，使其称为CA机构
+
+使用者发送证书申请文件给CA机构
+CA机构签发证书，返还给申请者
+申请者在自己的服务器上部署证书
+```
+生成CA机构证书
+```shell
+# 生成CA机构证书，不使用密码
+./easyrsa build-ca nopass
+
+Note: using Easy-RSA configuration from: /etc/openvpn/easy-rsa/vars
+Using SSL: openssl OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.0.2 15 Mar 2022)
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Common Name (eg: your user, host, or server name) [Easy-RSA CA]: magedu    # 填写CA机构名称
+
+CA creation complete and you may now import and sign cert requests.
+Your new CA certificate file for publishing is at:
+/etc/openvpn/easy-rsa/pki/ca.crt
+
+# 可以查看ca证书
+./easyrsa show-ca
+```
+
+#### 配置OpenVPN服务器证书
+
+生成证书申请文件
+```shell
+root@vpn-server:/etc/openvpn/easy-rsa# ./easyrsa gen-req server nopass
+
+Note: using Easy-RSA configuration from: /etc/openvpn/easy-rsa/vars
+Using SSL: openssl OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.0.2 15 Mar 2022)
+...............+...+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*..+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*...+.+..+.......+...+..+...+.......+........+.+..+............+.+.....+......................+..+..........+......+..+...+.......+...+......+...........+...+................+......+...+.....+.+.....+....+.........+..+.+.....+.......+......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+......+....+........+...+..........+......+...........+....+...+.....+.+............+..+.+.....+.......+..+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*...........+.+..+...+...+.+..............+.+...+......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.....+.....+.+...+..+...+....+..+....+..+.......+............+...+.....+...+...+....+.....................+.....+....+..+......+...............+...+.........+............+....+..+............+............+.+........+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Common Name (eg: your user, host, or server name) [server]:  # 这里直接回车或填写申请者信息
+
+Keypair and certificate request completed. Your files are:
+req: /etc/openvpn/easy-rsa/pki/reqs/server.req
+key: /etc/openvpn/easy-rsa/pki/private/server.key
+```
+
+审核申请文件，颁发机构证书
+```shell
+# 输入命令./easyrsa sign-req server server
+root@vpn-server:/etc/openvpn/easy-rsa# ./easyrsa sign-req server server
+
+Note: using Easy-RSA configuration from: /etc/openvpn/easy-rsa/vars
+Using SSL: openssl OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.0.2 15 Mar 2022)
+
+You are about to sign the following certificate.
+Please check over the details shown below for accuracy. Note that this request
+has not been cryptographically verified. Please be sure it came from a trusted
+source or that you have verified the request checksum with the sender.
+
+Request subject, to be signed as a server certificate for 825 days:
+
+subject=
+    commonName                = server
+
+Type the word 'yes' to continue, or any other input to abort.
+  Confirm request details: yes    # 这里填写yes
+Using configuration from /etc/openvpn/easy-rsa/pki/easy-rsa-3631.EFaQZY/tmp.kElqkB
+801B1799217F0000:error:0700006C:configuration file routines:NCONF_get_string:no value:../crypto/conf/conf_lib.c:315:group=<NULL> name=unique_subject
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+commonName            :ASN.1 12:'server'
+Certificate is to be certified until Aug 31 14:35:22 2026 GMT (825 days)
+
+Write out database with 1 new entries
+Data Base Updated
+
+Certificate created at: /etc/openvpn/easy-rsa/pki/issued/server.crt
+```
+
+创建Diffie-Hellman密钥
+
+Diffie-Hellman密钥交换方法是迪菲(Whitefield Diffie)和赫尔曼(Martin Hallman)在1976年公布的一种密钥交换算法，他是一种建立密钥的方法，而不是加密方法，所以密钥必须和其他一种加密算法结合使用。这种密钥交换技术的目的在于使两个用户安全地交换一个密钥，用此密钥作为对称密钥来加密后续的报文传输
+
+```shell
+# 创建参数文件
+# 执行指令：./easyrsa gen-dh
+root@vpn-server:/etc/openvpn/easy-rsa# ./easyrsa gen-dh
+
+Note: using Easy-RSA configuration from: /etc/openvpn/easy-rsa/vars
+Using SSL: openssl OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.0.2 15 Mar 2022)
+Generating DH parameters, 2048 bit long safe prime
+.................+...................................................................................................................++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*++*
+
+DH parameters of size 2048 created at /etc/openvpn/easy-rsa/pki/dh.pem
+```
+
+#### 配置OpenVPN客户端证书
+```shell
+# 修改配置文件，将证书有效期时长改为180天
+vim vars
+
+#set_var EASYRSA_CERT_EXPIRE    825
+set_var EASYRSA_CERT_EXPIRE     180
+
+# 生成客户证书申请文件
+root@vpn-server:/etc/openvpn/easy-rsa# ./easyrsa gen-req tom nopass
+
+Note: using Easy-RSA configuration from: /etc/openvpn/easy-rsa/vars
+Using SSL: openssl OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.0.2 15 Mar 2022)
+...+........+...+......+...+...+.......+......+..+...+.........+.+.....+.......+..+............+.+...+......+......+..+.......+.....+.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*.+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*...+.+.........+.....+.+.....+....+...+..+....+.........+..+.+...+.........+..+...+...............+.+..+...+.+...+..+.........+...............+....+.....+..........+...+...+..............+.+......+........+...+....+......+..+...+...+.........+.+............+.....+...+....+..........................+.........+..........+..+....+..+............+.+.....+......+.+..+.......+........+.+.....+.......+.....+..................+....+..+.............+........+...+.......+.........+...+......+...................................+.+......+.....+...+.........+.+..............+.+..............+...+....+...+..+...+...............+.+..+........................+......+..........+..+...+.......+.....+......+...............+....+..+....+.....+......+..........+...+..+.+.....+...+..........+............+..+.+....................+.........+.+.........+...+........+.+..............+....+.....+...+..........+........+.......+.....+.......+..+....+...............+..+..........+...+......+.....+.+..............+......+...+....+...+...+............+..................+.........+...+.....+....+.....+..........+.....+...............+...+......+.+...+...........+.......+............+........+....+........+......+......+.+..+.+.....+......+......+...+....+...+..+..........+........+.......+...+.....+....+........+.............+........+.+......+..+.......+.....+......+.......+.....+..........+........+...+....+..+....+..+....+.....+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+..+.+..+...+.........+..........+..+.+..+............+...+......+.+...+..+.+..+......+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*..+....+.........+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*........+....+........+.+..+...+..........+......+........+............+...+..........+..+......+...+.+...........+.......+..+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+-----
+You are about to be asked to enter information that will be incorporated
+into your certificate request.
+What you are about to enter is what is called a Distinguished Name or a DN.
+There are quite a few fields but you can leave some blank
+For some fields there will be a default value,
+If you enter '.', the field will be left blank.
+-----
+Common Name (eg: your user, host, or server name) [tom]:
+
+Keypair and certificate request completed. Your files are:
+req: /etc/openvpn/easy-rsa/pki/reqs/tom.req
+key: /etc/openvpn/easy-rsa/pki/private/tom.key
+
+# 给tom签署证书
+root@vpn-server:/etc/openvpn/easy-rsa# ./easyrsa sign-req client tom
+
+Note: using Easy-RSA configuration from: /etc/openvpn/easy-rsa/vars
+Using SSL: openssl OpenSSL 3.0.2 15 Mar 2022 (Library: OpenSSL 3.0.2 15 Mar 2022)
+
+You are about to sign the following certificate.
+Please check over the details shown below for accuracy. Note that this request
+has not been cryptographically verified. Please be sure it came from a trusted
+source or that you have verified the request checksum with the sender.
+
+Request subject, to be signed as a client certificate for 180 days:
+
+subject=
+    commonName                = tom
+
+Type the word 'yes' to continue, or any other input to abort.
+  Confirm request details: yes
+Using configuration from /etc/openvpn/easy-rsa/pki/easy-rsa-3883.Zs8s4f/tmp.8HQ0jy
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+commonName            :ASN.1 12:'tom'
+Certificate is to be certified until Nov 24 14:46:26 2024 GMT (180 days)
+
+Write out database with 1 new entries
+Data Base Updated
+
+Certificate created at: /etc/openvpn/easy-rsa/pki/issued/tom.crt
+```
+重复上述步骤，给jerry生成证书
+```shell
+./easyrsa gen-req jerry nopass
+
+./easyrsa sign-req client jerry
+```
+
+#### 整理目录
+
+将openVPN服务端相关证书文件复制到server目录中
+
+```shell
+cp /etc/openvpn/easy-rsa/pki/ca.crt /etc/openvpn/server/
+cp /etc/openvpn/easy-rsa/pki/issued/server.crt /etc/openvpn/server/
+cp /etc/openvpn/easy-rsa/pki/private/server.key /etc/openvpn/server/
+cp /etc/openvpn/easy-rsa/pki/dh.pem /etc/openvpn/server/
+```
+
+为客户端用户创建目录，并将相关文件放到指定目录
+```shell
+mkdir /etc/openvpn/client/{tom,jerry}
+
+cp /etc/openvpn/easy-rsa/pki/ca.crt /etc/openvpn/client/tom/
+cp /etc/openvpn/easy-rsa/pki/private/tom.key /etc/openvpn/client/tom/
+cp /etc/openvpn/easy-rsa/pki/issued/tom.crt /etc/openvpn/client/tom/
+
+cp /etc/openvpn/easy-rsa/pki/ca.crt /etc/openvpn/client/jerry/
+cp /etc/openvpn/easy-rsa/pki/private/jerry.key /etc/openvpn/client/jerry/
+cp /etc/openvpn/easy-rsa/pki/issued/jerry.crt /etc/openvpn/client/jerry/
+```
+
+### OpenVPN服务端配置
+
+#### 服务端配置文件说明
+配置文件默认不存在，需要手动创建
+```shell
+cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf /etc/openvpn/
+```
+
+#### 设置服务端配置文件
+```shell
+mv server.conf server.conf.bak
+
+# 新建配置文件
+vim server.conf
+
+port 1194
+proto tcp
+dev tun
+ca /etc/openvpn/server/ca.crt
+cert /etc/openvpn/server/server.crt
+key /etc/openvpn/server/server.key 
+dh /etc/openvpn/server/dh.pem
+server 10.8.0.0 255.255.255.0
+push "route 172.30.0.0 255.255.255.0"
+keepalive 10 120
+cipher AES-256-CBC
+compress lz4-v2
+push "compress lz4-v2"
+max-clients 2048
+user root
+group root
+status /var/log/openvpn/openvpn-status.log
+log-append /var/log/openvpn/openvpn.log
+verb 3
+mute 20
+```
+
+#### 设置server服务脚本文件
+
+```shell
+systemctl enable --now openvpn.service
+
+root@vpn-server:/etc/openvpn# ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 00:16:3e:0b:1e:c4 brd ff:ff:ff:ff:ff:ff
+    altname enp0s5
+    altname ens5
+    inet 172.30.0.66/24 metric 100 brd 172.30.0.255 scope global dynamic eth0
+       valid_lft 315354941sec preferred_lft 315354941sec
+    inet6 fe80::216:3eff:fe0b:1ec4/64 scope link 
+       valid_lft forever preferred_lft forever
+# 重启后生成了tun0网卡
+3: tun0: <POINTOPOINT,MULTICAST,NOARP,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UNKNOWN group default qlen 500
+    link/none 
+    inet 10.8.0.1 peer 10.8.0.2/32 scope global tun0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::4b72:d43a:f28f:d8d6/64 scope link stable-privacy 
+       valid_lft forever preferred_lft forever
+```
+
+### OpenVPN客户端配置
+
+
+
+
+
+
+
+## LVS与集群
+
+### 集群Cluster
+
+Cluster: 集群，为解决某个特定问题将多台计算机组合起来形成的单个系统
+
+Cluster分为三种类型
+- LB：Load Balancing：负载均衡，多个主机组成，每个主机只承担一部分访问请求
+
+- HA：High Availiability, 高可用，避免SPOF(single point of failure)
+  - MTBF：Mean Time Between Failure 平均无故障时间
+  - MTTR：Mean Time Restoration (repair)平均恢复前时间，故障时间
+  - SLA：服务等级协议（简称：SLA，全程：Service level agreement）。是指在一定开销下为保障服务的性能和可用性，服务提供商与用户间定义的一种双方认可的协议。通常这个开销是驱动提供服务质量的主要因素。在常规的领域中，总是设定3个9，4个9，N个9等来进行表示，当没有达到这种水平的时候，就会有一些惩罚性措施，而运维最主要的目标就是达成这种服务水平。
+  - 停机时间有分两种，一种是计划内停机时间，一种是计划外停机时间，而运维则主要关注计划外停机时间
+- HPC: High-performance computing。高性能
+
+### 分布式系统
+
+分布式常见应用
+
+- 分布式用用-服务按功能拆分，使用微服务
+- 分布式静态资源-静态资源放在不同的存储集群上
+- 分布式数据和存储-使用key-value缓存系统
+- 分布式计算-对特殊业务使用分布式计算，比如Hadoop集群
+
+分布式存储：Ceph(升级版本NFS), GluterFSS, FasstDFS, MogileFS
+
+分布式计算：hadoop, Spark
+
+### LB Cluster 负载均衡集群
+
+#### 按实现方式划分
+- 硬件
+  - F5 Big-IP
+  - Cltrix Netscaler
+  - A10
+
+- 软件
+  - lvs: Linux Virtual Server，阿里云四层SLB(Server Load Balance)使用
+  - nginx: 支持七层调度，阿里云七层SLB使用Tengine
+  - haproxy: 支持七层调度
+  - ats: Apache Traffic Server, yahoo捐助给apache
+  - perlbal：Perl编写
+  - pound
+
+
+#### 基于工作的协议层次划分
+
+- 传输层(通用)：DNAT和DPROT
+  - LVS
+  - Nginx:stream
+  - haproxy: mode tcp
+
+- 应用层(专用)：针对特定协议，常称为proxy server
+  - http: nginx; httpd; haproxy(mode http)
+  - fastcgi: nginx, httpd,...
+  - mysql: mysql-proxy,mycat...
+
+
+#### 负载均衡的会话保持
+
+- session sticky：同一用户调度固定服务器
+  - Source IP: LVS sh算法
+  - Cookie
+
+- Session replication：每台服务器拥有全部session
+  - session multicast cluster
+
+- session server: 专门的session服务器
+  - Redis, Memcached
+
+
+### HA 高可用集群实现
+keepalived：vrrp协议
+Ais: 应用接口规范
 
