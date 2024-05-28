@@ -18662,6 +18662,92 @@ root@vpn-server:/etc/openvpn# ip a
 
 ### OpenVPN客户端配置
 
+#### 为不同用户设置配置文件
+```shell
+vim client/tom/client.ovpn
+client
+dev tun
+proto tcp
+remote 47.92.252.12 1194
+resolv-retry infinite
+nobind
+#persist-key
+#persist-tun
+ca ca.crt
+cert tom.crt
+key tom.key
+remote-cert-tls server
+#tls-auth ta.key 1
+cipher AES-256-CBC
+verb 3
+compress lz4-v2
+```
+
+### 部署OpenVPN客户端
+
+部署Windows客户端
+
+下载
+```shell
+https://openvpn.net/community-downloads/
+```
+
+将客户端配置下载到windows中，将相关文件放到`C:/Program Files\OpenVPN\config`目录下
+```shell
+cd client/
+
+tar zcvf tom.tar.gz tom/
+
+sz tom.tar.gz
+```
+
+将文件解压到`C:/Program Files\OpenVPN\config`目录下后，打开OpenVPN GUI软件，连接即可
+
+连接成功后，会有一个10.8.0.1的网卡，可以ping`172.30.0.66`
+
+### 配置后端主机转发
+
+OpenVPN服务端开启ip_forward转发
+```shell
+echo net.ipv4.ip_forward = 1 >> /etc/sysctl.conf
+
+sysctl -p
+```
+
+在OpenVPN主机上设置SNAT转发，将从10.8.0.0/24网段主机请求的IP转换成本机(172.30.0.66)
+```shell
+iptables -t nat -A POSTROUTING -s 10.8.0.0/24 ! -d 10.8.0.0/24 -j MASQUERADE
+```
+
+### OpenVPN管理
+
+OpenVPN的管理功能主要关于安全加强及客户端的证书管理，用户密码验证等
+
+#### 启用安全加强功能
+
+服务端配置
+```shell
+openvpn --genkey --secret /etc/openvpn/server/ta.key
+
+# 修改服务端配置文件
+vim /etc/openvpn/server.conf
+tls-auth /etc/openvpn/server/ta.key 0  # 增强此行，服务端后面要跟数字0，客户端后面数字是1
+
+# 重启服务器，客户端会断开连接，小图标会变成黄色
+```
+
+客户端配置
+```shell
+# 将key文件下载到本地，转到C:\Program Files\OpenVPN\config目录下
+sz /etc/openVPN/server/ta.key
+
+# 修改客户端配置文件 C:\Program Files\OpenVPN\client.ovpn
+# 新增一行
+tls-auth ta.key 1
+
+# 客户端重新连接即可
+```
+
 
 
 
