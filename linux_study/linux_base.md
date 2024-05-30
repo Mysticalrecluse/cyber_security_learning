@@ -19120,9 +19120,41 @@ apt install ipvsadm
 
 ### 创建集群
 
-\
+```shell
+# 创建集群，-t默认tcp
+root@ubuntu2204:~$ipvsadm -A -t 10.0.0.108:80 -s rr
+root@ubuntu2204:~$ipvsadm -Ln
+IP Virtual Server version 1.2.1 (size=4096)
+Prot LocalAddress:Port Scheduler Flags
+  -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
+TCP  10.0.0.108:80 rr
+```
 
 
+### 添加服务器到集群
+```shell
+# -m默认net模式
+root@ubuntu2204:~$ipvsadm -a  -t 10.0.0.108:80 -r 10.0.0.128:80 -m
+root@ubuntu2204:~$ipvsadm -a  -t 10.0.0.108:80 -r 10.0.0.138:80 -m
+
+# 查看集群中的状态
+root@ubuntu2204:~$ipvsadm -Ln
+IP Virtual Server version 1.2.1 (size=4096)
+Prot LocalAddress:Port Scheduler Flags
+  -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
+TCP  10.0.0.108:80 rr
+  -> 10.0.0.128:80                Masq    1      0          0         
+  -> 10.0.0.138:80                Masq    1      0          0       
+```
+
+### 删除集群或里面的服务器
+```shell
+# 删除指定设备
+ipvsadm -d -t 10.0.0.108:80 -r 10.0.0.128:80
+
+# 删除整个集群 
+ipvsadm -D -t 10.0.0.108: 
+```
 
 
 
