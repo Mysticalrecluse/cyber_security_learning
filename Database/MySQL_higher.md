@@ -8839,7 +8839,7 @@ ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_secure_password';
 
 ### 在Rocky中，使用yum安装mysql-server之后，无法读取配置文件
 ```shell
-# 自建一个/etc/my.cnf的配置文件
+# 自建一个/etc/my.cnf的配置文件c
 vim /etc/my.cnf
 
 # 在my.cnf中写
