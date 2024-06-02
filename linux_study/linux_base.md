@@ -19236,7 +19236,6 @@ AUTO="true"
 
 ## LVS实验演示
 
-<<<<<<< HEAD
 ![alt text](images/image91.png)
 
 
@@ -19470,30 +19469,46 @@ WantedBy=multi-user.target
 ! Configuration File for keepalived
 
 global_defs {
+  # 邮件通知模块，keepalived发现故障，发邮件通知
+  # 收件人邮箱
    notification_email {
      acassen@firewall.loc
      failover@firewall.loc
      sysadmin@firewall.loc
    }
+   # 发件人邮箱
    notification_email_from Alexandre.Cassen@firewall.loc
    smtp_server 192.168.200.1
    smtp_connect_timeout 30
+   #--------------------------------------------
+   # 下面是keepalived配置
    router_id LVS_DEVEL
    vrrp_skip_check_adv_addr
+   # 严格模式，建议注释掉
    #vrrp_strict
    vrrp_garp_interval 0
    vrrp_gna_interval 0
-}
+   # 组播地址,默认项，同一个keepalived集群中的所有节点此地址相同，如果配置了单播，则此项无效
+   vrrp_mcast_group4 224.0.0.18
 
+   # 和vrrp_strct同时开启，会添加防火墙规则
+   vrrp_iptables
+}
 
 include /etc/keepalived/conf.d/*.conf
 
+#虚拟路由器配置
 vrrp_instance VI_1 {
     state MASTER
+    # 可以和VIP不是同一设备，此处设备用于心跳数据
     interface eth0
+    # 虚拟路由ID，范围0-255
     virtual_router_id 51
+    # 优先级，优先级高低决定VIP的位置
     priority 100
+    # vrrp通告的时间间隔，默认1s，同一集群内多节点，此值必须相同
     advert_int 1
+    # 集群内的节点验证，ID相同，密码相同才算同一集群
     authentication {
         auth_type PASS
         auth_pass 1111
@@ -19501,39 +19516,85 @@ vrrp_instance VI_1 {
     # 此IP不可用，因为Keepalived内嵌了防火墙策略
     # 可以使用nft查看
     # nft list rulest,详情见下面
+    # vip
     virtual_ipaddress {
         192.168.200.16
         192.168.200.17
         192.168.200.18
     }
+    # 单播模式
+    unicast_Src_ip 192.168.10.110
+    # 接受心跳数据的其它机器IP，可以多条
+    unicast_peer {
+        192.168.10.120
+        192.168.10.130
+    }
+    # 当前主机状态变成master节点时执行脚本
+    notify_master "/path/notify.sh"
+    # 当主机状态变成backup节点时执行脚本
+    notify_backup "/path/notify.sh"
+    # 当前主机状态变成fault(失败)节点时执行脚本
+    notify_fault "/path/notify.sh"
+    # 通用配置，该项可以替代前3项
+    notify "/path/notify.sh" 
+    # 当前主机停止VRRP时触发该脚本
+    notify_stop "/path/notify.sh"
 }
-=======
-![alt text](images\image91.png)
 
-### DR模式
->>>>>>> 4a06d6c2a9456cd0b7d84f68c6780e5e48bc4118
-
+# LVS配置
+              # vip和port
+# 这里的vip必须在上面vrrp实例的vip中出现
 virtual_server 192.168.200.100 443 {
+    # 检查后端服务器的时间间隔，默认60s
     delay_loop 6
+    # 集群调度算法
     lb_algo rr
+    # 集群类型
     lb_kind NAT
     persistence_timeout 50
     protocol TCP
+     # 所有后端RS节点不可用时，备用节点
+    sorry_server 192.168.123 443
 
+    # 后端RS节点的IP和Port，一个LVS集群可以有多个后端RS配置
     real_server 192.168.201.100 443 {
+        # 节点上线通知
+        notify_up "/path/notify.sh"
+        # 节点下线通知
+        notify_down "/path/notify.sh"
         weight 1
+
+        # RS节点的健康状态检查，支持四层和七层检查
+        # HTTP_GET|SSL_GET|TCP_CHECK|SMTP_CHECK|DNS_CHECK|PING_CHECK|FILE_CHECK|UDP_CHECK
         SSL_GET {
             url {
+              # 检测路径
               path /
+              # genhash 命令来获取检查路径的hash值是否匹配
               digest ff20ad2481f97b1754ef3e12ecd3a9cc
             }
             url {
               path /mrtg/
-              digest 9b3a0c85a887a256d6939da88aabd8cd
+              # url返回码，和digest二选一
+              status_code 200
             }
+            # 健康检查超时时长，超过此时长没有返回，就认为后端服务器不可用，默认5s
             connect_timeout 3
+            # 重试次数
             retry 3
+            # 重试之前的延迟
             delay_before_retry 3
+            
+            # 向RS的指定IP发起检查
+            connect_ip 192.168.201.100
+            # 向RS的指定端口发起检查
+            connect_port 8080
+            # 向RS
+            bindto 192.168.10.8
+        }
+      # 使用应用层协议检查后端RS服务器
+      HTTP_GET|SSL_GET {
+
         }
     }
 }
@@ -19658,3 +19719,162 @@ virtual_server 10.10.10.2 1358 {}       # LVS 配置
 virtual_server 10.10.10.3 1358 {}       # LVS 配置
 ```
 
+
+## Keepalived 实现LVS高可用
+
+### 环境说明
+
+前置条件
+- 各节点操作系统一致
+- 时间统一
+- 各节点网卡修改即传统修改笔命名形式
+- 各节点关闭防火墙
+
+### Keepalived 实现VIP高可用
+
+配置Master节点
+```shell
+#网络配置
+[root@ubuntu ~]# cat /etc/netplan/eth0.yaml 
+network:
+    ethernets:
+        eth0:
+          addresses: [10.0.0.216/24]
+          routes: [{to: default,via: 10.0.0.2}]
+          nameservers:
+            addresses: [10.0.0.2,223.5.5.5]
+    version: 2
+[root@ubuntu ~]# cat /etc/netplan/eth1.yaml 
+network:
+    ethernets:
+        eth1:
+          addresses: [192.168.10.8/24]
+    version: 2
+
+[root@ubuntu ~]# cat /etc/default/grub
+GRUB_CMDLINE_LINUX=" net.ifnames=0"
+
+[root@ubuntu ~]# grub-mkconfig -o /boot/grub/grub.cfg; reboot
+
+ #确认网卡
+[root@ubuntu ~]# ip a 
+
+# 配置Master节点
+cp /etc/keepalived/keepalived.conf.sample /etc/keepalived/keepalived.conf
+
+cat /etc/keepalived/keepalived.conf
+
+global_defs {
+    # 当前节点ID k216
+    router_id k216
+    # 广播地址
+    vrrp_mcast_group4 226.6.6.6
+}
+
+vrrp_instance VI_1 {
+    state Master
+    interface eth1
+    virtual_router_id 66
+    priority 100
+    advert_int 3
+    authentication {
+        auth_type PASS
+        auth_pass 123456
+    }
+    virtual_ipaddress {
+        # VIP是10.0.0.123/24配置在eth0上
+        10.0.0.123/24 dev eth0 
+    }
+}
+
+重启服务
+systemctl restart keepalived.service
+
+# 在Windows中测试
+ping 10.0.0.123
+
+# 抓VRRP包，当前主机已经在向广播IP发送数据了
+tcpdump vrrp -nn -i eth1
+```
+
+配置K2，Backup节点
+```shell
+#网络配置
+[root@ubuntu ~]# cat /etc/netplan/eth0.yaml 
+network:
+    ethernets:
+        eth0:
+          addresses: [10.0.0.217/24]
+          routes: [{to: default,via: 10.0.0.2}]
+          nameservers:
+            addresses: [10.0.0.2,223.5.5.5]
+    version: 2
+[root@ubuntu ~]# cat /etc/netplan/eth1.yaml 
+network:
+    ethernets:
+        eth1:
+          addresses: [192.168.10.18/24]
+    version: 2
+
+#配置Slave 节点
+[root@ubuntu ~]# cp /etc/keepalived/keepalived.conf.sample /etc/keepalived/keepalived.conf
+[root@ubuntu ~]# cat /etc/keepalived/keepalived.conf
+! Configuration File for keepalived
+global_defs {
+   router_id k217                   
+   vrrp_mcast_group4 226.6.6.6
+}
+vrrp_instance VI_1 {
+   state BACKUP                
+   interface eth1
+   virtual_router_id 66        
+   priority 80                 
+   advert_int 3
+   authentication {
+       auth_type PASS
+       auth_pass 123456
+    }
+    virtual_ipaddress {
+        10.0.0.123/24 dev eth0
+    }
+}
+# 重启服务
+[root@ubuntu ~]# systemctl restart keepalived.service
+```
+
+为不同的项目设置独立的配置文件
+```shell
+mkdir /etc/keepalived/conf.d
+
+# 在配置文件中引用
+cat /etc/keepalived/keepalived.conf
+
+! Configuration File for keepalived
+ global_defs {
+   router_id k217
+   vrrp_mcast_group4 226.6.6.6
+}
+include /etc/keepalived/conf.d/*.conf   #引用目录
+
+# 每个项目一个配置文件
+vrrp_instance www.m99-magedu.com {
+    state BACKUP
+    interface eth1
+    virtual_router_id 66
+    priority 80
+    advert_int 3
+    authentication {
+        auth_type PASS
+        auth_pass 123456
+    }
+    virtual_ipaddress {
+ 10.0.0.123/24 dev eth0
+    }
+}
+```
+
+### 脑裂现象分析
+
+"脑裂"通常指的是分布式系统中的一种故障状态。这种状态发生在集群中的节点之间失去了相互通信的能力，导致集群中的不同部分无法相互通信或协调。脑裂可能是由于网络故障、硬件故障、软件错误或配置问题等原因引起的，脑裂现象可能会导致集群中的不同部分采取冲突的操作，这可能会导致数据不一致或系统的行为不可预测
+
+总结：在 keepalived 集群中，同一时间，VIP 存在于一个以上的节点上，就是脑裂
