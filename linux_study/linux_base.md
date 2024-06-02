@@ -14765,7 +14765,9 @@ location = /error.html {
 # 重启Nginx访问不存在页面测试
 ```
 #### 自定义错误日志
+
 - 可以自定义错误日志
+
 ```shell
 Syntax: error_log file [level]
 Default:
@@ -14775,7 +14777,6 @@ level: debug, info, notice, warn, error, crit, alert, emerg
 
 # 关闭错误日志
 error_log /dev/null;
-```shell
 access_log /apps/nginx/logs/wang.org_access.log; 
 
 # 定义错误日志
@@ -18408,6 +18409,8 @@ pki/
 CA机构签发证书，返还给申请者
 申请者在自己的服务器上部署证书
 ```
+
+
 生成CA机构证书
 ```shell
 # 生成CA机构证书，不使用密码
@@ -19179,6 +19182,7 @@ ipvsadm -C
 ```
 
 ### 存储规则和导入规则
+
 ```shell
 [root@mystical ~] $ipvsadm-save -n
 -A -t 10.0.0.102:80 -s rr
@@ -19205,6 +19209,15 @@ TCP  10.0.0.102:80 rr
   -> 10.0.0.181:80                Masq    1      0          0         
 ```
 
+### 修改集群规则
+```shell
+# 修改集群规则
+ipvsadm -E -t192.168.10.200:30 -s wrr
+
+# 修改集群中的设备属性，比如权重，使用-e
+ipvsadm -e -t 192.168.10.200:80 -r 10.0.0.201:8080 -w 3 -m
+```
+
 ### Ubuntu系统保存规则和开机加载规则
 ```shell
 # 方法1：
@@ -19223,6 +19236,7 @@ AUTO="true"
 
 ## LVS实验演示
 
+<<<<<<< HEAD
 ![alt text](images/image91.png)
 
 
@@ -19493,6 +19507,11 @@ vrrp_instance VI_1 {
         192.168.200.18
     }
 }
+=======
+![alt text](images\image91.png)
+
+### DR模式
+>>>>>>> 4a06d6c2a9456cd0b7d84f68c6780e5e48bc4118
 
 virtual_server 192.168.200.100 443 {
     delay_loop 6

@@ -8371,6 +8371,36 @@ systemctl restart mysqld
 GTID(global transaction ID)：全局事务ID
 
 
+## MySQL中间件代理服务器
+
+### 数据库切片
+
+数据库切片简单来说，就是通过某种特定的条件，将我们存放在同一个数据库中的数据分散存放到多个数据库(主机)中，已达到分散单台设备负载的效果
+
+数据库的切分根据其切分规则的类型，可以分为两种切分模式
+
+一种是按照不同的表来切分到不同的数据库(主机之上)，这种切分可以称为数据的垂直(纵向)切分；另外一种则是根据表中的数据的逻辑关系，将同一个表中的数据按照某种规则拆分到多台数据库上面，这种切分称为横向切分。
+
+### 垂直切分
+
+一个数据库由很多表构成，每个表对应着不同的业务，垂直切分是指按照业务将表进行分类，分布接到不同的数据库上面，这样也就将数据或者说压力分担到不同的库上
+
+### Mysql中间件应用
+
+#### Mycat实现MySQL读写分离
+
+Mycat安装
+```shell
+# mycat是基于java语言开发，因此要先安装java环境
+yum install -y java
+
+# 下载mycat
+git clone https://gitee.com/MycatOne/Mycat2.git
+
+# 解压
+mkdir apps
+tar xf Mycat-server-1.6.7.6-release-20220524173810-linux.tar.gz -C /apps
+```
 
 
 
