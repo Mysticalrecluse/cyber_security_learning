@@ -2995,6 +2995,53 @@ echo 123456789|sed -rn 's/(123)(456)(789)/\2\1\3/p'
 用反斜杠'\'+数字表示分组的代号
 ```
 
+
+## AWK
+
+### AWK整体格式
+```shell
+awk [options] 'program' var=value file...
+awk [options] -f programfile var=value file...
+```
+
+### Program格式
+```shell
+pattern {action statement;...}
+
+# pattern: 决定动作语句何时触发及触发事件，比如：BEGIN,END,正则表达式等
+# BEGIN：数据处理前，先要执行BEGIN之后的动作
+# END：数据都处理结束后，执行END的动作
+# action statement：对数据进行处理，放在{}内指明，常见：print,printf
+```
+
+program通常被放在单引号中，并可以由三种部分组成
+- BEGIN语句块
+- 模式匹配的通用模块
+- END语句块
+
+## 常见选项（Option）
+
+- `-F` "分隔符" 指明输入时用到的字段分隔符,默认不限个数的空白分
+```shell
+# 多个分隔符的写法
+-F'[[:space:]]+|%'
+df | awk -F'[[:space:]]+|%' '{print $1,$5}'
+```
+- -v var=value 变量赋值
+
+### 分隔符、域和记录
+
+- 有分隔符分隔的字段（列column,域field）标记$1,$2...$n称为域标识，$0为所有域
+
+- 文件的每一行称为记录record
+
+- 如果省略action，则默认执行print $0的操作
+
+### print
+
+
+
+
 ## 文件查找与打包压缩
 ### 文件查找
 - 非实时查找（数据库查找）：locate
