@@ -1,6 +1,6 @@
 # Docker概述
 ## DevOps概述
-- DevOps是一种思想，一种管理模式，一种执行规范和标志。它主要用于促进开发，测试与运维部门之间的沟通，写作与整合
+- DevOps是一种思想，一种管理模式，一种执行规范和标志。它主要用于促进开发，测试与运维部门之间的沟通，协作与整合
 ## Docker简介
 -  Docker是一个开源的应用容器Container引擎，其可以让开发者将应用及应用运行的环境打包到一个轻量级、可移植的镜像中，然后发布到任何流行的Linux、Windows机器上。
 - Docker是由一个<abbr title="云计算中的服务，平台技术服务">PaaS</abbr>提供商dotCloud公司的创始人Solomon Hykes发起的一个内部项目，是基于多年云服务技术的一次革新，使用Go语言开发。2013年3月开源，并在Github上进行维护。后由于Docker项目的火爆，2013年底，dotCloud公司更名为Docker。官网更新为<a href="https://docker.com">docker.com</a>。
