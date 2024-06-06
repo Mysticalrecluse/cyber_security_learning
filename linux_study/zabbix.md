@@ -327,9 +327,37 @@ function body(){
 
 zabbix-agentd是由zabbix用户运行的，而如果想要实现故障自愈，zabbix-agentd使用zabbix的身份去重启服务
 
+#### 给zabbix赋予权限
 因此需要给zabbix设置权限
 ```shell
+# 给zabbix授权，使其可以使用sudo重启服务
 visudo
 
 zabbix ALL=(ALL:ALL)  NOPASSWD: ALL
 ```
+
+#### 修改配置，开启远程命令功能
+
+```shell
+# 在Zabbix agent和Zabbix proxy上，远程命令默认是不开启的，它可以使用以下方法开启
+
+在agent配置中添加
+# 在agent2版本需要手动添加该参数
+AllowKey=system.run[*] # 开启远程执行功能
+UnsafeUserparameters=1 # 允许远程执行命令时使用不安全的参数（特殊符号）
+
+在proxy配置中，将enableremotecommands参数设为1
+
+重启
+systemctl restart zabbix-agent.service
+```
+
+
+#### 在前端页面添加脚本
+
+管理---->脚本---->创建脚本
+
+
+#### 添加动作
+
+配置---->动作---->Trigger actions---->操作
