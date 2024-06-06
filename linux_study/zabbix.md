@@ -322,3 +322,14 @@ function body(){
 ```
 
 #### 钉钉脚本
+
+### 实现故障自愈
+
+zabbix-agentd是由zabbix用户运行的，而如果想要实现故障自愈，zabbix-agentd使用zabbix的身份去重启服务
+
+因此需要给zabbix设置权限
+```shell
+visudo
+
+zabbix ALL=(ALL:ALL)  NOPASSWD: ALL
+```
