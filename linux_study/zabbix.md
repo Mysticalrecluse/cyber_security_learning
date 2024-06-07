@@ -361,3 +361,55 @@ systemctl restart zabbix-agent.service
 #### 添加动作
 
 配置---->动作---->Trigger actions---->操作
+
+## Zabbix的主动与被动模式
+
+默认是被动模式，zabbix-agentd不支持主动模式，需要修改配置
+
+默认只支持zabbix-server连agent,agent默认不支持远程连zabbix-server
+
+修改/etc/zabbix/zabbix_agentd.conf
+```shell
+ServerActive=10.0.0.200 # 主动模式，连接服务端
+Hostname=10.0.0.151Rokcy # Hostname名称必须和前端的主机名一致
+```
+![alt text](zabbix_img/image13.png)
+
+ServerActive(主动模式)表示主动向10.0.0.200汇报目标，此时agent是客户端，server是服务端
+
+Server(被动模式)表示允许10.0.0.200连接我，此时agent是被连接对象，zabbix-server主动连接agent
+
+![alt text](zabbix_img/image14.png)
+
+主动模式是agent主动连接server的10051端口，被动模式是server主动连接agent的10050端口
+
+重点：主动模式，被动模式是`站在agent的角度说的`
+
+
+## Zabbix Java Gateway
+
+Zabbix不支持直接监控Java应用
+
+如果要监控Java程序，比如Tomcat等，需要使用Java gateway作为代理，才能从Java应用中获取数据
+
+注意：JAVA应用要求开启JMX(java Managerment Extensions,即java管理扩展)功能才能被监控
+
+### Zabbix监控JVM流程
+
+- Zabbix-server通知zabbix-java-Gateway需要获取监控主机的哪些监控项
+- Zabbix-Java-Gateway通过JMX协议请求采集JAVA进程数据
+- Java程序通过JMX协议返回数据给zabbix-Java-Gateway
+- Zabbix-Java-Gateway最终返回数据给zabbix-server
+- zabbix-server将采集的Java数据存储至数据库，然后进行Web展示
+
+### JMX协议
+
+默认状态下，java程序不支持JMX协议，如果支持JMX协议，则会打开一个12345的端口
+
+以tomcat为例，如果zabbix监控tomcat，则需要tomcat开启JMX协议，通过修改catalina配置文件实现
+```shell
+vim /usr/share/tomcat9/bin/catalina.sh
+
+# 添加下列选项以开启JMX
+ CATALINA_OPTS="$CATALINA__OPTS -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=12345 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=10.0.0.201"
+```
