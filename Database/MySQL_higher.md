@@ -8304,7 +8304,7 @@ systemctl restart mysqld
 
 在数据对齐的情况下，建立主从复制
 ```sql
-CHANGE MASTER TO MASTER_LOG_FILE='mysql-bin.000002', MASTER_LOG_POS=157,MASTER_HOST='10.0.0.151',MASTER_USER='repluser', MASTER_PASSWORD='123456',MASTER_PORT=3306;
+CHANGE MASTER TO MASTER_LOG_FILE='binlog.000005', MASTER_LOG_POS=157,MASTER_HOST='10.0.0.200',MASTER_USER='repluser', MASTER_PASSWORD='123456',MASTER_PORT=3306;
 
 start slave;
 
@@ -8356,9 +8356,14 @@ slave节点配置
 ```shell
 vim /etc/my.cnf.d/mysql-server.cnf
 [mysqld]
-replicate-do-db=db1
-replicate-do-db=db2
-replicate-wild-do-table=db%.stu
+replicate-do-db=db1        # 指定复制库的白名单，每行指定一个库，多个库写多行
+replicate-do-table=tab1    # 指定复制表的白名单，每行指定一个表，多个表写多行
+
+replicate-ignore-db=db1          # 指定复制库的黑名单，每行指定一个库，多个库写多行
+replicate-ignore-table=tab1      # 指定复制表的黑名单，每行指定一个表，多个表写多行 
+
+replicate-wild-do-table=db%.stu%      # 指定复制表的白名单，支持通配符，每行指定一个规则，多个规则写多行
+replicate-wild-ignore-table=foo%.bar% # 指定复制表的黑名单，支持通配符，每行指定一个规则，多个规则写多行 
 
 # 重启服务
 systemctl restart mysqld
@@ -8369,6 +8374,161 @@ systemctl restart mysqld
 ### GTID复制
 
 GTID(global transaction ID)：全局事务ID
+
+GTID是一个已提交的事务的编号，由当前MySQL节点的Server-uuid和每个事务的transaction-id联合组成，每个事务的transation-id唯一，但仅只在当前节点唯一，Server-uuid是在每个节点自动随机生成，能保证每个节点唯一。基于此，用server-uuid和transaction-id联合的GTID能保证全局唯一。
+
+开启GTID功能可以支持多DUMP线程的并发复制，而且MySQL实现了基于库级别SQL线程并发。
+
+
+GTID优点
+- GTID使用了master_auto_position=1替代了基于binlog和position号的主从复制方式，更便于主从复制的搭建
+- GTID可以知道事务在最开始是在哪个实例上提交的，保证事务全局统一
+- 截取日志更方便，跨多文件，判断起点终点更方便
+- 传输日志，可以并发传送，SQL回放可以跟高并发
+- 判断主从工作状态更加方便
+
+#### 查看当前节点的server-uuid
+```shell
+mysql> show global variables like '%server_uuid%';
++---------------+--------------------------------------+
+| Variable_name | Value                                |
++---------------+--------------------------------------+
+| server_uuid   | d5cdb5a0-26df-11ef-badc-000c29bb0db4 |
++---------------+--------------------------------------+
+1 row in set (0.00 sec)
+
+# 此文件在MySQL5.7开始才有
+cat /var/lib/mysql/auto.cnf
+[root@ubuntu2204 ~]#cat /var/lib/mysql/auto.cnf 
+[auto]
+server-uuid=d5cdb5a0-26df-11ef-badc-000c29bb0db4
+```
+
+在主从架构中，主从节点可以互相获取对方节点的server-id
+```shell
+mysql> show slave hosts;
++-----------+------+------+-----------+--------------------------------------+
+| Server_id | Host | Port | Master_id | Slave_UUID                           |
++-----------+------+------+-----------+--------------------------------------+
+|       202 |      | 3306 |       200 | ca6ae13a-2586-11ef-8306-0050563b6427 |
+|       201 |      | 3306 |       200 | bfde3e44-26df-11ef-acae-00505634fd39 |
++-----------+------+------+-----------+--------------------------------------+
+2 rows in set, 1 warning (0.00 sec) 
+
+# 在从slave节点上看主节点的server_id
+show slave status\G
+...
+Master_Server_Id: 200
+Master_UUID: d5cdb5a0-26df-11ef-badc-000c29bb0db4
+Master_Info_File: mysql.slave_master_info.
+...
+```
+
+#### 查看二进制日志中默认的匿名GTID
+```shell
+[root@ubuntu2204 mysql.conf.d]#mysqlbinlog /var/lib/mysql/binlog.000005|grep GTID|head -n 5
+#240610 12:29:08 server id 200  end_log_pos 157 CRC32 0xbc7a3026        Previous-GTIDs
+#240610 17:34:22 server id 200  end_log_pos 234 CRC32 0xd5818b07        Anonymous_GTID  last_committed=0        sequence_number=1       rbr_only=no     original_committed_timestamp=1718012062700828   immediate_commit_timestamp=1718012062700828     transaction_length=185SET @@SESSION.GTID_NEXT= 'ANONYMOUS'/*!*/;
+#240610 17:36:57 server id 200  end_log_pos 421 CRC32 0x1b86fd0f        Anonymous_GTID  last_committed=1        sequence_number=2       rbr_only=no     original_committed_timestamp=1718012217293682   immediate_commit_timestamp=1718012217293682     transaction_length=281SET @@SESSION.GTID_NEXT= 'ANONYMOUS'/*!*/;
+```
+
+#### GTID服务器相关选项
+```shell
+gtid_mode=ON     # gtid模式
+enforce_gtid_consistency=ON  # 保证GTID安全的参数
+```
+
+#### GTID复制实现
+```shell
+# 在slave节点的配置文件添加GTID选项
+[mysqld]
+gtid_mode=ON    
+enforce_gtid_consistency=ON
+
+# 重启
+systemctl restart mysql
+
+# 在master节点的配置文件上也添加GTID选项
+[mysqld]
+gtid_mode=ON    
+enforce_gtid_consistency=ON
+
+# 重启
+systemctl restart mysql
+
+# 在slave节点设置主从同步
+CHANGE MASTER TO
+MASTER_HOST='10.0.0.200',
+MASTER_USER='repluser',
+MASTER_PASSWORD='123456',
+MASTER_PORT=3306,
+MASTER_AUTO_POSITION=1
+
+# 如果报错：Error: Error connecting to source 'repluser@10.0.0.200:3306'. This was attempt 1/86400, with a delay of 60 seconds between attempts. Message: Authentication plugin 'caching_sha2_password' reported error: Authentication requires secure connection.
+
+# 解决方案
+# 1. 在主节点的mysqld的配置文件中添加
+default_authentication_plugin=mysql_native_password
+
+# 2. 在主节点的用户上添加权限
+ALTER USER 'repluser'@'10.0.0.%' IDENTIFIED WITH mysql_native_password BY '123456';
+GRANT REPLICATION SLAVE ON *.* TO 'repluser'@'10.0.0.%';
+```
+总结：GTID的作用：在高并发条件下，保证事务的顺序
+
+![alt text](images/image46.png)
+
+### 主从复制的监控和维护
+
+#### 查看同步状态
+```shell
+# 查看Mster节点上的GTID
+SHOW MASTER STATUS\G
+*************************** 1. row ***************************
+             File: binlog.000007
+         Position: 1147
+     Binlog_Do_DB: 
+ Binlog_Ignore_DB: 
+Executed_Gtid_Set: d5cdb5a0-26df-11ef-badc-000c29bb0db4:1-4
+1 row in set (0.00 sec)
+
+# 查看从节点状态
+SHOW SLAVE STATUS\G
+
+# 查看节点上的连接情况
+SHOW PROCESSLIST;
+```
+
+#### 如何确定主从节点的数据是否一致
+使用第三方工具percona-toolkit
+```shell
+ https://www.percona.com/software/database-tools/percona-toolkit
+```
+
+#### 数据不一致，如何修复
+
+重置主从关系，重新复制
+
+### 主从复制中常见问题和解决方案
+
+#### 数据损坏或丢失
+
+- 如果是slave节点的数据损坏，重置数据库，重新同步复制即可
+- 如果要防止master节点的数据损坏或丢失，则整个主从复制架构可以用MHA+半同步来实现，在master不可用时，提升一个slave节点为新的master节点
+
+#### 在环境中出现了不唯一的server-id
+
+可手动修改server-id至唯一，再次重新复制
+
+#### 主从复制出现延迟
+- 减少大事务，将大事务拆分成小事务
+- 减少锁
+- sync-binlog=1 加快binlog更新时间，从而加快日志复制
+- 多线程复制，对多个数据库复制
+- 一从多主：Mariadb10版本后支持
+
+
+
 
 
 ## MySQL中间件代理服务器
@@ -8387,6 +8547,25 @@ GTID(global transaction ID)：全局事务ID
 
 ### Mysql中间件应用
 
+#### Mycat工作原理
+Mycat的原理中最重要的一个动词是“拦截”，它拦截了用户发送过来的SQL语句，首先对SQL语句做了一些特定的分析，比如分片分析，路由分析，读写分离分析，缓存分析等，然后将此SQL发往后端的真实数据库，并将返回的结果做适当的处理，最终再返回给用户
+
+#### Mycat应用场景
+
+Mycat适用的场景很丰富，以下是几个典型的应用场景
+- 单纯的读写分离，此时配置最为简单，支持读写分离，主从切换
+- 分表分库，对于超过1000万的表进行分片，最大支持1000亿的单表分片
+- 多租户应用，每个应用一个库，但应用程序只连接Mycat，从而不改造程序本身，实现多租户化
+- 报表系统，借助于Mycat的分表能力，处理大规模报表的统计
+- 替代Hbase，分析大数据
+- 作为海量数据实时查询的一种简单有效方案，比如100亿条频繁查询的记录需要在3秒内查询出来结果，除了基于主键的查询，还可能在范围查询或其他属性查询，此时Mycat可能是最简单有效的选择
+
+#### Mycat的高可用
+需要注意：在生产环境下，Mycat节点最好使用双节点，即双机热备环境，防止Mycat这一层出现单点故障
+- Keepalived + Mycat + MySQL
+- Keepalived + LVS + Mycat + MySQL
+- Keepalived + Haproxy + Mycat + MySQL
+
 #### Mycat实现MySQL读写分离
 
 Mycat安装
@@ -8395,11 +8574,30 @@ Mycat安装
 yum install -y java
 
 # 下载mycat
-git clone https://gitee.com/MycatOne/Mycat2.git
+wget https://www.mysticalrecluse.com/script/tools/Mycat-server-1.6.7.6-release-20220524173810-linux.tar.gz
 
 # 解压
 mkdir apps
 tar xf Mycat-server-1.6.7.6-release-20220524173810-linux.tar.gz -C /apps
+```
+
+目录结构
+```shell
+bin           # mycat命令，启动，重启，停止等
+catlet        # 扩展功能目录，默认为空
+conf          # 配置文件目录
+lib           # 引用的jar包
+logs          # 日志目录，默认为空
+version.txt   # 版本说明文件
+
+# 日志
+logs/wrapper.log   # Mycat启动日志
+logs/mycat.log     # Mycat详细工作日志
+
+# 常用配置文件
+conf/server.xml    # Mycat软件本身相关的配置文件，设置账号，参数等
+conf/schema.xml    # 对应的物理数据库和数据库表的配置，读写分离，高可用，分布式策略定制，节点控制
+conf/rule.xml      # Mycat分片（分库分表）规则配置文件，记录分片规则列表，使用方法等。
 ```
 
 
