@@ -189,11 +189,642 @@ systemctl enable --now docker
 ```
 
 ### 官方脚本
+- install_docker_offline.sh
+```shell
+#!/bin/bash
+#
+#********************************************************************
+#Author:            wangxiaochun
+#QQ:                29308620
+#Date:              2022-10-14
+#FileName:          install_docker_offline.sh
+#URL:               http://www.wangxiaochun.com
+#Description:       The test script
+#Copyright (C):     2022 All rights reserved
+#********************************************************************
 
+#支持在线和离线安装
+
+DOCKER_VERSION=26.1.4
+#DOCKER_VERSION=26.0.0
+#DOCKER_VERSION=24.0.7
+#DOCKER_VERSION=24.0.5
+#DOCKER_VERSION=23.0.3
+#DOCKER_VERSION=20.10.19
+
+URL=https://mirrors.tuna.tsinghua.edu.cn
+#URL=https://mirrors.aliyun.com
+#URL=https://download.docker.com
+
+color () {
+    RES_COL=60
+    MOVE_TO_COL="echo -en \\033[${RES_COL}G"
+    SETCOLOR_SUCCESS="echo -en \\033[1;32m"
+    SETCOLOR_FAILURE="echo -en \\033[1;31m"
+    SETCOLOR_WARNING="echo -en \\033[1;33m"
+    SETCOLOR_NORMAL="echo -en \E[0m"
+    echo -n "$1" && $MOVE_TO_COL
+    echo -n "["
+    if [ $2 = "success" -o $2 = "0" ] ;then
+        ${SETCOLOR_SUCCESS}
+        echo -n $"  OK  "    
+    elif [ $2 = "failure" -o $2 = "1"  ] ;then 
+        ${SETCOLOR_FAILURE}
+        echo -n $"FAILED"
+    else
+        ${SETCOLOR_WARNING}
+        echo -n $"WARNING"
+    fi
+    ${SETCOLOR_NORMAL}
+    echo -n "]"
+    echo 
+}
+
+prepare () {
+    if [ ! -e docker-${DOCKER_VERSION}.tgz ];then
+        #wget ${URL}/docker-ce/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz
+        wget ${URL}/docker-ce/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz
+    fi
+    [ $? -ne 0  ] && { echo "文件下载失败"; exit; }
+}
+
+install_docker () {
+    tar xf docker-${DOCKER_VERSION}.tgz -C /usr/local/
+    cp /usr/local/docker/* /usr/local/bin/
+    cat > /lib/systemd/system/docker.service <<-EOF
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target firewalld.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+# the default is not to use systemd for cgroups because the delegate issues still
+# exists and systemd currently does not support the cgroup feature set required
+# for containers run by docker
+ExecStart=/usr/local/bin/dockerd -H unix://var/run/docker.sock
+ExecReload=/bin/kill -s HUP \$MAINPID
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this version.
+#TasksMax=infinity
+TimeoutStartSec=0
+# set delegate yes so that systemd does not reset the cgroups of docker containers
+Delegate=yes
+# kill only the docker process, not all processes in the cgroup
+KillMode=process
+# restart the docker process if it exits prematurely
+Restart=on-failure
+StartLimitBurst=3
+StartLimitInterval=60s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+}
+
+config_docker () {
+    mkdir -p /etc/docker
+    tee /etc/docker/daemon.json <<-'EOF'
+    {
+      "registry-mirrors": ["https://si7y70hh.mirror.aliyuncs.com"]
+     }
+EOF
+    #systemctl restart docker
+
+}
+
+start_docker (){
+    systemctl enable --now docker
+    docker version && color "Docker 安装成功" 0 ||  color "Docker 安装失败" 1
+}
+
+
+config_docker_completion () {
+    wget -P /etc/bash_completion.d http://www.wangxiaochun.com:8888/testdir/docker/docker_completion 
+    #source /etc/bash_completion.d/docker_completion
+}
+
+
+prepare
+
+install_docker
+
+config_docker
+
+start_docker
+
+config_docker_completion
+```
 
 ## Docker删除
 
 ```shell
 apt purge docker-ce
 rm -rf /var/lib/docker
+```
+
+## 停止docker服务
+```shell
+# 仅停止docker.service，暂停后会被自动激活
+systemctl stop docker.service
+
+# 想停止该服务，还需停止docker.socket
+systemctl stop docker.service docker.socket
+```
+
+## Docker命令分类
+### 通用命令
+
+### 管理命令
+#### 管理镜像image
+
+#### 管理容器container
+- 运行容器`run`
+  - `docker container run` = `docker run`
+#### 管理网络network
+### Swarm命令
+Swarm就是docker swarm（官方开发的容器编排引擎）,新版中swarm被集成在docker里
+
+
+## Docker相关信息与优化配置
+
+### docker优化配置
+#### 优化方法1：用空间足够的高速磁盘用来存放docker的相关数据
+```shell
+# 在/etc/docker/目录下创建配置文件daemon.json(该文件默认不存在，需要自己创建)
+vim /etc/docker/daemon.json
+
+# daemon.json
+{
+  #指定docker数据目录,新版24.0.0不支持，
+  # 实现：修改service文件
+  # ExecStart=/usr/bin/dockerd --data-root=/data/docker
+  "graph": "/data/docker",  
+}
+```
+
+#### 优化方法2：从自建仓库下载镜像
+```shell
+# 查看docker信息
+docker info
+
+# 默认不信任外部仓库
+···
+Insecure Registries:
+  127.0.0.0/8
+···
+
+# 需要在配置文件中添加信任的仓库
+vim /etc/docker/daemon.json
+{
+  "insecure-registries": ["harbor.wang.org","172.18.0.253"]
+}
+
+# 添加后重启
+systemctl restart docker
+
+# 再次查看docker信息
+docker info
+···
+Insecure Registries:
+  harbor.wang.org
+  172.18.0.253
+  127.0.0.0/8
+```
+
+#### 优化方法3：调整允许最多同时下载docker镜像的数量（使其性能更好）
+```shell
+vim /etc/docker/daemon.json
+{
+  # 允许最多同时下载docker镜像的数量
+  "max-concurrent-downloads": 10,
+  # 最大允许同时上传多少个
+  "max-concurrent-uploads": 5
+}
+```
+
+#### 优化方法4：对容器中生成的日志进行约束
+```shell
+vim /etc/docker/daemon.json
+{
+  # 防止容器的日志过大，撑满磁盘
+  "log-opts": {
+    # 指定容器日志文件的最大值
+    "max-size": "300m",
+    # 指定容器日志文件的个数
+    # 循环写入日志文件
+    # 即一个日志满，会写入第二个
+    "max-file": "2"
+  }
+}
+```
+
+#### 优化方法5：镜像加速，加快镜像下载速度
+```shell
+# docker网站被墙的情况下，该加速无效
+vim /etc/docker/daemon.json
+{
+  "registry-mirrors": [
+    "https://registry.docker-cn.com",
+    "http://hub-mirror.c.163.com",
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://si7y70hh.mirror.aliyuncs.com/"
+  ]
+}
+```
+
+#### 扩展：docker远程连接
+```shell
+systemctl cat docker
+
+...
+# -H 指定客户端和服务端通信的媒介
+# docker客户端通过该socket文件发送指令
+# docker服务端通过该socket通过该文件接收指令
+# for containers run by docker
+ExecStart=/usr/bin/dockerd -H unix://var/run/docker.sock  --data-root=/data/docker
+ExecReload=/bin/kill -s HUP $MAINPID
+...
+# 但是这只能保证同主机间的通信
+# 如果客户端和服务器端不再同一主机
+# 比如在10.0.0.101的客户端，去访问10.0.0.100的docker服务端，需要打开远程连接
+# 方法：在dockerd的守护进程上开启远程连接
+# -H,--host=
+# tcp://host:port,
+# 默认2375端口（不加密），加密：2376
+# unix://path/to/socket
+# fd://* or fd://socketfd
+```
+
+#### 远程连接的实现方法1
+
+方法1：修改service文件
+```shell
+vim /lib/systemd/system/docker.service
+# 后面加一行 -H tcp://0.0.0.0:2375
+ExecStart=/usr/bin/dockerd -H unix://var/run/docker.sock  --data-root=/data/docker -H tcp://0.0.0.0:2375
+```
+
+#### 问题：当虚拟机的全局环境变量开启代理，该虚拟机远程连接其他机器的docker服务端失效
+
+```shell
+cat .bashrc
+...
+export http_proxy=http://10.0.0.1:10809
+export https_proxy=http://10.0.0.1:10809
+export ftp_proxy=ftp://10.0.0.1:10809
+```
+
+此时运行`docker -H 10.0.0.208 version`失败
+
+原因：Docker 客户端直接连接：Docker 客户端连接 Docker 守护进程通常通过直接 TCP 连接 (tcp://) 而不是 HTTP(S) 代理。代理的设置会导致 Docker 客户端尝试通过代理去连接，而代理并不支持这种直接 TCP 连接，从而导致连接失败。
+
+解决方案
+```shell
+export http_proxy=http://10.0.0.1:10809
+export https_proxy=http://10.0.0.1:10809
+export ftp_proxy=ftp://10.0.0.1:10809
+export NO_PROXY="10.0.0.208"
+```
+
+指定连接10.0.0.208的通信不走代理即可
+
+#### 远程连接的实现方法2（更安全）
+
+通过ssh远程连接
+```shell
+docker -H ssh://root@10.0.0.206 version
+```
+
+实现ssh远程连接的前提
+- 打通key验证
+```shell
+# 生成密钥私钥对
+ssh-keygen
+
+# 将公钥拷贝到指定服务器
+ssh-copy-id root@10.0.0.206
+```
+
+
+#### 优化方法6：重启docker不影响容器运行
+```shell
+vim /etc/docker/daemon.json
+
+{
+  # docker.service重启，不影响容器的运行
+  "live-restore": true
+}
+```
+
+## 镜像管理
+### 镜像结构和原理
+![alt text](images/image8.png)
+
+镜像即创建容器的模版，含有启动容器所需要的文件系统及所需要的内容，因此镜像主要用于方便和快速的创建并启动容器
+
+#### 镜像的分层
+
+镜像里面是一层层文件系统，叫做Union FS(联合文件系统)，联合文件系统，可以将几层目录挂载到一起，形成一个虚拟文件系统
+
+虚拟文件系统的目录结构就像普通Linux的目录结构一样
+
+镜像通过`这些文件`再加上`宿主机的内核`共同提供了一个Linux的虚拟环境
+
+每一层文件系统叫做layer，联合文件系统可以对每一层文件系统设置三种权限：
+- 只读(readonly)
+- 读写(readwrite)
+- 写出(writeout-able)
+
+镜像中的每一层文件系统都是只读的，构建镜像的时候，从一个最基本的操作系统开始，每个构件提交的操作都相当于做一层的修改，增加了一层文件系统，一层层往上叠，上层的修改会覆盖下层的配置
+
+### 查看镜像（格式化输出）
+指定在输出中显示映像信息的格式。
+```shell
+docker images --format
+
+# 常用的格式占位符
+{{.Repository}}: 映像的仓库名称
+{{.Tag}}: 映像的标签
+{{.ID}}: 映像的ID
+{{.Digest}}: 映像的摘要值
+{{.CreateAt}}: 映像的创建时间
+{{.Size}}: 映像的大小
+
+# 示例
+docker images --format "{{.Repository}}:{{.Tag}}"
+```
+
+#### 查看说有dangling状态的镜像
+```shell
+docker images -f dangling=true
+```
+
+
+### 搜索镜像
+#### 官方网站进行镜像搜索
+```shell
+http://hub.docker.com
+http://dockerhub.com
+https://hub-stage.docker.com/
+```
+
+#### 执行docker search命令搜索
+```shell
+docker search [OPTIONS] TERM
+
+# 搜索点赞100个以上的镜像
+docker search --filter=stars=100 centos
+```
+
+
+### 上传和下载镜像
+```shell
+docker pull [image_name]
+
+# 后面详解，push需要账号密码
+docker push [image_name]
+```
+
+### 删除镜像
+```shell
+docker rmi [repository:tag]
+```
+
+#### 当容器运行时，强删镜像
+```shell
+# 生成一个容器并运行
+docker run nginx:1.24
+# 当有容器运行时，强删镜像
+docker rmi -f nginx:1.24
+# 此时镜像还在，仅仅是逻辑上被删除了
+# 镜像名没了变成了dangling状态
+<none>  <none>  ...
+# 此时该镜像还有机会找回来
+# 实现方式是，赋予它一个名字
+docker tag <image_id> ngixn:1.24
+```
+
+### 镜像的导入导出
+导出镜像
+```shell
+# save默认作为标准输出，输出到屏幕上
+docker save nginx:1.24 > nginx.tar
+# 等价于
+docker save nginx:1.24 -o nginx.tar
+# 导出并压缩
+docker save nginx:1.24 |gzip > nginx.tar.gz
+```
+
+导入镜像
+```shell
+# 支持直接导入压缩后的文件
+docker load -i nginx.tar.gz
+```
+
+导入导出的特殊情况
+- 如果导出时使用的IMAGE—ID进行导出，由于导出的时候没有名称，使用的是ID，因此导入到新的docker服务端的时候，是dangling状态
+
+- 解决方案：使用tag给dangling状态的镜像起名
+```shell
+docker tag [image_ID] [自己起的名]
+
+# 示例
+docker tag 243kjsdas nginx:1.24
+```
+
+### 清理所有dangling状态的镜像
+```shell
+# 清理dangling和不再使用的镜像
+docker image prune -a -f
+# 清理dangling的镜像
+docker rmi -f `docker images -q -f dangling=true`
+```
+
+### 扩展：一次导出所有镜像的方法
+```shell
+docker save `docker image|awk 'NR>1{print $1":"$2}'` -o all2.tar
+# 等价
+docker images | awk 'NR >1{print $1":"$2}' | xargs docker save -o all3.tar
+# 等价
+docker images --format "{{.Repository}}:{{.Tag}}" | xargs docker save -o all4.tarc 
+```
+
+### import的使用场景
+
+将容器导出为tar包，再将tar包使用import转换为镜像
+container --> tar --> image
+
+### 查看镜像的制作历史
+```shell
+docker history nginx:1.24
+```
+
+### 查看镜像的详细信息
+```shell
+docker inspect nginx:1.24
+```
+
+## 容器管理(容器操作基础命令)
+### 运行容器
+```shell
+docker [container] run [repository:tag]
+# 等价于
+docker [container] create [repository:tag]
+docker [container] start [repository:tag]
+```
+
+在运行docker create的时候，docker会给创建的容器分配容器名，并且分配id，资源等元数据，但是如果该容器仅仅是创建，而没有运行，docker仅仅准备该容器的相关数据，并不会真正的使其在内存中运行
+
+```shell
+[root@ubuntu2204 ~]#du -sh /data/docker/
+531M    /data/docker/
+[root@ubuntu2204 ~]#docker images
+REPOSITORY           TAG       IMAGE ID       CREATED         SIZE
+nginx                1.24      6c0218f16876   14 months ago   142MB
+sagikazarmark/dvwa   latest    e901498e651a   7 years ago     359MB
+# 创建nginx,但是不运行
+[root@ubuntu2204 ~]#docker create nginx:1.24
+052400cbac800ee5b588d756f13c52481f8049fce236672133c235f039d1d4a3
+# docker容器数据目录无变化
+[root@ubuntu2204 ~]#du -sh /data/docker/
+531M    /data/docker/
+# 启动该容器
+[root@ubuntu2204 ~]#docker start 052400cbac800ee5b588d756f13c52481f8049fce236672133c235f039d1d4a3
+052400cbac800ee5b588d756f13c52481f8049fce236672133c235f039d1d4a3
+# 目录的大小上涨100多M
+[root@ubuntu2204 ~]#du -sh /data/docker/
+683M    /data/docker/
+
+# 查看进程
+systemd(1)─┬─ModemManager(830)─┬─{ModemManager}(845)
+           │                   └─{ModemManager}(850)
+           ├─VGAuthService(761)
+           ├─agetty(823)
+           ├─containerd(811)─┬─{containerd}(843)
+           │                 ├─{containerd}(844)
+           │                 ├─{containerd}(846)
+           │                 ├─{containerd}(847)
+           │                 ├─{containerd}(857)
+           │                 ├─{containerd}(858)
+           │                 └─{containerd}(859)
+           ├─containerd-shim(4823)─┬─nginx(4848)─┬─nginx(4900)
+           │                       │             └─nginx(4901)
+           │                       ├─{containerd-shim}(4825)
+           │                       ├─{containerd-shim}(4826)
+           │                       ├─{containerd-shim}(4827)
+           │                       ├─{containerd-shim}(4828)
+           │                       ├─{containerd-shim}(4829)
+           │                       ├─{containerd-shim}(4830)
+           │                       ├─{containerd-shim}(4831)
+           │                       ├─{containerd-shim}(4833)
+           │                       ├─{containerd-shim}(4872)
+           │                       └─{containerd-shim}(4873)
+           ├─cron(794)
+           ├─dbus-daemon(795)
+```
+
+
+### 启动容器的流程（面试题）
+- 现在本地寻找镜像
+- 本机由镜像直接运行，没有的话去DockerHub上下载
+- 如果DockerHub上有则将进行拉到本地，然后运行
+- 如果DockerHub没有，则返回错误，找不到镜像
+
+### 查看容器ps
+```shell
+# 查看执行中的容器
+docker ps
+
+# 查看所有的容器
+docker ps -a
+
+# 使用 -f | --filter filter 筛选出指定状态的容器
+# 筛选出退出状态的容器
+docker ps -f 'status=exited'
+
+# 列出所有id
+docker ps -f 'status=exited' -qa
+```
+
+
+### 启动容器run
+```shell
+docker run [option] IMAGE [COMAMND] [ARG...]
+
+# 启动时，指定名称 --name string
+docker run --name mynginx nginx:1.24
+
+# 启动时后台运行 -d
+docker run -d --name mynginx nginx:1.24
+
+# 一个容器要持续运行的条件：在镜像中有一个持续运行并以前台方式运行的进程作为容器启动的默认程序
+# 关键点：前台，持续运行
+# 因此因为Ubuntu的默认程序是bash，满足秩序运行，不满足前台，因此启动时，如果不指定ubuntu前台运行的话，Ubuntu会启动后自动退出
+# 为了防止ubuntu启动后立即退出，使用-it给ubuntu分配一个终端，使其具有交互的能力，也就是说满足前台的条件
+docker run -it ubuntu:22.04
+# 进入ubuntu后，看到的磁盘和文件系统等都是宿主机的
+# 但是，很多root权限才能执行的操作，是没有权限执行的，需要使用特权指令
+docker run --privileged -it ubuntu:22.04
+# 从容器中退出
+exit
+# 从容器中退出，但容器不停止
+ctrl + p + q
+
+# 再次进入ubuntu
+docker exec -it <容器名> bash
+
+# 一次性容器：--rm 容器退出后，立即销毁
+docker run --rm mynginx nginx:1.24
+
+# --restart 可以指定四种不同的policy
+# always，程序停止后，自动重启
+# 容器加always可以实现开机自启
+docker run --name nginx01 --restart always -d nginx:1.22
+
+# 容器启动的时候执行指定命令
+docker run ubuntu:22.04 cmd
+```
+
+### 停止容器
+```shell
+# docker stop [container_NAMES]
+docker stop mynginx
+# 容器停止后会释放掉资源
+# 容器只有启动状态才会占磁盘空间
+```
+
+### 删除容器
+```shell
+# -f 强删
+docker rm -f [container_NAMES]
+```
+
+### 删除所有停止的容器
+```shell
+docker container prune -f
+```
+
+### 给正在运行的容器发信号
+```shell
+docker killg
+```
+
+### docker补齐失效解决方案
+```shell
+# 大概率缺少补齐脚本文件
+[root@ubuntu2204 ~]#ll /usr/share/bash-completion/completions/docker 
+-rw-r--r-- 1 root root 114588  6月  5 19:27 /usr/share/bash-completion/completions/docker
+
+# 将其他能补全的docker上的该目录下的docker脚本复制过去
+scp docker 10.0.0.XX:/usr/share/bash-completion/completions/
+
+# 然后将服务重启即可
 ```
