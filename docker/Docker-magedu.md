@@ -814,7 +814,11 @@ docker container prune -f
 
 ### 给正在运行的容器发信号
 ```shell
-docker killg
+# 重新加载配置
+docker kill -s 1 web01
+
+# 强行关闭所有运行中的容器
+docker kill `docker ps -a -q`
 ```
 
 ### docker补齐失效解决方案
@@ -827,4 +831,84 @@ docker killg
 scp docker 10.0.0.XX:/usr/share/bash-completion/completions/
 
 # 然后将服务重启即可
+```
+
+### 进入正在运行的容器
+#### attach
+
+```shell
+# docker attach 容器名
+docker attach mynginx 
+
+# 两个终端使用attach进入同一个容器时
+# 两个终端的显示图面是同步的
+```
+
+#### exec
+```shell
+docker exec -it 容器名 bash
+```
+
+#### 暴漏所有容器端口
+
+容器启动后，默认处于预定义的NAT网络中，所以外部网络的主机无法直接访问容器中网络服务
+`docker run -p`可以将实现容器预定义的所有端口映射宿主机的网卡的随机端口，默认从32768开始
+使用随机端口时，当停止容器后再启动可能会导致端口发生变化
+
+```shell
+# 映射容器所有暴露端口至随机本地端口
+docker run -P docker.io/nginx
+
+# 查看端口映射关系
+docker port 容器名
+```
+
+#### 指定端口映射
+```shell
+# 使用-p
+docker run -d -p 80:80 --name mynginx nginx:1.24
+```
+
+#### 查看容器日志
+```shell
+# 查看后台运行的容器日志
+docker logs 容器名
+
+# 跟踪日志输出，相当于tail -f
+docker logs -f 容器名
+
+# 查看日志最后N行
+docker logs --tail N 容器名
+```
+
+#### 传递命令
+
+使用自己指定的命令替代容器运行时的初始化命令
+```shell
+# 直接在容器名后面跟命令即可替代原默认初始化命令
+docker run --name nginx01 sleep 30
+```
+
+#### 容器内部的hosts文件
+
+容器会自动将容器的ID加入自己的/etc/hosts文件中，并解析成容器IP
+```shell
+# 修改容器的hosts文件
+docker run -it --rm --add-host www.wang.com:6.6.6.6 --add-host www.wang.org:8.8.8.8 busybox cat /etc/hosts
+```
+
+#### 指定容器内的DNS
+```shell
+# 指定DNS地址
+docker run -it --rm --dns1.1.1.1 --dns 8.8.8.8 centos bash
+
+
+#配置文件指定DNS和搜索domain名
+vim /etc/docker/daemon.json
+{
+  "dns"： 【"114.114.114.114"】
+  "dns-search": ["magedu.org"]
+}
+
+# 改完重启
 ```
