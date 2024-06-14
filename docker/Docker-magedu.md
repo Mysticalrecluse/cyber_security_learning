@@ -912,3 +912,153 @@ vim /etc/docker/daemon.json
 
 # 改完重启
 ```
+
+### 容器内和宿主机之间复制文件
+
+不论容器的状态是否运行，复制都可以实现
+```shell
+docker cp [OPTIONS] CONTAINER:SRC_PATH DEST_PATH
+docker cp [OPTIONS] SRC_PATH CONTAINER:DEST_PATH
+
+# 示例
+docker cp -a 1311:/etc/centos-release .
+docker cp /etc/issue 1311:/root/
+```
+
+### 传递环境变量
+
+有些容器运行时，需要传递变量，可以使用-e<参数> 或 --env-file<参数文件>实现
+```shell
+docker run --name mysql-test1 -v /data/mysql:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 -e MYSQL_DATABASE=wordpress -e MYSQL_USER=wpuser -e 
+MYSQL_PASSWORD=123456 -d -p 3306:3306 mysql:5.7.3
+```
+
+### 清除不再使用的数据
+```shell
+docker system prune -f -a
+```
+
+### 导出和导出容器文件系统
+#### export, import
+container ---> tar ---> image
+#### save, load
+images ---> tar ---> image
+
+## 镜像制作
+
+### 手动制作
+通过`docker commit`手动构建镜像
+```sh
+docker commit [OPOTIONS] CONTAINER [REPOSITORY:[TAG]]
+
+# commit = export + import
+```
+### 自动制作
+#### 创建dockerfile进行自动构建镜像的目录结构
+```shell
+# 按照业务类型或系统类型等方式划分创建目录环境，方便后期镜像比较多的时候进行分类
+mkdir -p /data/dockerfile/{web/{nginx,apache,tomcat,jdk},system/{centos,ubuntu,alpine,debian}}
+[root@ubuntu2204 data]#tree dockerfile/
+dockerfile/
+├── system
+│   ├── alpine
+│   ├── centos
+│   ├── debian
+│   └── ubuntu
+└── web
+    ├── apache
+    ├── jdk
+    ├── nginx
+    └── tomcat
+```
+#### 关于scratch镜像
+
+该镜像是一个空的镜像，可以用于构建busybox等超小镜像，可以说是真正的从零开始构建属于自己的镜像
+
+该镜像用于构建基础镜像或超小镜像
+
+### 制作镜像的指令
+### FROM
+### LABEL
+### RUN
+### ENV
+### COPY
+```shell
+COPY  src   dest
+# 源地址必须是该dockerfile路径的相对路径
+# 源地址是目录的话，拷贝到容器的时候，会是该目录下的内容
+# 如果目标目录不存在，copy执行的时候，会在镜像中，生成该路径
+```
+
+### ADD 
+ADD命令会自动解压缩，相当于增强版的COPY
+
+### CMD（重点）
+
+指定程序启动时的默认指令
+
+CMD的格式和RUN的格式一样，分为exec格式和shell格式
+
+```shell
+格式3：
+```
+
+### CMD和entrypoint的区别
+
+### 制作镜像的要点
+- 频繁变化的变量往后放，因为哪个指令变化了，制作镜像时，就会从此指令开始重新执行，前面的有缓存，可以不需要执行
+- 将多个指令尽可能合并，可能会减少大小（镜像每一层只会叠加，不会减少）
+
+
+### 多阶段构建
+
+多阶段构建可以帮助你在构建阶段使用大型的构建工具和依赖项，但是在最终阶段只包含运行时所需的内容
+
+利用多阶段构建，可以大大减少镜像的大小，但要注意相关依赖文件都要复制新构建中才能正常运行的容器
+
+多阶段构建的本质写两遍FROM，一次遍的FROM是基础的过渡阶段，在第二次写的时候，使用第一次的镜像的必要文件作为最终用的镜像（第二遍FROM）的父镜像
+
+第一遍的镜像仅仅是临时的中间镜像，将第一遍镜像生成的文件复制到最后所需要依赖的镜像中，复制过程中仅复制最有用的必要文件，其他的无用文件就留在了旧的镜像中不再使用
+
+#### 使用GO语言实现多阶段构建
+```go
+package main
+
+import {
+  "fmt"
+  "time"
+}
+
+func main() {
+  for {
+    fmt.Println("hello,world")
+    time.Sleep(time.Second)
+  }
+}
+
+// 使用go build hello.go -> 生成二进制执行文件
+```
+```dockerfile
+FROM golang:1.18-alpine as builder
+COPY hello.go /opt
+WORKDIR /opt
+RUN go build hello.go
+
+FROM alpine:3.15.0
+COPY --from=builder /opt/hello /hello
+# CMD /hello
+CMD ["/hello"]
+# JSON 数组语法 [ ... ] 确保 Docker 不使用 shell 来运行命令。
+``` 
+```shell
+# 创建docker镜像
+docker build go-hello-v2 -t go-hello-mini:v.0.2
+# 运行镜像
+docker run --rm --name mygo go-hello-mini:v.0.2ls
+
+```
+
+
+
+
+
