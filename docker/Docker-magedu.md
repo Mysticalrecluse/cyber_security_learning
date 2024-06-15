@@ -1039,7 +1039,7 @@ func main() {
 // 使用go build hello.go -> 生成二进制执行文件
 ```
 ```dockerfile
-FROM golang:1.18-alpine as builder
+FROM golang:1.18-alpine as builder 
 COPY hello.go /opt
 WORKDIR /opt
 RUN go build hello.go
@@ -1060,5 +1060,5 @@ docker run --rm --name mygo go-hello-mini:v.0.2ls
 
 
 
-
+￥{
 

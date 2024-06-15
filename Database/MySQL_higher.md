@@ -8729,6 +8729,97 @@ ALTER USER 'mycater'@'%' IDENTIFIED WITH 'mysql_native_password' BY '123456';
 # 关闭防火墙
 ```
 
+### ProxySQL实现MySQL读写分离
+
+#### ProxySQL介绍
+
+ProxySQL: MySQL中间件
+两个版本：官方版和percona版，percona版是基于官方版基础上修改
+C++语言开发，轻量级但性能优异，支持处理千亿级数据
+
+具有中间件所需要的绝大多数功能，包括
+- 多种方式的读写分离
+- 定制基于用户、基于schema、基于语句的规则对于SQL语句进行路由
+- 缓存查询结果
+- 后端节点监控
+
+#### proxySQL安装
+```shell
+# 配置源
+cat > /etc/yum.repos.d/proxysql.repo << EOF
+> [proxysql]
+> name=ProxySQL YUM repository
+> baseurl=https://repo.proxysql.com/ProxySQL/proxysql1-2.5.x/centos/\$releasever
+> gpgcheck=1
+> gpgkey=https://repo.proxysql.com/ProxySQL/proxysql-2.5.x/repo_pub_key
+> EOF
+
+# 安装
+yum install proxysql
+```
+
+proxy主要组成
+```shell
+/etc/init.d/proxysql     # 服务脚本
+/etc/proxysql.cnf        # 配置文件
+/usr/bin/proxysql        # 主程序
+/var/lib/proxysql/       # 基于SQLITE的数据库文件，存放配置
+```
+
+proxy配置
+```shell
+# 启动 
+service proxysql start
+
+# 默认监听6032，6033
+# 6032是ProxySQL的管理端口，6033是ProxySQL对外提供服务的端口
+
+# 使用mysql客户端连接到ProxySQL的管理接口6032，默认管理员用户和密码都是admin
+mysql -uadmin -padmin -P6032 -h127.0.0.1
+
+# main是默认的"数据库"名，表里存放后端db实例，用户验证、路由规则等信息。表名以runtime开头的表示proxysql当前运行的配置内容，不能通过dml语句修改，只能修改对应的不以runtime_开头的(内存)里的表，SAVE使其存到硬盘一共下次启动重载
+
+# disk是持久化到硬盘的配置，sqlite数据文件
+
+# stats是proxysql运行抓取的统计信息，包括到后端各命令的执行次数，流量，process list，查询种类汇总/执行时间，等等
+
+# monitor库存储monitor模块收集的信息，主要是对后端db的健康/延迟检查
+
+# 在main和monitor数据中的表，runtime开头的是运行时的配置，不能修改，只能修改非runtime表
+
+# 修改后必须执行LOAD ... TO RUNTIME才能加载到RUNTIME生效
+
+# 执行save ... to disk 才将配置持久化保存到磁盘，即保存在proxysql.db文件中
+
+# global_variables有许多变量可以设置，其中就包括监听的端口，管理账号等
+```
+
+#### proxy实现mysql读写分离
+实现读写分离
+- ProxySQL
+  - IP: 10.0.0.151
+- MySQL master
+  - IP: 10.0.0.152
+- MySQL slave
+  - IP: 10.0.0.153
+
+前置工作，后端mysql已配置好主从，slave节点设置read_only=1,proxySQL已安装完成
+```shell
+# proxySQL 上配置后端节点
+use main
+
+# 查看配置
+select * from proxysql_server
+Empty set (0.00 sec)
+
+# 配置后端节点
+insert into mysql_servers(hostgroup_id,hostname,port)
+VALUES (530,'10.0.0.152',3306);
+
+insert into mysql_servers(hostgroup_id,hostname,port)
+VALUES (531,'10.0.0.153',3306);
+```
+
 
 # 锁
 
