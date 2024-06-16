@@ -1060,5 +1060,3 @@ docker run --rm --name mygo go-hello-mini:v.0.2ls
 
 
 
-￥{
-

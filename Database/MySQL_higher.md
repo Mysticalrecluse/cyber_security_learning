@@ -8037,10 +8037,10 @@ relay_log_index=relay-log.index
 ```sql
 -- 在从节点上执行下列SQL语句，提供主节点地址和连接账号，用户名，密码，开始同步的二进制文件和位置等
 
-CHANGE MASTER TO MASTER_HOST='10.0.0.118',  -- 指定master节点
+CHANGE MASTER TO MASTER_HOST='10.0.0.152',  -- 指定master节点
 MASTER_USER='repluser',                     -- 连接用户
 MASTER_PASSWORD='123456',                 -- 连接密码
-MASTER_LOG_FILE='binlog.000003',         -- 从哪个二进制文件开始复制
+MASTER_LOG_FILE='mysql-bin.000001',         -- 从哪个二进制文件开始复制
 MASTER_LOG_POS=157,                         -- 指定同步开始的位置
 MASTER_DELAY=interval                       -- 可指定延迟复制实现防误操作，单位秒，这里可以用作延时同步，一般用于备份
 
@@ -8743,6 +8743,316 @@ C++语言开发，轻量级但性能优异，支持处理千亿级数据
 - 缓存查询结果
 - 后端节点监控
 
+#### proxySQL体系结构
+库介绍
+- main: ProxySQL最主要的库，修改配置时使用的库，它是一个`内存数据库系统`。所以，修改main库中的配置后，必须将其持久化到disk上才能永久保存。
+- 
+- disk: 磁盘数据库，该数据库结构和内存数据库完全一致。当持久化内存数据库中的配置时，其实就是写入disk库中。磁盘数据库的默认路径为$DATADIR/proxysql.db
+- 
+- stats: 统计信息库。这个库包含了ProxySQL收集的关于内部功能的指标。通过这个数据库，可以知道触发某个计数器的频率，通过ProxySQL的SQL执行次数等
+- 
+- monitor: 监控后端MySQL节点的相关的库，该库中只有几个log类的库，监控模式收集的监控信息全部存放到对应的log表中（心跳监控，主从复制监控，主从延时监控，读写监控）
+
+- stats_history: 用于存放历史统计数据。
+
+```shell
+mysql> show databases;
++-----+---------------+-------------------------------------+
+| seq | name          | file                                |
++-----+---------------+-------------------------------------+
+| 0   | main          |                                     |
+| 2   | disk          | /var/lib/proxysql/proxysql.db       |
+| 3   | stats         |                                     |
+| 4   | monitor       |                                     |
+| 5   | stats_history | /var/lib/proxysql/proxysql_stats.db |
++-----+---------------+-------------------------------------+
+# 可以看出main,stats,monitor都是内存库
+
+# 查看内存库的方法
+show tables from main;
+
+mysql> show tables from main;
++----------------------------------------------------+
+| tables                                             |
++----------------------------------------------------+
+| coredump_filters                                   |
+| global_variables                                   |
+| mysql_aws_aurora_hostgroups                        |
+| mysql_collations                                   |
+| mysql_firewall_whitelist_rules                     |
+| mysql_firewall_whitelist_sqli_fingerprints         |
+| mysql_firewall_whitelist_users                     |
+| mysql_galera_hostgroups                            |
+| mysql_group_replication_hostgroups                 |
+| mysql_hostgroup_attributes                         |
+| mysql_query_rules                                  |
+| mysql_query_rules_fast_routing                     |
+| mysql_replication_hostgroups                       |
+| mysql_servers                                      |
+| mysql_servers_ssl_params                           |
+| mysql_users                                        |
+| proxysql_servers                                   |
+| restapi_routes                                     |
+| runtime_checksums_values                           |
+| runtime_coredump_filters                           |
+| runtime_global_variables                           |
+| runtime_mysql_aws_aurora_hostgroups                |
+| runtime_mysql_firewall_whitelist_rules             |
+| runtime_mysql_firewall_whitelist_sqli_fingerprints |
+| runtime_mysql_firewall_whitelist_users             |
+| runtime_mysql_galera_hostgroups                    |
+| runtime_mysql_group_replication_hostgroups         |
+| runtime_mysql_hostgroup_attributes                 |
+| runtime_mysql_query_rules                          |
+| runtime_mysql_query_rules_fast_routing             |
+| runtime_mysql_replication_hostgroups               |
+| runtime_mysql_servers                              |
+| runtime_mysql_servers_ssl_params                   |
+| runtime_mysql_users                                |
+| runtime_proxysql_servers                           |
+| runtime_restapi_routes                             |
+| runtime_scheduler                                  |
+| scheduler                                          |
++----------------------------------------------------+
+38 rows in set (0.00 sec)
+
+# 使用use的时候，默认是进入main库
+# 比如：use stats,进入stats库中，然后查询表，实际情况是
+# 查看的是main库的表，所以必须要使用show tables from stats来查看对应库的表
+```
+
+#### proxySQL配置文件
+```shell
+# rpm -ql proxysql
+/etc/proxsql.cnf
+```
+```shell
+# 数据库目录
+datadir="/var/lib/proxysql"
+# 日志（用于平时定位问题）
+errorlog="/var/lib/proxysql/proxysql.log"
+# 和管理相关的
+admin_variables=
+{
+        admin_credentials="admin:admin"
+#       mysql_ifaces="127.0.0.1:6032;/tmp/proxysql_admin.sock"
+        mysql_ifaces="0.0.0.0:6032"
+#       refresh_interval=2000
+#       debug=true
+}
+# 和mysql相关的
+mysql_variables=
+{
+        threads=4
+        max_connections=2048
+        default_query_delay=0
+        default_query_timeout=36000000
+        have_compress=true
+        poll_timeout=2000
+#       interfaces="0.0.0.0:6033;/tmp/proxysql.sock"
+        interfaces="0.0.0.0:6033"
+        default_schema="information_schema"
+        stacksize=1048576
+        server_version="5.5.30"
+        connect_timeout_server=3000
+# make sure to configure monitor username and password
+# https://github.com/sysown/proxysql/wiki/Global-variables#mysql-monitor_username-mysql-monitor_password
+        monitor_username="monitor"
+        monitor_password="monitor"
+        monitor_history=600000
+        monitor_connect_interval=60000
+        monitor_ping_interval=10000
+        monitor_read_only_interval=1500
+        monitor_read_only_timeout=500
+        ping_interval_server_msec=120000
+        ping_timeout_server=500
+        commands_stats=true
+        sessions_sort=true
+        connect_retries_on_failure=10
+}
+
+# 和数据库服务相关的
+# defines all the MySQL servers
+mysql_servers =
+(
+#       {
+#               address = "127.0.0.1" # no default, required . If port is 0 , address is interpred as a Unix Socket Domain
+#               port = 3306           # no default, required . If port is 0 , address is interpred as a Unix Socket Domain
+#               hostgroup = 0           # no default, required
+#               status = "ONLINE"     # default: ONLINE
+#               weight = 1            # default: 1
+#               compression = 0       # default: 0
+#   max_replication_lag = 10  # default 0 . If greater than 0 and replication lag passes such threshold, the server is shunned
+#       },
+#       {
+#               address = "/var/lib/mysql/mysql.sock"
+#               port = 0
+#               hostgroup = 0
+#       },
+#       {
+#               address="127.0.0.1"
+#               port=21891
+#               hostgroup=0
+#               max_connections=200
+#       },
+#       { address="127.0.0.2" , port=3306 , hostgroup=0, max_connections=5 },
+#       { address="127.0.0.1" , port=21892 , hostgroup=1 },
+#       { address="127.0.0.1" , port=21893 , hostgroup=1 }
+#       { address="127.0.0.2" , port=3306 , hostgroup=1 },
+#       { address="127.0.0.3" , port=3306 , hostgroup=1 },
+#       { address="127.0.0.4" , port=3306 , hostgroup=1 },
+#       { address="/var/lib/mysql/mysql.sock" , port=0 , hostgroup=1 }
+)
+
+# 和数据库用户相关的
+# defines all the MySQL users
+mysql_users:
+(
+#       {
+#               username = "username" # no default , required
+#               password = "password" # default: ''
+#               default_hostgroup = 0 # default: 0
+#               active = 1            # default: 1
+#       },
+#       {
+#               username = "root"
+#               password = ""
+#               default_hostgroup = 0
+#               max_connections=1000
+#               default_schema="test"
+#               active = 1
+#       },
+#       { username = "user1" , password = "password" , default_hostgroup = 0 , active = 0 }
+)
+
+# 和MySQL查询规则相关的
+#defines MySQL Query Rules
+mysql_query_rules:
+(
+#       {
+#               rule_id=1
+#               active=1
+#               match_pattern="^SELECT .* FOR UPDATE$"
+#               destination_hostgroup=0
+#               apply=1
+#       },
+#       {
+#               rule_id=2
+#               active=1
+#               match_pattern="^SELECT"
+#               destination_hostgroup=1
+#               apply=1
+#       }
+)
+# 调度相关的
+scheduler=
+(
+#  {
+#    id=1
+#    active=0
+#    interval_ms=10000
+#    filename="/var/lib/proxysql/proxysql_galera_checker.sh"
+#    arg1="0"
+#    arg2="0"
+#    arg3="0"
+#    arg4="1"
+#    arg5="/var/lib/proxysql/proxysql_galera_checker.log"
+#  }
+)
+
+# 调度组相关的
+mysql_replication_hostgroups=
+(
+#        {
+#                writer_hostgroup=30
+#                reader_hostgroup=40
+#                comment="test repl 1"
+#       },
+#       {
+#                writer_hostgroup=50
+#                reader_hostgroup=60
+#                comment="test repl 2"
+#        }
+)
+```
+
+#### 多层配置系统
+多层配置的目的是为了方便在线配置，在线生效，确保在零停机的状态下做配置变更。主要分三层：
+- Runtime: 内容无法直接修改
+- Memory：mysql_servers; mysql_users; mysql_query_rules; global_variables; mysql_collations
+- Disk&Configuration File;
+
+tip: 因为有runtime层，因此可以实现配置变更的在线生效，不需要做停机处理
+
+这里我们唯一手动修改的是memory层，然后通过LOAD去更改runtime层
+
+ProxySQL接收到LOAD...FROM CONFIG命令时，预期行为如下：
+- 如果配置文件和内存表中都存在已加载的条目，则LOAD...FROM CONFIG将会覆盖内存表中已配置的条目
+- 如果配置文件中存在但内存表中不存在已加载的条目，则LOAD...FROM CONFIG将会将该条目添加到内存表中
+- 如果内存表中存在但配置文件中不存在的条目，则LOAD...FROM CONFIG不会从内存表中删除该条目
+
+```shell
+# 将Memory修改的命令加载到Runtime, 下面两条命令等价
+Load ... FROM MEMORY
+LOAD ... TO RUNTIME
+
+# 将Runtime层的命令同步到MEMORY层, 下面两条命令等价
+SAVE ... TO MEMORY
+SAVE ... FROM RUNTIME
+
+# 将Disk的内容同步到Memory
+Load ... TO MEMORY
+LOAD ... FROM DISK
+
+# 将MEMROY的内容落盘的DISK
+SAVE ... FROM MEMROY
+SAVE ... TO DISK
+
+# 将配置文件的内容加载到内存MEMORY
+LOAD ... FROM CONFIG
+```
+
+上述的...表示五类条目，分别是
+- Active/Persist Mysql Users
+```shell
+# Active current in-memory MySQL User configuration
+LOAD MYSQL USERS TO RUNTIME;
+
+# Save the current in-memory MySQL User Configuration to disk
+SAVE MYSQL USERS TO DISK;
+```
+- Active/Persist MySQL Servers and MySQL Repllication Hostgroup
+```shell
+# Active current in-memory MySQL Server and Replication Hostgroup configuration
+LOAD MYSQL SERVERS TO RUNTIME;
+
+# Save the current in-memory MySQL Server and Replication Hostgroup configuration to disk
+SAVE MYSQL SERVERS TO DISK;
+```
+- Activate/Persist MySQL Query Rules
+```shell
+# Active current in-memory MySQL Query Rule configuration
+LOAD MySQL QUERY RULES TO RUNTIME;
+
+# Save the current in-memory MySQL query Rule configuration to disk
+SAVE MYSQL QUERY RULES TO DISK;
+```
+- Activate/Persist MySQL Variables
+```shell
+# Active current in-memory MySQL Variable configuration
+LOAD MYSQL VARIABLES TO RUNTIME;
+# Save the current in-memory MySQL variable configuration to disk
+SAVE MYSQL VARIABLES TO DISK;
+```
+- Activate/Persist ProxySQL Admin Varables
+```shell
+# Active current in-memory ProxySQL Admin Variable configuration
+LOAD ADMIN VARIABLES TO RUNTIME;
+# SAVE the current in-memory ProxySQL Admin Variable configuration to disk
+
+```
+
+
 #### proxySQL安装
 ```shell
 # 配置源
@@ -8796,12 +9106,27 @@ mysql -uadmin -padmin -P6032 -h127.0.0.1
 
 #### proxy实现mysql读写分离
 实现读写分离
+配置主机组【规划集群】
 - ProxySQL
   - IP: 10.0.0.151
 - MySQL master
   - IP: 10.0.0.152
 - MySQL slave
   - IP: 10.0.0.153
+
+将后端的服务器集群抽象成一个集群
+```shell
+# 查看当前主机组状态
+select * from mysql_replication_hostgroups;
+
+# 配置读写主机组
+INSERT INTO mysql_replication_hostgroups (writer_hostgroup,reader_hostgroup,comment)
+VALUES (1,2,'TestCluster');
+
+LOAD MYSQL SERVERS TO RUNTIME;
+SAVE MYSQL SERVERS TO DISK;
+```
+
 
 前置工作，后端mysql已配置好主从，slave节点设置read_only=1,proxySQL已安装完成
 ```shell
@@ -8813,13 +9138,176 @@ select * from proxysql_server
 Empty set (0.00 sec)
 
 # 配置后端节点
+# 一个hostgroup_id可以锚定多台服务器
+# 这里假设5801是写
+# 5802是读
 insert into mysql_servers(hostgroup_id,hostname,port)
-VALUES (530,'10.0.0.152',3306);
+VALUES (5801,'10.0.0.152',3306);
 
 insert into mysql_servers(hostgroup_id,hostname,port)
-VALUES (531,'10.0.0.153',3306);
+VALUES (5802,'10.0.0.153',3306);
+
+# 加载到RUNTIME
+load mysql servers to runtime;
+
+# 保存到硬盘
+save mysql servers to disk;
 ```
 
+后端MySQL的master节点上添加监控后端节点的用户，连接每个节点的read_only值来自动调整主从节点是属于读组还是写组
+```shell
+# 通过全局变量表，查看监控后端用户名和密码的变量
+mysql-monitor_username
+mysql-monitor_password
+# 将这两个变量修改为后端服务器上创建的用来监控的账号的用户，密码
+mysql> select * from global_variables where variable_name like 'mysql-monitor_%';
++----------------------------------------------------------------------+----------------+
+| variable_name                                                        | variable_value |
++----------------------------------------------------------------------+----------------+
+| mysql-monitor_enabled                                                | true           |
+| mysql-monitor_connect_timeout                                        | 600            |
+| mysql-monitor_ping_max_failures                                      | 3              |
+| mysql-monitor_ping_timeout                                           | 1000           |
+| mysql-monitor_aws_rds_topology_discovery_interval                    | 1000           |
+| mysql-monitor_read_only_max_timeout_count                            | 3              |
+| mysql-monitor_replication_lag_group_by_host                          | false          |
+| mysql-monitor_replication_lag_interval                               | 10000          |
+| mysql-monitor_replication_lag_timeout                                | 1000           |
+| mysql-monitor_replication_lag_count                                  | 1              |
+| mysql-monitor_groupreplication_healthcheck_interval                  | 5000           |
+| mysql-monitor_groupreplication_healthcheck_timeout                   | 800            |
+| mysql-monitor_groupreplication_healthcheck_max_timeout_count         | 3              |
+| mysql-monitor_groupreplication_max_transactions_behind_count         | 3              |
+| mysql-monitor_groupreplication_max_transactions_behind_for_read_only | 1              |
+| mysql-monitor_galera_healthcheck_interval                            | 5000           |
+| mysql-monitor_galera_healthcheck_timeout                             | 800            |
+| mysql-monitor_galera_healthcheck_max_timeout_count                   | 3              |
+| mysql-monitor_replication_lag_use_percona_heartbeat                  |                |
+| mysql-monitor_query_interval                                         | 60000          |
+| mysql-monitor_query_timeout                                          | 100            |
+| mysql-monitor_slave_lag_when_null                                    | 60             |
+| mysql-monitor_threads_min                                            | 8              |
+| mysql-monitor_threads_max                                            | 128            |
+| mysql-monitor_threads_queue_maxsize                                  | 128            |
+| mysql-monitor_local_dns_cache_ttl                                    | 300000         |
+| mysql-monitor_local_dns_cache_refresh_interval                       | 60000          |
+| mysql-monitor_local_dns_resolver_queue_maxsize                       | 128            |
+| mysql-monitor_wait_timeout                                           | true           |
+| mysql-monitor_writer_is_also_reader                                  | true           |
+| mysql-monitor_username                                               | proxyer        |
+| mysql-monitor_password                                               | 123456         |
+| mysql-monitor_history                                                | 600000         |
+| mysql-monitor_connect_interval                                       | 60000          |
+| mysql-monitor_ping_interval                                          | 10000          |
+| mysql-monitor_read_only_interval                                     | 1500           |
+| mysql-monitor_read_only_timeout                                      | 500            |
++----------------------------------------------------------------------+----------------+
+
+# master节点上创建用户并授权（监控账号）
+create user proxyer@'10.0.0.%' identified by '123456';
+
+grant REPLICATION CLIENT on *.* to proxyer@'10.0.0.%';
+
+# ProxySQL上配置连接mysql的用户名和密码
+set mysql-monitor_username='proxyer';
+set mysql-monitor_password='123456';
+# 加载到内存
+load mysql variables to runtime;
+# 落盘
+save mysql variables to disk;
+
+# 查看连接日志
+select * from mysql_server_connect_log;
+
+# 查询ping日志
+select * from mysql_server_ping_log;
+```
+
+在ProxySQL上将后端主机分类
+```shell
+# 将后端服务器集群抽象成一个规则记录
+insert into mysql_replication_hostgroups(writer_hostgroup,reader_hostgroup,comment) values(5801,5802,"test");
+
+# 保存配置
+load mysql servers to runtime;
+# runtime层的表查看
+# select * from runtime_mysql_replication_hostgroups
+save mysql servers to disk;
+
+# 根据主机group_id分到write组和read组
+select * from mysql_replication_hostgroups;
++------------------+------------------+------------+---------+
+| writer_hostgroup | reader_hostgroup | check_type | comment |
++------------------+------------------+------------+---------+
+| 5801             | 5802             | read_only  | test    |
++------------------+------------------+------------+---------+
+
+select hostgroup_id,hostname,port,status,weight from mysql_server;
++--------------+------------+------+--------+--------+
+| hostgroup_id | hostname   | port | status | weight |
++--------------+------------+------+--------+--------+
+| 5801         | 10.0.0.152 | 3306 | ONLINE | 1      |
+| 5802         | 10.0.0.153 | 3306 | ONLINE | 1      |
++--------------+------------+------+--------+--------+
+```
+
+在后端MySQL配置用户（业务账号）
+```shell
+# master节点创建用户并授权
+create user sqluser@'10.0.0.%' identified by '123456';
+grant all on *.* to sqluser@'10.0.0.%';
+
+# 在proxySQL配置，将用户sqluser添加到mysql_users表中，default_hostgroup默认组设置为写组5801，当读写分离的路由规则不符合时，会访问默认组的数据库
+insert into mysql_users(username, password,default_hostgroup)
+values('sqluser','123456','5801');
+
+# 保存配置
+mysql> load mysql users to runtime;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> save mysql users to disk;
+Query OK, 0 rows affected (0.01 sec)
+```
+
+测试，默认连接到master节点
+```shell
+# 6033是业务端口
+mysql -usqluser -p'123456' -P6033 -h127.0.0.1 -e 'select @@server_id,@@read_only';
+```
+
+在proxysql上配置路由规则，实现读写分离
+与规则有关的表：mysql_query_rules和mysql_query_rules_fast_routing，后者是前者的扩展表，1.4.7之后支持
+插入路由规则，将select语句分离到5802的读组，select中有一个特殊的语句`SELECT...FOR UPDATE`它会申请写锁，应该路由到5801的写组
+```shell
+# 注意，因proxySQL根据rules_id顺序进行规则匹配，select ... for update规则的rule_id必须要小于普通的select规则的rule_id
+
+insert into mysql_query_rules(rule_id,active,match_digest,destination_hostgroup,apply)
+VALUES (1,1,'^SELECT.*FOR UPDATE$',5801,1),(2,1,'^SELECT',5802,1);
+
+# 保存规则
+mysql> load mysql query rules to runtime;
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> save mysql query rules to disk;
+Query OK, 0 rows affected (0.00 sec)
+```
+
+连接ProxySQL测试读写分离
+```shell
+# select被路由到slave节点
+mysql -usqluser -p'123456' -P6033 -h127.0.0.1 -e 'select @@server_id,@@read_only';
+
+# 测试写操作
+mysql -usqluser -p'123456' -P6033 -h127.0.0.1 -e 'start transaction;select @@server_id,@@read_only;commit;'
+```
+
+总结：
+1. 创建一个后端集群（即一个抽象的条目），并设置好它的读写
+2. 将后端服务器节点根据需求分别加入到集群的写组和读组中
+3. 配置监控后端的mysql节点的用户账号（用户名，密码）
+4. ProxySQL上配置连接mysql的用户名和密码
+5. 创建业务账号（在后端数据库和proxysql都创建），之前设置的是为了监控集群的账号，这次的是web链接的账号
+6. proxysql中创建的业务账号的缺省是写组
 
 # 锁
 
