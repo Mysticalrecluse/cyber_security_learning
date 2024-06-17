@@ -9310,6 +9310,124 @@ mysql -usqluser -p'123456' -P6033 -h127.0.0.1 -e 'start transaction;select @@ser
 6. proxysql中创建的业务账号的缺省是写组
 7. 在proxysql上配置规则
 
+
+## MySQL高可用
+
+### MHA
+
+MHA: Master High Availiability，对主节点进行监控，可以实现自动故障转移至其他从节点；通过提升某一从节点为新的主节点，基于主从复制实现，还需要客户端配合实现，目前MHA主要支持一主多从的架构，要搭建MHA，要求一个复制集群中必须最少有三台数据库服务器，一主二从，即一台充当master，一台充当备用master，另外一台充当从库，处于机器成本的考虑，淘宝进行了改造，目前淘宝TMHA已经支持一主一从。
+
+#### MHA集群架构
+
+一个MHA-manager节点可以管理多个MySQL集群
+
+#### MHA工作原理
+- MHA利用SELECT 1 As Value 指定判断master服务器的健康性，一旦master宕机，MHA从宕机崩溃的master保存二进制日志事件(binlog evnets)
+- 识别含有最新更新的slave
+- 应用差异的中继日志(relay log)到所有slave节点
+- 应用从master保存的二进制日志事件(binlog events)到所有slave节点
+- 提升一个slave为新的master
+- 是其他的slave连接新的master进行复制
+- 故障服务器自动被剔除集群，将配置信息去掉
+- 旧的master的VIP漂移到新的master上，用户应用就可以访问新的Master
+
+
+
+#### MHA实现架构
+- Manager服务器
+  - IP：10.0.0.181
+- Master服务器
+  - IP：10.0.0.8
+- Slave服务器
+  - IP：10.0.0.18
+- Slave服务器
+  - IP：10.0.0.28
+
+
+#### 软件下载
+```shell
+# mha4mysql-manager-0.58-0.el7.centos.noarch.rpm 只支持Centos7上安装，不支持8，支持Mysql5.8和Mysql8.0，不支持Mariadb-10.3.17
+
+# manager下载地址
+https://github.com/yoshinorim/mha4mysql-manager/releases/tag/v0.58
+# node下载地址
+https://github.com/yoshinorim/mha4mysql-node/releases/tag/v0.58
+
+# 通过yum安装，自行解决依赖
+yum install -y epel-release
+yum install -y mha4mysql*
+
+# 查看，可执行程序都是perl脚本
+[root@localhost ~] $file /usr/bin/masterha_*
+/usr/bin/masterha_check_repl:      Perl script, ASCII text executable
+/usr/bin/masterha_check_ssh:       Perl script, ASCII text executable
+/usr/bin/masterha_check_status:    Perl script, ASCII text executable
+/usr/bin/masterha_conf_host:       Perl script, ASCII text executable
+/usr/bin/masterha_manager:         Perl script, ASCII text executable
+/usr/bin/masterha_master_monitor:  Perl script, ASCII text executable
+/usr/bin/masterha_master_switch:   Perl script, ASCII text executable
+/usr/bin/masterha_secondary_check: Perl script, ASCII text executable
+/usr/bin/masterha_stop:            Perl script, ASCII text executable
+```
+
+在所有mysql节点上安装node包
+```shell
+yum install -y ./mha4mysql-node-0.58-0.el7.centos.noarch.rpm
+```
+
+在所有节点实现基于ssh-key的免密登录
+```shell
+# 生成密钥对，并在当前主机完成C/S校验
+ssh-keygen
+ssh-copy-id 127.1
+
+# 分发
+rsync -av .ssh 10.0.0.8:/root/
+rsync -av .ssh 10.0.0.18:/root/
+rsync -av .ssh 10.0.0.28:/root/
+# 或者
+scp -r .ssh 10.0.0.8:/root/
+scp -r .ssh 10.0.0.18:/root/
+scp -r .ssh 10.0.0.28:/root/
+```
+
+在mba-manager节点创建相关配置文件
+```shell
+mkdir /etc/mastermha
+vim /etc/mastermha/app1.cnf
+
+[server default]
+user=mhauser
+password=123456
+manager_workdir=/data/mastermha/app1/
+manager_log=/data/mastermha/app1/manager.log
+remote_workdir=/data/mastermha/app1/
+ssh_user=root
+repl_user=repluser
+repl_password=123456
+ping_interval=1
+master_ip_failover_script=/usr/local/bin/master_ip_failover
+report_script=/usr/local/bin/sendmail.sh
+check_repl_delay=0
+master_binlog_dir=/data/mysql/logbin/
+
+[server1]
+hostname=10.0.0.8
+candidate_master=1
+
+[server2]
+hostname=10.0.0.18
+candidate_master=1
+
+[server3]
+hostname=10.0.0.28
+```
+
+提升slave节点为master节点的策略
+- 如果所有slave节点的日志都相同，则默认会以配置文件的顺序选择一个slave节点提升为master节点
+- 如果slave节点上的日志不一致，则会选择数据量最接近master节点的slave节点，将其提升为master节点
+- 如果对某个slave节点设置权重(candidate_master=1)，权重节点优先选择，但是此节点日志量落后于master节点超过100M时，也不会选择，可以配合check_repl_delay=0,关闭日志量的检查，强制选择候选节点
+
 # 锁
 
 事务的隔离性由锁实现
