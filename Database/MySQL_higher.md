@@ -9308,6 +9308,7 @@ mysql -usqluser -p'123456' -P6033 -h127.0.0.1 -e 'start transaction;select @@ser
 4. ProxySQL上配置连接mysql的用户名和密码
 5. 创建业务账号（在后端数据库和proxysql都创建），之前设置的是为了监控集群的账号，这次的是web链接的账号
 6. proxysql中创建的业务账号的缺省是写组
+7. 在proxysql上配置规则
 
 # 锁
 

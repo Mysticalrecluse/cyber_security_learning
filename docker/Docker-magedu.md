@@ -1058,5 +1058,154 @@ docker run --rm --name mygo go-hello-mini:v.0.2ls
 
 ```
 
+## 容器的数据管理
+### Docker的数据分层
+- LowerDir:
+  - image镜像层，即镜像本身，只读
+- UpperDir:
+  - 容器的上层，可读写，容器变化的数据存放在此处
+- MergeDir:
+  - 容器的文件系统，使用Union FS（联合文件系统）将lowerdir和upperdir合并完成后给容器使用，最终呈现给用户的统一视图 
+- WorkDir:
+  - 容器在宿主机的工作目录，挂载后内容会被清空，且在使用过程中其内容用户不可见
+
+### 实现持久化的三种方式
+#### 卷(Volume)
+匿名卷
+```shell
+# 在/var/lib/docker/volumes/随机目录/
+docker run -it --name web01 -v /path/dir <image>:<tag>
+# 删除镜像以及匿名卷内容
+docker rm -v
+# 新容器的匿名卷的内容无法直接使用就得匿名件的内容，除非手动复制
+
+# 查看匿名卷名称
+docker volume ls
+
+# 查看匿名卷详细信息
+docker volume inspect <匿名件名称>
+
+# 清理匿名卷
+docker volume prune
+
+# 所有不再用的卷包括命名卷都删
+docker volume prune -a
+```
+
+命名卷
+```shell
+# 创建命名卷
+docker volume create mydata
+# 启动容器的时候，顺便生成命名卷
+docker run -it --name web01 -v mynginx_data:/usr/share/nginx/html
+```
+
+#### 绑定挂载(Bind Mount)
+```shell
+# 指定宿主机目录或文件格式
+-v <宿主机绝对路径的目录或文件>:<容器目录或文件>[:ro]  # 将宿主机目录挂载容器目录，两个目录都可自动创建
+# 使用相对路径也不是不可以，但是必须前面加点./
+
+```
+
+#### tmpfs挂载（不算持久化）
+tmpfs挂载不与宿主机上的任何文件或目录相关联，而是将一个临时文件系统挂载到容器的某个目录下。这种方式的主要优点是它提供了一个高速且安全的挂载方式，因为tmpfs挂载通常驻留在宿主机的内存中，且在容器停止后会被自动删除。
+```shell
+docker run -d --tmpfs/data --name test <镜像名>:<tag>
+```
 
 
+## 容器的网路管理
+
+```shell
+# 查询网桥
+brctl show
+
+# 查看设备驱动
+ethtool -S <网卡名>
+
+ethtool -i <网卡名>
+```
+
+禁止容器间通讯
+```shell
+--icc=false
+```
+
+### 更改容器默认docker网桥的网络配置
+```shell
+# --bip
+vim /etc/docker/daemon.json
+{
+  "bip": "192.168.100.1/24"
+}
+```
+
+### 自定义网桥
+```shell
+# 创建网桥
+brctl addbr docker1
+
+# 启用网桥
+ip link set docker1 up
+
+# 添加网桥地址
+ip a a 172.27.0.1/16 dev docker1
+
+# 修改配置文件/usr/lib/systemd/system/docker.service
+ExecStart=...         -b docker1 # 加在后面
+
+# 重启system
+systemctl daemon-reload
+systemctl restart docker
+```
+
+### 容器名称互联
+```shell
+# --link list
+```
+
+## 网络模型
+
+### docker的五种网络模型（面试题）
+
+```shell
+# 定义当前网路模型，默认bridge
+
+# 查看网络模型
+docker network ls
+```
+
+### Bridge网络模式
+查看bridge的详细情况
+```shell
+docker inspect bridge
+```
+
+### Host模式
+```shell
+# 指定host模式
+docker run --network host
+```
+
+
+### None模式
+没有网络，不进行任何网路配置
+
+
+### Container模式
+```shell
+docker run --network container:<依附的容器>
+```
+
+### 自定义网路
+```shell
+docker network create -d<mode> --subnet<CIDR> --gateway<网关> 自定义网名
+# -d默认bridge模式
+
+# 查看网络
+docker network ls
+
+# 将容器加入指定网路
+docker network connect <网络> <容器名>
+```
