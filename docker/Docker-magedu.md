@@ -1288,7 +1288,101 @@ docker network connect <网络> <容器名>
 apt update && apt install docker.io # ubuntu默认24.0.7，该版本没有compose的子命令
 
 # 安装compose plugin需要先配置docker仓库
-apt update
-apt -y install apt-transport-https ca-certificates curl software-properties-common
+# step 1: 安装必要的一些系统工具
+apt-get update
+apt-get -y install apt-transport-https ca-certificates curl software-properties-common
+# step 2: 安装GPG证书
+curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | sudo apt-key add -
+# Step 3: 写入软件源信息
+add-apt-repository "deb [arch=amd64] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable"
 
+# 安装插件
+apt-get install docker-compose-plugin
 ```
+
+#### 安装独立的docker compose
+```shell
+# 版本较老
+apt install docker-compose
+
+# 下载新版
+# 国内加速 https://mirror.ghproxy.com/<github资源链接>
+wget https://mirror.ghproxy.com/https://github.com/docker/compose/release/download/v2.27.1/docker-compose-linux-x86_64
+# 下载的直接就是二进制静态编译的文件，可以直接加执行权限使用
+# 加入环境变量
+mv docker-compose-linux-x86_64 /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+```
+
+#### docker命令自动转换为docker compose
+```shell
+www.composerize.com
+
+# 反查，docekr composr转docker run
+www.decomposerize.com
+```
+
+### 常用Docker compose命令
+```shell
+# 进入docker compose所在目录
+#启动和关闭项目
+docker compose up
+docker compose down
+
+# 查看项目下的容器
+docker compose ps
+
+# 项目已后台方式启动
+docker compose up -d
+
+# 查看项目相关镜像
+docker compose images
+
+# 检查docker-compose.yaml语法是否正确
+docker compose config -q
+# 如果有错，会报错
+```
+
+### Docker Compose使用
+
+详情查看`Docker_Compose.md`
+
+## Docker仓库管理
+
+### 利用github项目来使用CICD技术自动将镜像下载到阿里云
+```shell
+项目名称：docker_image_pusher
+
+# 该项目下有个images.txt的文件
+将你想要的镜像编辑到该文件下，会自动将上面写的镜像pull到aliyun中 # 这里要进行配置一些环境变量，关于阿里云账号等信息的，否则没有权限上传到阿里云
+
+# B站有详细的配置流程
+```
+
+### Docker harbor
+
+- vmware 官方开源服务：https://vmware.github.io/
+- harbor 官方github地址：https://github.com/vmware/harbor
+- harbor 官方网站：https://goharbor.io
+- harbor 官方文档：https://goharbor.io/docs/
+
+### Harbor组成
+
+```shell
+# Harbor是由很多容器组成实现完整的功能
+```
+
+### Harbor安装（虚拟机内存至少4G以上）
+
+- 前置要求：安装docker,docker compose
+```shell
+# 下载harbor安装包并解压缩
+wget https://mirror.ghprowget https://mirror.ghproxy.com/https://github.com/goharbor/harbor/releases/download/v2.11.0/harbor-offline-installer-v2.11.0.tgz
+
+# 解压缩
+mkdir /apps
+tar xvf harbor-offline-install-v1.7.6.tgz -C /apps/
+```
+
+
+
