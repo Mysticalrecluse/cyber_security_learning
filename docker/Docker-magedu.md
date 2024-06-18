@@ -1127,18 +1127,38 @@ ethtool -S <网卡名>
 ethtool -i <网卡名>
 ```
 
-禁止容器间通讯
+### 禁止容器间通讯
 ```shell
---icc=false
+# dockerd的 --icc=false 选项可以禁止同一个宿主机的不同容器间通信
+vim /lib/sysgtemd/system/docker.service
+ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd.sock --icc=false
+# 重启服务
+systemctl daemon-reload
+systemctl restart docker
+
+# 此后创建的容器间无法通信
+# 本质上是修改了iptables规则
+# -A FORWARD -i docker0 -o docker0 -j ACCEPT修改为DROP
 ```
 
 ### 更改容器默认docker网桥的网络配置
+默认docker后会自动生成一个docker0的网桥，使用的IP是172.17.0.1/16，可能和宿主机的网段发生冲突，可以将其修改为其他网段的地址，避免冲突
 ```shell
-# --bip
+# 方法1
 vim /etc/docker/daemon.json
 {
   "bip": "192.168.100.1/24"
 }
+
+systemctl restart docker.service
+
+# 方法2
+vim /lib/systemd/system/docker.service
+ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --bip=192.168.100.1/24
+systemctl daemon-reload
+systemctl restart docker.service
+
+# 注意两种方法不可混用，否则将无法启动docker服务
 ```
 
 ### 自定义网桥
@@ -1161,8 +1181,28 @@ systemctl restart docker
 ```
 
 ### 容器名称互联
+新建容器时，docker会自动分配容器名称，容器ID和IP地址，导致容器名称，容器ID和容器IP都不固定，那么如何区分不同的容器，实现和确定的目标容器的通信？
+解决方案：给容器起个固定的名字，容器之间通过固定名称实现确定目标的通信
+
+#### 容器名称实现
+`docker run`创建容器，可使用--link选项实现容器名的引用，其本质就是在容器内的/etc/hosts中添加--link后指定的容器的IP和主机名的对应关系，从而实现名称解析
 ```shell
 # --link list
+# 格式
+docker run --name <容器名称>                   # 先创建指定名称的容器
+docker run --link <目标通信的容器ID或容器名>    # 再创建容器时引用上面容器的名称 
+```
+
+#### 容器别名
+自定义的容器名称可能后期会发生变化，那么一旦名称发生变化，容器内程序之间也必须要随之改变，比如：程序通过固定的容器名称进行服务调用，但是容器名称发生变化之后再使用之前的名称肯定无法调用成功，每次都进行更改又比较麻烦，因此可以使用自定义别名的方式解决，即容器名称可以随意更改，只要不能改别名即可
+
+```shell
+docker run -d --name mysql -e MYSQL_ROOT_PASSWORD=123456 -e MYSQL_DATABASE=wordpress -e MYSQL_USER=wordpress -e MYSQL_PASSWORD=123456 mysql:8.0.29-oracle
+
+# 方式1
+docker run -p 80:80 --name wordpress --link mysql -d wordpress:php8.2-apache
+# 方式2
+docker run -p 80:80 --name wordpress --link mysql:mysql123  -e WORDPRESS_DB_HOST=mysql123 -e WORDPRESS_DB_NAME=wordpress -e WORDPRESS_DB_USER=wordpress -e WORDPRESS_DB_PASSWORD=123456  -d wordpress:php8.2-apache
 ```
 
 ## 网络模型
@@ -1198,14 +1238,57 @@ docker run --network host
 docker run --network container:<依附的容器>
 ```
 
-### 自定义网路
+### 自定义网路 Network Name
 ```shell
 docker network create -d<mode> --subnet<CIDR> --gateway<网关> 自定义网名
+# 这里网关实际就是网桥的ip
 # -d默认bridge模式
+# 注意mode不支持host和none
+# 示例
+[root@ubuntu2204 ~]#docker network create -d bridge --subnet 172.27.0.0/16 --gateway 172.27.0.1 net1
+3b47ed4b6b8315ebc2ee2a13cc503b497394e899c014bbb2a2f4e68dada10089
+[root@ubuntu2204 ~]#docker network ls
+NETWORK ID     NAME      DRIVER    SCOPE
+78d56445a976   bridge    bridge    local
+e2ed4b9c13ec   host      host      local
+3b47ed4b6b83   net1      bridge    local
+ceb31d2b93b7   none      null      local
 
 # 查看网络
 docker network ls
 
+# 查看自定义网络信息
+docker network inspect <自定义网路名称或网络ID>
+
+# 引用自定义网络
+docker run --network <自定义网络名称> <镜像名称>
+docker run --net <自定义网路名称> --ip <指定静态ip> <镜像名称>
+
+# 删除自定义网络
+docker network rm <自定义网络名称或网络ID>
+
+# 内置网路，比如：host,none,bridge无法删除
+
 # 将容器加入指定网路
 docker network connect <网络> <容器名>
+# 本质上是添加一个新网卡，分配了新加入网路的同网段IP
+```
+
+## Docker Compose容器单机编排
+
+### 安装Docker Compose
+
+新版不需要安装，直接以子命令的模式就有，只有旧版本需要安装
+
+#### 通过Compose plugin形式安装
+即通过docker内置子命令实现，此方式无需专门安装独立的docker-compose工具
+- 注意：此方式需要配置官方仓库才支持，Ubuntu内置仓库没有此插件包
+```shell
+# 先安装旧版的docker
+apt update && apt install docker.io # ubuntu默认24.0.7，该版本没有compose的子命令
+
+# 安装compose plugin需要先配置docker仓库
+apt update
+apt -y install apt-transport-https ca-certificates curl software-properties-common
+
 ```
