@@ -1307,7 +1307,7 @@ apt install docker-compose
 
 # 下载新版
 # 国内加速 https://mirror.ghproxy.com/<github资源链接>
-wget https://mirror.ghproxy.com/https://github.com/docker/compose/release/download/v2.27.1/docker-compose-linux-x86_64
+wget https://mirrors.ghproxy.com/https://github.com/docker/compose/release/download/v2.27.1/docker-compose-linux-x86_64
 # 下载的直接就是二进制静态编译的文件，可以直接加执行权限使用
 # 加入环境变量
 mv docker-compose-linux-x86_64 /usr/local/bin/docker-compose
@@ -1384,5 +1384,62 @@ mkdir /apps
 tar xvf harbor-offline-install-v1.7.6.tgz -C /apps/
 ```
 
+### 创建账号
+系统管理 ---> 用户管理 ---> 创建用户
+
+### 将项目授权给用户
+项目 ---> 具体项目 ---> 成员
+
+### 上传镜像
+```shell
+# 默认向官网推镜像
+docker push mysql:8.0.29-oracle
+
+# 向指定仓储（自建仓库）推镜像
+# 第一步：更改镜像名
+docker tag mysql:8.0.29-oracle 10.0.0.206/example/mysql:8.0.29-oracle
+# 直接推会报错，需要解决两个问题
+# 1. docker默认推https协议，我们之开启了80端口
+# 解决方案：将仓库地址加入不信任列表/etc/docker/daemon.json
+{
+  "insecure-registries": ["harbor.wang.org","172.18.0.253","harbor.magedu.org","10.0.0.206"]
+}
+# 2. 需要认证登录才能上传
+docker login 10.0.0.206 -u zhangyifeng -p Zyf646130..
+
+# 上面两个问题解决，即可成功上传镜像
+docker push 10.0.0.206/example/mysql:8.0.29-oracle
+```
+
+### 扩展：harbor仓库的目录结构
+```shell
+[root@ubuntu2204 apps]#cd /data/harbor/
+[root@ubuntu2204 harbor]#ls
+ca_download  database  job_logs  redis  registry  secret
+```
+
+## Harbor仓库的高可用
+### 使用NFS服务器实现（存在NFS服务器单点问题）
+两台Harbor仓库，共用NFS服务器的数据
 
 
+### 使用数据实时同步（rsync）实现
+
+
+### 使用官方解决方案（双向复制）
+
+当前两台harbor，IP分别是10.0.0.206和10.0.0.208
+先将10.0.0.206的仓库作为源，向10.0.0.208进行同步
+
+实现步骤：
+- 先在10.0.0.206即源仓库进行操作
+- 仓库管理 ---> 新建目标 （配好目标后）
+- 复制管理 ---> 新建规则
+- 建好规则后，第一次手动点击复制触发
+
+
+然后反向再做一次，即可实现双向复制
+
+![alt text](images/image9.png)
+
+其他的比较简单，这里不做图例
