@@ -9397,27 +9397,27 @@ mkdir /etc/mastermha
 vim /etc/mastermha/app1.cnf
 
 [server default]
-user=mhauser
-password=123456
-manager_workdir=/data/mastermha/app1/
-manager_log=/data/mastermha/app1/manager.log
-remote_workdir=/data/mastermha/app1/
-ssh_user=root
-repl_user=repluser
-repl_password=123456
-ping_interval=1
-master_ip_failover_script=/usr/local/bin/master_ip_failover
-report_script=/usr/local/bin/sendmail.sh
-check_repl_delay=0
-master_binlog_dir=/data/mysql/logbin/
+user=mhauser                                                  # mba-manager节点连接远程mysql使用的账户，需要有管理员的权限
+password=123456                                               # mha-manager节点连接远程mysql使用的账户密码
+manager_workdir=/data/mastermha/app1/                         # mha-manager对于当前集群的工作目录
+manager_log=/data/mastermha/app1/manager.log                  # mha-manager对于当前集群的日志
+remote_workdir=/data/mastermha/app1/                          # mysql节点mha工作目录，会自动创建
+ssh_user=root                                                 # 各节点间的SSH连接账号，提前做好基于key的登录验证，用于访问二进制
+repl_user=repluser                                            # mysql节点主从复制用户名
+repl_password=123456                                          # mysql节点主从复制密码
+ping_interval=1                                               # mha-manager节点对于master节点的心跳检测时间间隔
+master_ip_failover_script=/usr/local/bin/master_ip_failover   # 切换VIP的perl脚本，不支持跨网络，也可用keepalived实现
+report_script=/usr/local/bin/sendmail.sh                      # 发送告警信息脚本
+check_repl_delay=0                                            # 默认值为1，表示如果slave中从库落后主库relaylog超过100M，主库不会选择这个从库作为新的master
+master_binlog_dir=/data/mysql/logbin/                         # 指定二进制日志存放的目录，mha4mysql-manager-0.58必须指定，之前版本不需要指定
 
 [server1]
 hostname=10.0.0.8
-candidate_master=1
+candidate_master=1                                            # 优先候选master，即使不是集群中事件最新的slave，也会优先当master
 
 [server2]
 hostname=10.0.0.18
-candidate_master=1
+candidate_master=1                                            # 优先候选master，即使不是集群中事件最新的slave，也会优先当master
 
 [server3]
 hostname=10.0.0.28
@@ -9427,6 +9427,290 @@ hostname=10.0.0.28
 - 如果所有slave节点的日志都相同，则默认会以配置文件的顺序选择一个slave节点提升为master节点
 - 如果slave节点上的日志不一致，则会选择数据量最接近master节点的slave节点，将其提升为master节点
 - 如果对某个slave节点设置权重(candidate_master=1)，权重节点优先选择，但是此节点日志量落后于master节点超过100M时，也不会选择，可以配合check_repl_delay=0,关闭日志量的检查，强制选择候选节点
+
+#### 配置相关脚本
+```shell
+# 告警消息脚本
+vim /usr/local/bin/sendmail.sh
+
+#!/bin/bash
+echo 'MHA is failover!' | mail -s 'MHA Warning' 15104600741@163.com
+
+# 脚本添加执行条件
+chmod a+x /usr/local/bin/sendmail.sh
+
+# 下载邮件服务
+yum install mailx postfix
+
+# 邮件服务配置
+vim /etc/mail.rc
+
+# 加在下面
+set from=15104600741@163.com                # 发件箱
+set smtp=smtp.163.com                       # smtp服务器
+set smtp-auth-user=15104600741@163.com      # 发件人
+set smtp-auth-password=aaaaaaaaa            # 授权码
+set smtp-auth=login
+set ssl-verifv=ignore
+
+# 重启服务
+systemctl restart postfix.service
+
+# 测试告警邮件
+./sendmail.sh
+```
+
+切换VIP的perl脚本
+```shell
+vim /usr/local/bin/master_ip_failover
+
+#!/usr/bin/env perl
+
+use strict;
+use warnings FATAL => 'all';
+
+use Getopt::Long;
+use MHA::DBHelper;
+
+my (
+  $command,        $ssh_user,         $orig_master_host,
+  $orig_master_ip, $orig_master_port, $new_master_host,
+  $new_master_ip,  $new_master_port,  $new_master_user,
+  $new_master_password
+);
+
+my $vip = '10.0.0.100/24';
+my $key = "1";
+my $ssh_start_vip = "/sbin/ifconfig eth0:$key $vip";
+my $ssh_stop_vip = "/sbin/ifconfig eth0:$key down";
+
+GetOptions(
+  'command=s'              => \$command,
+  'ssh_user=s'             => \$ssh_user,
+  'orig_master_host=s'     => \$orig_master_host,
+  'orig_master_ip=s'       => \$orig_master_ip,
+  'orig_master_port=i'     => \$orig_master_port,
+  'new_master_host=s'      => \$new_master_host, 
+  'new_master_ip=s'        => \$new_master_ip,
+  'new_master_port=i'      => \$new_master_port,
+  'new_master_user=s'      => \$new_master_user,
+  'new_master_password=s'  => \$new_master_password,
+);
+
+exit &main();
+
+sub main {
+  my $exit_code = 1;  # Default to failure
+
+  if ( $command eq "stop" || $command eq "stopssh" ) {
+    eval {
+      # updating global catalog, etc
+      $exit_code = 0;
+    };
+    if ($@) {
+      warn "Got Error: $@\n";
+    }
+  }
+  elsif ( $command eq "start" ) {
+    eval {
+      print "Enabling the VIP - $vip on the new master - $new_master_host \n";
+      &start_vip();
+      &stop_vip();
+      $exit_code = 0;
+    };
+    if ($@) {
+      warn $@;
+    }
+  }
+  elsif ( $command eq "status" ) {
+    print "Checking the Status of the script.. OK \n";
+    `ssh $ssh_user\@$orig_master_host \"$ssh_start_vip\"`;
+    $exit_code = 0;
+  }
+  else {
+    &usage();
+  }
+  
+  exit $exit_code;
+}
+
+sub start_vip {
+ `ssh $ssh_user\@$new_master_host \"$ssh_start_vip\"`;
+}
+
+# A simple system call that disables the VIP on the old master 
+sub stop_vip {
+ `ssh $ssh_user\@$orig_master_host \"$ssh_stop_vip\"`;
+}
+
+sub usage {
+  print
+  "Usage: master_ip_failover --command=start|stop|stopssh|status --orig_master_host=host --orig_master_ip=ip --orig_master_port=port --new_master_host=host --new_master_ip=ip --new_master_port=port\n";
+}
+
+
+# 添加执行权限
+chmod a+x /usr/local/bin/master_ip_failover
+```
+
+在master配置VIP，此IP会在不同的Mysql节点上漂移
+```shell
+ifconfig eth0:1 10.0.0.8/24
+
+# 查看
+ifconfig eth0:1
+```
+
+配置MySQL节点
+```shell
+# master 节点配置
+yum install -y mysql-server
+
+vim /etc/my.cnf
+
+[mysqld]
+server-id=8
+log-bin=/data/mysql/logbin/mysql-bin
+
+# 创建存放二进制日志的文件目录 
+mkdir -pv /data/mysql/logbin/
+chown -R mysql.mysql /data/mysql
+systemctl start mysqld
+```
+
+slave-1配置
+```shell
+[root@slave-1 ~]# yum install -y mysql-server
+[root@slave-1 ~]# vim /etc/my.cnf
+......
+[mysqld]
+server-id=18
+log-bin=/data/mysql/logbin/mysql-bin
+read-only
+[root@slave-1 ~]# mkdir -pv /data/mysql/logbin/
+[root@slave-1 ~]# chown -R mysql.mysql /data/mysql
+[root@slave-1 ~]# systemctl start mysqld.service
+```
+
+slave-2配置
+```shell
+#slave-2 节点配置
+[root@slave-2 ~]# yum install -y mysql-server
+ root@slave-2 ~]# vim /etc/my.cnf
+......
+[mysqld]
+server-id=186
+log-bin=/data/mysql/logbin/mysql-bin
+read-only
+[root@slave-2 ~]# mkdir -pv /data/mysql/logbin/
+[root@slave-2 ~]# chown -R mysql.mysql /data/mysql
+[root@slave-2 ~]# systemctl start mysqld.service
+```
+
+配置主从
+```shell
+# 节点查看
+mysql> show master logs;
++------------------+-----------+-----------+
+| Log_name         | File_size | Encrypted |
++------------------+-----------+-----------+
+| mysql-bin.000001 |       180 | No        |
+| mysql-bin.000002 |       157 | No        |
++------------------+-----------+-----------+
+2 rows in set (0.01 sec)
+
+# 创建主从同步账号并授权
+create user repluser@'10.0.0.%' identified by '123456';
+grant replication slave on *.* to repluser@'10.0.0.%';
+
+# 创建mha-manager使用的账号并授权
+create user mhauser@'10.0.0.%' identified by '123456';
+grant all on *.* to mhauser@'10.0.0.%';
+
+# slave-1节点配置主从
+CHANGE MASTER TO
+MASTER_HOST='10.0.0.8',
+MASTER_USER='repluser',
+MASTER_PASSWORD='123456',
+MASTER_LOG_FILE='mysql-bin.000002',
+MASTER_LOG_POS=157;
+
+# 开启slave
+start slave
+show slave status\G
+
+# slave-2节点配置主从
+CHANGE MASTER TO
+MASTER_HOST='10.0.0.8',
+MASTER_USER='repluser',
+MASTER_PASSWORD='123456',
+MASTER_LOG_FILE='mysql-bin.000002',
+MASTER_LOG_POS=157
+
+# 开启slave
+start slave
+show slave status\G
+```
+
+mha-manager节点上检查环境
+```shell
+# 配置和ssh连接检查
+vim /etc/mastermha/app1.cnf
+
+# 主从复制检查，会在mysql节点自动创建remote_workdir=/data/mastermha/app1/
+masterha_check_repl --conf=/etc/mastermha/app1.cnf
+
+# 查看当前mysql集群状态
+[root@localhost /usr/local/bin] $masterha_check_status --conf=/etc/mastermha/app1.cnf
+app1 is stopped(2:NOT_RUNNING).
+```
+
+在mha-manager节点上启动集群
+```shell
+# 生产环境放在后台执行，并且与终端分离
+nohup masterha_manager --conf=/etc/mastermha/app1.cnf --remove_dead_master_conf --ignore_last_failover &> /dev/null
+
+# 如果想停止后台的manager,使用此命令
+masterha_stop --conf=/etc/mastermha/app1.cnf
+
+# 启动
+masterha_manager --conf=/etc/mastermha/app1.cnf --remove_dead_master_conf --ignore_last_failover
+
+# 查看生产文件
+[root@localhost ~] $tree /data/mastermha/app1/
+/data/mastermha/app1/
+├── app1.master_status.health
+└── manager.log
+
+# 查看日志
+[root@localhost ~] $cat /data/mastermha/app1/app1.master_status.health 
+5051    0:PING_OK       master:10.0.0.8
+```
+
+在MySQL的master节点上查看mha-manager发送的心跳查询
+```shell
+# 开启master节点通用日志
+set global general_log=1;
+# 每秒检测一次活动状态，间隔时长实在配置文件中指定的
+[root@localhost /var/lib/mysql] $ tail -f localhost.log 
+2024-06-19T19:36:24.477776Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:25.478772Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:26.478866Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:27.480030Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:28.480250Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:29.482375Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:30.483061Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:31.484677Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:32.485453Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:33.486232Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:34.486836Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:35.487872Z        48 Query     SELECT 1 As Value
+2024-06-19T19:36:36.488944Z        48 Query     SELECT 1 As Value
+```
+
+停止主节点的服务,vip飘到了新的slave上，并且该slave升级为master，和另一个slave组成新的主从，并且向邮箱发出告警信息
+
+将源master修复后，将其作为slave挂在新的master上，并重新配置mha即可
 
 # 锁
 
