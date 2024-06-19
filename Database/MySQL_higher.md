@@ -9712,6 +9712,25 @@ set global general_log=1;
 
 将源master修复后，将其作为slave挂在新的master上，并重新配置mha即可
 
+#### 说明
+- 当master节点宕机，mha-manager节点上的masterha_manager程序会退出
+- 经过手动处理，原来的master节点上线后，应该将节点设置成slave节点，让其从新的节点处同步数据
+- 对于前端用户来讲，此过程是无感知的，因为前端用户是通过连接VIP操作数据的，而VIP一直可用，只是转移到另一台服务器上
+- MHA只能解决一次master节点故障，VIP只能飘一次，再次启动之前，需要删除相关文件，否则无法工作
+```shell
+cat /etc/mastermha/app1.cnf
+...
+
+manager_workdir=/data/mastermha/app1/
+manager_log=/data/mastermha/manager.log
+remote_workdir=/data/mastermha/app1/
+
+# MHA再次使用之前，需要先删除manager_workdir指向的目录和remote_workdir指向的目录
+# manager_workdir，指向的目录在mha-manager节点上
+# remote_workdir，指向的目录在mysql节点上
+```
+
+
 # 锁
 
 事务的隔离性由锁实现
