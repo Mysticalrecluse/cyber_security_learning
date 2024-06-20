@@ -8371,7 +8371,7 @@ systemctl restart mysqld
 
 复制过滤可能会出现跨库时同步失败的问题，设置过滤规则一定要考虑业务，防止连表，垮裤操作失败，要把业务覆盖全
 
-### GTID复制
+### GTID复制（高并发场景）
 
 GTID(global transaction ID)：全局事务ID
 
@@ -9729,6 +9729,252 @@ remote_workdir=/data/mastermha/app1/
 # manager_workdir，指向的目录在mha-manager节点上
 # remote_workdir，指向的目录在mysql节点上
 ```
+
+### Galera Cluster（高可用解决方案）
+
+Galera Cluster: 集成了Galera插件的MySQL集群，是一种新型的数据不共享的，高度冗余的高可用方案，目前Galera Cluster有两个版本，分别是percona Xtradb Cluster及MariaDB Cluster，Galera本身是具有多主特性的，即采用multi-master的集群架构，是一个既稳健，又在数据一致性，完整性及高性能方面有出色表现的高可用解决方案
+
+```shell
+# 自我解析
+Galera Cluster 是底层的同步复制协议和库，提供同步多主复制的基础功能。
+```
+
+#### Galera Cluter复制工作原理
+
+Galera复制是一种基于验证的复制，基于验证的复制使用组通信和事务排序技术实现同步复制。它通过广播并发事务之间建立的全局总序来协调事务提交。
+
+简单说就是事务必须以相同的顺序应用于所有实例。事务在本节点`乐观执行`，然后在提交时运行一个验证过程以保证全局数据一致性。
+
+所谓乐观执行是指：事务在一个节点提交时，被认为与其他节点上的事务没有冲突，首先在本地执行，然后再发送到所有节点做冲突检测，无冲突时在所有节点提交，否则所有节点回滚
+
+如果操作同时符合以下三个条件，则会认为此次提交存在冲突（验证失败）
+- 两个事务来源于不同节点
+- 两个事务包含相同的主键
+- 老事务对新事务不可见，即老事务未提交完成。新老事务的划定依赖于全局事务总序，即GTID
+
+#### Galera Cluter官方文档
+```shell
+http://galeracluster.com/documentation-webpages/galera-documentation.pdf
+http://galeracluster.com/documentation-webpages/index.html
+https://www.percona.com/doc/percona-xtradb-cluster/LATEST/index.html
+https://mariadb.com/kb/en/library/getting-started-with-mariadb-galera-cluster/
+```
+
+#### Galera Cluster组件
+- Galera replication library(galera-3)
+- WSREP: MySQL extended with the Write Set Replication
+
+#### WSREP实现
+- PXC: Percona XtraDB Cluster，是Percona对Galera的实现
+- MariaDB Galera Cluster
+```shell
+#pxc 国内源
+https://mirrors.tuna.tsinghua.edu.cn/percona/release/$releasever/RPMS/$basearch
+```
+
+注意：两者都需要至少三个节点，不能安装mysql server或MariaDB-server
+
+
+#### Galera Cluster特点
+- 多主架构：真正的多点读写的集群，在任何时候读写数据，都是最新的
+- 同步复制：改善了主从复制延迟问题，基本上达到了实时同步
+- 并发复制：从节点APPLY数据时，支持并行执行，更好的性能
+- 故障切换：在出现数据库故障时，因支持多点写入，切换容器
+- 热插拔：在服务期间，如果数据库挂了，只要监控程序发现的够快，不可服务时间就非常少，在节点故障期间，节点本身对集群的影响非常小
+- 自动节点克隆：在新增节点，或者停机维护时，增量数据或者基础数据不需要人工手动备份提供，Galera Cluster会自动拉取在线节点数据，最终集群会变为一致
+- 对应用透明，集群的维护，对应用程序是透明的
+
+#### Galera Cluster和PXC的关系
+
+可以想象成`Galera Cluster`是一种“引擎”，而PXC则是一个集成了这种引擎的“汽车”。Galera提供了核心的同步复制功能，而PXC则集成了Galera，并添加了更多的功能，使得它更容易管理和使用
+
+
+
+### Percona XtraDB Cluster (PXC)
+Percona XtraDB Cluster (PXC) 是一种数据库集群解决方案，它是基于 MySQL 的 Percona Server 以及 Galera Cluster 实现的。PXC 提供了以下功能：
+
+- 基于 Percona Server: PXC 使用 Percona Server for MySQL，这是一种增强版的 MySQL，提供了更多的功能和优化。
+- 集成 Galera: PXC 集成了 Galera Cluster 进行同步多主复制，实现高可用性和一致性。
+- 自动化: 提供了自动化配置和管理工具，使集群管理更加简便。
+- 额外的工具和支持: 提供了监控、备份和其他管理工具，以及企业级支持
+
+### PXC原理
+
+PXC最常使用如下4个端口号
+- 3306：数据库对外服务的端口号
+- 4444：请求SST的端口号
+- 4567：组成员之间进行沟通的端口号
+- 4568：用于传输IST的端口号
+
+### PXC中涉及到的重要核心概念和参数
+
+#### 集群中节点的数量（涉及选举概念）
+
+整个集群中节点数量应该控制在最少3个，最多8个的范围内。最少3个节点是为了防止出现脑裂现象，因为只有在2个节点下才会出现的现象。脑裂现象的标志就是输入任何命令，返回的结果都是`unknown command`。节点在集群中，会因新节点的加入或故障，同步失效等原因发生状态得切换
+
+#### 节点状态的变化
+
+![alt text](images/image47.png)
+
+- open: 节点启动成功，尝试连接到集群时的状态
+- primary：节点已处于集群中，在新节点加入并选取donor进行数据同步时的状态
+- joiner：节点处于等待接收同步文件时的状态
+- joined：节点完成数据同步工作，尝试保持和集群进度一致时的状态
+- synced：节点正常提供服务时的状态，表示已经同步完成并和集群进度保持一致
+- donor：节点处于为新加入的节点提供全量数据时的状态
+
+备注：donor节点就是数据的贡献者，如果一个新节点加入集群，此时又需要大量数据的SST数据传输，就有可能因此而拖垮整个集群的性能，所以在生产环境中，如果数据量较小，还可以使用SST全量数据传输，但如果数据量很大就不建议使用这种方式，可以考虑先建立主从关系，然后再加入集群
+
+#### 节点的数据传输方式
+- SST：State Snapshot Transfer 全量数据传输
+- IST：Increment State Transfer 增量数据传输
+
+SST数据传输有xtrabackup、mysqldump和rsync三种方式，而增量数据传输就只有一种方式xtrabackup，但生产环境中一般数据量较小时，可以使用SST全量数据传输，但也只使用xtrabackup方法。
+
+#### GCache模块
+
+在PXC中一个特别重要的模块，它的核心功能就是为每个节点缓存当前最新的写集。如果有新节点加入进来，就可以把新数据的增量传递给新节点，而不需要再使用SST传输方式，这样可以让节点更快地加入集群中，涉及参数如下：
+- gcache.size: 缓存写集增量信息的大小，它的默认大小是128MB，通过wsrep_provider_options参数设置，建议调整为2GB~4GB范围，足够的空间便于缓存更多的增量信息
+- gcache.mem.size: GCache中内存缓存的大小，适度调大可以提高整个集群的性能
+- gcache.page_size: 如果内存不够用（GCache不足），就直接将写集写入磁盘文件
+
+### PXC实现
+
+#### 主机清单
+- 主机IP：10.0.0.151
+  - 角色：node-1
+  - PXC版本：Percona-XtraDB-Cluster-8
+- 主机IP：10.0.0.152
+  - 角色：node-2
+  - PXC版本：Percona-XtraDB-Cluster-8
+- 主机IP：10.0.0.153
+  - 角色：node-2
+  - PXC版本：Percona-XtraDB-Cluster-8
+
+
+#### 前置工作
+
+Percona XtraDB是一种特殊形态的MySQL数据库，与MySQL官方的发行版及MariaDB是两种不同的产品，要求安装节点上没有MySQL和MariaDB。另外提前关闭Selinux，关闭防火墙，保证时间同步
+
+#### 安装软件，三个节点都要执行安装操作
+```shell
+# 配置源并安装
+yum install https://repo.percona.com/yum/percona-release-latest.noarch.rpm -y
+percona-release setup pxc-80 -y   # 源的初始化动作
+yum install percona-xtradb-cluster -y
+
+# 查看安装包
+yum list percona-xtradb* --installed
+
+# server包配置文件
+rpm -qc percona-xtradb-cluster-server
+
+# 查看安装包
+yum list percona-xtradb* --installed
+
+# server 包配置工作
+rpm -qc percona-xtradb-cluster-server
+/etc/logrotate.d/mysql
+/etc/my.cnf
+/etc/sysconfig/mysql.bootstrap
+
+# 修改配置，每个节点都要修改
+cat /etc/my.cnf
+
+[client]
+socket=/var/lib/mysql/mysql.sock
+
+[mysqld]
+server-id=151   # 指定server-id
+...
+wsrep_cluster_address=gcomm://10.0.0.151,10.0.0.152,10.0.0.153
+# 集群中所有节点都写在这里
+...
+wsrep_node_address=10.0.0.151  # 当前节点IP，每个节点唯一
+wserp_cluster_name=m58-pxc-cluster # 集群名称，这里随便写
+wsrep_node_name=pxc-cluster-node-1   # 当前节点名称，每个节点唯一
+...
+pxc-encrypt-cluster-traffic=OFF   # 不使用加密传输，手动添加
+```
+
+尽管Galera Cluster不再需要通过binlog的形式进行同步，但还是建议在配置文件中开启二进制日志功能，原因是后期如果有新节点需要加入，旧的节点通过SST全量传输的方式向新节点传输数据，很可能会拖垮集群性能，所以让新节点先通过binlog方式完成同步后再加入集群会是一种更好的选择
+
+#### 扩展：加密数据传输
+```shell
+# 如果启动加密数据传输，则要保证每个节点的公私密钥对和CA证书保持一致，且mysqld和sst处都要配置
+[mysqld]
+wsrep_provider_options="socket.ssl_key"=server-key.pem;socket.ssl_cert=server-cert.pem;socket.ssl_ca=ca.pem"
+
+[sst]
+encrypt=4
+ssl-key=server-key.pem
+ssl-ca=ca.pem
+ssl-cert=server-cert.pem
+```
+
+#### 启动node-1
+```shell
+# 启动第一个节点，集群中的任意一个节点都可以最先启动
+systemctl start mysql@bootstrap.service
+
+# 查看端口，3360,33060,4567
+
+# 查找初始用户名和密码进行连接
+cat /var/log/mysqld.log|grep password
+
+# 使用该密码客户端连接
+mysql -uroot -p'XXXX'
+
+# 当前无任何权限，要先修改密码
+alter user root@'localhost' identified by '123456';
+
+# 查看相关变量
+SHOW VARIABLES LIKE 'wsrep%'\G
+
+# 集群状态
+SHOW STATUS LIKE 'wsrep%';
+```
+
+
+#### 启动后续节点
+
+启动后续节点，只要启动成功，pxc-1的数据会自动同步过来
+```shell
+systemctl start mysql      # node-2
+mysql -uroot -p'123456'    # 使用node-1中的用户名和密码连接
+
+# node-3同上
+
+# 在任意节点查询此变量，值为当前集群中的节点数
+SHOW STATUS LIKE 'wsrep_cluster_size';
+```
+
+#### 往PXC集群中加入新节点
+```shell
+# 前置条件，待加入集群的机器，已完成了前置操作，安装了相同版本的PXC
+# 将其他节点的/etc/my.cnf文件拷贝到新节点进行修改
+
+# 修改配置项，在当前节点修改配置，其他节点不用修改，但为了保证后续重启等操作，将每个节点中的wsrep_cluster_address都进行修改
+
+# 启动
+systemctl start mysql
+```
+
+一个节点加入到Galera集群有两种情况，新节点加入集群，暂时离组的成员再次加入集群
+
+#### 新节点加入Galera集群
+
+新节点加入集群时，需要当前集群中选择一个Donor节点来同步数据，也就是所谓的stat_snapshot_tranfer(SST)过程。SST同步数据的方式由选项wsrep_sst_method决定，一般选择的是xtrabackup
+
+必须注意，新节点加入Galera时，会删除新节点上所有已有数据，在通过xtrabackup(假设使用的是该方式)从Donor处完整备份所有数据进行恢复，所以，如果数据量很大，新节点加入过程会很慢。而且，在一个新节点成为synced之前，不要同时加入其他新节点，否则很容易将集群压垮。如果这种情况，可以考虑使用`wsrep_sst_method=rsync`来做增量同步，既然是增量同步，最好保证新节点上已经有一部分数据基础，否则和全量同步没什么区别，且这样会对Donor节点机上全局readonly锁
+
+#### 旧节点加入Galera群
+
+如果旧节点加入Galera集群，说明这个节点在之前已经在Galera集群中呆过，有一部分数据基础，缺少的只是它离开集群时的数据。这时加入集群时，会采用IST(incremental snapshot transfer)传输机制，即增量传输。
+
+但注意，这部分增量传输的数据源是Donor上缓存在GCache文件中的，这个文件有大小限制，如果缺失的数据范围超过已缓存的内容，则自动转为SST传输。如果旧节点上的数据和Donor上的数据不匹配 (例如这个节点离组后人为修改了一点数据)，则自动转为SST传输。
+
+在除第一个节点离线之外，其他节点离线直接使用systemctl start mysql恢复即可
 
 
 # 锁
