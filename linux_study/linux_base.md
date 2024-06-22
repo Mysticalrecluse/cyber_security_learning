@@ -18303,6 +18303,20 @@ icmp协议的扩展选项
 iptable -A INPUT -s 10.0.0.150 -p icmp --icmp-type 8 -j REJECT]
 ```
 
+#### 扩展：基于协议的扩展选项总结
+```shell
+# 1. tcp协议扩展选项
+-p tcp --sport port[:port]   # port:port表范围，示例：21:23，表示21,22,23
+-p tcp --dport port[:port]
+-p tcp -m multiport --sports|--dports num,num...   # 同时指定离散的端口
+## 示例
+iptables -A INPUT -p tcp -m multiport --dports 21,23 -j REJECT
+
+-p tcp --tcp-flags SYN,ACK,FIN,RST [SYN,ACK,FIN,RST]  # 如果相应标志位是1，则在后面写标志位名称
+## 示例
+iptables -t filter -A INPUT -s 10.0.0.150 -d 10.0.0.110 -p tcp --tcp-flags SYN,ACK,FIN,RST SYN -j REJECT  # --tcp-flags SYN,ACK,FIN,RST SYN表示第一次握手
+```
+
 #### 显示扩展及其相关模块
 
 显示扩展即必须使用-m选项指明要调用的扩展模块名称，需要手动加载扩展模块

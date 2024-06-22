@@ -14,13 +14,34 @@
 - Hypertext Transfer Protocol(HTTP)协议
 ![Alt text](images/image02.png)
 
+- a `stateless` application-level `request/response` protocol that uses `extensible semantics` and `self-descriptive` message payloads for flexibale interaction with network-based `hypertext information` systems
+(https://tools.ietf.org/html/rfc7230)
+
+- 推荐书籍
+  - 《HTTPS权威指南》
+  - 《TCP/IP协议详解》
+
+- RFC文档是对所有协议的最权威的定义  
+
 ## 基于ABNF语义定义的HTTP消息格式
+
+- 使用的理由
+  - 根据ABNF语义描述的HTTP是最为严谨的，可以避免工作中的很多问题
 - HTTP协议格式
   - start-line
-  - header-field
+    - request-line
+    - status-line
+  - header
+    - header-field1
+    - header-field2
+    - ...
   - message-body
 
 ![Alt text](images/image17.png)
+
+- ABNF——一种定义语法的元语言，可以防止不同服务器在处理http数据的时候，出现基于具有格式问题导致的解析解结果不同，比如空格和制表符或者其他空白符，短横线和下滑线等等一系列由于不规范导致的问题
+
+- ABNF——常用于定义协议语法
 
 - ABNF (扩充巴克斯-瑙尔范式) 操作符
   - 包含两部分
