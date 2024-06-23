@@ -65,8 +65,10 @@
   ![Alt text](images/image18.png)
 
 - 基于ABNF描述的HTTP协议格式
-```ABNF
+```shell
+# HTTP完整格式
 HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
+# 详细解读
   start-line = request-line/status-line
     request-line = method SP request-target SP HTTP-version CRLF
     status-line = HTTP-version SP status-code SP reason-phrase CRLF
@@ -78,6 +80,28 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
 ```
 - 可以通过telnet进行对指定网站发送请求，收到响应值
   - 响应信息无法观看隐藏字符，隐藏字符可以通过wireshark进行观测
+  ```shell
+  [root@ubuntu2204 ~]#telnet www.feng.org 80
+  Trying 10.0.0.200...
+  Connected to www.feng.org.
+  Escape character is '^]'.
+  GET / HTTP/1.1
+  Host: www.feng.org
+
+  HTTP/1.1 200 OK
+  Server: nginx/1.18.0 (Ubuntu)
+  Date: Sun, 23 Jun 2024 04:06:22 GMT
+  Content-Type: text/html
+  Content-Length: 26
+  Last-Modified: Sun, 23 Jun 2024 04:00:08 GMT
+  Connection: keep-alive
+  ETag: "66779dc8-1a"
+  Accept-Ranges: bytes
+
+  i'm test-10.0.0.200-index
+  ```
+
+![alt text](th_images/image1.png)
 
 ### ABNF（Augmented BNF）官方文档的学习
 - <a href="./ABNF_ietf.org_rfc_rfc5234.txt">官方文档原文</a>
