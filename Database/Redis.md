@@ -170,6 +170,25 @@ redis-cli -a <password>
 
 # 客户端直接访问
 redis-cli a 123456 get class
+
+# 查看redis信息分类
+[root@localhost ~] $ redis-cli -a 123456 info|grep "^#"
+Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe.
+# Server ------------- 服务端有关信息
+# Clients ------------ 客户端有关信息
+# Memory ------------- 内存有关信息
+# Persistence -------- 持久化相关信息
+# Stats -------------- 状态相关信息
+# Replication -------- 复制
+# CPU ---------------- CPU
+# Modules ------------ 模块
+# Errorstats --------- 错误状态
+# Cluster ------------ 集群
+# Keyspace ----------- 数据空间
+
+# 只看部分信息
+redis-cli -a 123456 info <信息类别，比如：server>
+# 可以通过这里的信息，配置zabbix监控项
 ```
 
 ### 程序连接Redis
@@ -258,11 +277,26 @@ bind 0.0.0.0 -::1  # 开启远程监听，默认127.0.0.1仅本地能访问
 pidfile /var/.../*.pid  # 指定pid文件路径
 databases <num>   # 默认16，可以自定义
 tcp-backlog 511   # 指定全连接队列长度
-
-# 和性能相关参数
-maxclients 10000  redis最大连接客户端数量
-
 ```
+
+### Redis配置文件优化（面试）
+- `maxclients 10000` Redis最大连接的客户端数量，默认10000
+   - 生产中可以适当调大，使其支持更多连接
+
+- `maxmemory <bytes>` 最大使用内存数,0表示不限制
+   - 生产中可以限制一下，建议设置成当前物理内存的一半，注意：缓冲区不计算在maxmemory内，生产中如果不设置该项，可能导致OOM
+
+- `memory-policy` 内存使用策略（当达到内存时，Redis如何处理要删除的内容）【面试可能会问】
+   - allkeys-lru：在所有键中使用 LRU（Least Recently Used）算法进行淘汰。
+      - 【使用场景】适用于一般缓存场景，优先淘汰最久未使用的键，确保最近使用的数据保留。
+      - 可以有效利用内存，保持高命中率。
+   - volatile-lru：在设置了过期时间的键中使用 LRU 算法进行淘汰。
+      - 【使用场景】适用于只希望淘汰有过期时间的缓存数据，而保留永久性数据的场景
+      - 能够在有限内存中优先保留永久性数据。
+   - allkeys-lfu:在所有键中使用 LFU（Least Frequently Used）算法进行淘汰。
+      - 【使用场景】适用于热点数据明显的场景，确保高频访问的数据保留
+   - noeviction：当内存使用达到限制时，不会再接受新的写入请求，返回错误。
+      - 【使用场景】适用于需要确保数据不会被自动删除的场景，比如缓存中存储了非常重要且不能丢失的数据。
 
 ## CONFIG命令实现动态修改配置【热加载】
 ### 设置客户端连接密码
@@ -293,6 +327,11 @@ CONFIG get slowlog-log-slower-than
 
 ### 开启慢查询
 ```shell
+# 在配置文件中开启慢查询
+vim /etc/redis.conf
+slowlog-log-slower-than 1    # 指定超过1us的即为慢查询，默认10000un，即10ms
+slowlog-max-len 1024         # 指定只保存最近的1024条慢记录，默认为128
+
 slowlog-max-len # 默认128
 
 # 查看慢查询指令

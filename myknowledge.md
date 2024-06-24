@@ -188,7 +188,29 @@ LVS默认模式
 
 
 # Redis
+## Redis是做什么的，即在哪些场景下使用
+Redis常用的使用场景
+- 缓存RDBMS（Relational Datebase Management System）中数据
+- SESSION共享，实现Web集群中多服务器间的SESSION共享
+- 计数器：商品访问排行榜，浏览数，粉丝数，关注，点赞，评论
+- 社交：朋友圈，共同好友，可能认识他们
+- 地理位置：摇一摇，附近的人，外卖
+- 消息队列：ELK等日志系统缓存，业务的订阅、发布系统
+
+## Redis客户端timeout报错突然增加，排查思路是怎样的
+
+- 首先timeout增加，意味着无法正常与Redis服务端进行通信
+- 先考虑redis上是否发生了阻塞，排队，导致客户端访问超时
 
 ## Redis的持久化方案
 
+
 ## AOF的三种持久化策略
+
+
+## Redis优化
+
+### redis配置文件优化
+- `maxmemory <bytes>` reids使用的最大内存
+
+### 禁用危险命令
