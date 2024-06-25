@@ -484,11 +484,26 @@ aof-load-truncated yes
 #### AOF重写（清理）
 将一些重复的，可以合并的，过期的数据重新写入一个新的AOF文件，从而节约AOF备份占用的硬盘空间，也能加速恢复过程，可以手动执行`bgwriteaof`触发AOF，第一次开启AOF功能，或定义自动rewrite策略
 
-AOF rewrite过程
+#### AOF rewrite过程
 
-父进程生成一个新的子进程负责生成新的AOF文件，同时父进程将新的数据更新同时写入两个缓冲区aof_buf和aof_rewrite_buf
+1. 首先执行指令`bgwriteaof`
+2. 指令发送给父进程
+3. 父进程fork一个子进程
+   - 子进程接受新用户的写入数据到aof_buf缓存中,aof_buf中的数据
+      - 该aof_buf中的数据会写入旧的AOF文件中
+   - 同样的新写入数据再写一份到aof_rewrite_buf
+4. 在fork一个子进程（第二个子进程）
+   - 第二个子进程用来完成新建一个AOF文件，新建的AOF文件中
+   - aof_write_buf中的数据会写入新建的AOF文件中
+5. 新建的AOF文件覆盖掉旧的AOF文件，此时磁盘上保留的就是被整理过的文件
+6. 新建AOF覆盖掉旧AOF文件后，第二次创建的子进程向主进程发一个信号，表明重写结束，销毁子进程
 
-6.X版本之前新的AOF文件覆盖旧的AOF文件
+#### 手动触发AOF
+```shell
+redis-cli -a 123456 bgrewriteof ; pstree -p | grep redis; ll /apps/redis/data/appendondir/
 
-7.X版本之后，新的AOF文件
+vim /apps/redis/etc/redis.conf
+auth-aof-rewrite-percentage 100
+auto-aof-rewrite-min-size 64mb
+```
 
