@@ -199,11 +199,63 @@ Redis常用的使用场景
 
 ## Redis客户端timeout报错突然增加，排查思路是怎样的
 
-- 首先timeout增加，意味着无法正常与Redis服务端进行通信
-- 先考虑redis上是否发生了阻塞，排队，导致客户端访问超时
+1. 检查Redis服务器状态
+   - 检查服务器资源使用率，确保Redis服务器没有因资源不足导致响应缓慢
+   ```shell
+   1. top查看CPU和内存使用情况
+   2. Redis内存使用情况是否超过maxmemory设置
+   3. 查看maxmemory-policy策略，并确定是否发生了内存淘汰
+   redis-cli INFO memory
+   4.看是否有耗时过程的命令造成排队
+        redis-cli INFO commandstats
+        查看慢日志：redis-cli SLOWLOG get 10
+   5. 查看Redis日志，看是否有异常错误或告警信息
+   ```
+
+2. 网络检查
+   - 查看网络延迟
+   ```shell
+   使用ping或mtr命令检查客户端与Redis服务器之间的网络延迟
+   ```
+
+3. 客户端检查
+   - 检查客户端的超时事件设置是否合理，确认不要过短
+   ```python
+   # Example for Python
+   redis.Redis(host='localhost', port=6379,socket_timeout=5)
+   ```
+
+4. Redis配置检查
+   - 检查Redis配置是否合理
+     - 连接数限制`maxclients`是否过小，达到上限
+     - 连接数过大，需要采取优化手段对其进行优化
+       - 连接池的链接复用
+       - Redis多实例负载
+       - 适当增大maxclients
+       - 优化应用程序，比如timeout时间减少
+     - 客户端输出缓冲区`client-output-buffer-limit`，确保没有因缓冲区过大导致连接超时
+  
+5. 集群或Cluster模式下检查
+   - 是否有节点失联或者出问题，由于故障转移导致的临时不稳定
+
+总结：面试回答
+timeout突然增加，从两方面看，一方面是外部因素，比如：用户激增导致客户端连接过多，此时需要对此进行针对性优化，（比如：使用连接池技术，复用连接，增大maxclients数值，增加redis实例进行负载均衡）另一方面可能是内部因素，比如：redis服务器的资源是否不足，可以通过top查看CPU和内存的资源情况，网络是否稳定，通过慢日志或者info commandstats查看是否有特别耗时的指令，如果有则对其进行优化。如果使用哨兵+主从模式或者Cluster模式，看是不是节点故障，由于故障转移导致的临时波动
+
+## 为什么pipeline功能会提升redis性能
+
+Redis Pipeline 是一种在网络上批量发送多个命令的方法，它允许客户端将一系列命令打包成一个请求，然后一次性发送到服务器。这有效减少了`网络往返的次数`，从而提高了性能。
 
 ## Redis的持久化方案
+### RDB的优点与缺点
+- 优点：
+  - 操作简单
+  - 在大数据集时恢复的速度比AOF快
 
+- 缺点：
+  - 不能实时保存
+  - 数据集较大的时候，会导致CPU时间紧张，可能会造成阻塞影响业务
+
+### AOF的优点与缺点
 
 ## AOF的三种持久化策略
 
