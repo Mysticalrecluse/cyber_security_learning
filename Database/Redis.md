@@ -481,6 +481,18 @@ auto-aof-rewrite-min-size 64mb
 aof-load-truncated yes
 ```
 
+# AOF日志格式
+```shell
+# set testkey testvalue的日志格式
+*3                  # 这个3意味着当前命令有3个部分
+$3                  # 每部分都是有“$+数字”
+set                 # 
+$7
+testkey
+$9
+testvalue
+```
+
 #### AOF重写（清理）
 将一些重复的，可以合并的，过期的数据重新写入一个新的AOF文件，从而节约AOF备份占用的硬盘空间，也能加速恢复过程，可以手动执行`bgwriteaof`触发AOF，第一次开启AOF功能，或定义自动rewrite策略
 
