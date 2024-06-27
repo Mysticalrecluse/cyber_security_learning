@@ -501,14 +501,10 @@ testvalue
 1. 首先执行指令`bgwriteaof`
 2. 指令发送给父进程
 3. 父进程fork一个子进程
-   - 子进程接受新用户的写入数据到aof_buf缓存中,aof_buf中的数据
-      - 该aof_buf中的数据会写入旧的AOF文件中
-   - 同样的新写入数据再写一份到aof_rewrite_buf
-4. 在fork一个子进程（第二个子进程）
-   - 第二个子进程用来完成新建一个AOF文件，新建的AOF文件中
-   - aof_write_buf中的数据会写入新建的AOF文件中
-5. 新建的AOF文件覆盖掉旧的AOF文件，此时磁盘上保留的就是被整理过的文件
-6. 新建AOF覆盖掉旧AOF文件后，第二次创建的子进程向主进程发一个信号，表明重写结束，销毁子进程
+4. 初始阶段，主进程和子进程共享内存空间，但该内存空间对于子进程是只读的，子进程基于此进行数据读取，重写并保存到新的文件
+5. 如果有新的数据写入主进程，且该数据在之前已存在，则主进程复制该数据所在的内存页 ，并在复制的内存页上更改此数据，并保存到aof_buf
+6. 同时主进程将数据拷贝一份到aof_rewrite_buf，等待数据重写后，追加到新生成的aof文件中
+7. 当数据重写结束，子进程给主进程一个信号，然后将新的aof替代就得aof，然后子进程释放
 
 #### 手动触发AOF
 ```shell
@@ -518,4 +514,187 @@ vim /apps/redis/etc/redis.conf
 auth-aof-rewrite-percentage 100
 auto-aof-rewrite-min-size 64mb
 ```
+
+## 消息队列
+
+### 生产者消费者模式
+
+生产者消费者模式下，多个消费者同时监听一个频道(redis用队列实现)，但是生产者产生的一个消息只能被最先抢到消费的一个消费者消费一次，队列中的消息由可以多个生产者写入，也可以由不同的消费者取出进行消费处理，此模式应用广泛
+
+#### 生产者生成消息
+```shell
+LPUSH channel1 message1
+LPUSH channel1 message2
+LPUSH channel1 message3
+LPUSH channel1 message4
+LPUSH channel1 message5
+```
+
+#### 获取所有消息
+```shell
+LRANGE channel1 0 -1
+message5
+message4
+message3
+message2
+message1
+```
+
+
+#### 消费者消费消息
+```shell
+RPOP channel1  
+# message1
+RPOP channel1
+# message2
+RPOP channel1
+# message3
+RPOP channel1
+# message4
+RPOP channel1
+# message5
+```
+
+### 发布者订阅者模式
+
+#### 订阅者订阅频道
+```shell
+SUBSCRIBE channel01 # 订阅者实现订阅指定频道，之后发布的消息才能收到
+```
+
+#### 发布者发布消息
+```shell
+PUBLISH channel01 message1 # 发布者发布信息到指定频道
+# 发布者发布的消息，所有订阅者都能收到
+```
+
+#### 可以同时发布多个频道的信息，支持通配符
+```shell
+PUBLISH channel01 channel02 channel*
+```
+
+#### 取消订阅
+```shell
+unsubscribe channel01
+```
+
+## Redis高可用与集群
+
+### Redis主从复制
+
+主从复制特点
+- 一个master可以有多个slave
+- 一个slave只能有一个master
+- 数据流向是从master到slave单向的
+- master可读可写
+- slave只读
+
+### 主从复制实现
+当master出现故障后，可以自动提升一个slave节点变成新的master，因此Redis Slave需要设置和master`相同的连接密码`
+此外当一个Slave提升为新的master的时候，需要通过持久化实现数据的恢复
+
+#### 启用主从同步
+Redis Server 默认为master节点，如果要配置从节点，需要指定master服务器的IP，端口以及链接密码
+```shell
+# 新版Reids，从节点
+REPLICAOF MASTER_IP PORT
+
+# 旧版将被淘汰
+SLAVEOF MASTERIP PORT
+
+# 指明主节点密码
+CONFIG SET masterauth <masterpass>
+
+# 集群中，建议所有主节点，从节点，都设置相同的requirepass和masterauth
+
+# 配置好后，查看身份
+role
+redis-cli -a 123456 role
+
+# 查看同步状态
+redis-cli -a 123456 info replication
+master_sync_in_progress: 0    # 0表示同步完成，1表示同步中，还未完成
+
+# 所有从节点默认只读
+
+# 从节点从主从状态变为独立节点
+REPLICAOF NO ONE  # 临时取消，要永久生效修改配置文件
+```
+
+### 主从复制优化
+
+#### 主从复制过程
+
+Redis主从复制分为全量同步和增量同步
+
+主节点重启会导致`全量同步`, 从节点重启会导致`增量同步`
+
+复制过程详解
+- 主从节点建立连接，验证身份后，从节点向主节点发送PSYNC(2.8版本之前是SYNC)命令
+- 主节点向从节点发送FULLRESYNC命令，包括master_replid(runID)和offset
+- 从节点保存主节点信息
+- 主节点执行BGSAVE保持RDB文件，同时记录新的记录到buffer中
+- 主节点发送RDB文件给从节点
+- 主节点将新收到的buffer中的记录发送至从节点
+- 从节点删除本机的旧数据
+- 从节点加载RDB
+- 从节点同步主节点的buffer信息
+
+全量复制发生在下面情况
+- 从节点首次连接主节点
+- 从节点的复制偏移量不在复制挤压缓冲区内
+- 从节点无法连接主节点超过一定时间
+- replicid变了，即主节点重启过，之后一定发生全量复制
+
+
+#### 主从复制优化
+- 第一次全量复制不可避免，后续的全量复制可以利用小主节点（内存小），业务低峰时进行全量
+- 节点RUN_ID不匹配，主节点重启会导致RUN_ID变化，从而触发全量备份，可以利用config动态修改配置
+- 复制积压缓冲区不足，当主节点生成的新数据大于缓冲区大小，从节点恢复和主节点连接后，会导致全量复制，解决方法将`repl-backlog-size`调大
+
+#### 避免复制风暴
+- 单主节点复制风暴
+   - 当主节点重启，多节点复制
+   - 解决方法：更换复制拓扑，可以换成级联复制，这样只有一个从节点全量复制，后面的都是增量复制
+
+- 单机器多实例复制风暴
+   - 机器宕机后，大量全量复制
+   - 解决方法：主节点分散多机器
+   - Redis建议小内存，多实例o
+
+#### 多实例实现方法
+
+- /bin目录二进制文件共用
+- 其他的数据，日志，配置，pid文件以及service文件都复制，每个实例复制一份
+- 还可以使用docker，更简单，直接使用多容器
+
+
+#### 主从同步优化配置
+
+Redis在2.8版本之前没有提供增量部分复制的功能，当网络闪断或者slave Redis重启之后会导致主从之间的全量同步，即从2.8版本开始增加了部分复制功能
+
+```shell
+repl-diskless-sync no  # 是否使用无盘方式进行同步RDB文件，默认为no（编译安装为yes），no表示不使用无盘，需要将RDB文件保存到磁盘后再发送给slave，yes表示使用无盘，即RDB无需保存到本地磁盘，而是直接通过网络发送给slave
+
+repl-disless-sync-delay 5 # 无盘时复制的服务器等待的延迟时间
+
+repl-ping-slave-preiod 10 # slave向master发送ping指令的时间间隔，默认为10s
+
+repl-timeout 60   # 指定ping连接超时时间，超过此值无法连接，master_link_status显示为down状态，并记录错误日志
+
+repl-disable-tcp-nodelay no # 是否启动TCP_NODELAY
+# 设置成yes，则redis会合并多个小的tcp包打包成一个大包再发送，此方式可以节省带宽，但会造成同步延迟时长增加，导致master与slave短期不一致，设置成no，则master会立即同步数据
+
+repl-backlog-size 1mb  # 建议此值是设置的足够大，如果此值太小，会造成全量复制
+
+repl-backlog-ttl 3600 # 指定多长时间后如果没有slave连接到master，则backlog的内存数据将会过期，如果值为0，表示永不过期
+
+slave-priority 100 # slave参与选择新的master的优选级，此整数值越小，优先级越高。如果值为0，表示slave永远不会被选为master节点
+
+min-replicas-to-write 1 # 指定master的可用salve不能少于个数，如果少于此值，master将无法重写执行操作，默认值为0，生产建议波动1.5
+```
+
+### Reddis哨兵(Sentinel)
+
+
 
