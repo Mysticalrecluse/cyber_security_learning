@@ -89,7 +89,7 @@ redis-server /apps/redis/etc/redis.conf
 # 设置systemd服务
 [root@localhost /usr/local/src/redis-7.2.5] $ cat /lib/systemd/system/redis.service 
 [Unit]
-Descriptioin=Redis persistent key-value database
+Description=Redis persistent key-value database
 After=network.target
 
 [Service]
