@@ -694,7 +694,59 @@ slave-priority 100 # slave参与选择新的master的优选级，此整数值越
 min-replicas-to-write 1 # 指定master的可用salve不能少于个数，如果少于此值，master将无法重写执行操作，默认值为0，生产建议波动1.5
 ```
 
-### Reddis哨兵(Sentinel)
+### Reddis哨兵(Sentineh)
 
+#### Redis哨兵实现故障转移的原理
+
+#### Sentinel中的三个定时任务
+- 每10秒每个sentinel对master和slave执行jinfo
+   - 发现slave节点
+   - 确认主从关系
+- 每2秒每个sentinel通过master节点的channel交换信息(pub/sub)
+   - 通过sentinel_:hello频道交互
+   - 交互对节点的“看法”和自身信息
+- 每1秒每个sentinel和其他sentinel和redis执行ping
+
+#### 哨兵实现
+sentinel配置
+
+Sentinel实际上是一个特殊的redis服务器，有些redis指令支持，但很多指令并不支持，默认监听在26379/tcp端口
+哨兵服务可以和redis服务器分开部署，但为了节约成本一般会部署在一起
+
+```shell
+# 哨兵的本质是redis-server的软连接
+# 基于包安装的sentinel
+apt install -y redis-sentinel  # 配置文件sentinel.conf在/etc/目录下
+
+# 基于编译安装
+直接解压后，里面有sentinel.conf，拷贝到指定etc/目录下
+
+# 修改哨兵的配置文件
+bind 0.0.0.0
+port 26379
+daemonize yes
+pidfile "redis-sentinel.pid"
+logfile "sentinel_26379.log"
+dir "/tmp"  # 工作目录
+
+sentinel monitor mymaster 10.0.0.108 6379 2
+# mymaster是集群的名称，此行指定当前mymaster集群中master服务器的地址和端口
+# 2为法定人数限制(quorum)，即有几个sentinel认为master down了就进行故障转移，一般此值是所有sentinel节点的一半以上的整数值
+# 是master的ODOWN客观下线依据
+
+sentinel auth-pass mymaster 123456
+# mymaster集群中master的密码，注意此行要在上面行的下面，注意，要求这组redis主从复制所有节点的密码相同
+
+sentinel down-after-milliseconds mymaster 30000
+# 判断mymaster集群中所有节点的主观下线(SDOWN)时间，单位：毫秒，建议3000
+
+sentinel parallel-syncs master 1
+# 发生故障转移后，可以同时向新master同步数据的slave的数量，数字越小说明总同步时间越长，但可以减轻新master的负载压力
+
+sentinel failover-timeout mymaster 180000
+# 所有slaves指向新的master所需要的超时时间，单位：毫秒
+
+sentinel deny-scripts-reconfig yes # 禁止修改脚本
+```
 
 
