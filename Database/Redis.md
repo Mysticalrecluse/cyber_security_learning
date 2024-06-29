@@ -694,12 +694,12 @@ slave-priority 100 # slave参与选择新的master的优选级，此整数值越
 min-replicas-to-write 1 # 指定master的可用salve不能少于个数，如果少于此值，master将无法重写执行操作，默认值为0，生产建议波动1.5
 ```
 
-### Reddis哨兵(Sentineh)
+### Reddis哨兵(Sentinel)
 
 #### Redis哨兵实现故障转移的原理
 
 #### Sentinel中的三个定时任务
-- 每10秒每个sentinel对master和slave执行jinfo
+- 每10秒每个sentinel对master和slave执行info
    - 发现slave节点
    - 确认主从关系
 - 每2秒每个sentinel通过master节点的channel交换信息(pub/sub)
@@ -749,4 +749,320 @@ sentinel failover-timeout mymaster 180000
 sentinel deny-scripts-reconfig yes # 禁止修改脚本
 ```
 
+#### Sentinel运维
 
+在Sentinel主机手动触发故障切换
+```shell
+sentinel failover <mastername>
+```
+
+可以通过调整优先级数值`replica-priority`来指定故障切换时，优先切换的从节点
+
+#### python上对于哨兵模式的使用
+```python
+import redis
+from redis.sentinel import Sentinel
+
+# 连接哨兵服务器(主机名也可以用域名)
+# 因为故障转移，所以主节点的ip并不固定，所以通过哨兵来确认当前哪个ip是主节点
+sentinel = sentinel ([('10.0.0.206', 26379),
+                     ('10.0.0.204', 26379),
+                     ('10.0.0.203', 26379)
+                     ], socket_timeout=0.5)
+
+redis_auth_pass='123456'
+
+# mymaster是运维人员配置哨兵模式的的数据库名称，实际名称按照个人部署决定
+# 获取主服务地址
+master=sentinel.discover_master('mymaster')
+print(master)
+
+# 获取从服务器地址
+slave=sentinel.discover_slaves('mymaster')
+print(slave)
+
+ 
+
+
+
+# 获取从服务器进行读取（默认是round-roubin）
+slave=sentinel.slave_for('mymaster', socket_timeout=0.5,password=redis_auth_pass, db=0)
+r_ret = slave.get('name')
+print(r_ret)
+```
+
+#### 哨兵机制总结
+
+哨兵机制大抵涉及3个问题
+- 主库真的挂了吗
+- 该选择哪个从库作为主库
+- 怎么把新主库的相关信息通知给从库和客户端
+
+
+上述问题对应着哨兵的三个任务
+- 监控
+  - 哨兵进程在运行时，周期性给所有主从库发送ping命令，检测它们是否在线
+  - 判断主库是否在线的机制：
+    - 哨兵采用多实例组成的集群模式进行部署，即哨兵集群
+    - 通过多个哨兵共同判断，当主观下线的数量超过了n/2时，则判定为客观下线
+- 选主
+  - 当主库挂了之后，哨兵需要从很多个从库里，`按照一定的规则`，选择一个从库实例，把它作为主库
+  - 选择新主的过程“筛选+打分”
+    - 筛选：按照`一定`的筛选条件，把不符合条件的从库去掉
+      - 从库正常在线，且网络连接状态良好
+        - 判断网络连接状态不好的依据：在`down-after-milliseconds`毫秒内，发生断连的次数超过10次
+    - 打分：按照`一定`的规则，给剩下的从库逐个打分,将得分最高的从库选为新主库
+      - 按照三个规则，依次进行三轮打分
+        - 第一轮：`优先级`最高的从库得分高，如果优先级相同，则进入第二轮打分
+        - 第二轮：`和旧主库同步程度最接近的得分高`
+          - 在主从库同步的过程中，主库会用`master_repl_offset`记录当前的最新写操作在repl_backlog_buffer中的位置
+          - 从库使用`slave_repl_offset`记录当前的复制进度
+          - `slave_repl_offset`和`master_repl_offset`最接近的则判断得分高，如果同步程度相同，则进入第三轮打分
+        - 第三轮：从库ID号小的打分高
+- 通知
+  - 哨兵会把新主库的连接信息发给其他从库。让它们执行replicaof命令，和新主库建立来连接，并进行数据复制
+  - 哨兵把新主库的连接信息通知给客户端，让它们把请求操作发到新主库上
+
+
+### 哨兵集群的组成和运行机制
+
+#### 哨兵集群间建立通信的原理
+哨兵实例之间可以相互发现，归功于Redis提供的`pub/sub`，也就是`发布订阅机制`
+
+- 哨兵先和主库建立联系（在配置项上`sentinel monitor mymaster 10.0.0.206 6379 2`）
+- 建立了联系就可以在主库上发布消息，比如`发布它自己的连接信息（IP和端口号）`
+- 也可以从主库订阅消息，获得其他哨兵发布的连接信息。
+- 也就是说先在主库上订阅相同的频道，然后发布信息，每个哨兵都能收到这个频道上的消息，也就得到了彼此的IP地址和端口号
+- 这个频道就是`__sentinel__:hello`
+- 在这个频道得到彼此的IP和端口号后就可以互相通过网络进行通信，比如：`对主库有没有下线进行判断和协商`
+
+#### 哨兵如何的到从库的信息
+
+- 哨兵向主库发送INFO命令来完成，主库会接受到INFO命令后，将从库列表返回
+- 接着，哨兵可以根据从库列表中的连接信息，和每个从库建立连接，并在这个连接上持续对从库进行监控
+```shell
+[root@ubuntu2204 redis]#redis-cli -a 123456 info replication
+Warning: Using a password with '-a' or '-u' option on the command line interface may not be safe.
+# Replication
+role:master
+connected_slaves:2
+# 可以拿到从库的IP和端口号
+slave0:ip=10.0.0.203,port=6379,state=online,offset=2939656,lag=0
+slave1:ip=10.0.0.206,port=6379,state=online,offset=2939656,lag=0
+master_replid:b3ce242dd27e5f5703da2f9a17b28e840cfc3110
+master_replid2:693d43b96e9ee68f710fe8cff04597b26be466cf
+master_repl_offset:2939656
+second_repl_offset:7491
+repl_backlog_active:1
+repl_backlog_size:1048576
+repl_backlog_first_byte_offset:1891081
+repl_backlog_histlen:1048576
+```
+
+#### 哨兵如何和客户端建立连接（告诉客户端当前主库的信息）
+
+每个哨兵实例也提供`PUB/SUB`机制，客户端可以从哨兵订阅消息，从而得到需要的信息。
+
+哨兵提供的信息订阅频道有很多，不同的频道包含了主从库切换过程中的不同关键事件
+```shell
+相关频道
+# 主库下线事件
++sdown (实例进入“主观下线状态”)
+-sdown (实例退出“主观下线”状态)
++odown (实例进入“客观下线”状态)
+-odown (实例退出“客观下线”状态)
+# 从库重新配置事件
++slave-reconf-sent (哨兵发送SLAVEOF命令重新配置从库)
++slave-reconf-inprog (从库配置了新主库，但尚未进行同步)
++slave-reconf-done (从库配置了新主库，且和新主库完成同步)
+# 新主库切换
++switch-master (主库地址发生变化)
+```
+
+可以在客户端通过订阅来观察所有事件的频道发布的信息
+
+
+## Redis Cluster
+解决主从架构的单节点性能瓶颈问题，实现负载均衡
+
+### 集群Cluster架构的缺陷
+- 不支持换库，即Redis有默认有16个数据库，但是集群模式下，只能用一个，不能切换
+- 不支持同时对多个值赋值，即以下用法不支持，会报错
+```shell
+mset a 1 b 2 c 3
+# 在Cluster模式下会报错
+```
+
+### Redis Cluster架构
+
+Redis Cluster需要至少3个master节点才能实现，slave节点数量不限，当然一般每个master都至少对应一个slave节点
+
+#### 数据分区：虚拟槽分区
+
+Redis Cluster设置0~16383的槽，每个槽映射一个数据子集，通过hash函数，将数据存放在不同的槽位中，每个集群的节点保存一部分的槽
+
+每个Key存储时，先经过算法函数CRC16(key)得到一个整数，然后整数与16384取余，得到槽的数值，然后找到对应的节点，将数据存放入对应的槽中
+
+CRC16算法
+```shell
+CRC（循环冗余检测算法）是一种错误检测码，通过一系列数学运算生成一个检验值（校验码）。
+校验码满足确定性，即确保相同的输入始终产生相同的输出，以此进行数据的验证
+```
+
+#### 集群通信
+
+
+
+### Redis Cluster集群实现
+- 6台设备上所有配置文件初始相同，全部开启集群模式
+```shell
+# 每个节点修改redis配置，必须开启cluster功能的参数
+# 手动修改配置文件
+vim /etc/redis/redis.conf
+bind 0.0.0.0
+requirepass 123456
+masterauth 123456
+cluster-enabled yes # 取消此行注释，必须开启集群，开启后，redis进程会有cluster标识
+cluster-config-file nodes-6379.conf # 取消此行注释，此为集群状态数据文件，记录主从关系及slot范围信息，由redis cluster集群自动创建和维护
+cluster-require-full-coverage no # 默认值为yes，设为no可以防止一个节点不可用导致的整个cluster不可用（如果是yes的话，在集群中，只要有一组主从不可用，则整个集群停止服务）
+```
+
+- 在将所有节点加入同一个集群中
+```shell
+# 下面命令在集群节点或任意节点执行皆可，命令redis-cli的选项，
+# --cluster-relicas 1表示每个master对应一个slave节点，注意，所以节点数据必须清空
+redis-cli -a 123456 --cluster create 10.0.0.8:6379 10.0.0.18:6379 10.0.0.28:6379 10.0.0.38:6379 10.0.0.48:6379 10.0.0.58:6379 --cluster-replicas 1
+# 前面的是主节点，后面的是从节点，1表示一对一
+# 后面输入yes，自动分槽位
+
+# -c 表示自动查找该key应该存到哪个槽位，然后存过去
+# 因为每次写入数据，都可能定位到新的节点，都会涉及查询后保存，所以性能肯定比单机差
+# 但是如果用户量很大的话，多个设备整体的效率是要高过单机的
+redis-cli -a 123456 -c
+
+# 查看集群中具体节点状态
+redis-cli -a 123456 --cluster info 10.0.0.38:6379
+```
+
+#### 使用python操作集群
+```python
+# 配置python加速
+python3 -m pip config set global.index-url https://mirrors.aliyun..com/pypi/simple
+python3 -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+# pip3 install redis-py-cluster
+
+from rediscluster import RedisCluster
+startup_nodes = [
+   {"host":"10.0.0.200","port":6379},
+   {"host":"10.0.0.201","port":6379},
+   {"host":"10.0.0.202","port":6379},
+   {"host":"10.0.0.203","port":6379},
+   {"host":"10.0.0.204","port":6379},
+   {"host":"10.0.0.205","port":6379},
+]
+
+redis_conn = RedisCluster(startup_nodes=startup_nodes,password='123456',decode_responses=True)
+
+for i in range(0,10000):
+   redis_conn.set('key'+str(i),'value'+str(i))
+   print('key'+str(i)+':',redis_conn.get('key'+str(i)))
+```
+
+注意：Cluster集群模式下，从节点仅做备份，读写都从主节点进行
+
+#### 集群操作
+```shell
+# 查询单个槽位上的数据,查询有几个key
+redis-cli -a 123456 cluster countkeysinslot [num]
+```
+
+
+#### 集群数据偏斜问题
+```shell
+# 查询大key
+redis-cli -a 123456 --bigkeys
+# 如果多个节点上的槽位中的数据很不平衡，可以使用命令重新分配
+# 执行自动的槽位重新平衡分布，会影响客户端访问，慎用
+redis-cli -a 123456 --cluster rebalance 10.0.0.8:6379
+```
+
+
+## Redis Cluster管理
+
+### 集群扩容
+
+增加Redis新节点，需要与之前的Redis node版本和配置一致，然后分别再启动两台Redis node，应为一主一从。
+
+#### 添加新master节点到集群
+使用以下命令添加新节点，要添加的新redis节点IP和端口添加到已有的集群中任意节点的IP端口
+```shell
+# 该命令可以再任意机器上执行
+redis-cli -a 123456 --cluster add-node new_host:newport existing_host:existing_port [--slave --master-id <arg>]
+# new_host:new_port             指定新添加的主机IP和端口
+# existing_host:existing_port   指定已有的集群中任意节点的IP和端口
+
+# 移动槽位
+redis-cli -a 123456 --cluster reshard <当前任意集群节点>:6379
+.... 
+[OK] All 16384 slots covered
+How many slots do you want to move (from 1 to 16384)? 4096
+What is the receiving node ID? <填写新加入节点的node ID>
+Please enter all the source node IDs
+   Type 'all' to use all the nodes as source nodes for the hash slots
+   Type 'done' once you entered all the source nodes ID.
+Source node #1: all  （从所有设备上将槽位匀给新加入的设备）
+...
+# 敲yes开始挪动槽位
+```
+
+把从节点加进来
+```shell
+redis-cli a 123456 --cluster add-node <新加节点IP:端口> <任意集群节点IP:端口> --cluster-slave --cluster-master-id <主节点node ID>
+```
+
+#### 集群节点缩容
+```shell
+redis-cli -a 123456 --cluster reshard <当前任意集群节点>:6379
+[OK] All 16384 slots covered
+How many slots do you want to move (from 1 to 16384)? 1365
+What is the receiving node ID? <要接收的node ID>
+Please enter all the source node IDs
+   Type 'all' to use all the nodes as source nodes for the hash slots
+   Type 'done' once you entered all the source nodes ID.
+Source node #1: <要退出的node ID>
+Source node #2: done
+...
+# 确认yes
+...
+
+# 分批将所有的槽点都分给集群其他node之后，此时该节点中的槽位清空
+# 节点清空后将其踢出集群
+redis-cli -a 123456 --cluster del-node <任意集群节点的IP>:b379 <删除的节点IP>
+```
+#### 导入现有数据到集群
+
+- 迁移前基础环境准别
+```shell
+# 集群中所有节点关闭保护模式，清空密码
+# 1. 关闭保护模式，2. 清空密码
+redis-cli -a 123456 config set protected-mode no
+# 在所有节点(源节点和集群节点)关闭各redis密码认证
+redis-cli -a 123456 --no-auth-warning CONFIG SET requirepass ""
+```
+
+- 执行数据导入操作（这个任务慎重，尽量交给别人干）
+```shell
+redis-cli --cluster import <集群任意节点服务器IP:Port> --cluster-from <外部Redis node-IP:Port> --cluster-copy --cluster-replace
+# 只使用cluster-copy，则要导入集群中的key不能存在
+# 如果集群中已有同样的key，如果需要替换，可以--cluster-copy --cluster-replace联用，这样集群中的key就会被替换为外部数据
+``` 
+
+- 还原安全配置
+```shell
+# 动态修改
+# 在所有节点（源节点和集群节点）还原redis密码认证
+redis-cli -p 6379 --no-auth-warning CONFIG SET requirepass "123456"
+
+# 还原配置protected-mode
+redis-cli -a 123456 config set protected-mode yes
+```
