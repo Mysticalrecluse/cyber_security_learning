@@ -174,6 +174,58 @@ jenkins.wang.org:8080
 #### 传统流程
 - 开发人员将代码提交给Gitlab
 - gitlab上的项目下载到目标服务器(Jenkins自动完成)
+- CICD自动化脚本
 ```shell
-git clone 
+#!/bin/bash
+
+TIME=`date +%F_%s`
+
+HOST_LIST="
+10.0.0.128
+10.0.0.138"
+
+
+for i in $HOST_LIST; do
+        ssh root@$i mkdir /opt/wheel/wheel-$TIME
+        scp -r * root@$i:/opt/wheel/wheel-$TIME/
+        ssh root@$i rm -rf /var/www/html
+        ssh root@$i ln -s /opt/wheel/wheel-$TIME/ /var/www/html
+
+done;
+```
+
+进阶脚本
+```shell
+#!/bin/bash
+
+HOST_LIST="
+10.0.0.128
+10.0.0.138
+"
+
+APP=wheel
+APP_PATH=/var/www/html
+DATA_PATH=/opt/wheel
+DATE=`date +%F_%H-%M-%S`
+
+deploy () {
+        for i in ${HOST_LIST}; do
+                ssh root@$i "rm -f ${APP_PATH} && mkdir -pv ${DATA_PATH}/$(APP)-${DATE}"
+                scp -f * root@$i:${DATA_PATH}/${APP}-${DATE}
+                ssh root@$i "ln -sv $(DATA_PATH)/${APP}-${DATE} ${APP_PATH}"
+
+        done
+}
+
+
+rollback() {
+        for i in ($HOST_LIST); do
+                CURRENT_VERISION=$(ssh root@$i "readlink $APP_PATH")
+                CURRENT_VERISION=$(bashname ${CURRENT_VERISION})
+                echo ${CURRENT_VERISION}
+                PRE_VERISION=$(ssh root@$i "ls -l ${DATA_PATH} | grep -B1 ${CURRENT_VERISION}|head -n1")
+                echo $PRE_VERISION
+                ssh root@$1 "rm -f ${APP_PATH} && ln -sv ${DATA_PATH}/${PRE_VERISION} ${APP_PATH}"
+        done
+}
 ```
