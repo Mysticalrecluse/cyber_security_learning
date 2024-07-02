@@ -229,3 +229,150 @@ rollback() {
         done
 }
 ```
+
+#### 创建凭证
+- 基于用户密码进行凭证创建
+- 基于ssh密钥进行凭证创建
+  - 将gitlab的私钥上传到jenkins的凭证上
+
+
+### 创建Java项目
+
+#### 安装maven
+```shell
+apt install -y maven
+
+# 查看mvn版本
+mvn -v
+```
+
+#### 加速maven
+- 加速方法1：修改maven配置文件
+```shell
+# /etc/maven/settings.xml
+# 修改这里<mirrors>
+<mirrors>
+   <!-- mirror
+    | Specifies a repository mirror site to use instead of a given repository. The repository that
+    | this mirror serves has an ID that matches the mirrorOf element of this mirror. IDs are used
+    | for inheritance and direct lookup purposes, and must be unique across the set of mirrors.
+    |
+   <mirror>
+     <id>mirrorId</id>
+     <mirrorOf>repositoryId</mirrorOf>
+     <name>Human Readable Name for this Mirror.</name>
+     <url>http://my.repository.com/repo/path</url>
+   </mirror>
+    -->
+</mirrors>
+
+# </miroor>后面添加为
+    <mirror>
+      <id>nexus-aliyun</id>
+      <mirrorOf>*</mirrorOf>
+      <name>Nexus aliyun</name>
+      <url>http://maven.aliyun.com/nexus/content/groups/public</url>
+    </mirror>
+```
+
+- 加速方法2：在项目内直接加速
+```shell
+# 修改pom.xml
+# pom.xml里面通常放了打包的格式，依赖关系和依赖包
+# 加速代码在最下面
+
+  <!-- 配置阿里云仓库 -->
+  <repositories>
+    <repository>
+        <id>aliyun-repos</id>
+        <url>https://maven.aliyun.com/repository/public</url>
+        <releases>
+            <enabled>true</enabled>
+        </releases>
+        <snapshots>
+            <enabled>false</enabled>
+        </snapshots>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+     <pluginRepository>
+        <id>aliyun-repos</id>
+        <url>https://maven.aliyun.com/repository/public</url>
+        <releases>
+            <enabled>true</enabled>
+        </releases>
+        <snapshots>
+            <enabled>false</enabled>
+        </snapshots>
+     </pluginRepository>
+  </pluginRepositories>
+```
+
+#### maven编译java源码命令
+```shell
+mvn clean package -Dmaven.test.skep=true
+
+# 使用mvn编译的java源码，中途下载的所有依赖包的默认路径是/root/.m2/repositry
+# 该路径可以修改，配置文件为/etc/maven/setting.xml
+  <!-- localRepository
+   | The path to the local repository maven will use to store artifacts.
+   |
+   | Default: ${user.home}/.m2/repository
+  <localRepository>/path/to/local/repo</localRepository>
+  -->
+```
+
+#### 执行jar包并更改访问端口
+```shell
+java -jar target/spring-boot-helloworld-0.9.0-SNAPSHOT.jar --server.port=8888
+```
+
+#### 运行java程序脚本
+```shell
+APP_PATH=/data/spring-boot-helloworld
+
+HOST_LIST="
+10.0.0.200
+10.0.0.201
+"
+#PORT=6666 6666为不安全端口，浏览器无法访问，只能用命令行访问
+PORT=8888
+
+mvn clean package -Dmaven.test.skip=true
+
+for host in $HOST_LIST; do
+        ssh root@$host killall -9 java &> /dev/null
+        scp target/spring-boot-helloworld-*-SNAPSHOT.jar root@$host:${APP_PATH}/spring-boot-helloworld.jar
+        #ssh root@$host "java -jar ${APP_PATH}/spring-boot-helloworld.jar --server.port=8888 &"
+        ssh root@$host "nohup java -jar ${APP_PATH}/spring-boot-helloworld.jar --server.port=6666 &> /dev/null & "&
+done
+```
+
+#### 部署War包实现CICD
+```shell
+# 先在待部署机器上安装tomcat
+apt install -y tomcat9
+
+# 在tomcat上，war包通常部署在/var/lib/tomcat/webapps目录下，和里面的ROOT目录同级
+```
+
+- 部署war包的脚本
+```shell
+#!/bin/bash
+
+APP_PATH=/var/lib/tomcat9/webapps
+
+HOST_LIST="
+10.0.0.200
+10.0.0.201
+"
+mvn clean package -Dmaven.test.skip=true
+
+for host in $HOST_LIST; do
+        ssh root@$host systemctl stop tomcat9
+        scp target/hello-world-war-*.war root@$host:${APP_PATH}/hello.war
+        ssh root@$host systemctl start tomcat9
+done
+```
+
+#### 部署ruoyi系统
