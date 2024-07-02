@@ -376,3 +376,294 @@ done
 ```
 
 #### 部署ruoyi系统
+
+- 部署数据库
+```shell
+# 安装数据库
+apt update && apt install -y mysql-server
+
+# 将数据库端口开放，并在里面根据/RuoYi/ruoyi-admin/src/main/resources/application-druid.yaml中的数据，创建用户和数据库
+
+create database <指定数据库>;
+create user <user>@'%' identified by '123456';
+grant all on <database>.* to <user>@'%';
+
+# 将数据导入数据库
+[root@python3 /repo/RuoYi] $mysql -u ry -p -h 10.0.0.3 ry < sql/quartz.sql 
+[root@python3 /repo/RuoYi] $mysql -u ry -p -h 10.0.0.3 ry < sql/ry_20240112.sql 
+```
+
+- 写CICD运行脚本
+```shell
+#!/bin/bash
+
+APP=ruoyi
+APP_PATH=/data/ruoyi
+
+HOST_LIST="
+10.0.0.200
+10.0.0.201
+"
+PORT=80
+
+mvn clean package -Dmaven.test.skip=true
+
+for host in $HOST_LIST; do
+        ssh root@$host killall -9 java &> /dev/null
+        scp ruoyi-admin/target/*.jar root@$host:${APP_PATH}/${APP}.jar
+        ssh root@$host "nohup java -jar ${APP_PATH}/${APP}.jar --server.port=$PORT &> /dev/null & "&
+done
+```
+
+- 在Jenkins上创建构建任务
+
+
+### 创建Golang项目
+
+#### 安装go编译器
+```shell
+apt install golang-go
+```
+#### 准备mysql和redis
+```shell
+# 安装mysql和redis
+# 修改配置文件，开放端口，设置账户密码，mysql还需要配置权限
+# 将git clone中的sql数据导入mysql的指定数据库中
+# 设置DNS域名解析，使其与项目的配置文件中mysql和redis的host一致
+```
+
+#### Go语言项目构建脚本模板
+```shell
+#!/bin/bash
+
+APP=ginweb
+APP_PATH=/data
+DATE=`date +%F_%H-%M-%S`
+HOST_LIST="
+10.0.0.200
+10.0.0.201
+"
+build () {
+        #go env 可以查看到下面变量信息，如下环境变量不支持相对路径，只支持绝对路径
+        #root用户运行脚本
+        #export GOCACHE="/root/.cache/go-build"
+        #export GOPATH="/root/go"
+        #Jenkins用户运行脚本
+        export GOCACHE="/var/lib/jenkins/.cache/go-build"
+        export GOPATH="/var/lib/jenkins/go"
+        #go env -w GOPROXY=https://goproxy.cn,direct
+        export GOPROXY="https://goproxy.cn,direct"
+        (GO_ENABLED=0 go build -o ${APP})
+}
+
+deploy () {
+        for host in $HOST_LIST; do
+                ssh root@$host "mkdir -p $APP_PATH/${APP}-${DATE}"
+                scp -r * root@$host:$APP_PATH/${APP}-${DATE}/
+                ssh root@$host "killall -0 ${APP} &> /dev/null && killall -9 ${APP}; rm -f ${APP_PATH}/${APP} && \
+                        ln -s ${APP_PATH}/${APP}-${DATE} ${APP_PATH}/${APP}; \
+                        cd ${APP_PATH}/${APP}/ && nohup ./${APP} &> /dev/null" &
+        done
+}
+
+build
+
+deploy
+```
+
+
+### 集成Ansible的任务构建
+
+#### 安装Ansible环境
+```shell
+apt update && apt -y install ansible
+
+# Ubuntu22.04默认没有配置文件，可以手动创建一个空文件，使用默认值即可
+mkdir -p /etc/ansible && touch /etc/ansible/ansible.cfg
+
+# 也可以使用init命令，创建一个初始化配置文件
+# 生成配置文件
+ansible-config init -t all -disabled > /etc/ansible/ansible.cfg
+
+# 在hosts配置文件中指定以root身份连接对方，并jenkis对root的ssh验证
+# 默认以账户当前身份运行
+vim hosts
+[webservers]
+10.0.0.200 ansible_ssh_user=root
+10.0.0.201
+```
+
+#### 在Jenkins上安装ansible插件
+- 插件名就叫`ansible`
+
+#### 使用Ansible Playbook基于参数化实现任务测试和生产多套不同环境的部署
+
+
+
+#### 使用Ansible Playbook实现向Playbook中传参功能
+
+- 编写playbook文件
+```yaml
+- hosts: "{{ ansible_hosts }}"  # 指ansible变量，后面在Jenkins中对其赋值
+  remote_user: root
+
+  tests:
+  - name: excute cmd
+    shell:
+      cmd: hostname -I
+    register: result
+  
+  - name: show result
+    debug:
+      msg: "{{ result }}"
+```
+
+- 创建主机清单文件
+```shell
+cat /etc/ansible/hosts_test
+[webservers]
+10.0.0.104
+
+[appservers]
+10.0.0.106
+
+cat /etc/ansible/hosts_test
+[webservers]
+10.0.0.105
+
+[appservers]
+10.0.0.107
+```
+
+- 创建Ansible Playbook的任务
+![alt text](images\image1.png)
+![alt text](images\image2.png)
+
+
+## 构建后通知
+
+
+### 邮件通知 
+
+Mailer和Email Extension插件都可以实现邮件通知功能
+
+#### 邮箱配置
+
+- Manage Jenkins -> System -> (往下翻)系统管理员邮件地址
+
+- 授权码位置：在上面系统管理员邮件地址下方（比较远的地方，要往下翻,接近最底下的地方）`邮件通知`
+  - SMTP服务器：
+  - 用户默认邮件后缀(eg：@qq.com)
+  - 高级里面填写信息
+    - 用户名：即发出邮箱
+    - 密码：授权码
+    - SMTP端口：（加密端口465，不加密25）
+  - 可以发一个测试邮箱试试
+
+#### 在构建后操作中，选择邮件通知
+
+
+#### Email Extension
+
+具体填写方式，详情见ppt
+
+
+### 微信通知
+
+具体填写方式，详情见ppt
+
+### 钉钉通知
+
+具体填写方式，详情见ppt
+
+##  自动化构建
+### 定时和SCM构建
+
+#### 定时构建
+Jenkins cron语法遵循Unix cron语法，但在细节上略有不同
+一样是分时日月周，但是，多一个H属性
+H符号可用于任何字段，且它能够在一个时间范围内对项目名称进行散列值计算出一个唯一的偏移量，以避免所有配置相同cron值的项目在同一时间启动，比如
+```shell
+# H可以看做一个随机值
+triggers{ cron(H(0,30) * * * * )} #表示每小时的前半小时的某一分钟进行构建
+
+# 示例2
+H H(0-7) * * *  # 表示每天0-7点任意一个小时内的任意时间点执行一次
+
+# 对比说明
+H/2 * * * *：基于作业哈希值选择的起始时间，然后每 2 分钟执行一次。
+*/2 * * * *：从每小时的 0 分钟开始，每 2 分钟执行一次。
+```
+
+![alt text](images\image3.png)
+![alt text](images\image4.png)
+
+#### SCM构建
+
+![alt text](images\image5.png)
+
+### Webhook触发构建
+
+一共三种方法
+#### 触发远程构建（无需装插件）
+
+![alt text](images\image6.png)
+根据上图需构建的weburl为
+```shell
+JENKINS_URL/job/freestyle-ansible/build?token=TOKEN_NAME
+# JENKINS_URL可以在system中查看
+TOKEN_NAME即为自定义的令牌，相当于密码
+
+# 构造之后的webbook的url为
+http://jenkins.wang.org:8080/job/freestyle-ansible/build?token=123456
+
+# 此时构造的这个url还是有问题，因为没有用户权限，可以为这个链接专门创建一个用户
+# 然后将用户的账号密码写在上面
+http://jenkins:123456@jenkins.wang.org:8080/job/freestyle-ansible/build?token=123456
+
+# 但是这种还是有问题，账号密码明文暴露了，因此基于此Jenkinsz账号生成一个令牌，使用该令牌
+```
+![alt text](images\image7.png)
+![alt text](images\image8.png)
+使用Jenkins账号，生产一个随机令牌，框中的随机值无所谓，都可以
+后续可以使用这个令牌替换`123456`这个密码，最终构建的URL如下
+```shell
+http://jenkins:1124cb6c571b1b58c240e42be739acbe6c@feng.jenkins.org:8080/job/freestyle-wheel-demo1/build?token=123456
+```
+
+- 生成了Webhook后，配合Gitlab实现通过Gitlab的行为触发
+![alt text](images\image9.png)
+![alt text](images\image10.png)
+
+tip: 此时webhook还无法在gitlab创建成功，在创建gitlab的webhook之前，还需要修改
+
+在添加Webhook之前必须先打开外发请求
+管理中心 -> 设置 -> 网络 -> 外发请求（勾选）
+![alt text](images\image11.png)
+所有信息写在URL框即可，，第一种方法不用写Secret令牌
+![alt text](images\image12.png)
+
+#### Gitlab Webhook URL（插件）构建
+- 需要先安装Gitlab插件
+![alt text](images\image13.png)
+![alt text](images\image14.png)
+![alt text](images\image15.png)
+
+将生成的连接和令牌直接填写在Gitlab的Webhook上即可
+
+
+#### Generic Webhook Trigger 构建
+
+略
+
+### 多个项目间的关联构建
+
+#### 将一个项目关联到另一个项目之后
+![alt text](images\image16.png)
+
+#### 将一个项目关联到另一个项目之前
+
+![alt text](images\image17.png)
+
+
+### Blue Ocean
