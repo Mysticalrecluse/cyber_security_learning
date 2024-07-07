@@ -437,9 +437,158 @@ RUN pwd
 # 最终路径：/a/b/c
 ```
 
-#### dockerfile优化总结
+#### ONBUILD: 子镜像引用父镜像的指令
+可以用来配置当构建当前镜像的子镜像时，会自动触发执行的指令，但在当前镜像构建时，并不会执行，即延迟到子镜像构建时才执行
+```dockerfile
+ONBUILD cmd
+# 该指令不在当前镜像执行，而是谁用这个镜像作为父镜像，则该命令在其子镜像中执行
+```
+
+#### USER：指定当前用户
+- 指定运行容器的用户名或UID，在后续dockerfile中的RUN,CMD和ENTRYPOINT指令时使用此用户
+- 当服务不需要管理员权限时，可以通过命令指定运行用户
+- 这个用户必须是事先建立好的，否则无法切换
+- 如果没有指定USER，默认是root身份执行
+```dockerfile
+USER <user>[:<group>]
+
+# 示例
+RUN groupadd -r mysql && useradd -r -g mysql mysql
+USER mysql
+```
+
+#### HEALTHCHECK: 健康检查
+```dockerfile
+HEALTHCHECK [选项] CMD # 设置检查容器健康状况的命令，如果命令执行失败，则返回1，即unhealthy
+HEALTHCHECK NONE   # 如果基础镜像有健康检查指令，使用这行可以屏蔽掉健康检查指令
+
+# HEALTHCHECK支持下列选项：
+--interval=<间隔>   # 两次健康检查的间隔，默认30s
+--timeout=<时长>    # 健康检查命令运行超时，如果超过这个时间，本次健康检查被视为失败，默认30s
+--retries=<次数>    # 当连续失败指定次数后，则将容器状态视为unhealthy，默认3次
+--start-period=<FDURATION> # 容器重启多久进行健康性检查，default:0s
+# 示例
+HEALTHCHECK --interval=5s --timeout=3s CMD curl -fs http://localhost/
+```
+
+#### .dockerignore
+忽略指定文件
+
+### dockerfile优化总结
 - 将多个指令尽可能合并，可能会减少大小, 因为dockerfile的每一层是叠加的，只会增加不会减少
 - 频繁变化的层往后放, 能有效提高镜像制作的速度，哪个指令变化了，制作镜像是就会从此指令往后执行，前面的有缓存不需要再执行
+
+
+### 多阶段构建
+- 实战案例：编译一个Go语言的镜像
+#### 创建一个GO语言程序
+```shell
+# cat hello.go
+package main
+
+import (
+   "fmt"
+   "time"
+)
+
+func main() {
+   for {
+      fmt.Println("hello,world")
+      time.Sleep(time.Second)
+   }
+}
+```
+
+#### 基于传统方式构建Golang应用
+```Dockerfile
+# cat Dockerfile
+FROM golang:1.18-alpine
+COPY hello.go /
+# WORKDIR /
+RUN cd / && go build hello.go
+CMD ["/hello"]
+```
+
+#### 多阶段构建1:GO语言程序
+```dockerfile
+# 第一次构建
+cat Dockerfile
+FROM golang:1.18-alpine
+COPY hello.go /opt
+WORKDIR /opt
+RUN go build hello.go
+CMD "./hello"
+```
+```shell
+docker build -t go-hello:v1.0 .
+docker run --name hello go-hello:v1.0
+```
+
+```dockerfile
+# 第二次优化
+# cp Dockerfile Dockerfile-v1.0
+# vim Dockerfile
+FROM golang:1.18-alpine as builder
+COPY hello.go /opt
+WORKDIR /opt
+RUN go build hello.go
+
+FROM alpine:3.15.0
+#FROM scratch
+COPY --from=builder /opt/hello /hello
+#COPY --from=0 /opt/hello /hello
+CMD ["/hello"]
+```
+
+#### 多阶段构建2：C语言程序
+```dockerfile
+ARG VERSION=3.20.0
+FROM alpine:$VERSION
+LABEL maintainer="mystical<mysticalrecluse@gmail.com>"
+
+ENV NGINX_VERSION=1.26.1
+ENV NGINX_DIR=/apps/nginx
+
+ADD nginx-$NGINX_VERSION.tar.gz /usr/local/src
+
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/' /etc/apk/repositories && \
+    apk update && apk --no-cache add gcc make libgcc libc-dev libcurl lib-utils pcre-dev zlib-dev libnfs pcre pcre2 net-tools curl pstree wget libevent libevent-dev iproute2 openssl-dev && \
+    cd /usr/local/src/nginx-$NGINX_VERSION && \
+    ./configure --prefix=${NGINX_VERSION} --user=nginx --group=nginx --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_stub_status_module --with-http_gzip_static_module --with-pcre --with-stream --with-stream_ssl_module --with-stream_realip_module && \
+    make && make install && \
+    rm -rf /usr/local/src/nginx-$NGINX_VERSION
+
+COPY nginx.conf ${NGINX_DIR}/conf/nginx.conf
+
+FROM alpine:$VERSION
+ENV NGINX_DIR=/apps/nginx
+COPY --from=0 ${NGINX_DIR}/ ${NGINX_DIR}/
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc/edu.cn/' /etc/apk/repositories \
+    && apk update && apk --no-cache add tzdate pcre pcre2 \
+    && ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+    && addgroup -g 888 -S nginx \
+    && adduser -u 888 -G nginx -D -S -s /sbin/nologin nginx \
+    && chown -R nginx.nginx ${NGINX_DIR}/ \
+    # 在容器化环境中，推荐的做法是将应用程序的日志输出到标准输出和标准错误。容器运行时（如 Docker）会捕获这些日志并将它们存储在宿主机上。这样，日志就可以被宿主机上的日志收集和处理系统统一管理。
+    && ln -sf /dev/stdout ${NGINX_DIR}/logs/access.log \
+    && ln -sr /dev/stderr ${NGINX_DIR}/logs/error.log
+EXPOSE 80 443
+CMD ["nginx","-g","daemon off;"]
+```
+
+## 数据持久化
+
+### 联合文件系统
+- LowerDir
+   - 镜像的文件
+- MergedDir
+   - 整体，等于LowerDIr+UpperDir
+- UpperDir
+   - 容器启动后，新生成的文件
+- WorkDir
+   - 容器运行时的临时数据
+
+上述目录，会随着容器的删除，而跟着删除
 
 
 # Redis
