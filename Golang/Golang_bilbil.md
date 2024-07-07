@@ -723,3 +723,161 @@ go test -bench=Json json_test.go
 -bench  # 指定测试的函数
 -benchmem # 测试每次运行的内存申大小，以及运行时申请的内存次数
 ```
+
+## defer
+
+- 这里注意defer的两个过程
+    - defer的注册
+    - defer的执行
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+func foo() int {
+    a, b:=3, 5
+    c := a + b
+    defer fmt.Println("111", c) // defer的注册, 输出111 8
+    fmt.Println(c)
+    defer fmt.Println("222", c) // 如果defer后面跟的是go语句，而不是函数，则变量在注册的时候就已经计算好了，此时值已固定
+    defer func() {
+        fmt.Println("333", c) // 输出333 100
+        // 如果defer后面跟的是一个匿名函数，函数体里涉及的变量是defer执行的时候才去计算的
+    }()
+    c = 100
+    return c
+}
+
+func main() {
+    foo()
+    // 输出 8， 222， 111 ，defer后注册的先执行
+}
+```
+
+
+## 接口
+
+```go
+package main
+
+import (
+    "fmt"
+)
+
+type Human interface{
+    // 结构体与接口的区别
+    // 结构体里定义的是成员变量，而接口中定义的是函数 
+    // 接口的本质是一组行为规范的集合
+    // 接口是一组行为规范的集合
+    Say(int, int) int
+    Think(string) (string, error)
+}
+
+func foo(h Human) {
+    c := h.Say(3, 6)
+    fmt.Println("c=",c)
+}
+
+func main() {
+    var a Human
+
+}
+```
+
+
+## 依赖管理
+
+项目目录结构
+```shell
+golang_test_project/
+├── go.mod
+├── go.sum
+├── main
+│   └── d.go
+└── util
+    ├── a.go
+    └── math
+        ├── b.go
+        └── c.go
+
+3 directories, 6 files
+# 上述目录结构，文件依赖关系如下
+c.go -> 调用 -> b.go
+d.go(入口main函数) -> 调用 -> a.go, c.go, 第三方库
+```
+
+### 创建go.mod
+
+在项目目录golang_test_project下，使用`go mod init <mod名称>`初始化项目, 执行此命令后，该目录下会生成一个go.mod的文件
+```shell
+go mod init g6
+```
+
+- go.mod
+```go
+// vim go.mod
+module g6
+
+go 1.22.3  // go的版本
+```
+
+- b.go
+```go
+package maths
+
+func sub(a,b int) int {
+    return a - b
+}
+```
+- c.go
+```go
+package maths
+
+func Add(a,b,c int) int {
+    return a + sub(b, c)
+}
+```
+- a.go
+```go
+package util
+
+var (
+    Name="大脸猫"
+)
+
+func Add(a,b int) int{
+    return a+b
+}
+```
+
+- d.go(程序入口)
+```go
+package main // 入口函数包名和函数名必须叫main,目录名和文件名可以不叫main
+
+import (
+    "fmt"
+    "g6/util" // 这里的util是目录名称
+    math "g6/util/math"
+    "github.com/bytedance/sonic"
+)
+
+func main() {
+    a, b, c := 1, 2, 3
+    fmt.Println(util.Name) // 这里uil是包名和目录名无任何关系
+    fmt.Println(util.Add(a,b))
+    fmt.Println(math.Add(a, b, c))
+    bytes,_:=sonic.Marshal("hello")
+    fmt.Println(string(bytes))
+}
+```
+
+
+#### 注意1:
+
+- 同一个目录下面的package名称必须一致【包的名称和目录的名称可以不同,比如上述目录是math，包名却还maths】
+- 同一个目录下面，这些go文件属于同一个package，同一个package内部，可以自由随意的互相调用
+- 大写开头的函数，可以在其他的package里调用，小写开头的函数仅在本包内可见
+- 同理，大写开头的全局变量，可以在其他package使用，小写开头的全局变量，仅在本包内可用
