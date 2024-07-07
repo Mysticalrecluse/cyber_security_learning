@@ -187,6 +187,261 @@ LVS默认模式
 ### 六种动态调度算法
 
 
+# Docker
+
+## Docker file制作
+### 制作镜像的常用指令
+#### FROM：引用父镜像 
+制作一个进行必须要有一个父镜像，使用FROM指定
+即使是第一个镜像，也必须使用FROM指定它的父镜像，此时它的镜像是`scratch`(空镜像)
+
+
+#### LABEL: 指定镜像元数据
+```dockerfile
+LABEL <key>=<value> <key>=<value> <key>=<value>
+
+# 示例
+LABEL "version"="1.0"
+LABEL "description"="XXXXXX"
+```
+
+#### RUN
+RUN命令用于在制作镜像时，执行FROM指定镜像所支持的SHELL命令
+重点：只能执行`父镜像`有的命令
+
+注意：
+- RUN可以写多个，每个RUN指令都会建立一个镜像层，所以尽可能合并成一条指令，比如将多个Shell命令通过&&连接成一条指令
+- 每个RUN都独立运行，和前一个RUN无关
+```dockerfile
+# shel格式: 相当于 /bin/sh -c <命令>
+RUN <命令>
+
+# 如果使用其他SHELL，可以用SHELL指令指定不同shell 
+SHELL ["/bin/bash", "-c"]
+RUN <命令>
+
+# exec格式，不支持环境变量
+RUN ["executable", "param1", "param2"...]
+
+# exec格式指定其他shell
+RUN ["/bin/bash", "-c", "<executable>", "<paraml>"]
+RUN ["/bin/bash", "-c", "echo hello"]
+```
+
+SHELL格式和exec格式
+- shell形式依赖于shell解释，可能会受到shell注入攻击或者其他shell相关问题，但支持重定向，管道等shell特性
+- exec形式更安全，不经过shell，所以没有shell特性支持
+
+#### 简单案例
+```dockerfile
+FROM alpine:3.11
+LABEL maintainer="mystical<mysticalrecluse@gmail.com>"
+RUN apk add bash
+RUN echo {1..10} > a.txt
+RUN ["bash","-c","echo {1..10} > b.txt"]
+```
+```dockerfile
+RUN echo '<h1>Hello,Docker!</h1>' > /usr/share/nginx/html/index.html
+RUN ["/bin/bash", "-c", "echo hello world"]
+RUN yum -y install epel-release \
+  && yum -y install nginx \
+  && rm -rf /usr/share/nginx/html/* \
+  && echo "<h1>docker test nginx</h1>" > /usr/share/nginx/html/index.html
+```
+#### 制作镜像
+```shell
+# docker build -t <镜像名:tag> <Dockerfile所在路径>
+docker build -t alpine-test:v1.0 .
+```
+
+#### 重点
+docker镜像制作的时候，每一层只能增加不能减少，所以对于删除之类的操作，建议和被删除文件放在一行
+```shell
+FROM alpine:3.20.0
+LABEL maintainer="mystical<mysticalrecluse@gmail.com>"
+RUN dd if=/dev/zero of=/bigfile bs=1M count=100
+RUN rm -f /bigfile
+
+# 由于镜像分层，每一次相互独立，因此在最后一行执行rm指令，并不能减少镜像空间大小
+```
+
+#### 镜像调整时区
+```dockerfile
+FROM alpine: 3.19.1
+LABEL author=mystical class=m58
+# 使用alpine下载记得换源，很重要
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/' /etc/apk/repositories \ 
+    apk update && apk --no-cache add curl bash tzdata && ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/locatime 
+```
+
+#### ENV: 定义环境变量
+```dockerfile
+FROM alpine:3.20.0
+LABEL maintainer="mystical<mysticalrecluse@gmail.com>"
+ENV VERSION=1.0.0
+RUN echo $VERSION > /$VERSION.txt
+
+# dockerfile -> image -> container是两个阶段
+# RUN只在dockerfile->image这个阶段生效
+# CMD才能在image -> container阶段生效 
+```
+
+#### ARGS: 和ENV类似
+ENV定义的变量在两个阶段都有效，但是ARGS只在build构建阶段有效
+ARG的应用场景:使用一个Dockerfile，通过更改ARG参数，实现灵活打镜像
+ARG是唯一一个允许写在FROM之前的指令
+```dockerfile
+ARG VERSION=3.20.0
+FROM alpine:$VERSION
+LABEL maintainer="mystical"
+RUN echo 'hellowrold' > 1.txt
+```
+
+注意：在写dockerfile的时候，频繁变化的层向后放，因为docker具有缓存功能，在生成镜像的时候，遇到变化的地方会重新执行
+
+#### COPY:将宿主机的文件拷贝到镜像中
+
+注意：拷贝的源地址必须是相对路径，相对于`Dockerfile`所在位置的`相对路径`
+```dockerfile
+COPY hosts /opt/
+# hosts和Dockerfile在同一级目录， /opt/是镜像内的绝对路径
+COPY files /opt/
+# files是目录
+# 可以直接拷贝文件夹(目录),但是拷贝到镜像中的是源目录下的所有文件，不包括目录本身
+COPY files /a/b/c/
+# COPY指令在拷贝时,可以自动在镜像内创建目录
+# COPY命令不能自动解压缩文件
+```
+
+#### ADD:复制和解包文件
+COPY指令的加强版，不仅可以拷贝文件，还可以在拷贝的过程中解压压缩文件
+
+
+#### CMD: 在容器启动的瞬间，作为启动的默认指令
+```shell
+# 具体使用方法和RUN相同
+#exec格式
+CMD ["executable","param1","param2"]
+
+# shell形式
+SHELL ["/bin/bash","-c"]
+CMD <cmd>
+# dockerfile -> image -> container是两个阶段
+# RUN只在dockerfile->image这个阶段生效
+# CMD才能在image -> container阶段生效 
+```
+
+#### nginx镜像制作
+```dockerfile
+FROM apline:3.20.0
+ENV VERSION=1.26.1
+ADD nginx-${VERSION}.tar.gz /usr/local/src
+RUN apk update && apk --no-cache add gcc make zip unzip net-tools pstree wget libgcc libc-dev libcurl \
+    libc-utils pcre-dev zlib-dev libnfs pcre pcre2 libevent libevent-dev iproute2 && \
+    addgroup -g 888 -S nginx && adduser -s /sbin/nologin -S -D -u 888 -G nginx nginx && \
+    cd /usr/local/src/nginx-${VERSION} && ./configure --prefix=/usr/local/nginx && make && make install && \
+    ln -s /usr/local/nginx/sbin/nginx /usr/local/bin/nginx && \
+    chown -R nginx.nginx /usr/local/nginx/ && rm -rf /usr/local/src/nginx*
+CMD nginx -g "daemon off;"
+# 必须是前台执行的指令
+```
+
+#### 使用CMD构建可传参脚本
+```dockerfile
+FROM nginx:1.26.1-alpine-3.20.0-2024-06-14
+ENV SERVER=m58.wang,org
+RUN mkdir /data/html -p
+COPY start.sh /usr/local/bin/
+CMD ["start.sh"]
+```
+- vim start.sh
+```shell
+#!/bin/bash
+
+mkdir -p /usr/local/nginx/conf/conf.d/
+cat > /usr/local/nginx/conf/conf.d/wang.org.conf
+server {
+   listen 80;
+   server_name ${SERVER};
+   location / {
+      root /data/html;
+   }
+}
+EOF
+echo $SERVER > /data/html/index.html
+nginx -g "daemon off;"
+```
+- 启动容器
+```shell
+docker run -p 80:80 -e SERVER=59 --rm --name nginx01 nginx-mx:1.27
+```
+
+#### ENTRYPOINT: 类似于CMD
+ENTRYPOINT和CMD的区别
+- ENTRYPOINT后面的指令会追加，作为前面指令的参数
+- CMD后面如果有后续输入，则会替换之前设置的指令
+- 如果ENTRYPOINT和CMD共存，则CMD的值看作是ENTRYPOINT的参数
+
+#### ENTRYPOINT和CMD之间配合使用
+- ENTRYPOINT负责执行环境初始化
+- CMD作为容器启动的默认进程
+```dockerfile
+CMD ["nginx","-g","daemon off;"]
+ENTRYPOINT ["start.sh"]
+```
+- vim start.sh
+```shell
+# 环境初始化后面追加CMD指令
+# exec的功能是使用指令命令，替换当前进程
+...
+exec "$@"
+```
+
+#### 面试回答：ENTRYPOINT和CMD的区别
+- 在只有ENTRYPOINT的时候，ENTRYPOINT后面的指令作为容器的启动指令，但是后面的docker命令后面追加的值会作为该指令的参数
+- 在只有CMD的时候，CMD后面的指令作为容器的启动指令，但是后面的docker命令后面追加的值会替换该指令
+- 当ENTRYPOINT和CMD并存时，CMD作为ENTRYPOINT的参数，但是实际应用中，ENTRYPOINT通常负责执行环境初始化，CMD作为容器启动的指令，这里通过在ENTRYPOINT脚本的最后写`exec "@"`实现
+
+
+#### VOLUME: 做数据持久化(匿名卷)
+```dockerfile
+# 生成随机字符串目录，映射到容器内的/data/html
+# 路径通常在/data/docker/volumes/
+VOLUME /data/html
+```
+清理所有的匿名卷
+```shell
+docker volume prune
+```
+在制作docker镜像时，volume指令的作用更多的是告诉使用者，该目录应该持久化，使用者在后续启动容器的时候，使用命名卷对此目录进行持久化
+
+#### EXPOSE: 暴露端口
+```dockerfile
+EXPOSE 80 443
+```
+
+#### WORKDIR: 指定工作目录
+为后续的RUN，CMD，ENTRYPOINT指令配置工作目录，当容器运行后，进入容器内WORKDIR指定的默认目录
+WORKDIR：指定工作目录（当前目录），以后各层的当前目录就被改为指定目录，如果目录不存在，WORKDIR会自行创建
+```dockerfile
+WORKDIR /path/to/workdir
+```
+可以使用多个WORKDIR指令，后续命令如果参数是相对路径，则会基于之前命令指令到的路径
+```dockerfile
+WORKDIR /a
+
+WORKDIR b
+WORKDIR c
+RUN pwd
+
+# 最终路径：/a/b/c
+```
+
+#### dockerfile优化总结
+- 将多个指令尽可能合并，可能会减少大小, 因为dockerfile的每一层是叠加的，只会增加不会减少
+- 频繁变化的层往后放, 能有效提高镜像制作的速度，哪个指令变化了，制作镜像是就会从此指令往后执行，前面的有缓存不需要再执行
+
+
 # Redis
 ## Redis是做什么的，即在哪些场景下使用
 Redis常用的使用场景
