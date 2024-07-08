@@ -263,11 +263,35 @@ curl --data 'query=node_memory_MemFree_bytes{instance=~"10.0.0.(101|102):9100"}[
 }
 ```
 
+#### 数据选择器
+所谓的数据选择器，其实指的是获取实时数据或者历史数据的一种方法
+```shell
+metrics_name{筛选label=值,...}<时间范围> offset <偏移>
+```
+#### 即时向量选择器
+示例
+```shell
+node_memory_MemFree_bytes{instance=~"10.0.0.(101|102):9100"}
+```
+#### 范围选择器
+示例
+```shell
+prometheus_http_requests_total{job="prometheus"}[5m]
+# 表示过去5分钟之内的监控数据
+```
+
 
 #### 指标的类型
-- counter
-- gauge
+- counter(计数器)
+  - counter特点是，值一定是不断增大
+- gauge（计量器）
+  - 当前的值大小，一种度量标准
+- histogram
+  - 直方图
 - summary
+  - 摘要
+
+### PromQL运算
 
 ## 标签管理
 
