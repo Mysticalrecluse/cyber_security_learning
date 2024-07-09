@@ -48,4 +48,22 @@ func g1() func() {
 func timeStudy() {
 	t0 := time.Now()
 	fmt.Println(t0.Unix())
+	fmt.Println(t0.Unix()) // 时间戳 int64
+	time.Sleep(50 * time.Millisecond)
+	t1 := time.Now()
+	// Time - Time = Duration
+	diff := t1.Sub(t0)
+	// Sub()是time.Time这个结构体的方法
+	// 用来计算时间差
+	fmt.Println(diff.Milliseconds())
+
+	// 从t0时刻到此刻
+	fmt.Println(time.Since(t0).Milliseconds())
+
+	// 计算时间的加法
+	// Time + Duration = Time
+	d := time.Duration(2 * time.Sencond)
+	t2 := t0.Add(d)
+	fmt.Println(t2.Unix()) // 时间戳 int64
+
 }

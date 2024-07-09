@@ -1342,6 +1342,11 @@ import (
     "time"
 )
 
+const (
+    DATE="2006-01-02" // 等价于YYYY-mm-dd
+    TIME="2006-01-02 15:04:05" // 等价于 H:M:S, 时:分:秒
+)
+
 func main() {
     // 获取当前时间
     t0 := time.Now()  // t0是time.Time数据类型, 本质是一个结构体
@@ -1356,10 +1361,18 @@ func main() {
     time.Sleep(50*time.Millisecond)
     t1 := time.Now()
     // Time - Time = Duration
+    // type Duration int64, 源码中Duration继承自int64
     diff := t1.Sub(t0)
     // Sub()是time.Time这个结构体的方法
     // 用来计算时间差
     fmt.Println(diff.Milliseconds())
+    //func (d Duration) Abs() Duration
+    //func (d Duration) Hours() float64
+    //func (d Duration) Microseconds() int64
+    //func (d Duration) Milliseconds() int64
+    //func (d Duration) Minutes() float64
+    //func (d Duration) Nanoseconds() int64
+    //func (d Duration) Seconds() int64
 
     // 从t0时刻到此刻
     fmt.Println(time.Since(t0).Milliseconds())
@@ -1370,5 +1383,104 @@ func main() {
     t2 := t0.Add(d)
     fmt.Println(t2.Unix()) // 时间戳 int64
 
+    // 时间的格式化和时间的解析
+    fmt.Println(t0.Format(DATE))
+    s:=t0.Format(TIME)
+    fmt.Println(s)
+
+    // 字符串解析成time类型: Parse
+
+    // time.Parse(时间格式，字符串)返回值是时间
+    t3,_:=time.Parse(TIME, s)  // t3 Time数据类型
+    // t3,err:=time.Parse(TIME, s)  // t3 Time数据类型
+    // 当字符串和时间格式不一致时，就会解析出错，此时err值为!nil
+    fmt.Println(t3.Unix())
+    // 建议使用Parse的时候，加上时区
+    loc,_:=time.LoadLocation("Asia/Shanghai") // 该函数也有err返回值，防止字符串拼写错误
+    t4,_:=time.ParseInLocation(Time,s,loc)
+}
+```
+
+### 时间的格式化
+```go
+const (
+    DATE="2006-01-02" // 等价于YYYY-mm-dd
+    TIME="2006-01-02 15:04:05" // 等价于 H:M:S, 时:分:秒
+)
+```
+
+## Json序列化
+
+Go语言中的Json序列化，就是把一个对象，转换成一个二进制流，即[]byte(切片)
+
+在Go语言中，如果要引用第三方库，需要使用go.mod进行包的管理
+```
+go mod init g6
+go get github.com/bytedance/sonic
+```
+
+```go
+package main
+
+import (
+    "fmt"
+    "encoding/json"
+    // bytedance/sonic库，更高效的序列化反序列化函数库
+    "github.com/bytedance/sonic"
+)
+
+type Student struct {
+    Name string
+    Age int
+    Gender bool
+}
+
+type Class struct {
+    Id string
+    Students []Student
+}
+
+func main() {
+    s:=Student{"张三", 18, true}
+    c:=Class {
+        Id: "1(2)班",
+        Students: []Student{s,s,s},
+    }
+
+    // 将实例c转换成二进制流
+    bytes,err:=json.Marshal(c)  // json序列化
+    if err!=nil{
+        fmt.Println("json序列化失败"，err)
+        return
+    }
+
+    // 将byte切片通过强制类型转换，转换为字符串
+    str:=string(bytes)
+    fmt.println(str)
+
+    // 反序列化，将二进制字节流转换为结构体
+    // 声明一个结构体，后续用来承接反序列化生成的对象
+    var c2 Class
+    // json.Unmarshal(bytes切片，承接对象的结构体)
+    err=json.Unmarshal(bytes, &c2) // 要在函数成员内部改变函数参数，必须传递指针
+    if err!=nil{
+        fmt.Println("json反序列化失败"，err)
+        return
+    }
+    fmt.Println("%+v", c2)// 要打印一个结构体，使用%v或者%+v
+    // 在go语言中，如果要在函数内部修改一个结构体，必须传递指针，否则所有修改仅在函数内部生效
+
+    // 使用sonic进行序列化和反序列化
+    bytes,err:=sonic.Marshal(c)  // json序列化
+    if err!=nil{
+        fmt.Println("json序列化失败"，err)
+        return
+    }
+
+    err=sonic.Unmarshal(bytes, &c2) // 要在函数成员内部改变函数参数，必须传递指针
+    if err!=nil{
+        fmt.Println("json反序列化失败"，err)
+        return
+    }
 }
 ```
