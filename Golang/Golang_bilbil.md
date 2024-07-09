@@ -682,6 +682,17 @@ if v, exists:=m["a"]; exists {
 }
 ```
 
+### map常见用法——判断值是否存在
+```go
+arr := []int{1, 2, 3}
+mp := map[int]bool{1:true, 2:true, 3:true}
+for _, k := range  arr{
+    if _, exists := mp[k]; exists {
+        fmt.Printf("%d,it's exists\n",k)
+    }
+}
+```
+
 ### map的遍历
 ```go
 m := map[string]int{"a": 1, "b": 2}
@@ -979,3 +990,385 @@ require (
 - 大写开头的函数，可以在其他的package里调用，小写开头的函数仅在本包内可见
 - 同理，大写开头的全局变量，可以在其他package使用，小写开头的全局变量，仅在本包内可用
 
+
+## 函数
+### 基本格式
+```go
+func return1(a, b int) int {
+    a = a + b
+    c := a // 声明并初始化一个变量c
+    return c // 函数返回，return后面的语句不会再执行
+}
+```
+### 函数格式2
+```go
+func return2(a, b int) (c int) {// 返回变量c已经声明好了
+    a = a + b
+    c = a //可以直接使用c，不要再次声明
+    return  // 此处必须显式写return
+    // return c 这里写c也ok
+}
+```
+
+### 不定长参数
+```go
+func variable_length_arg(a int, other ...int) int {
+    // 调用该函数时，other可以对应0个参数也可以对应多个参数
+    sum := a
+    // 不定长参数实际上是slice类型
+    for _, ele := range other {
+        sum += ele
+    }
+    if len(other) > 0 {
+        fmt.Printf("first ele %d len %d cap %d\n", other[0], len(other, cap(other)))
+    } else {
+        fmt.Printf("len %d cap %d\n", len(other), cap(other))
+    }
+}
+```
+- 调用varable_length_arg
+```go
+func main() {
+    variable_length_arg(1)
+    variable_length_arg(1, 2)
+    variable_length_arg(1, 2, 3)
+    slc := []int{4,5,6}
+    variable_length_arg(1, slc...)
+    // 将一个切片传递给一个接受不定长参数的函数时，确实需要在切片后面加上 ... 来展开切片。这种用法允许你将切片的元素逐一传递给函数，而不是将整个切片作为一个单独的参数传递。
+}
+```
+
+### 总结`...``的三种用法
+- 数组
+```go
+arr := [...]int{1, 2, 3}
+```
+- 不定长参数
+```go
+func test (a int, other ...int) int {}
+```
+
+- 将一个切片传递给不定长参数
+```go
+slc := []int{1,2,3}
+test(4, slc...)
+```
+
+### 函数类型的变量
+```go
+// FV是一个函数类型的变量
+var FV = func(arg int) {
+    fmt.Printf("%d la %d\n", arg, 2*arg)
+}
+FV(3)
+
+// FT是一种类型(FT没有成员变量)
+type FT func(arg int)
+
+// 类型可以有自己的成员方法
+func (ft FT) Hello (arg int) {
+    ft(arg)
+}
+
+// 类型可以实现接口
+type IFC interface {
+    Hello(arg int)  // 此时FT就实现了Hello()
+}
+
+// 因此ft就可以赋值给IFC类型的变量
+
+// 类型之间的继承
+type byte = uint8  // 表示这两个类型完全等价
+
+type uintptr uintptr // 表示左边的类型是基于右边的类型发展的
+// 右边类型的功能，左边都有，而且左边还可以有自己的额外功能
+```
+
+### 参数是函数
+```go
+func funcCallBack(f func(arg int), arg int) {
+    f(arg)
+}
+```
+
+### 参数是接口
+```go
+func funcInterface(i IFC, arg int) {
+    i.Hello(arg)
+}
+// 所有实现该接口的类型都可以作为参数传进来，比如
+```
+
+### 闭包函数
+```go
+func g1() func() {
+    a := 1
+    g2 := func() {
+        a++
+        fmt.println(a)
+    }
+    return g2
+}
+```
+
+### 回调函数
+
+
+## 异常处理
+如果一个函数内可能出现异常，建议在参数最后添加error参数，做异常处理
+常见异常
+- 除零异常
+- 数组溢出
+  
+```go
+// 递归实现所有参数乘积的倒数
+// error一般作为最后一个返回值
+func div(args ...float64) (float64, error) {
+    if len(args) == 0 {
+        //return 0, errors.New("divide by zero")
+        return 0, fmt.Errorf("divide by zero %s %d", "abc", 4)
+    }
+    first := args[0]
+    if first == 0 {
+        return 0, errors.New("divide by zero")
+    }
+    if len(args) == 1 {
+        return 1 / first, nil
+    }
+    remain := args[1:]
+    res, err := div(remain...)
+    if err != nil {
+        return 0, err
+    } else {
+        return 1 / first * res, nil
+    }
+}
+```
+
+
+### error类型
+error本质上是一个接口
+```go
+type error interface {
+    Error() string
+}
+
+func (e *errorString) Error() string {
+    return e.s
+}
+```
+
+`errors.New()`解析
+```go
+package errors
+
+func New(text string) error {
+    // 这里是返回一个结构体
+    return &errorString{text}
+}
+
+// errorStrings是一个结构体
+type errorString struct {
+    s string
+}
+
+```
+
+
+## 补充
+### panic()用法
+panic()的作用：
+- 立即停止函数执行
+```go
+func defer_exe_time() (i int) {
+    i = 9
+    defer func() {
+        fmt.Printf("first i=%d\n", i)
+    }()
+    defer func(i int) {
+        fmt.Printf("sencond i=%d\n", i)
+        panic("zcy")
+    }
+    defer fmt.Printf("third i = %d\n", i) 
+
+    return 5
+}
+
+// 执行后输出
+/* 
+   third i = 9
+   second i = 9
+   first i = 5
+   panic: zcy
+
+   goroutine 1 [running]:
+   main.defer_exe_time.fun2(0x32f2e8?)
+          D:/go_project/go2career/function/defer.go:27 +0x6a
+   main.defer_exe_time()
+          D:/go_project/go2career/function/defer.go:30 +0x10c
+   main.main()
+          D:/go_project/go2career/function/main.go:11 +0xf
+*/
+```
+```go
+func defer_exe_time() (i int) {
+	i = 9
+	defer func() {
+		fmt.Printf("first i=%d\n", i)
+	}()
+	defer func(i int) {
+		fmt.Printf("sencond i=%d\n", i)
+	}(i)
+	panic("zcy")
+	defer fmt.Printf("third i = %d\n", i)
+
+	return 5
+}
+
+/*
+    sencond i=9
+    first i=9
+    panic: zcy
+    
+    goroutine 1 [running]:
+    main.defer_exe_time()
+            D:/git_repository/cyber_security_learning/Golang/go_prac/prac3/prac.go:44 +0xac
+    main.main()
+            D:/git_repository/cyber_security_learning/Golang/go_prac/prac3/prac.go:70 +0xf
+    exit status 2
+/*
+```
+
+#### 总结：panic与defer的关系
+当`panic`发生时，程序会立刻停止正常执行，开始运行`defer`语句中的代码，然后再传播`panic`事件。如果在`defer`语句中再次发生`panic`，则新的`panic`会替代旧的`panic`
+
+```go
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Starting program")
+    defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("Recovered in main:", r)
+        }
+    }()
+    f1()
+    fmt.Println("This will be printed")
+}
+
+func f1() {
+    fmt.Println("In f1")
+    f2()
+}
+
+func f2() {
+    fmt.Println("In f2")
+    panic("Something went wrong in f2")
+}
+// 程序执行流程如下
+/*
+启动程序
+注册defer
+调用f1
+调用f2
+在f2中引发panic
+panic传播到f1
+panic传播到main
+recover捕获了panic，之后打印"Recovered in main..."
+程序停止
+*/
+```
+- 设计使其能够继续向下执行main函数中后面的程序
+```go
+import "fmt"
+
+func main() {
+	fmt.Println("Starting program")
+	f1()
+	fmt.Println("This will be printed")
+}
+
+func f1() {
+	fmt.Println("In f1")
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in f1:", r)
+		}
+	}()
+    // 这里的重点是，一定要让defer在f2()之前，也就是在触发panic之前，已经注册了defer，后续才会执行
+
+	f2()
+    // 如果将defer放在f2之后，根本不会被注册，会直接传播f2->f1->main->退出
+}
+
+func f2() {
+	fmt.Println("In f2")
+	panic("Something went wrong in f2")
+}
+/*
+   程序执行路径如下
+   开始执行
+   执行f1
+   注册f1的defer
+   执行f2
+   触发f2的panic
+   panic传播到f1
+   因为之前已注册过defer
+   执行defer后的匿名函数
+   捕获panic
+   f1执行结束，同时，成功截获panic
+   程序在main中继续执行
+*/
+
+/*
+   最终结果是
+   Starting program
+   In f1
+   In f2
+   Recovered in f1: Something went wrong in f2
+   This will be printed
+*/
+```
+
+
+## 时间相关函数
+```go
+package main
+
+import (
+    "fmt"
+    "time"
+)
+
+func main() {
+    // 获取当前时间
+    t0 := time.Now()  // t0是time.Time数据类型, 本质是一个结构体
+    /*
+        type Time struct {
+          wall uint64
+          ext  int64
+          loc *Location
+        }
+    */
+    fmt.Println(t0.Unix()) // 时间戳 int64
+    time.Sleep(50*time.Millisecond)
+    t1 := time.Now()
+    // Time - Time = Duration
+    diff := t1.Sub(t0)
+    // Sub()是time.Time这个结构体的方法
+    // 用来计算时间差
+    fmt.Println(diff.Milliseconds())
+
+    // 从t0时刻到此刻
+    fmt.Println(time.Since(t0).Milliseconds())
+
+    // 计算时间的加法
+    // Time + Duration = Time
+    d := time.Duration(2*time.Sencond)
+    t2 := t0.Add(d)
+    fmt.Println(t2.Unix()) // 时间戳 int64
+
+}
+```
