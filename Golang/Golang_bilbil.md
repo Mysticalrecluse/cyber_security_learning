@@ -1484,3 +1484,202 @@ func main() {
     }
 }
 ```
+
+## 抽象
+### 关于抽象的小案例
+```go
+package main
+
+import (
+    "fmt"
+)
+
+// 定义一个结构体Account
+type Account struct {
+    AccountNo string
+    Pwd string
+    Balance float64
+}
+
+// 方法
+// 1.存款
+func (account *Account) Deposite(money float64, pwd string) {
+    // 看下输入的密码是否正确
+    if pwd != account.Pwd {
+        fmt.Println("你输入的密码不正确")
+        return
+    }
+
+    // 查看存款金额是否正确
+    if money <= 0 {
+        fmt.Println("你输入的金额不正确")
+        return
+    }
+
+    account.Balance += money
+    fmt.Println("存款成功")
+}
+
+// 2.取款
+func (account *Account) WithDraw(money float64, pwd string) {
+    // 看下输入的密码是否正确
+    if pwd != account.Pwd {
+        fmt.Println("你输入的密码不正确")
+        return
+    }
+
+    // 查看存款金额是否正确
+    if money <= 0 || money > account.Balance {
+        fmt.Println("你输入的金额不正确")
+        return
+    }
+
+    account.Balance -= money
+    fmt.Println("取款成功")
+}
+
+// 查询余额
+func (account *Account) Query(pwd string) float64 {
+    if pwd != account.Pwd {
+        fmt.Println("你输入的密码不正确")
+        return
+    }
+    return account.Balance
+}
+```
+
+## 面向对象基本特性
+### 封装
+封装(encapsulation)就是把抽象出的`字段和对字段的操作`封装在一起，数据被保护在内部，程序的其他包只有通过被授权的操作(方法)，才能对字段进行操作
+
+封装的好处
+- 隐藏实现细节
+- 它可以对数据进行验证，保证安全合理
+
+如何体现封装
+- 对结构体中的属性进行封装
+- 通过方法、包实现封装
+
+封装实现的步骤
+1. 将结构体、字段(属性)的`首字母小写`(不能导出了，其他包不能使用，类似private)
+2. 给结构体所在包提供一个工厂模式的函数，首字母大写，类似一个构造函数
+3. 提供一个首字母大写的Set方法（类似其他语言的public），用于对属性判断并赋值
+```go
+func (var 结构体类型名) SetXxx(参数列表) (返回值列表) {
+    // 加入数据验证的业务逻辑
+    var.字段 = 参数
+}
+```
+4. 提供一个首字母大写的Get方法(类似其他语言的public)，用于获取属性的值
+```go
+func(var 结构体类型名) GetXxx() {
+    return var.字段
+}
+```
+
+#### 封装案例
+设计一个程序，不能随便查看人的年龄，工资等隐私，并对输入年龄进行合理验证
+```go
+// 目录结构设计
+// encapsulate>(main, model(person.go))
+package model
+
+type person struct {
+    Name string
+    age int  // 其他包不能直接访问呢
+    sal float64
+}
+
+// 写一个工厂模式的函数，相当于构造函数
+func NewPerson(name string) *person {
+    return &person {
+        Name: name,
+    }
+}
+
+// 为了访问age和sal我们编写一对SetXxx的方法和GetXxx的方法
+func (p *person) SetAge(age int) {
+    if age >=0 && age < 150 {
+        p.age = age
+    } else {
+        fmt.Println("年龄范围不正确..")
+        // 也可以给个默认值
+    }
+}
+
+func (p *person) GetAge() int {
+    return p.age
+}
+
+func (p *person) SetSal(age float64) {
+    if sal >= 3000 && sal < 30000 {
+        p.sal = sal
+    } else {
+        fmt.Println("薪水范围不正确..")
+    }
+}
+
+func (p *person) GetSal() float64 {
+    return p.sal
+}
+```
+
+### 继承
+
+```go
+// 小学生
+type Pupil struct {
+    Name string
+    Age int
+    Score int
+}
+
+// 显示成绩
+func (p *Pupil) ShowInfo() {
+    fmt.Printf("学生名=%v 年龄=%v 成绩=%v\n", p.Name, p.Age, p.Score)
+}
+
+func (p *Pupil) SetScore(socre int) {
+    // 业务判断
+    p.Score = score
+}
+
+func (p *Pupil) testing() {
+    fmt.Println("小学生正在考试...")
+}
+
+// 大学生，研究生...
+// 这里如果重写大学生的结构体和方法，就会发生代码冗余，因此这里使用继承
+
+func main() {
+    // 测试
+    var pupil = &Pupil{
+        Name : "tom",
+        Age : 10
+    }
+    pupil.testing()
+    pupil.SetScore(90)
+    pupil.ShowInfo()
+}
+```
+
+### Go中继承的实现
+通过匿名结构体实现继承
+在结构体中嵌入一个匿名结构体实现继承
+
+#### 总结
+在Golang中，如果一个struct嵌套了另一个匿名结构体，那么这个结构体可以直接访问匿名结构体的字段和方法，从而实现了继承特性。
+
+#### 嵌套匿名结构体的基本语法
+```go
+type Goods struct {
+    Name string
+    Price int
+}
+
+type Book struct {
+    Goods // 这里就是嵌套匿名结构体，这里只有类型，没有名称
+    Writer string
+}
+// 此时Book也能使用Goods的属性和方法
+```
