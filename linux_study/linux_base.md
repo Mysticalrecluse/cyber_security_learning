@@ -14348,6 +14348,11 @@ worker_priority 0  # 相当于CPU的NICE优先级，且范围和Nice相同，都
 # 通常配合lvs反向代理使用,比如该nginx所在服务器最多承载5w的连接，则可以限流5w，多余的浏览由lvs将其分流给其他服务器处理
 # 该数据受内核参数`ulimit -n`数量限制，来需要该外面的其他设置
 # 如果是nginx直接启动，更改/egt/security/limits.conf 
+# 更改limits.conf
+# 添加 * hard nofile 10000
+# * soft nofile 10000
+# root hard nofile 10000
+# root soft nofile 10000
 
 # 如果是systemctl启动，则更改service文件中的参数
 # LimitNOFILE=100000

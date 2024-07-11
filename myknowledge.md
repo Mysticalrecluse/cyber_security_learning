@@ -188,7 +188,11 @@ LVS默认模式
 
 
 # Docker
+## 什么是容器
+容器就是Namespace+Cgroups
 
+Namespace帮助容器实现各种计算资源的隔离
+Cgroups主要对容器使用某种资源量的多少做一个限制
 ## NameSpace
 主要作用：资源隔离
 ## Cgroups
@@ -196,20 +200,7 @@ LVS默认模式
 主要作用：资源限制
 
 ### Cgroups的原理
-Cgroups 通过不同的子系统限制了不同的资源，每个子系统限制一种资源。每个子系统限制资源的方式都是类似的，就是把相关的一组进程分配到一个控制组里，然后通过树结构进行管理，每个控制组都设有自己的资源控制参数。
-
-### Cgroups常见子系统
-- CPU 子系统，用来限制一个控制组（一组进程，你可以理解为一个容器里所有的进程）可使用的最大 CPU。
-- memory 子系统，用来限制一个控制组最大的内存使用量。
-- pids 子系统，用来限制一个控制组里最多可以运行多少个进程。
-- cpuset 子系统， 这个子系统来限制一个控制组里的进程可以在哪几个物理 CPU 上运行。
-
-对于启动的每个容器，都会在 Cgroups 子系统下建立一个目录，在 Cgroups 中这个目录也被称作控制组
-```shell
-root@ubuntu2204:~/dockerfile$ll /sys/fs/cgroup/system.slice/|grep docker
-drwxr-xr-x  2 root root 0 Jul 10 18:57 docker-765574dfc55276ba79d41f5615b19011ac19d0b3a4b1ddb348eb004f952315fc.scope/
-```
-
+详情见Container.md
 
 ## Docker file制作
 ### 制作镜像的常用指令
@@ -645,10 +636,32 @@ ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock
 docker run --name nginx -v /etc/nginx nginx
 # 当执行docker rm -v 或者docker run --rm ...，都会删除匿名卷
 ```
+当新启一个容器时，匿名卷会新建，无法复用老容器的资源，除非找到之前匿名件的位置，将里面的数据拷贝到新的容器的匿名卷中
 #### 命名卷
 ```shell
-
+# 单独创建命名卷
+docker volume create mydata
+# 启动容器的时候生成命名卷
+docker run -it --name web01 -p 80:80 -v mynginx:/usr/share/nginx/html nginx:1.22
+# 查看所有卷信息
+docker volume ls
 ```
+
+#### 数据卷容器
+应用场景：当多个容器需要挂载同一个目录时
+```shell
+docker run -v /data/nginx:/usr/share/nginx/html -v ./nginx.conf:/etc/nginx/nginx.conf --name web01
+docker run -v /data/nginx:/usr/share/nginx/html -v ./nginx.conf:/etc/nginx/nginx.conf --name web02
+docker run -v /data/nginx:/usr/share/nginx/html -v ./nginx.conf:/etc/nginx/nginx.conf --name web03
+```
+创建一个专门提供卷挂载的容器，volume-server
+其他的容器使用volume-server提供的挂载关系
+```shell
+docker run --name volume-server -v /data/nginx:/usr/share/nginx/html -v ./nginx.conf:/etc/nginx.conf alpine:latest
+
+docker run --volumes-from volume-server -name web01 nginx
+```
+数据卷容器仅为提供挂载关系而存在，因此，具体是什么容器，是否处于启动状态都不重要，只要存在即可
 
 ### 绑定挂载
 ```shell
@@ -667,6 +680,65 @@ tmpfs挂载是临时的，只存留在容器宿主机的内存中，当容器停
 docker run -d --tmpfs /data --name test <images>
 # tmpfs里的数据，不论是删除容器，还是停止容器，容器内的数据都会被清理掉
 ```
+
+## docker网络
+```shell
+3: docker0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:50:eb:c4:d1 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:50ff:feeb:c4d1/64 scope link 
+       valid_lft forever preferred_lft forever
+# if6: 容器网卡接口
+7: vethaff3922@if6: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default 
+    link/ether d2:79:57:d9:7e:7c brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::d079:57ff:fed9:7e7c/64 scope link 
+       valid_lft forever preferred_lft forever
+```
+进入容器内部查看
+```shell
+[root@devops system.slice]#docker exec myhttpd1 ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+6: eth0@if7: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+```
+
+### 容器间的通信
+默认情况下，同一个宿主机的不同容器可以相互通信
+```shell
+dockerd --icc Enable inter-container communication (default true)
+--icc=false  # 此配置可以禁止同一个宿主机的容器之间通信
+# 添加--icc选项，本质上就是修改iptables规则
+-A FORWARD -i docker0 -o docker0 -j ACCEPT修改为DROP
+```
+
+#### 修改默认docker0网桥的网络配置
+默认docker会自动生成一个docker0的网桥，使用的IP是172.17.0.1/16，可能和宿主机的网段发生冲突，可以将其修改成其他网段地址，避免冲突
+```shell
+# 方法1：
+vim /etc/docker/daemon.json
+{
+   "bip": "192.169.100.1/24"
+}
+# 重启docker
+systemctl restart docker.service
+
+# 方法2：
+vim /lib/systemd/system/docker.service
+ExecStart=/usr/bin/dockerd -H fd:// --containerd=/run/containerd/containerd.sock --bip=192.168.100.1/24
+
+# 重置并重启
+systemctl daemon-reload && systemctl restart docker.service
+```
+#### 修改默认网桥设置使用自定义网桥
+详情见Docker-magedu.md
 
 # Redis
 ## Redis是做什么的，即在哪些场景下使用

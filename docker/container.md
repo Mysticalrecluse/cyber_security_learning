@@ -53,3 +53,104 @@ Cgroups 通过不同的子系统限制了不同的资源，每个子系统限制
 root@ubuntu2204:~/dockerfile$ll /sys/fs/cgroup/system.slice/|grep docker
 drwxr-xr-x  2 root root 0 Jul 10 18:57 docker-765574dfc55276ba79d41f5615b19011ac19d0b3a4b1ddb348eb004f952315fc.scope/
 ```
+容器中所有的进程都会存储在这个控制组中`cgroup.procs`这个参数里
+
+#### 通过控制组控制Memory使用量
+```shell
+# cd /sys/fs/cgroup/memory/system.slice/docker-c5a9ff78d9c1fedd52511e18fdbd26357250719fa0d128349547a50fad7c5de9.scope
+
+# cat cgroup.procs
+20731
+20787
+20788
+20789
+20791
+
+# echo 2147483648 > memory.limit_in_bytes
+# cat memory.limit_in_bytes
+2147483648
+```
+
+
+## 容器进程
+
+### 理解init进程
+```c
+init/main.c
+
+        /*
+         * We try each of these until one succeeds.
+         *
+         * The Bourne shell can be used instead of init if we are
+         * trying to recover a really broken machine.
+         */
+        
+        // 如果提供了execute_command命令，即通过内核参数`init=`指定了初始化命令
+        // run_init_process会尝试运行这个命令
+        if (execute_command) {
+                ret = run_init_process(execute_command);
+                // 如果命令执行成功，则返回0
+                if (!ret)
+                        return 0;
+                // 命令执行失败，就会触发panic，显示错误，并引发内核恐慌
+                panic("Requested init %s failed (error %d).",
+                      execute_command, ret);
+        }
+        // 如果没有指定`execute_command`或它执行失败，代码会尝试
+        // 代码会尝试运行常见的初始化进程路径
+        // 其中任何一个成功，都会返回0，表示进程启动成功
+        // 如果全都失败，就会引发内核恐慌，并输出提示信息
+        if (!try_to_run_init_process("/sbin/init") ||
+            !try_to_run_init_process("/etc/init") ||
+            !try_to_run_init_process("/bin/init") ||
+            !try_to_run_init_process("/bin/sh"))
+                return 0;
+
+
+        panic("No working init found.  Try passing init= option to kernel. "
+              "See Linux Documentation/admin-guide/init.rst for guidance.");
+```
+
+### 如何指定"init="参数
+#### 在GRUB引导菜单中指定
+如果你的系统使用GRUB作为引导加载程序，你可以在引导时临时指定`init=`参数
+- 在启动时进入GRUB菜单（通常通过按下`Esc`，`Shift`或`F2`）
+- 选择要启动的内核行，按`e`键进入编辑模式
+- 找到以`linux`开头的行，在行末添加`init=/path/to/your/init`
+- 按`Ctrl + X`或`F10`启动修改后在内核配置
+
+#### 修改GRUB配置文件
+如果你希望永久更改`init`参数，可以修改GRUB配置文件`/etc/default/grub`并更新GRUB配置
+```shell
+# 编辑/etc/default/grub
+# vim /etc/default/grub
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash init=/path/to/your/init"
+
+```
+
+
+### 信号(SIGHUP)和(SIGKILL)
+
+#### `kill -1`(SIGHUP)
+作用：`kill -1`发送SIGHUP信号，即“挂起”信号(Hangup Signal)
+
+- 重新加载配置：
+  - 对于很多守护进程（如`nginx`、`apache`），接收到SIGHUP信号后，它们不会终止进程，而是重新加载配置文件。这对于在不中断服务的情况下，更新配置非常有用
+- 终止进程
+  - 对与某些进程，SIGHUP信号会导致它们终止。这通常适用于那些没有特别处理SIGUP信号的进程
+- 回话终止
+  - 最初，SIGHUP信号用于通知终端用户的挂起。例如，当用户断开与中断的连接时，SIGHUP信号会发送到与该终端相关的所有进程，通知它们会话已结束
+
+总结：发送SIGUP信号，通常用于通知守护进程重新加载配置，或者通知会话终止
+
+#### `kill -9`(SIGKILL)
+作用：`kill -9`发送SIGKILL信号，即“强制终止”信号(Kill Signal)
+- 立即终止进程：
+  - SIGKILL信号无法被捕获、阻塞、或忽略。当进程接收到SIGKILL信号时，它会立即被内核终止，无法进行任何清理操作
+- 强制杀死进程：
+  - 及时进程处于挂起状态，僵尸状态或者无法响应其他信号，SIGKILL也会确保进程被强制终止
+
+总结：强制立即终止进程，不允许进程进行任何清理操作
+
+
+

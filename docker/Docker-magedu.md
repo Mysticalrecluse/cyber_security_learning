@@ -1272,6 +1272,8 @@ docker network rm <自定义网络名称或网络ID>
 # 将容器加入指定网路
 docker network connect <网络> <容器名>
 # 本质上是添加一个新网卡，分配了新加入网路的同网段IP
+
+# 当容器都处在一个自定义网路中的时候，可以直接使用容器名通讯，不需要--link再指定一次
 ```
 
 ## Docker Compose容器单机编排
