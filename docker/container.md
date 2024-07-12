@@ -129,7 +129,23 @@ GRUB_CMDLINE_LINUX_DEFAULT="quiet splash init=/path/to/your/init"
 ```
 
 
-### 信号(SIGHUP)和(SIGKILL)
+### `Kill`信号
+
+进程在收到信号后，就会去做相应的处理。对于每个信号，进程对它的处理有下面三个选择
+- 第一个选择是`忽略(Ignore)`，就是对这个信号不做任何处理
+  - 有两个信号例外：`SIGKILL(9)`和`SIGSTOP(19)`，进程是不能忽略的
+  - 他们的主要作用是为Linux Kernel和超级用户提供删除任何进程的特权
+
+- 第二个选择，就是`捕获(Catch)`，这个是指让用户进程可以注册自己针对这个信号的handle。
+  - 对于`捕获` `(SIGSTOP)`和`(SIGKILL)`这两个信号也例外，这两个信号不能有用户自己的处理代码，只能执行系统的缺省行为
+
+- 第三个选择，`缺省行为(Default)`,Linux 为每个信号都定义了一个缺省的行为，你可以在 Linux 系统中运行 man 7 signal来查看每个信号的缺省行为。
+
+
+#### `kill -15`(SIGTERM)
+这个信号是Linux命令kill缺省发出的，给一个进程发送信号，在没有别的参数时，这个信号类型默认为SIGTERM
+
+SIGTERM可以被`捕获`，这里的`捕获`指的就是用户进程可以为这个信号注册自己的handler，而这个handler，他可以处理进程的graceful-shutdown问题
 
 #### `kill -1`(SIGHUP)
 作用：`kill -1`发送SIGHUP信号，即“挂起”信号(Hangup Signal)
@@ -153,4 +169,4 @@ GRUB_CMDLINE_LINUX_DEFAULT="quiet splash init=/path/to/your/init"
 总结：强制立即终止进程，不允许进程进行任何清理操作
 
 
-
+####
