@@ -154,12 +154,20 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
 ## HTTP解决了什么问题
 - HTTP/1.1 创始人：Roy Thomas Fielding
   - 参与制订HTTP/1.0规范 (1996.5)
-  - 参与制订URL规范 (1998.8)
+  - 参与制订URI规范 (1998.8)
   - 主导制订HTTP/1.1规范 (1999.6)
   - 2000年发布指导HTTP/1.1规范制订的论文
     - 《Architectural Style and the Design of Network-based Software Architectures》即我们常谈的Representational State Transfer(REST)架构
   - Apache基金会 (The Apache Software Foundation) 共同创始人
     - 参与开发Apache httpd服务 
+
+- Form Follws Function (形式一定是为功能服务的)
+```shell
+GET / HTTP/1.1
+Host: developer.mozilla.org
+Accept-Language: fr
+# 思考：http报文，为什么是这种形式
+```
 
 - 万维网创始人：Tim Berners Lee
   - Web's major goal was to be a shared information space through which people and machines could communicate.
@@ -169,7 +177,7 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
   - 可扩展性：巨大的用户群体，超长的寿命
   - 分布式系统下的Hypermedia：大粒度数据的网络传输
   - Internet模式
-    - 无法控制的scalability
+    - 无法控制的scalability(可扩展性)
       - 不可预测的负载、非法格式的数据、恶意消息
       - 客户端不能保持所有服务器信息，服务器不能保持多个请求间的状态信息
     - 独立的组件部署：新老组件并存
@@ -179,7 +187,7 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
 - HTTP协议应当在以下属性中取得可接受的均衡：
   - 性能performance：影响高可用的关键因素
   - 可伸缩性Scalability：支持部署可以相互交互的大量组件
-  - 简单性Simplicity：易理解、易实现、易验证
+  - 简单性Simplicity：易理解、易实现、易验证(一个复杂的设计通常不是最好的解决方案)
   - 可见性Visiable：对两个组件间的交互进行监视或者仲裁的能力。如缓存、分层设计等
   - 可移植性Portability：在不同的环境下运行的能力
   - 可靠性Reliability：出现部分故障时，对整体影响的程度
@@ -187,20 +195,23 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
 
 ### 性能
 - 网络性能 Network Performance
-  - Throughput吞吐量：小于等于带宽Bandwidth
+  - Throughput吞吐量：小于等于带宽Bandwidth(高并发下，每秒处理的请求数等)
   - Overhead开销：首次开销，每次开销
+    - 比如：http建立长连接，首次连接会有三次握手的开销，后续的开销就会比较小，而在http2.0，后续开销还会少传一些http头部，因为2.0中的后续每次开销可以复用首次开销中传递过的http的头部
 - 用户感知到的性能 User-perceived Performance
   - Latency延迟：发起请求到接收到响应的时间
   - Completion完成时间：完成一个应用动作所花费的时间
 - 网络效率 Network Efficiency
-  - 重用缓存、减少交互次数、数据传输距离更近(CDN)、COD
+  - 重用缓存、减少交互次数、数据传输距离更近(CDN)、COD(按需代码)
 
 ### 可修改性
 - 可进化型Evolvability：一个组件独立升级而不影响其他组件
 - 可扩展性Extensibility：向系统添加功能，而不会影响到系统的其他部分
+  - (比如TLS的加入，并不影响不使用TLS加密的http网站的使用，这就是可扩展性)
 - 可定制性Customizability：临时性、定制性地更改某一要素来提供服务，不对常规客户产生影响
 - 可配置性Configurability：应用部署后可通过修改配置提供新的功能
 - 可重用性Reusability：组件可以不做修改在其他应用上使用
+  - 比如：浏览器渲染引擎，可以在多个浏览器IE,chrome使用，这就是可重用性的体现
 
 ## 从五种架构风格推导出HTTP的REST架构
 ### 5种架构风格
@@ -216,6 +227,94 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
 - 点对点风格：Peer-to-Peer Styles
   - 优点：可进化型、可重用性、可扩展性、可配置性
 
+#### 数据流风格 Data-flow Style
+- 管道与过滤器Pipe And Filter,PF
+  - 每个Filter都有输入和输出端，只能从输入端读取数据，处理后再从输出端产生数据
+  - 比如：协议：tcp->ip->数据链路层协议... 是一个单向的，
+- 统一接口的管道与过滤器(Uniform Pipe And Filter,UPF)
+  - 在PF上增加了同一接口的约束，所有Filter过滤器必须具备同样的接口
+
+#### 复制风格 Replicated Repository,RR
+- 多个进程提供相同的服务，通过反向代理对外提供集中服务
+  - 比如：mysql的主从备份，Web集群等
+
+- 缓存 $
+  - RR的变体，通过复制请求的结果，为后续请求复用
+
+#### 分层风格 Hierarchical Styles
+- 客户端服务器 Client-Server, CS
+  - 由Client触发请求，Server监听到请求后产生响应，Client一直等待收到响应后，会话结束
+  - 分离关注点隐藏细节，良好的简单性，可伸缩性，可进化性
+    - 分离关注点解读：Server只关注资源响应的深层，资源的管理，Client关注网路结果，可视化渲染,无论是客户端还是服务端都向对方隐藏了各自的细节，因此简单性比较好
+
+- 分层系统 Layered System,LS
+  - 每层为其之上的层服务，并使用在其之下的层所提供的服务，例如TCP/IP
+
+- 分层客户端服务器架构Layered Client-Server,LCS
+  - LS+CS，例如正常代理，反向代理，从空间上分为外部和内部
+
+- 无状态，客户端服务器Client-Stateless-Server,CSS
+  - 基于CS，服务器上不允许有session state会话状态
+  - 提升了可见性，可伸缩性，可靠性，但重复数据会降低网络性能
+
+- 缓存，无状态，客户端服务器（Client-Stateless-Server CSS）C$SS
+ - 提性能
+
+- 分层、缓存、无状态、客户端服务器Layered-Client-Cache-Stateless-Server, LC$SSo
+
+- 远程会话 Remote Session,RS
+  - CS变体，服务器保存Application state应用状态
+  - 可伸缩性，可见性差
+
+- 远程数据访问 Remote Date Access，RDA
+  - CS变体，Application State应用状态同时分布在客户端和服务端
+  - 巨大的数据集有可能通过迭代而减少
+  - 简单小，可伸缩性差
+
+#### 移动代码风格 Mobile Code Styles
+- 虚拟机Virtual Machine VM
+  - 分离指令与实现
+
+- 远程求值Remote Evaluation,REV
+  - 基于CS的VM，将代码发送至服务器执行
+
+- 按需代码Code on Demand, COD
+  - 服务器在响应中发回处理代码，在客户端执行(js,javascript)
+  - 优秀的可扩展性和可配置型，提成用户察觉性能和网络效率
+
+- 分层，需要带代码，缓存，无状态，客户端服务器
+  - LCODC$SS: Layered-Code-on-Demand-Client-Cache-Stateless-Server
+  - LC$SS + COD
+
+- 移动代理Mobile Agent, MA
+  - 相当于REV+COD
+
+#### 点对点风格Peer-to-Peer Style
+- Event-based Intergration EBI
+  - 基于事件集成系统，类似kafka这样的消息系统+分发订阅来消除耦合
+  - 优秀的可重用性，可扩展性，可进化性
+  - 缺乏可理解性
+  - 由于消息广播等因素造成的消息风暴，可伸缩性差
+
+- Chiron-2 C2
+  - 相当于EBI+LCS，控制了消息的方向
+
+- Distributed Object，DO
+  - 组件结对交互
+
+- Brokered Distrubuted Object BDO
+  - 引入名字解析组件，来简化DO，例如CORBA
+
+## Chrome抓包，快速定位HTTP协议问题
+- 快捷键：Contorl + Shift + I
+
+### Chrome抓包：Network面板
+- 控制器：控制面板的外观和功能
+- 过滤器：过滤请求列表中显示的资源
+  - 按ctrl，然后点击过滤器可以同时选择多个过滤器
+- 概览：显示HTTP请求，响应时间轴
+- 请求列表：默认时间排序，可选择显示列
+- 概要：请求总数，总数据量，总花费时间
 
 ## URL和URI的区别
 ### 什么是URI
