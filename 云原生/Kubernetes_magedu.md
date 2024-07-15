@@ -9,7 +9,7 @@ Kubernetes组件分为三种
     - K8S内部通信的总入口
   - scheduler
   - controller-mananger
-  - Etcd
+  - Etcd(集群状态存储系统，用于存储集群状态)
 - Node Components 节点组件
   - Kubelet
     - 接收从master节点发过来的指令(通过API Server)
@@ -70,3 +70,86 @@ Kubernetes集群中有三套CA机制
 - 负载均衡haproxy2
   - IP: 10.0.0.13
   - 主机名：ha2.feng.org
+
+## Kubernetes资源种类
+查看kubernetes资源种类
+```shell
+kubectl api-resources
+```
+
+## Kubernetes与集群进行交互的主要方式
+### RESTful API
+#### 获取所有Pod
+- 请求方法：GET
+- 请求URL：`/api/v1/namespaces/{namespace}/pods`
+- 示例
+```shell
+GET /api/v1/namespace/default/pods
+```
+
+#### 创建一个新的Pod
+- 请求方法：POST
+- 请求URL：`/api/v1/namespace/{namespace}/pods`
+```shell
+POST /api/v1/namespaces/default/pods
+Content-Type: application/json
+
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "my-pod"
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "my-container",
+        "image": "nginx",
+        "ports": [
+          {
+            "containerPort": 80
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+#### 删除一个Pod
+- 请求方法：DELETE
+- 请求URL：`/api/v1/namespace/{namespace}/pods/{name}`
+```shell
+DELETE /api/v1/namespaces/default/pods/my-pod
+```
+
+#### 更新一个Pod
+- 请求方法：PUT
+- 请求URL`/api/v1/namespace/{namespace}/pods/{name}`
+- 示例：更新名为`my-pod`的Pod(注意，更新Pod通常使用的是`PATCH`请求，但这里以`PUT`为例)
+```shell
+PUT /api/v1/namespaces/default/pods/my-pod
+Content-Type: application/json
+
+{
+  "apiVersion": "v1",
+  "kind": "Pod",
+  "metadata": {
+    "name": "my-pod"
+  },
+  "spec": {
+    "containers": [
+      {
+        "name": "my-container",
+        "image": "nginx:latest",
+        "ports": [
+          {
+            "containerPort": 80
+          }
+        ]
+      }
+    ]
+  }
+}
+
+```
