@@ -316,6 +316,72 @@ Accept-Language: fr
 - 请求列表：默认时间排序，可选择显示列
 - 概要：请求总数，总数据量，总花费时间
 
+### 过滤器
+- domain: 仅显示来自指定域的资源。你可以使用通配符(*)纳入多个域
+- has-response-header: 显示包含指定HTTP响应标头的资源
+- is：
+  - `is: running`可以查找WebSocket资源，
+  - `is:from-cache`可以查找缓存读出的资源
+- larger-than: 显示`大于`指定大小的资源(以字节为单位)。
+- method: 显示通过指定HTTP方法类型检索的资源
+- mime-type: 显示指定MIME类型资源
+- mixed-content: 显示所有混合内容资源（mixed-content:all），或者仅显示当前显示的资源（mixed-content:displayed）
+- scheme: 显示通过未保护HTTP（scheme:http）或受保护HTTPS(scheme:https)检索的资源
+- set-cookie-domain: 显示具有Set-Cookie标头并且Domain属性与指定值匹配的资源
+- set-cookie-name: 显示具有set-cookie标头并且名称与指定值匹配的资源
+- set-cookie-value: 显示具有set-cookie标头并且值与指定值匹配的资源
+- status-code: 仅显示HTTP状态代码与指定代码匹配的资源
+
+- tip: 想要过滤多个条件，各个条件间用空格隔开(and操作)
+
+
+### 请求列表的排序
+- 时间排序，默认
+- 按列排序
+- 按活动时间排序（右键->Waterfall->..）
+  - Start Time：发出的第一个请求位于顶部
+  - Response Time: 开始下载的第一个请求位于顶部
+  - End Time: 完成的第一个请求位于顶部
+  - Total Duration: 连接设置时间和请求/响应时间最短的请求位于顶部
+  - Latency：等待最短响应时间的请求位于顶部 
+
+### 预览请求内容
+- 查看头部
+- 查看cookie
+- 预览响应正文，查看图像用
+- 查看响应正文
+- 时间详细分布
+- 导出数据为HAR格式
+- 查看请求上下游：按住`shift`键悬停请求上，绿色是上游，红色是下游
+
+### 浏览器加载时间
+- 触发流程
+  - 解析HTML结构
+  - 加载外部脚本和样式表文件
+  - 解析并执行脚本代码 //部分脚本会阻塞页面加载
+  - DOM树构建完成 // DOMContentLoaded事件
+  - 加载图片等外部文件
+  - 页面记载完毕 // load事件
+
+### 请求时间详情分布
+![alt text](th_images/image2.png)
+
+- Queueing: 浏览器在以下情况下对请求排队
+  - 存在更高优先级的请求
+  - 此源已打开六个TCP连接，达到限值，仅适用HTTP/1.0和HTTP/1.1
+  - 浏览器正在短暂分配磁盘缓存中的空间
+- Stalled：请求可能会因Queueing中描述的任何原因而停止
+- DNS Lookup：浏览器正在解析请求的IP地址
+- Proxy Negotiation：浏览器正在与代理服务器协商请求
+- Request sent：正在发送请求
+- ServiceWorker Preparation: 浏览器正在启动Service Worker（真正负责网络相关的进程）
+- Request to ServiceWorker：正在将请求发送到Service Worker
+- Waiting（TTFB）：浏览器正在等待响应的第一个字节。TTFB表示Time To First Byte（至第一字节的时间）。此时间包括1次往返延迟时间及服务器准备响应所用的时间
+- Content Download：浏览器正在接受响应
+- Receiving Push：浏览器正在通过HTTP/2服务器推送接收此响应的数据
+- Reading Push：浏览器正在读取之前收到的本地数据
+
+
 ## URL和URI的区别
 ### 什么是URI
 - URL: RFC1738 (1994.12) , Uniform Resource Locator
