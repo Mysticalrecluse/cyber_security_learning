@@ -398,3 +398,84 @@ KREW=./krew-"$(uname | tr '[:upper:]' '[:lower:]')_amd64"
 "$KREW" install --manifest=krew.yaml --archive=krew.tar.gz
 "$KREW" update
 ```
+
+## Kubernetes资源管理
+### 工作负载型资源
+
+### 发现与负载均衡 
+#### ReplicationController(上一代无状态应用控制器，不建议使用)
+- 用于确保每个Pod副本在任意时刻均能满足目标数量，即它用于保证每个容器或容器组总是运行并可访问
+#### ReplicaSet
+- 新一代ReplicationController，与ReplicationController唯一不同的：
+  - 支持的标签选择器不同，不仅支持等值选择器，还支持基于集合的`选择器`
+
+#### Deployment
+- 用于管理无状态的持久化应用，例如HTTP服务等
+- 用于为Pod和ReplicaSet提供声明式更新，是构建在ReplicaSet之上的更高级的控制器
+
+#### StatefulSet
+- 用于管理有状态的持久化应用
+- 为每个Pod创建一个独有的持久性标识符，并确保各Pod间的`顺序性`
+
+#### DaemonSet
+- 用于确保每个节点都运行了某Pod的一个副本，包括后来新增的节点
+- 常用于运行各类系统级守护进程
+
+#### Job
+- 用于管理运行完成后即可终止的任务，例如批处理作业任务；
+- Job创建一个或多个Pod，并确保其符合目标数量，直到应用完成而终止
+- `Cronjob`控制器对象，还能为Job型任务提供定期执行机制
+
+
+### 发现与负载均衡
+#### Service
+- 用于为工作负载实例提供固定的访问入口及负载均衡服务
+- 它把每个后端实例定义为`Endpoint`，简称ep
+
+#### Ingress
+- 为工作负载提供7层代理(HTTP/HTTPS)及负载均衡功能
+
+
+### 配置与存储
+#### ConfigMap
+- 以环境变量或存储卷的方式，接入Pod资源的容器中，并可被多个同类的Pod共享引用
+- 从而做到`一次修改，多处生效`
+
+#### Secret
+- 适用于存储敏感数据
+- 例如：证书，私钥和密码等
+
+#### CSI(存储)
+
+
+### 集群型资源
+- 用于定义集群自身的配置信息
+
+#### 名称空间NameSpace
+
+#### Node
+- Kubernetes并不能直接管理工作节点
+- 它把由管理员添加进来的任何形式的工作节点映射为一个Node资源对象(待理解)
+
+#### Role
+- 角色，隶属于名称空间，代表名称空间级别由规则组成的权限集合
+- 可被`RoleBinding`引用
+
+#### ClusterRole
+- 集群角色，隶属于集群，由规则组成的权限集合
+- 可被`RoleBinding`和`ClusterRoleBinding`引用
+
+#### RoleBinding
+- 用于将Role中的许可权限绑定在一个或一组用户上，从而完成用户授权
+- 仅作用于名称空间级别
+
+#### Clusterole
+- 同上，但是是集群级别
+
+
+### 元数据型资源
+此类资源对象用于为集群内部其他资源对象配置其行为或特性
+
+#### Pod模版
+
+#### LimitRange
