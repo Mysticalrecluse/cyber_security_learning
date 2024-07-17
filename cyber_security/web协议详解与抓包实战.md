@@ -535,8 +535,8 @@ status-line = HTTP-version SP status-code SP reason-phrase CRLF
 
   - 2XX（成功处理请求）
     - 200 OK：成功返回响应
-    - 201 Created：有新资源在服务器端被成功创建
-    - 202 Accepted：服务器接收并开始处理请求，但请求未处理完成。这样一个模糊的概念是有意如此设计的，可以覆盖更多的场景。例如：异步，需要长时间处理的任务
+    - 201 Created：有新资源在服务器端被成功创建, 通常是上传了一个新的文件，很多PUT请求是201
+    - 202 Accepted：服务器接收并开始处理请求，但请求未处理完成。这样一个模糊的概念是有意如此设计的，可以覆盖更多的场景。例如：异步，需要长时间处理的任务, 常用于RESTfulAPI的设计
     - 203 Non-Authoritative Information：当代理服务器修改了origin server的原始响应包体时（例如更换了HTML中的元素值）代理服务器可以通过修改200为203的方式告知客户端这一事实，方便客户端为这一行为做出相应的处理。203相应可以被缓存
       - 很多的代理服务器并不支持这个203规范
     - 204 No Content：成功执行了请求且不携带响应包体，并暗示客户端无需更新当前的页面视图
@@ -559,18 +559,27 @@ status-line = HTTP-version SP status-code SP reason-phrase CRLF
 ## HTTP的错误响应码
 - 4XX：客户端出现错误
   - 400 Bad Request：服务器认为客户端出现了错误，但不能明确判断为以下哪种错误时，使用此错误码。例如HTTP请求格式错误
+```shell
+mystical@mystical ~ % telnet www.baidu.com 80
+Trying 110.242.68.3...
+Connected to www.a.shifen.com.
+Escape character is '^]'.
+GET / reqwrwq  # 故意构造一个不合法的GET请求，从而得到400的响应码
+HTTP/1.1 400 Bad Request
+```
   - 401 Unauthorized：用户认证信息缺失或者不正确，导致服务器无法处理请求
   - 407 Proxy Authentication Required：对需要经由代理的请求，认证信息未通过代理服务器的验证
-  - 403 Forbidden：服务器理解请求的含义，但没有权限执行此请求
+  - 403 Forbidden：服务器理解请求的含义，但没有权限执行此请求, 访问服务器中的某个资源，但是没有权限
   - 404 Not Found：服务器没有找到对应的资源
   - 410 Gone：服务器没有找到对应的资源，且明确的知道该位置永久性找不到该资源
-  - 405 Method Not Allowed: 服务器不支持请求行中的method方法
+  - 405 Method Not Allowed: 服务器不支持请求行中的method方法, 比如Trace方法
   - 406 Not Acceptable：对客户端指定的资源表述不存在（例如对语言或编码有要求），服务器返回表述列表供客户端选择
   - 408 Request Timeout：服务器接收请求超时
   - 409 Conflict：资源冲突，例如上传文件时目标位置已经存在版本更新的资源
   - 411 Length Required：如果请求含有包体且未携带Content-Length头部，且不属于chunk类请求时，返回411
   - 412 Precondition Failed：复用缓存时传递的If-Unmodified-Since或If-None-Match头部不被满足
   - 413 Payload Too Large/Request Entity Too Large：请求的包体超出服务器能处理的最大长度
+    - 比如搭建WordPress博客，要求上传附件不超过2M，如果不调整的话，在上传大附件的时候就会触发该错误
   - 414 URI Too Long：请求的URI超出服务器能接受的最大长度
   - 415 Unsupported Media Type：上传的文件类型不被服务器支持
   - 416 Range Not Satisfiable：无法提供Range请求中指定的那段包体
@@ -592,7 +601,7 @@ status-line = HTTP-version SP status-code SP reason-phrase CRLF
   - 500 Internal Server Error：服务器内部错误，且不属于以下错误类型
   - 501 Not Implemented：服务器不支持实现请求所需要的功能
   - 502 Bad Gateway：代理服务器无法获取到合法响应
-  - 503 Service Unavailable：服务器资源尚未准备好处理当前请求
+  - 503 Service Unavailable：服务器资源尚未准备好处理当前请求,比如服务端做资源的限速
   - 504 Gateway Timeout：代理服务器无法及时的从上游获得响应
   - 505 HTTP Version Not Supported：请求使用的HTTP协议版本不支持
   - 507 Insufficient Storage：服务器没有足够的空间处理请求
@@ -601,8 +610,98 @@ status-line = HTTP-version SP status-code SP reason-phrase CRLF
 
 ## 长连接与短连接
 ```shell
+# http请求包中，如果有Connection字段，
 Connection:keep-live / close
 # 如果是keep-live，就表示长连接，即持续连接
 # 如果是close，就表示短链接，即非持续连接
 ```
 - 如果是非常老的，无法识别Connection头部信息的代理服务器，就用Proxy-Connection来替代Connection来处理长连接
+
+- Connection头部
+  - Keep-Alive: 长连接
+    - 客户端请求长连接（请求包）
+      - Connection: Keep-Alive
+    - 服务端表示支持长连接（响应包）
+      - Connection: Keep-Alive
+    - 客户端复用连接
+    - HTTP/1.1默认支持长连接
+      - Connection: Keep-Alive无意义
+  - Close: 短连接
+
+- 当整个访问链路存在代理服务器，则Connection仅针对当前链接有效
+
+## Host头部
+- Host = uri-host[":"port]
+  - HTTP/1.1规范要求，不传递Host头部则返回400错误响应码
+  - 为防止陈旧的代理服务器，发向正向代理的请求request-target必须以absolut-form出现
+    - request-line = method SP request-target SP HTTP-version CRLF
+    - absolute-form=absolute-URI
+      - absolute-URI= scheme":"hier-part["?" query]
+### Host头部与消息路由
+- 建立TCP连接
+  - 确认服务器IP地址
+- 服务器接收请求
+- 寻早虚拟主机
+  - 匹配Host头部与域名
+- 寻找URI的处理代码
+  - 匹配URI
+- 执行处理请求代码
+- 生成HTTP响应
+- 发送HTTP响应
+- 记录访问日志
+
+
+## 当访问链路中存在很多代理服务器，如何传递IP
+- 场景
+```shell
+用户（内网IP：192.168.0.x） ---->  ADSL(运营商公网IP：115.204.33.1) ----> 正向代理（IP地址1.1.1.1）----> CDN(2.2.2.) ----> 反向代理（得到用户地址115.204.33.1, remote_addr变量：2.2.2.2）
+
+# 这里正向代理到CDN
+X-Forwarded-For: 115.204.33.1
+X-Real-IP: 115.204.33.1
+
+# CDN到反向代理
+
+X-Forwarded-For: 115.204.33.1, 1.1.1.1
+X-Real-IP: 115.204.33.1
+```
+
+
+### 消息的转发
+- Cache-Control: no-transform
+  - 禁止代理服务器修改响应包体
+
+- Via头部
+  - 指明经过的代理服务器名称及版本
+
+## 请求与响应的上下文
+- UA(User-Agent)
+
+### 请求的上下文Referer
+浏览器对某一页面的请求自动添加的头部
+- Referer = absolute-URI / partial-URI
+`
+- 示例
+```shell
+Referer: https://developer.mozilla.org/...
+```
+
+- Referer不会被添加的场景
+  - 来源页面采用的协议为本地文件file或dataURI
+  - 当前请求页面采用的是http协议，来源页面采用的是https协议
+
+- 服务端常用于统计分析，缓存优化，防盗链等功能
+
+### 请求上下文：From
+- 主要用于网络爬虫，告诉服务器如何通过email到爬虫负责人
+- From = mailbox
+
+### 响应的上下文：Server
+- 指明服务器上用的web软件，用于帮助客户端定位问题或统计数据
+```shell
+# 例如
+Server:nginx
+Server: openresty/1.13.6.2
+```
+
+### 响应上下文 Allow与Accept-Ranges
