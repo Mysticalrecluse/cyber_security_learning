@@ -1254,3 +1254,301 @@ kubectl get TYPE -l SELECTOR1 [-l SELECTOR2] ...
 #额外针对指定的每一个标签单独一列来显示对应的值
 kubectl get TYPE -L label_name
 ```
+
+### Replica Set 工作机制(RS)
+#### 查看资源清单写法
+```shell
+kubectl explain 资源类型
+```
+
+#### Replica Set基础管理Replica Set资源清单示例
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet   # 注意大小写
+metadata:
+  name: _
+  namespace: _
+spec:
+  minReadySeconds <int>
+  replicas <int>
+  selector:
+    matchExpression <[]object>
+    matchLabels <map[string]string>
+  template:
+    metadata:
+      labels:   # 这个地方定义具体Pod的标签一定要和selector标签选择器规则匹配
+    spec:
+    ...
+```
+
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: controller-replicaset-test
+spec:
+  minReadySeconds: 0
+  replicas: 3    # 修改此行
+  selector:
+    matchLabels:
+      app: rs-test
+      release: stable
+      version: v1.0
+  template:
+    metadata:
+      labels:
+        app: rs-test
+        release: stable
+        version: v1.0
+    spec:
+      containers:
+      - name: rs-test
+        images: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+```
+
+#### ReplicaSet扩容和缩容
+```shell
+# 方法1：修改yaml文件中replicas的参数
+
+# 方法2：
+kubectl scale replicaset controller-replicaset-test --replicas 2
+```
+
+#### 更新镜像版本
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: controller-replicaset-test
+spec:
+  minReadySeconds: 0
+  replicas: 3    # 修改此行
+  selector:
+    matchLabels:
+      app: rs-test
+      release: stable
+      version: v1.0
+  template:
+    metadata:
+      labels:
+        app: rs-test
+        release: stable
+        version: v1.0
+    spec:
+      containers:
+      - name: rs-test
+        images: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2 #修改此行
+```
+
+必须要手动将旧的删除后，再重新创建才能更新成功
+虽然镜像模版信息更新了，但是pod并没有升级镜像，RS不支持自动更新
+
+#### 蓝绿发布示例
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-replicaset-blue-green
+spec:
+  type: ClusterIP
+  selector:
+    app: rs-test
+    ctr: rs-${DEPLOY}
+    version: ${VERSION}
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: rs-${DEPLOY}
+spec:
+  minReadySeconds: 3
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rs-test
+      ctr: rs-${DEPLOY}
+      version: ${VERSION}
+  template:
+    metadata:
+      labels:
+        spp: rs-test
+        ctr: rs-${DEPLOY}
+        version: ${VERSION}
+    spec:
+      containers:
+      - name: pod-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:${VERSION}
+```
+```shell
+# 访问
+DEPLOY=blue VERSION=v0.1 envsubst < controller-replicaset-blue-green.yaml|kubectl apply -f -
+# envsubst命令
+用环境变量的值替换掉标准输入的内容
+root@master101:~/mypod# NAME=feng envsubst
+i'm $NAME
+i'm feng
+```
+
+
+### Deployment
+
+Deployment相对于RS的一个最大升级是：支持滚动发布策略，其他功能几乎一样
+
+#### 创建Deployment
+```shell
+kubectl create deployment myapp --image registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas 3 --dry-run=client -o yaml
+
+root@master101:~/mypod# kubectl create deployment myapp --image registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas 3 --dry-run=client -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: myapp
+  name: myapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+        name: pod-test
+        resources: {}
+status: {}
+# 同replicaset基本一致
+```
+```shell
+# 查看标签
+root@master101:~/mypod# kubectl get pod --show-labels
+NAME                               READY   STATUS    RESTARTS   AGE     LABELS
+controller-replicaset-test-64x48   1/1     Running   0          96m     app=rs-test,release=stable,version=v1.0
+controller-replicaset-test-jc5h4   1/1     Running   0          105m    app=rs-test,release=stable,version=v1.0
+controller-replicaset-test-sngj8   1/1     Running   0          96m     app=rs-test,release=stable,version=v1.0
+controller-replicaset-test-xjlft   1/1     Running   0          96m     app=rs-test,release=stable,version=v1.0
+controller-replicaset-test-zjx9b   1/1     Running   0          105m    app=rs-test,release=stable,version=v1.0
+myapp-547df679bb-9p82b             1/1     Running   0          77s     app=myapp,pod-template-hash=547df679bb
+myapp-547df679bb-cwknj             1/1     Running   0          6m11s   app=myapp,pod-template-hash=547df679bb
+myapp-547df679bb-djpkh             1/1     Running   0          6m11s   app=myapp,pod-template-hash=547df679bb
+myapp-547df679bb-ftxlg             1/1     Running   0          6m11s   app=myapp,pod-template-hash=547df679bb
+myapp-547df679bb-ssdk5             1/1     Running   0          77s     app=myapp,pod-template-hash=547df679bb
+```
+
+#### DEployment扩容与缩容
+```shell
+# 基于资源对象调整
+kubectl scale --current-replicas=<新副本数>] --replicas=[副本数] deployment /deploy_name
+
+# 基于文件调整
+kubectl scale --replicas=<新副本数> -f deploy_name.yaml
+```
+
+Deployment创建后的名称组成为name+rs_name_随机字符串
+
+#### Deployment动态更新和回滚
+```shell
+# 更新命令
+kubectl set SUBCOMMAND [options] 资源类型 资源名称
+# 示例
+kubectl set image deployment/myapp pod-test=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2 --record=true
+
+# 参数详情
+--record=true      # 更改时，将会信息转增到历史
+
+# 查看版本更新状态和历史
+kubectl rollout history deployment myapp
+
+# 撤销回退上次的更改，注意只能回退一次
+kubectl rollout undo deployment myapp
+
+# 回退到指定历史
+kubectl rollout undo --to-revision=2 deployment myapp
+```
+
+#### 批量更新
+```shell
+# 多次更新合并为一次更新
+# 暂停更新
+kubectl rollout pause deployment pod-test
+
+# 第一次更新
+kubectl set image deployment/myapp pod-test=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2 --record=true
+
+# 第二次修改
+kubectl set resources deployment/myapp -c pod-test --limits=cpu=200m,memory=128Mi --requests=cpu=200m,memory=128Mi
+
+# 此时还没有更新
+
+# 恢复批量更新
+kubectl rollout resume deployment myapp
+```
+
+#### Deployment实现滚动更新策略
+金丝雀发布示例
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-rolling-update-canary
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pod-test
+  template:
+    metadata:
+      labels:
+        app: pod-test
+    spec:
+      containers:
+      - name: pod-rolling-update-canary
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+  strategy:  # 更新策略
+    type: RollingUpdate
+    rollingUpdate：
+      maxSurge: 1     # 先加后减
+      maxUnavaliable: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pod-test
+  name: pod-test
+spec:
+  ports:
+  - name: "80"
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: pod-test
+  tyep: ClusterIP
+```
+
+滚动发布
+```shell
+# 发布
+kubectl apply -f controller-deployment-rollupdate-canary.yaml
+
+# 版本升级
+sed -i 's/pod-test:v0.1/pod-test:v0.2/' controller-deployment-rollupdate-canary.yaml
+
+# 滚动发布
+kubectl apply -f controller-deployment-rollupdate-canary.yaml && kubectl rollout pause deployment deployment-rolling-update-canary`
+
+# 如果确认没问题继续更新
+kubectl rollout resume deployment deployment-rolling-udpate-canary && kubectl rollout pause deployment deployment-rolling-update-canary
+```
