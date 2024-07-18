@@ -479,3 +479,778 @@ KREW=./krew-"$(uname | tr '[:upper:]' '[:lower:]')_amd64"
 #### Pod模版
 
 #### LimitRange
+
+
+## Pod资源
+### Pod资源分类
+- 自主式Pod
+- 由Workload Controller管控的Pod
+- 静态Pod
+
+### 自主式Pod支持三种方法创建
+#### 指令式命令创建Pod
+通过kubectl命令行工具指令选项创建Pod，适合临时工作
+```shell
+kubectl run NAME --image=image [--port=port]
+# 这里--port仅是声明要暴露的端口
+
+# 删除pod
+kubectl delete pod NAME --grace-period=5
+# 立即删除
+kubectl delete pod NAME --grace-period=0 --force
+```
+
+### Pod资源清单说明
+#### Pod资源清单必须存在的属性
+- apiVersion
+  - 这里指的是K8S API的版本，目前是基于V1的，可以通过`kubectl api-versions`查询
+
+- kind
+  - 这里指的是yaml文件定义的资源类型和橘色，比如我们创建一个Pod，他就是pod类型，如果创建的是一个deployment，就是deployment类型
+
+- metadata
+  - 元数据对象，固定值就写metadata，也就意味着，这个字段对象里面写的是他的一些元数据类型，这个对象类型主要有两个字段
+    - metadata.name
+    - metadata.namespace
+
+- spec
+  - 这里写的是spec对象的容器列表定义，是一个列表
+    - 第一个主要元素name
+    - 第二个主要元素image
+
+## Pod生命周期
+### init container
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-pod
+spec:
+  initContainers:
+  - name: init-container-1
+    image: busybox
+    command: ['sh', '-c', 'echo Init Container 1; sleep 5']
+  - name: init-container-2
+    image: busybox
+    command: ['sh', '-c', 'echo Init Container 2; sleep 5']
+  containers:
+  - name: app-container
+    image: myapp:latest
+    ports:
+    - containerPort: 80
+```
+
+- 在Pod的生命周期内，首先启动Pause容器以提供基础环境，然后按顺序启动init Container执行初始化任务，最后启动业务容器以运行应用程序
+
+### 两种钩子PostStart和PreStop
+- 关于钩子函数的执行主要由两种方式
+  - Exec，在钩子事件触发时，直接在当前容器中运行由用户定义的命令，用于执行一段特定的命令，不过要注意的是该命令消耗的资源会被计入容器
+  - HTTP，在当前容器中向某URL发起HTTP请求
+
+#### poststart示例
+```yaml
+[root@master1 yaml]#cat pod-poststart.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-poststart
+spec:
+ containers:
+  - name: busybox
+   image: busybox:1.32.0
+   lifecycle:
+     postStart:
+       exec:
+         command: ["/bin/sh","-c","echo lifecycle poststart at $(date) > /tmp/poststart.log"]
+   command: ['sh', '-c', 'echo The app is running at $(date) ! && sleep 3600']
+```
+
+PostStart钩子函数和主容器启动可以看作是同时进行
+
+#### PreStop示例
+```yaml
+#由于默认情况下，删除的动作和日志我们都没有办法看到，那么我们这里采用一种间接的方法，在删除动作之前，给本地目录创建第一个文件，输入一些内容
+[root@master1 yaml]#cat pod-prestop.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-prestop
+spec:
+ volumes:
+  - name: vol-prestop
+   hostPath:
+     path: /tmp
+ containers:
+  - name: prestop-pod-container
+   image: busybox:1.32.0
+   volumeMounts:
+    - name: vol-prestop
+     mountPath: /tmp
+   command: ['sh', '-c', 'echo The app is running at $(date) ! && sleep 3600']
+   lifecycle:
+     postStart:
+       exec:
+         command: ['/bin/sh', '-c','echo lifecycle poststart at $(date) > /tmp/poststart.log']
+```
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-prestop
+spec:
+  volumes:
+  - name: vol-prestop
+    hostPath:
+      path: /tmp
+  containers:
+  - name: prestop-pod-container
+    image: buxybox-1.32.0
+    volumeMounts:
+    - name: vol-prestop
+      mountPath: /tmp
+    command: ['sh', '-c', 'echo The app is running at $(date) ! && sleep 3600']
+    lifecycle:
+      postStart:
+        exec:
+          command: ['/bin/sh', '-c', 'echo Lifecycle poststart at $(date)' > /tmp/poststart.log]
+      preStop:
+        exec:
+          command: ['/bin/sh', '-c', 'echo Lifecycle poststart at $(date)' > /tmp/poststart.log]
+```
+
+
+## Pod资源限制
+### 可限制资源单位
+- CPU
+  - 在Kubernetes中，通常以千分之一的CPU(core)为最小单元，用毫m表示，即一个CPU核心表示1000m
+- 内存
+
+### 资源限制实现
+要实现资源限制，需要先安装metrics-server
+```shell
+curl -LO https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.7.1/components.yaml
+
+# 默认文件需要修改
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+labels:
+  k8s-app: metrics-server
+name: metrics-server
+namespace: kube-system
+spec:
+selector:
+  matchLabels:
+  k8s-app: metrics-server
+strategy:
+  rollingUpdate:
+  maxUnavailable: 0
+template:
+  metadata:
+  labels:
+    k8s-app: metrics-server
+  spec:
+  containers:
+  - args:
+    - --cert-dir=/tmp
+    - --secure-port=4443
+    - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+    - --kubelet-use-node-status-port
+    - --metric-resolution=15s
+    - --kubelet-insecure-tls   #添加本行和下面两行
+    image: registry.cn-hangzhou.aliyuncs.com/google_containers/metrics-server:v0.7.1  # 或者开代理
+ #image: registry.cn-hangzhou.aliyuncs.com/google_containers/metrics-server:v0.6.1
+ #image: k8s.gcr.io/metrics-server/metrics-server:v0.6.1
+ imagePullPolicy: IfNotPresent
+ livenessProbe:
+
+# 应用此文件
+kubectl apply -f components.yaml
+# 查看性能性能
+kubectl top nodes
+```
+
+### 资源限制
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-limit-request
+spec:
+ containers:
+  - name: pod-limit-request-container
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+   imagePullPolicy: IfNotPresent
+   resources:
+     requests:
+       memory: "200Mi"
+       cpu: "500m"
+     limits:
+       memory: "200Mi"
+       cpu: "500m"
+```
+提示：为保证性能，生产推荐Requests和Limits设置为相同的值
+limit数值可以超过实际大小，但是requests不可以
+- 如果requests的数值大小，没有任何节点可以满足，则调度器无法完成调度，则会卡在pending状态，详情可以查看pod创建流程
+
+- 如果限制资源后，无法满足容器实际所需的资源大小，则会触发OOMkilled，在OOMKILLED和重启之间反复循环
+
+
+#### LimitRange实现使用资源限制
+后续有时间可以了解
+
+
+## Pod安全
+
+### 容器安全上下文
+安全上下文是一组用于决定容器是如何创建和运行的约束条件，它们代表着创建和运行容器时使用的运行时参数
+
+它根据约束的作用范围主要包括三个级别：
+- Pod级别
+  - 针对Pod范围内的所有容器
+- 容器级别
+  - 仅针对Pod范围内的指定容器
+- PSP级别
+  - PodSecurityPolicy，全局级别的Pod安全策略，涉及到准入控制相关的知识
+
+### 资源策略
+#### 用户级别
+默认Pod容器进程是以root身份运行，可以通过下面属性指定其他用户
+- runAsUser
+- runAsGroup
+
+默认情况下，一旦Pod创建好后，是不允许对用户归属权限进行任意修改的，所以需要修改的话，必须先关闭，在开启
+
+添加安全上下文属性实现指定用户身份运行Pod内的进程
+```yaml
+[root@master1 yaml]#cat pod-securitycontext-runasuser.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-securitycontext-runasuser
+ namespace: default
+spec:
+ containers:
+  - name: pod-test
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+   imagePullPolicy: IfNotPresent
+   env:
+    - name: PORT
+     value: "8080"
+   securityContext:
+     runAsUser: 1001     #指定运行身份
+     runAsGroup: 1001
+# 注意，普通用户无法监控特权端口0~1023
+```
+- 扩展知识
+```shell
+# 内核中有个参数可以控制特权端口的范围
+sysclt -a | grep net.ipv4.ip_unprivileged_port_start
+net.ipv4.ip_unprivileged_port_start=0
+# 有的容器该参数默认为0，则即使是普通用户也能监控特权端口
+```
+
+#### 资源能力
+Linux中相关的资源能力
+```shell
+CAP_CHOWN           # 改变文件的所有者和所属组
+CAP_MKNOD           # mknod()，创建设备文件
+CAP_NET_ADMIN       # 网络管理权限
+CAP_SYS_TIME        # 更改系统的时钟
+CAP_SYS_MODULE      # 装载卸载内核模块
+CAP_NET_BIND_SERVER # 允许普通用户绑定1024以内的特权端口
+CAP_SYS_ADMIN       # 大部分的管理权限，基本相当于root权限
+```
+
+可以在容器内部通过command+args运行一个自定义的容器启动命令
+```yaml
+# [root@master1 yaml]#cat pod-securitycontext-capabilities.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-securitycontext-capabilities
+ namespace: default
+spec:
+ containers:
+  - name: pod-test
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+   imagePullPolicy: IfNotPresent
+   command: ["/bin/sh","-c"]
+   args: ["/sbin/iptables -t nat -A PREROUTING -p tcp --dport 8080 -j REDIRECT --to-port 80 && /usr/bin/python3 /usr/local/bin/demo.py"]
+```
+
+通过add添加特权
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-securitycontext-capabilities
+ namespace: default
+spec:
+ containers:
+  - name: pod-test
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+   imagePullPolicy: IfNotPresent
+   command: ["/bin/sh","-c"]
+   args: ["/sbin/iptables -t nat -A PREROUTING -p tcp --dport 8080 -j REDIRECT -
+-to-port 80 && /usr/bin/python3 /usr/local/bin/demo.py"]
+#添加下面三行
+   securityContext:
+     capabilities:
+       add: ['NET_ADMIN']
+       drop: ['CHOWN']
+
+# 注意add后面的权限能力使用单引号('')，也可以使用双引号("")
+# drop可以删除特权
+```
+
+#### Pod中的内核参数
+Pod安全上下文级别默认只支持为数不多的内核安全参数
+```shell
+net.ipv4.ip_local_port_range
+net.ipv4.ip_unprivileged_port_start
+net.ipv4.tcp_syncookies
+kernel.shm_rmid_forced
+```
+
+上面的几个内核参数可以在Pod内部的容器名称空间的内核级别进行调整，被视为安全参数
+但其他的绝大部分参数不支持直接修改，被视为不安全参数
+如果想对其他不安全内核参数修改，必须要所在的node节点上修改kubelet的配置
+```shell
+KUBELET_EXTRA_ARGS='--allowed-unsafe-sysctls=net.core.somaxconn,net.ipv4.ip_nonlocal_bind'
+```
+示例
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-sysctl
+spec:
+ securityContext:
+   sysctls:
+      - name: kernel.shm_rmid_forced
+       value: "1"
+      - name: net.ipv4.ip_unprivileged_port_start
+       value: "60"
+    # - name: net.core.somaxconn
+    #   value: "6666"
+ containers:
+  - name: pod-sysctl
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+   securityContext:
+     runAsUser: 1001
+     runAsGroup: 1001
+```
+
+
+#### 特权
+添加privileged特权
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-privileged-demo
+spec:
+ initContainers:  
+  - name: set-sysctl
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/admin-box:v0.1
+   command: ["sysctl","-w","vm.max_map_count=6666666"]
+   securityContext:         #添加特权
+     privileged: true
+ containers:
+  - name: pod-privileged-demo
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+```
+
+#### 服务质量分类
+QoS(服务质量等级)是作用在Pod上的一个配置
+当Kubernetes创建一个Pod时，它就会给这个Pod分配一个Qos等级
+- 低优先级BestEffort：没有任何一个容器设置了requests或limits属性(最低优先级)
+- 中优先级Burstable: Pod至少有一个容器设置了CPU或内存的requests和limits，且不相同
+- 高优先级Guaranteed：Pod内的每一个容器同时设置了CPU和内存的requests和limits，而且所有值必须相等
+
+当主机出现OOM时，先删除服务质量低的, 服务质量高的最后删除
+
+
+## 单节点多容器模式
+### Init Container模式
+```yaml
+#通过init模式实现iptables规则的端口重定向
+[root@master1 yaml]#cat pod-init-container.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-init-container
+ namespace: default
+spec:
+ initContainers:
+  - name: iptables-init
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/admin-box:v0.1
+   imagePullPolicy: IfNotPresent
+   command: ['/bin/sh','-c']
+   args: ['iptables -t nat -A PREROUTING -p tcp --dport 8080 -j REDIRECT --to-port 80']
+   securityContext:
+capabilities:
+       add:
+        - NET_ADMIN
+ containers:
+  - name: demo
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+   imagePullPolicy: IfNotPresent
+   ports:
+    - name: http
+     containerPort: 80
+```
+
+### sideCar模式
+在一个pod内启动两个容器，访问B容器的时候，都需要经过A容器，只有通过A处理后的数据才会发送给B容器。
+在整个过程中，A容器就是B容器应用的代理服务器
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: sidecar-test
+spec:
+ containers:
+  - name: proxy
+   image: envoyproxy/envoy-alpine:v1.14.1
+   command: ['sh', '-c', 'sleep 5 && envoy -c /etc/envoy/envoy.yaml']
+   lifecycle:
+     postStart:
+       exec:
+         command: ["/bin/sh","-c","wget -O /etc/envoy/envoy.yaml 
+http://www.wangxiaochun.com/kubernetes/yaml/envoy.yaml"]
+  - name: pod-test
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+   env:
+    - name: HOST
+     value: "127.0.0.1"
+    - name: PORT
+     value: "8080"
+```
+这里设计云原生的envoy组件，有时间可以学习下
+
+
+## Pod健康性检查
+
+### Pod中的健康检查流程
+- 初始启动容器的时候，有一个初始化时间（InitialDelaySeconds，可自定义，如5s）
+- 5s后启动第一个探针，`Startup Probe`，初始化时间是为了确保程序已经运行，因为有些程序启动可能较慢，`Startup Probe`一般在服务启动后探测
+- Startup Probe如果探测失败，容器将立即重启
+- Startup Probe探测成功后，进入下一阶段，此时Startup Probe将不会再执行
+- 在该阶段初始也会有一个`InitalDelaySceonds for Livness Probe`和`InitalDelaySceonds for Readiness Probe`即启动后续探针的等待时间
+- 后续有两个探针：Livness Probe和Readiness Probe
+- 如果Livness检测失败，则重启Pod
+- 如果Readiness检查失败，Pod不会重启，而是会将其从SerVice资源的端点控制器中的调度列表移除，待后续检查成功，在将其从调度列表恢复
+
+
+### Pod健康性检查的方法
+- Exec探测方法
+- TCPSocket探测方法
+- HTTPGET探测方法
+- gRPC探测方法
+
+### 探针案例
+#### Exec方式案例
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-startup-exec
+ namespace: default
+ labels:
+   app: pod-startup-exec
+spec:
+ containers:
+  - name: pod-startup-exec-container
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+   imagePullPolicy: IfNotPresent
+   startupProbe:
+     exec:
+       command: ['/bin/sh', '-c', '[ "$(curl -s 127.0.0.1/livez)" == "OK" ]']
+     initialDelaySeconds: 60
+     timeoutSeconds: 1
+     periodSeconds: 5
+     successThreshold: 1
+     failureThreshold: 1
+```
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-liveness-exec-cmd
+ namespace: default
+spec:
+ containers:
+  - name: pod-liveness-exec-cmd-container
+   image: busybox:1.32.0
+   imagePullPolicy: IfNotPresent
+   command: ["/bin/sh","-c","touch /tmp/healthy; sleep 3; rm -f 
+/tmp/healthy;sleep 3600"]
+   livenessProbe:
+     exec:
+       command: ["test", "-e","/tmp/healthy"]
+     initialDelaySeconds: 1
+     periodSeconds: 3
+```
+
+#### Tcpsocket方式案例
+使用此配置，kubelet将尝试在指定端口上打开容器的套接字，如果可以建立连接，则容器被认为是健康的，如果不能则认为是失败的，其实就是在检查端口是否开启
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+name: pod-liveness-tcpsocket
+ namespace: default
+spec:
+ containers:
+  - name: pod-liveness-tcpsocket-container
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+   imagePullPolicy: IfNotPresent
+   ports:
+    - name: http           #给指定端口定义别名
+     containerPort: 80
+   securityContext:  #添加特权，否则添加iptables规则会提示：getsockopt failed strangely: Operation not permitted
+     capabilities:
+       add:
+        - NET_ADMIN
+   livenessProbe:
+     tcpSocket:
+       port: http        #引用上面端口的定义
+     periodSeconds: 5
+     initialDelaySeconds: 5
+#注意：由于此镜像应用对外暴露的端口是80端口，所以要探测80端口
+```
+
+Readness的Tcpsocket探针
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-readiness-tcpsocket
+ labels:
+   app: pod-readiness-tcpsocket
+spec:
+ containers:
+  - name: pod-readiness-tcpsocket-container
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+   readinessProbe:
+     tcpSocket:
+       port: 80
+     initialDelaySeconds: 5
+     periodSeconds: 10
+   livenessProbe:
+     tcpSocket:
+       port: 80
+     initialDelaySeconds: 15
+     periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+ name: pod-readiness-tcpsocket-svc
+spec:
+ ports:
+  - name: http
+   port: 80
+   protocol: TCP
+   targetPort: 80
+ selector:
+   app: pod-readiness-tcpsocket  #指定上面Pod相同的标签
+```
+
+
+#### HTTPGET方式案例
+HTTP探测通过对容器内容开放的Web服务，进行http方法的请求探测，如果探测成功（即响应码为2XX,3XX），否则就失败
+
+HTTP Probes允许针对httpGet配置额外的字段
+```shell
+host：连接使用的主机名，默认是 Pod 的 IP。也可以在 HTTP 头中设置 “Host” 来代替。一般不配置此
+项
+scheme ：用于设置连接主机的方式（HTTP 还是 HTTPS）。默认是 "HTTP"。一般不配置此项
+path：访问 HTTP 服务的路径。默认值为 "/"。一般会配置此项
+port：访问容器的端口号或者端口名。如果数字必须在 1～65535 之间。一般会配置此项
+httpHeaders：请求中自定义的 HTTP 头。HTTP 头字段允许重复。一般不配置此项
+```
+```yaml
+# [root@master1 yaml]#cat pod-liveness-http.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+ name: pod-liveness-http
+spec:
+ containers:
+  - name: pod-liveness-http-container
+   image: busybox:1.32.0
+   ports:
+    - name: http
+     containerPort: 80
+   livenessProbe:
+     httpGet:
+       port: http    #或者指定80，如果非标准端口可以指定端口号
+       path: /index.html
+     initialDelaySeconds: 1
+     periodSeconds: 3
+```
+
+## 工作负载
+### 工作负载资源分类
+- 无状态应用编配
+  - Deployment
+  - ReplicaSet
+- 有状态应用编排
+  - StatefulSet
+- 系统级应用
+  - DaemonSet
+- 工作类应用
+  - Job
+  - CronJOb
+
+### 标签（键值对）
+#### 查看标签
+```shell
+kubectl pod --show-labels
+kubectl <资源类型> --show-labels
+```
+#### 添加标签
+```shell
+# kubectl label <资源对象> <对象名称> <key1> <value1> <key2> <value2>...
+kubectl label pod myapp class=m58 title=k8s
+```
+
+#### 更改原有标签
+```shell
+kubectl label pod myapp class=m59 title=k8s --overwrite=true
+```
+
+#### 删除标签
+```shell
+kubectl label 资源类型 资源名称 label_name- [label_name]-...
+kubectl label pod myapp title-
+```
+
+#### Yaml方法
+```yaml
+metadata:
+  labels:
+    key1: value1
+    key2: value2
+    ...
+# 注意：labels复数
+```
+
+### 标签选择器 Label Selector
+Label附加到Kubernetes集群中的各种资源对象上，目的是对这些资源对象可以进行后续的分组管理
+而分组管理的核心就是：`标签选择器Label Selector`
+
+#### 等值匹配
+```shell
+# 等值
+name = nginx
+name == nginx
+name            # 表示匹配存在name标签的资源对象
+
+# 不等值
+！name          # 表示匹配不存在name标签的资源对象
+name != nginx   # 匹配所有没有name标签或者标签name的值不等于nginx的资源对象
+```
+
+应用示例
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: cuda-test
+spec:
+ containers:
+ - name: cuda-test
+     image: "registry.k8s.io/cuda-vector-add:v0.1"
+     resources:
+       limits:
+         nvidia.com/gpu: 1
+ nodeSelector:
+   accelerator: nvidia-tesla-p100
+```
+
+应用示例2
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+ name: service-loadbalancer-lbaas
+spec:
+ type: LoadBalancer
+ externalTrafficPolicy: Local
+ selector:
+   app: myapp
+ ports:
+  - name: http
+   protocol: TCP
+   port: 80
+   targetPort: 80
+```
+
+#### 集合匹配
+```shell
+# 集合匹配相当于“或”
+#示例：
+env in (dev, test)        #匹配所有具有标签 env = dev 或者 env = test 的资源对象
+name notin (frontend,backent)    #匹配所有不具有标签name=frontend或者name=backend或者没有name标签的资源对象
+```
+
+#### 匹配标签matchLabels
+```shell
+#匹配标签：
+   matchLabels:
+     name: nginx
+     app: myapp
+#当 matchLabels 中有多个标签时，它们之间的关系是逻辑与（AND）关系
+#如下所示：
+matchLabels:
+ app: frontend
+ environment: production
+#那么只有那些标签中同时包含 app=frontend 和 environment=production 的资源才会被选中。
+```
+#### 匹配表达式
+```shell
+#匹配表达式：
+   matchExpressions:
+      - {key: name, operator: NotIn, values: [frontend]}
+#当 matchExpressions 中包含多个标签表达式时，它们之间的关系是逻辑与（AND）关系
+#常见的operator操作属性值有：
+   In、NotIn、Exists、NotExists等
+   Exists和NotExist时，values必须为空，即 { key: environment, opetator: Exists,values:}
+#注意：这些表达式一般应用在RS、RC、Deployment等其它管理对象中。
+```
+
+```yaml
+matchExpressions:
+  - key: environment
+   operator: In
+   values:
+      - production
+      - staging
+  - key: app
+   operator: NotIn
+   values:
+      - test
+#那么只有那些标签满足以下两个条件的资源才会被选中：
+- 标签中 environment 的值是 production 或 staging
+- 标签中 app 的值不是 test
+```
+
+### 标签选择器操作方式
+- 命令
+- 文件
+
+#### 命令方式
+```shell
+#多个SELECTOR表示并且的关系
+kubectl get TYPE -l SELECTOR1[,SELECTOR2,...]
+kubectl get TYPE -l SELECTOR1 [-l SELECTOR2] ...
+#额外针对指定的每一个标签单独一列来显示对应的值
+kubectl get TYPE -L label_name
+```

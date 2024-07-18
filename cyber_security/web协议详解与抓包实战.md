@@ -624,7 +624,7 @@ Connection:keep-live / close
     - 服务端表示支持长连接（响应包）
       - Connection: Keep-Alive
     - 客户端复用连接
-    - HTTP/1.1默认支持长连接
+    - `HTTP/1.1默认支持长连接`
       - Connection: Keep-Alive无意义
   - Close: 短连接
 
@@ -686,11 +686,44 @@ X-Real-IP: 115.204.33.1
 Referer: https://developer.mozilla.org/...
 ```
 
+### Referer详解
+`referer`字段用于标识当前请求的来源页面
+- 示例
+```shell
+假设用户在浏览器访问https://example.com/page1.html，并在该页面上点击一个链接，该链接指向https://example.com/page2.html,浏览器会发送如下HTTP请求
+
+GET /page2.html HTTP/1.1
+Host: example.com
+Referer: https://example.com/page1.html
+```
+
+- 注意事项
+  - 隐私和安全：Referer字段可能会泄漏用户隐私信息，例如在URL包含的查询参数。为了保护用户隐私，某些浏览器或插件可能会对referer字段进行截断或省略敏感信息
+  - 跨域请求：在跨域请求中，浏览器可能会限制`referer`字段的内容
+    - 例如：对于跨站点请求，浏览器可能会仅发送源站点，而不包含完整的路径和查询参数
+  - 安全和防护：通过检查`referer`，服务器可以防止跨站请求伪造(CSRF)攻击，确保请求是从信任的来源发出的
+  
 - Referer不会被添加的场景
   - 来源页面采用的协议为本地文件file或dataURI
   - 当前请求页面采用的是http协议，来源页面采用的是https协议
 
 - 服务端常用于统计分析，缓存优化，防盗链等功能
+
+
+### 请求上下文`Referer-Policy`
+
+通过设置`referer-Policy，网站可以指定在什么情况下以及如何发送Referer
+示例
+```shell
+Referer-Policy: no-referer
+```
+其他`referer-policy`选项包括
+- `no-referer`：不发送referer信息
+- `no-referer-when-downgrade`：在跨协议（如从HTTPS到HTTP）的请求中不发送referer
+- `origin`：只发送源站点信息，不包括查询路径和参数
+- `same-origin`：只有在同一站点内的请求才发送`referer`
+- `strict-origin`：仅在同协议的站点请求中发送源站点信息
+- `unsafe-url`：始终发送完整的URL(不推荐)
 
 ### 请求上下文：From
 - 主要用于网络爬虫，告诉服务器如何通过email到爬虫负责人

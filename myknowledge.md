@@ -871,12 +871,13 @@ stawtus
 # 建议使用kubectl apply -f *.yaml，apply指令具有幂等性
 ```
 
-## 资源对象
-### Namespace
-#### Kubernetes的名称空间和Docker名称空间的区别
+## 资源对象NameSpace
+
+### Kubernetes的名称空间和Docker名称空间的区别
 - Kubernetes的名称空间是用来隔离名称空间级别的资源对象的,管理员可以自定义创建
 - Docker的名称空间是内核内置的，个人无法更改
 
+## 资源对象Pod
 ### Pod创建流程（面试重点）
 - 用户通过`kubectl`命令或API请求将Pod定义提交到API Server
   - 用户 -------- 提交Pod定义 --------> API Server
@@ -942,6 +943,19 @@ kubelet 启动容器，管理容器的生命周期，并定期向 API Server 报
 ```
 ### Pod的终止过程
 
+- 用户shiyong kubectl指令或通过API请求删除Pod对象。
+- API Server接收到删除请求后，将Pod对象的状态标记为`Terminating`，并记录宽限期的起始时间，并将该状态记录到etcd存储系统
+- API更新Pod状态后，会通知相关的控制器和相应Pod的Node上的Kubelet
+- 端点控制器监控到Pod对象的关闭行为时，将从其所有匹配到此端点的Service资源的端点列表中移除
+- 对应Pod所在的Node上的kubelet通过watch机制监视到Pod状态变为`terminating`
+- kubelet立即向Pod中的所有容器发送SIGTERM信号，发送SIGTERM信号的时刻标志着宽限期的开始
+- kubelet开始宽限期倒计时（默认30s），在这段时间内，容器应进行优雅关闭，例如完成正在处理的请求，保存状态等
+- 如果容器定义了preStop钩子，kubelet会在发送`SIGTERM`信号前执行该钩子
+- kubelet等待容器在宽限期内自行退出，如果容器在宽限期内成功退出，kublet将报告Pod已终止，并完成Pod删除过程
+- 如果宽限期结束，容器仍未退出，kubelet会分配额外的2秒小宽限期，以尝试让`preStop`钩子完成
+- 如果在这2秒内`preStop`钩子完成，容器将继续优雅关闭
+- 如果额外的2秒小宽限期内容器仍未退出，kubelet会发送`SIGKILL`信号，强制终止容器。确保Pod在合理时间内被删除
+- 当所有容器被终止后，`kubelet`向API Server报告Pod已终止，API Server随后从etcd中删除Pod对象，完成整个删除过程。
 
 
 #### Pod的组成
@@ -954,6 +968,7 @@ kubelet 启动容器，管理容器的生命周期，并定期向 API Server 报
 - 单节点内多Pod通信
   - 主机间容器通信（host模型），利用kube-proxy实现
 - 多节点内多Pod通信，利用CNI标准的网络插件实现
+
 #### Pod分类
 - 自主式Pod
 ```shell
@@ -964,9 +979,52 @@ kubectl run <Pod名称> --image=容器
   - `/etc/kubenetes/manifests/*.yaml`
 
 
+### Pod生命周期
 
-## Pod的创建流程
-- 创建指定送到api server
-- 通知scheduler调度此请求到合适的节点
-- init容器
-  - 初始化容器，独立于主容器之外，即和主容器是隔离的
+### Pod重启策略
+同一个Pod内所有容器只能使用统一的重启策略
+- Always
+  - 无论退出码exit code是否为0，都要重启，只要退出就重启，并且重启次数没有限制，此为默认值
+
+- OnFailure
+  - 容器终止运行退出码exit Code不为0时才重启，重启次数并没有限制
+  
+- Never
+  - 无论何种退出码exit code，Pod都不重启，主要针对job，Cronjob
+
+### Pod镜像拉取状态
+- Always
+  - 总是拉取新镜像
+  - 注意：如果镜像的Tag为latest，拉取策略为always和ifNotPresent都会重新拉取镜像
+
+- ifNotPresent
+  - 此为默认值，如果本地不存在的话，再拉取镜像
+
+- Never
+  - 只使用本地镜像，从不获取新镜像
+
+### Pod状态总汇
+
+### Pod资源限制
+- requests资源下限
+  - 如果运行调度到node后，node上的资源无法满足下限，则容器始终处于pending状态
+
+- limits资源上限
+  - 如果后续使用，pod使用资源超过limits，会导致容器重启或删除
+
+- 提示：为保证性能，生产推荐Requests和Limits设置为相同的值
+
+- 如果在创建Pod的时候，设置的requests值过大，导致所有节点都满足不了，则调度器无法实现调度，会卡在pending状态
+
+- 如果创建Pod的时候，limit设置的过小，无法满足Pod本身的最小需求，则会触发OOMKILLED，然后重启容器，并反复在两种状态间循环
+
+
+### Pod中的健康检查流程
+- 初始启动容器的时候，有一个初始化时间（InitialDelaySeconds，可自定义，如5s）
+- 5s后启动第一个探针，`Startup Probe`，初始化时间是为了确保程序已经运行，因为有些程序启动可能较慢，`Startup Probe`一般在服务启动后探测
+- Startup Probe如果探测失败，容器将立即重启
+- Startup Probe探测成功后，进入下一阶段，此时Startup Probe将不会再执行
+- 在该阶段初始也会有一个`InitalDelaySceonds for Livness Probe`和`InitalDelaySceonds for Readiness Probe`即启动后续探针的等待时间
+- 后续有两个探针：Livness Probe和Readiness Probe
+- 如果Livness检测失败，则重启Pod
+- 如果Readiness检查失败，Pod不会重启，而是会将其从SerVice资源的端点控制器中的调度列表移除，待后续检查成功，在将其从调度列表恢复
