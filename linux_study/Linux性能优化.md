@@ -154,3 +154,72 @@ Linux 5.15.0-52-generic (ubuntu2204.wang.org)   2024年07月19日  _x86_64_     
 ```
 
 从这里可以明显看到，stree进程的CPU使用率是100%
+
+#### 场景二： I/O 密集型进程
+
+首先运行`stress`命令，这次模拟IO压力，即不停执行sync
+```shell
+stress -i 1 --timeout 600
+
+16:24:57 up 33 min,  9 users,  load average: 1.27, 0.89, 0.55
+```
+
+在第二个终端运行uptime查看平均负载的变化
+```shell
+watch -d uptime
+
+```
+
+第三个终端运行mpstat查看CPU使用率的变化情况
+
+```shell
+root@mystical:~# mpstat -P ALL 5
+Linux 5.15.0-100-generic (mystical)     07/19/24        _x86_64_        (2 CPU)
+
+Average:     CPU    %usr   %nice    %sys %iowait    %irq   %soft  %steal  %guest  %gnice   %idle
+Average:     all    1.25    0.00   41.21    0.06    0.00    0.52    0.00    0.00    0.00   56.96
+Average:       0    2.42    0.00   89.11    0.13    0.00    0.20    0.00    0.00    0.00    8.14
+Average:       1    0.36    0.00    4.81    0.00    0.00    0.77    0.00    0.00    0.00   94.07
+```
+
+为什么 sys 高而 iowait 低
+系统调用的高频率：
+
+stress -i 启动的 I/O 工作者通常会进行大量的系统调用，如 read() 和 write()，这些调用会消耗大量的系统态 CPU 时间。因此，%sys 高是因为大量的 CPU 时间花费在处理系统调用上。
+低 iowait：
+
+%iowait 低表示 CPU 几乎没有在等待实际的 I/O 操作完成。这是因为 I/O 工作者主要在执行快速的 I/O 操作，这些操作可能是内存到内存的 I/O（如缓冲区操作）或者是一些小而快的 I/O 操作，而不是长时间的磁盘 I/O。
+
+#### 场景三：大量进场场景
+使用stress模拟8个进程
+```shell
+stress -c 8 --timeout 600
+```
+
+由于系统只有2个CPU，明显比8个CPU少的多，因而系统的CPU处于严重过载状态，平均负载高度为8.17
+
+运行pidstat来看一下情况
+```shell
+root@mystical:~# pidstat -u 5 1
+Linux 5.15.0-100-generic (mystical)     07/19/24        _x86_64_        (2 CPU)
+
+17:18:00      UID       PID    %usr %system  %guest   %wait    %CPU   CPU  Command
+17:18:05        0      1774    0.00    0.20    0.00    0.20    0.20     0  kworker/0:0-events
+17:18:05        0      6957   24.06    0.60    0.00   75.35   24.65     1  stress
+17:18:05        0      6958   24.25    0.40    0.00   75.35   24.65     0  stress
+17:18:05        0      6959   24.06    0.40    0.00   74.35   24.45     0  stress
+17:18:05        0      6960   23.86    0.80    0.00   75.15   24.65     1  stress
+17:18:05        0      6961   23.86    0.60    0.00   75.35   24.45     1  stress
+17:18:05        0      6962   25.25    0.20    0.00   74.35   25.45     0  stress
+17:18:05        0      6963   24.25    0.40    0.00   75.15   24.65     1  stress
+17:18:05        0      6964   24.65    0.00    0.00   74.95   24.65     0  stress
+17:18:05        0      7592    0.00    0.40    0.00    0.20    0.40     1  kworker/1:0-event
+```
+
+#### 总结
+- 平均负载高，有可能是CPU密集型进程导致的
+- 平均负载高并不一定是CPU使用率高，还可能是IO繁忙
+
+
+## CPU上下文切换
+
