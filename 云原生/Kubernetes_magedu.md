@@ -1517,7 +1517,7 @@ spec:
         image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
   strategy:  # 更新策略
     type: RollingUpdate
-    rollingUpdate：
+    rollingUpdate:
       maxSurge: 1     # 先加后减
       maxUnavaliable: 0
 ---
