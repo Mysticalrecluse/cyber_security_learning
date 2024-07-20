@@ -1517,6 +1517,7 @@ spec:
         image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
   strategy:  # 更新策略
     type: RollingUpdate
+    # 滚动更新类型，可用值有Recreate（删除所有旧Pod再创建新Pod）和RollingUpdate
     rollingUpdate:
       maxSurge: 1     # 先加后减
       maxUnavaliable: 0
@@ -1551,4 +1552,401 @@ kubectl apply -f controller-deployment-rollupdate-canary.yaml && kubectl rollout
 
 # 如果确认没问题继续更新
 kubectl rollout resume deployment deployment-rolling-udpate-canary && kubectl rollout pause deployment deployment-rolling-update-canary
+```
+
+### Daemon工作机制
+#### 扩展：污点容忍度
+```yaml
+...
+  tolerations:
+  - operator: Exists
+```
+
+#### 注意daemonSet对象不支持pause动作（暂停更新）
+
+#### DaemonSet案例-node-exporter
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemonset-demo
+  namespace: default
+  labels:
+    app: prometheus
+    component: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+      componennt: node-exporter
+  template:
+    metadata:
+      name: prometheus-node-exporter
+      labels:
+        app: prometheus-node-exporter
+        component: node-exporter
+    spec:
+      # 污点容忍度
+      #tolerations:
+      #- key: node-role.kubernetes.io/control-plane
+      #  operator: Exists
+      #  effect: NoSchedule
+      #- key: node-role.kubernetes.io/master
+      #  operator: Exists
+      #  effect: NoSchedule
+      containers:
+      - image: prom/node-exporter:v1.2.2
+        name: prometheus-node-exporter
+        ports:
+        - name: prom-node-exp
+          containerPort: 9100
+          # hostPort: 9100, 和hostNetwork二选一即可，要吗只保露节点端口，要吗直接使用节点网络
+        livenessProbe:
+          tcpSocket:
+            port: prom-node-exp
+          initialDelaySeconds: 3
+        readinessProbe:
+          httpGet:
+            path: '/metrics'
+            port: prom-node-exp
+            scheme: HTTP
+          initialDelaySeconds: 5
+      hostNetwork: true
+      hostPID: true
+```
+
+#### 仅在指定标签的每个主机上运行一个Pod
+```shell
+# 贴标签
+kubectl label node node1.wang.org node2.wang.org ai=true
+# 查看标签
+kubectl get nodes --show-lables
+```
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: controler-daemonset-label-test
+spec:
+  selector:
+    matchLabels:
+      ai: "true"
+  template:
+    metadata:
+      labels:
+        app: pod-test
+    spec:
+      nodeSelector:
+        ai: "true"
+      container:
+      - name: pod-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v1.0
+```
+
+#### 滚动更新
+```yaml
+...
+  updateStrategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavaiable: 1
+    type: RollingUpdate  #pod自动更新
+```
+
+### Job工作机制
+Job负责编排运行有结束时间的“一次性”任务
+- 控制器要确保Pod内的进程“正常（成功完成任务）”退出
+- 非正常退出的Pod可以根据需要重启，并在重试指定的次数后终止
+- Job可以是单次任务，也可以是在多个Pod分别各自运行一次，实现运行多次（次数通常固定）
+- job支持同时创建及并行运行多个Pod以加快任务处理速度，job控制器支持用户自定义其并行度
+
+关于job的执行主要有两种并行度的类型：
+- 串行job：即所有job任务都在上一个job执行完成后，再开始执行
+- 并行job：如果存在多个job，可以设定并行执行的job数量
+
+job资源同样需要标签选择器和Po的模版，但它不需要指定replicas，且需要给定completions，即需要完成的作业次数，默认为1次
+- job资源会为其Pod对象自行添加"job-name=JOB_NAME"和"controller-uid=UID"标签，并使用标签选择器完成对controller-uid标签的关联，因此，selector并非必选字段
+- Pod的命名格式：$(job-name)-$(index)-$(random-string)，其中的$(index)字段取值与completion和completionMode有关
+
+注意
+- job资源是标准API资源类型
+- job资源所在群组为"batch/v1"
+- job资源中，Pod的RestartPolicy的取值只能为Never和OnFailure
+
+#### Job属性解析
+```shell
+apiVersion: batch/v1               # API群组及版本
+kind: Job                          # 资源类型特有标识
+metadata：
+  name <string>                    # 资源名称，在作用域中要唯一
+  namespace <string>               # 名称空间，job资源隶属名称空间级别
+spec:
+  selector <object>                # 标签选择器，必须匹配template字段中Pod模版中的标签
+  suspend <boolean>                # 是否挂起当前Job的执行，挂起作业会重置StartTime字段的值
+  template
+  completions <int>                # 期望的完成作业次数，成功运行结束的Pod数量
+  completionMode <string>          # 追踪Pod完成模式，支持有序的Index和无序的Noindexed (默认)
+  ttlSecondsAfterFinished          # Completed终止状态作业的生存时长，超时将被删除
+  parallelism <int>                # 作业的最大并行度：默认为1
+  backoffLimit <int>               # 将作业标记为Failed之前的重试次数，默认为6
+  activeDeadlineSeconds <int>      # 作业启动后可处于活动状态的时长
+```
+
+#### 并行配置示例
+```yaml
+# 串行运行共5次任务
+spec:
+  parallelism: 1
+  completion: 5
+
+# 并行2个队列，总共运行6次任务，也就是说并行运行3次即可
+spec:
+  parallelism: 2
+  completion: 6
+```
+
+#### 多个串行任务示例
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-multi-serial
+spec:
+  completions: 5
+  parallelism: 1
+  #completionMode: Indexed
+  template:
+    spec:
+      containers:
+      - name: job-multi-serial
+        image: busybox:1.30.0
+        command: ["/bin/sh", "echo serial job; sleep 3"]
+        restartPolicy: OnFailure
+```
+
+#### 并行任务
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-multi-parallel
+spec:
+  completions: 6
+  parallelism: 2
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 3
+  activeDeadlineSeconds: 1200 2
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 3
+  activeDeadlineSeconds: 1200 
+  template:
+    spec:
+      containers:
+      - name: job-multi-parallel
+        image: busybox:1.30.0
+        command: ["/bin/sh","-c","echo parallel job; sleep 3"]
+      restartPolicy: OnFailure
+```
+- 扩展资料activeDeadlineSeconds
+```shell
+开始计时：
+当 Job 被创建时，Kubernetes 开始计时 activeDeadlineSeconds。
+超过时间限制：
+
+如果 Job 的所有 Pod 在 1200 秒内没有完成，无论当前有多少 Pod 仍在运行，Kubernetes 会终止所有 Pod。
+状态更新：
+
+Job 的状态会被标记为 Failed，并附带一个消息，说明 Job 超过了 activeDeadlineSeconds。
+```
+- 扩展资料backoffLimit
+- 测试backoffLimit参数
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: example-job
+spec:
+  backoffLimit: 4  # 最多重试 4 次
+  template:
+    metadata:
+      name: example-job-pod
+    spec:
+      containers:
+      - name: example
+        image: busybox
+        command: ["sh", "-c", "exit 1"]
+      restartPolicy: Never
+```
+```shell
+初始创建：
+Kubernetes 创建一个 Pod 来执行 Job。
+Pod 执行 exit 1 命令，返回失败状态。
+重试：
+
+Kubernetes 根据 backoffLimit 开始重试。
+每次重试后，Kubernetes 会根据指数退避算法（exponential backoff）增加重试间隔时间。
+超过限制：
+
+如果 Job 的 Pod 连续失败 4 次（包括初始创建），Kubernetes 将停止重试，并将 Job 的状态标记为 Failed。
+状态更新：
+
+Job 的状态会更新为 Failed，并附带一个消息，说明 Job 因重试次数超过 backoffLimit 而失败
+```
+
+### CronJob工作机制
+- CronJob案例
+```yaml
+apiVersin: batch/v1
+kind: CronJob
+metadata:
+  name: cronjob
+spec:
+  schedule: "*/2 * * * *" #每2分钟执行1次
+  jobTemplate:
+    spec:
+      #parallelism: 2
+      #completions: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: cronjob
+            image: busybox:1.30.0
+            command: ["/bin/sh","-c","echo Cron Job"]
+```
+
+## 服务发现 Service
+
+- service只能做四层代理
+- Ingress有七层负载能力  
+
+### Service核心能力
+- 服务发现：利用标签选择器，在同一个namespace中筛选符合的条件的pod，从而实现发现一组提供了相同服务的Pod
+- 负载均衡：Service作为流量入口和负载均衡器，其入口为ClusterIP，这组筛选出的Pod的IP地址，将作为该Service的后端服务器
+- 名称解析：利用Cluster DNS，为该组Pod所代表的服务提供一个名称，在DNS中对于每个Service，自动生成一个A、PTR和SRV记录
+
+### Endpoints
+当创建Service资源的时候，最重要的就是Service指定能够提供服务的标签选择器
+
+Service Controller就会根据标签选择器会自动创建一个同名的Endpoint资源对象，Kubernetes新版中还增加了endpointerslices资源
+- Endpoint Controller使用Endpoint的标签选择器（继承自Service标签选择器），筛选符合条件（包括符合标签选择器条件和处于Ready状态）的Pod资源
+- Endpint Controller将符合要求的pod资源绑定到Endpoint上，并告知给Service资源谁可以正常提供服务
+- Service会自动获取一个固定的cluster IP向外提供由Endpoint提供的服务资源
+- Service其实就是为动态的一组Pod资源对象提供一个固定的访问入口。即Service实现了后端Pod应用服务发现的发现功能
+
+- 每创建一个Service，自动创建一个与之同名的API资源类型Endpoints
+- Endpoints负载维护由相关Service标签选择器匹配的Pod对象
+- Endpoints对象上保存Service匹配到的所有Pod的IP和Port信息，称之为端点
+- ETCD是K/V数据库，而一个Endpoints对象对应一个Key，所有后端Pod端点信息为其Value
+- 当一个Endpoints对象对应后端每个Pod的每次变动，都需更新整个Endpoints对象，并将新的Endpoints对象重新保存至API Server和ETCD
+- 此外还需要将该对象同步至每个节点的kube-proxy
+- 在ETCD中的对象默认最大为1.5MB，一个Endpoints对象至多可以存储5000个左右的端点信息，这意味着平均每个端点占300KB
+
+### EndpointSlice
+- 基于Endpoints机制，即便只有一个Pod的IP等信息发生变动，就需要向集群中的每个节点上的kube-proxy发送整个Endpoints对象
+- 比如: 一个由2000个节点组成的集群中，更新一个有5000个Pod IP占用1.5MB空间的Endpoints 对象，就需要发送3GB的数据若以滚动更新机制，一次只升级更新一个Pod的信息，这将导致更新这个Endpoints对象需要发送15T的数据
+- EndpointSlice资源通过将Endpoints切片为多片来解决上述问题
+- 自Kubernetesv1.16引入EndpointSlice
+- 每个EndpointSlice默认存储100个端点信息，不会超过etcd对单个对象的存储限制
+- 可在kube-controller-manager程序上使用 --max-endpoints-per-slice选项进行配置
+- EndpointSlice并未取代Endpoints，二者同时存在
+
+
+### Endpoint实战示例 
+通过手动创建 Kubernetes Endpoints 并将其与外部服务器的地址关联，从而使集群内的 Pod 可以访问集群外部的服务器服务
+
+- 创建一个 Service：
+  - 首先，创建一个 Kubernetes Service，但不指定任何 selector，这样 Kubernetes 不会自动创建对应的 Endpoints。
+
+- 手动创建 Endpoints：
+  - 手动创建一个 Endpoints 对象，其中包含外部服务器的 IP 地址和端口。
+
+创建一个没有selector的service服务，没有selector,因此也不会为它自动创建endpoint
+```shell
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service
+  namespace: default
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+```
+
+手动创建endpoint
+```shell
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: external-service
+  namespace: default
+subsets:
+  - addresses:
+      - ip: 192.168.1.100   # 外部服务器的 IP 地址
+    ports:
+      - port: 80            # 外部服务器的端口
+```
+
+执行资源清单
+```shell
+kubectl apply -f external-service.yaml
+kubectl apply -f external-endpoints.yaml
+
+# 现在，集群内的 Pod 可以通过 external-service Service 的 DNS 名称来访问外部服务器的服务。
+curl http://external-service.default.svc.cluster.local
+```
+
+### Service服务的执行过程
+
+运维（写一个资源清单） ----> API Server ------> etcd数据库
+API Serser同时 ----> service controller ----> API Server
+----> kube-proxy -----> iptables/ipvs/nftables
+
+
+### Service类型(四种)
+
+- CluterIP
+- NodePort
+- LoadBalancer
+- ExteralName
+
+
+### Service类型之ClusterIP
+
+此为Service的默认类型
+为集群内部的客户端访问，包括节点和Pod等，外部网络无法访问
+
+### ClusterIP实现
+```shell
+# 在命令行中，ClusterIP Name很重要，这个name必须和pod的app:~标签一致，否则匹配不到pod
+kubectl create service clusterip NAME [--tcp=<port>:<targetrPort>] [--dry-run=server|client|none] [options]
+
+# 示例
+kubectl create service myapp --tcp 88:80 --dry-run=client -o yaml
+```
+
+### Service类型之NodePort
+
+本质上就是把Port的端口暴露给宿主机的端口
+nodePort = pod:port --> node:port
+- 这里的node可以是任意节点，因为集群中所有节点都有kube-proxy，都能实现调度，但是本地local更快
+- 默认随机端口范围30000-32767，可指定为固定端口 
+
+#### NodePort实现
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service-nodeport
+spec:
+  ports:
+  - name: 80-80
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: myapp
+  type: NodePort
 ```
