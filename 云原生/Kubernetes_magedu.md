@@ -1950,3 +1950,318 @@ spec:
     app: myapp
   type: NodePort
 ```
+指定暴露端口
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service-nodeport
+spec:
+  ports:
+  - name: 80-80
+    port: 80
+    protocol: TCP
+    targetPort: 80
+    nodePort: 32000   # 指定暴露端口
+  selector:
+    app: myapp
+  type: NodePort
+```
+#### 资源清单解析
+端口映射详解
+- Service 内部端口 (port: 80):
+  - 这是 Service 对外提供的端口，客户端（例如其他 Pods）可以通过这个端口访问 Service。
+
+- 目标端口 (targetPort: 80):
+  - 这是 Service 选择器匹配到的 Pod 上的端口。Service 将请求转发到这个端口上的 Pod。也就是说，当请求到达 Service 的 80 端口时，它将转发到 Pod 的 80 端口。
+NodePort (nodePort: 32000):
+
+这是在每个节点上暴露的端口，用于将外部流量路由到 Service。外部客户端可以通过节点的 IP 地址和 32000 端口来访问 Service，Kubernetes 将这个流量转发到 Service 的 80 端口，然后再转发到 Pod 的 80 端口。
+
+端口映射总结
+外部流量访问: 外部客户端可以通过访问节点的 IP 地址和 32000 端口（例如 http://<node-ip>:32000）来访问你的 Service。
+
+内部流量处理: Kubernetes 将这些请求转发到 Service 的 80 端口，然后再转发到与 Service 选择器匹配的 Pod 的 80 端口。
+
+
+#### 内部流程策略
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service-nodeport
+spec:
+  ports:
+  - name: 80-80
+    port: 80
+    protocol: TCP
+    targetPort: 80
+    nodePort: 32000   # 指定暴露端口
+  selector:
+    app: myapp
+  type: NodePort
+  internalTrafficPolicy: # 内部流程策略处理方式，Local表示由当前节点处理，Cluster表示向集群范围调度，默认Cluster
+  externalTrafficPolicy: # 外部流程策略处理方式，默认Cluster，当为Local时，表示由当前节点处理，性能较好，但无负载均衡功能，且可以看到真实客户IP，Cluster表示向集群范围调度，和Local相反，基于性能原因，生产更建议Local
+  # 此方式仅支持type是NodePort和LoadBlance
+```
+
+外部流量策略本质
+- Cluster：本质是FULLNAT
+- Local：本质是DNAT
+
+### Service类型之LoadBalancer
+
+#### LoadBalancer类型实现
+
+LoadBalancer类型默认无法获取loadBalancerIP
+
+```yaml
+# 清单文件
+# cat service-loadbalancer.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-loadbalancer
+spec:
+  type: Load Balancer
+  externalTrafficPolicy: Local
+  selector:
+    app: myweb
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+    # loadBalancerIP: 6.6.6.6 #指定地址后，还需要连接云服务商的LBaas服务才能真正获得此地址，否则为pending状态
+```
+
+注意：LoadBalancer本身是一个增强的Nodeport类型的Service
+
+使用openelb实现LoadBalancer
+```shell
+# 国内镜像地址
+# 青云项目
+image: registry.cn-beijing.aliyuncs.com/wangxiaochun/ingress-nginx-kube-webhook-certgen:v1.1.1
+image: registry.cn-beijing.aliyuncs.com/wangxiaochun.kubesphere/openelb.v0.5.1
+
+# 谷歌项目：MetalLB实现
+METALLB_VERSION='v0.14.7'
+wget https://mirror.ghproxy.com/https://raw.githubusercontent.com/metallb/metallb/${METALLB_VERSION}/config/manifests/metallb-native.yaml
+
+# 直接执行
+kubectl apply -f metallb-native.yaml
+
+#指定IP地址池
+[root@master1 yaml]#cat service-metallb-IPAddressPool.yaml 
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+ name: localip-pool
+ namespace: metallb-system
+spec:
+ addresses:
+  - 10.0.0.10-10.0.0.50
+ autoAssign: true
+ avoidBuggyIPs: true
+  
+[root@master1 yaml]#cat service-metallb-L2Advertisement.yaml 
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+ name: localip-pool-l2a
+ namespace: metallb-system
+spec:
+ ipAddressPools:
+  - localip-pool
+ interfaces:
+  - eth0
+
+# 执行
+kubectl apply -f service-metallb-IPAddressPool.yaml -f service-metallb-L2Advertisement.yaml
+
+# 创建Deployment和LoadBalancer类型的Service，测试地址池是否能给Service分配LoadBalancer IP
+kubectl create deployment myapp --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas=3
+
+# 创建Service
+[root@master1 yaml]#cat service-loadbalancer-lbaas.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+ name: service-loadbalancer-lbaas
+spec:
+ type: LoadBalancer
+ externalTrafficPolicy: Local
+ selector:
+   app: myapp
+ ports:
+  - name: http
+   protocol: TCP
+   port: 80
+   targetPort: 80
+```
+
+### externallPs
+如果当前底层没有laas服务，也没有LBaas服务，但是想直接通过众所周知的服务端口地址来进行访问，可以通过externallPS实现
+
+在任意主机上，配置一个地址
+```shell
+# 这里模拟外网ip，必须被宿主机能够访问，而且与Kubernetes的集群Pod网段不一样
+ip a a 10.0.0.66 dev eth0 label 0:1
+
+#配置清单文件
+[root@master1 yaml]#cat service-loadbalancer-externalip.yml 
+apiVersion: v1
+kind: Service
+metadata:
+ name: service-loadbalancer-externalip
+spec:
+ type: LoadBalancer
+ ports:
+  - port: 80
+ selector:
+   app: myweb
+ externalIPs:
+  - 10.0.0.66
+#注意：这里的externalIPs对于使用哪种Service类型无关
+
+# 这里创建nodeport，然后加externalIPS是一样的
+```
+
+### Service类型之externalname
+externalname实现
+```yaml
+# vim service-externalname-redis.yaml
+kind: Service
+apiVersion: v1
+metadata:
+ name: svc-externalname-web
+ namespace: default
+spec:
+ type: ExternalName
+ externalName: www.wangxiaochun.com   #外部服务的FQDN,不支持IP
+ # 使用外部DNS的同时需要修改coreDNS
+ ports:                               #以下行都可选
+  - protocol: TCP
+   port: 80
+   targetPort: 8888                    #外部服务端口
+   nodePort: 0
+ selector: {}                         #没有标签选择器，表示不关联任何Pod
+```
+
+pod域名固定写法：`Service名+namespace名+svc.cluster.local`
+
+- cluster.local是在安装k8s的时候指定的
+- 查看方法`kubectl cluster-info dump|grep cluster.local`
+- 访问：`curl sev-externalname-web.default.svc.cluster.local:8888`
+
+
+#### 使用自建的Endpoint实现基于ClusterIP类型的Service代理集群外部服务
+- 手动创建一个Endpoints资源对象，直接把外部端点的Ip地址，放入可用地址列表
+- 额外创建一个不带selector的同名的Service对象
+
+```yaml
+# vim service-endpoints.yaml
+---
+kind: Endpoints
+apiVersion: v1
+metadata:
+  name: service-redis
+  namespace: default
+subsets:
+  - addresses:
+    - ip: 10.0.0.101    # 外部服务的FQDN或IP
+  # - ip: 10.0.0.102   可以有多个外部主机
+    ports:
+      - name: redis
+        port: 6379
+        protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-redis  # 和上面的endpoints必须同名, 后续靠域名访问，即service-redis
+  namespace: default
+spec:
+  type: ClusterIP
+  # clusterIP: "None"
+  ports:
+    - name: redis
+      port: 6379
+      protocol: TCP
+      targetPort: 6379
+```
+
+### 会话粘滞
+```shell
+# 创建一个clusterip
+kubectl create svc clusterip myapp --tcp 80:80
+```
+默认没有开启会话粘滞
+```yaml
+kubectl create deployment myweb --image=wangxiaochun/pod-test:v0.1 --replicas=3
+
+# cat service-test.yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: service-test
+spec:
+  selector:
+    app: myweb
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+```
+
+实现会话粘滞
+```yaml
+# cat service-session.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-session
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  selector:
+    app: myweb
+  sessionAffinity: ClientIP  # 客户端IP的亲缘性，实现1800s内的会话保持
+  sessionAffinityConfig:
+    ClientIP:
+      timeoutSeconds: 1800
+```
+
+### IPVS
+#### 查看当前模式
+```shell
+#查看当前模式
+[root@master1 ~]#curl 127.0.0.1:10249/proxyMode
+iptables
+```
+
+#### 更改模式
+更改kube-proxy为IPVS模式方法说明
+```shell
+#方法1： 在集群创建的时候，修改kubeadm-init.yml 添加如下配置，此方法是生产中推荐
+[root@master1 ~]#kubeadm config print init-defaults > kubeadm-init.yaml
+#在文件最后面添加以下几行
+[root@master1 ~]#vim kubeadm-init.yaml
+---
+apiVersion: kubeproxy.config.Kubernetes.io/v1alpha1
+kind: KubeProxyConfiguration
+featureGates:
+ SupportIPVSProxyMode: true
+mode: ipvs
+
+#方法2：在测试环境中，临时修改一下configmap中proxy的基本属性，此方式在测试环境中推荐使用
+root@master1:~# kubectl edit configmap kube-proxy -n kube-system
+ ...
+   mode: "ipvs"  #修改此行，默认为空”“表示iptables模式
+
+#所有的规则都是 ipvs本身的调度规则，可以在node节点上查看效果(master也可以)
+ipvsadm -Ln
+# 保存后立即生效，但是pod需要删除重新生成
+```
