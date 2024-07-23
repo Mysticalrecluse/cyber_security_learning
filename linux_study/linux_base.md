@@ -20738,3 +20738,4 @@ mkdir /data/isos -p
 cd /data/isos
 rz [镜像]
 ```
+

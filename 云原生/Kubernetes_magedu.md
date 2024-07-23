@@ -2265,3 +2265,607 @@ root@master1:~# kubectl edit configmap kube-proxy -n kube-system
 ipvsadm -Ln
 # 保存后立即生效，但是pod需要删除重新生成
 ```
+
+## 使用K8S实现wordpress架构
+### 创建wordpress的Service网络
+```shell
+kubectl create svc loadbalancer wordpress --tcp 80:80 --dry-run=client -o yaml > wordpress-mysql-svc-deployment.yaml
+```
+
+### 创建deployment类型编排的wordpress
+```shell
+kubectl create deployment wordpress --image registry.cn-beijing.aliyuncs.com/wangxiaochun/wordpress:php8.2-apache--dry-run=client -o yaml >> wordpress-mysql-svc-deployment.yaml kubectl cre
+```
+
+### 创建mysql的Service网络
+```shell
+kubectl create svc clusterip mysql --tcp 3306:3306 --dry-run=client -o yaml > wordpress-mysql-svc-deployment.yaml
+```
+
+### 创建mysql的deployment类型
+```shell
+kubectl create deployment mysql --image registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:8.0.29-oracle --dry-run=client -o yaml >> wordpress-mysql-svc-deployment.yaml 
+```
+
+### 在最开始定义一个名称空间，整理yaml文件如下
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wordpress
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: wordpress
+  name: wordpress
+spec:
+  ports:
+  - name: 80-80
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: wordpress
+  type: LoadBalancer
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: wordpress
+  name: wordpress
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: wordpress
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/wordpress:php8.2-apache--dry-run=client
+        imagePullPolicy: IfNotPresent
+        name: wordpress
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: mysql
+  name: mysql
+spec:
+  ports:
+  - name: 3306-3306
+    port: 3306
+    protocol: TCP
+    targetPort: 3306
+  selector:
+    app: mysql
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: mysql
+  name: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:8.0.29-oracle
+        name: mysql
+```
+
+### 在执行资源清单的时候，指定一开始创建的namespace，并记得把环境变量写上
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wordpress
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: wordpress
+  name: wordpress
+spec:
+  ports:
+  - name: 80-80
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: wordpress
+  type: LoadBalancer
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: wordpress
+  name: wordpress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/wordpress:php8.2-apache
+        imagePullPolicy: IfNotPresent
+        name: wordpress
+        env:
+        - name: WORDPRESS_DB_HOST
+          value: mysql.wordpress.svc.cluster.local.
+        - name: WORDPRESS_DB_USER
+          value: wordpress
+        - name: WORDPRESS_DB_PASSWORD
+          value: "123456"
+        - name: WORDPRESS_DB_NAME
+          value: wordpress
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: mysql
+  name: mysql
+spec:
+  ports:
+  - name: 3306-3306
+    port: 3306
+    protocol: TCP
+    targetPort: 3306
+  selector:
+    app: mysql
+  type: ClusterIP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:8.0.29-oracle
+        name: mysql
+        env: 
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123456"
+        - name: MYSQL_DATABASE
+          value: "wordpress"
+        - name: MYSQL_USER
+          value: wordpress
+        - name: MYSQL_PASSWORD
+          value: "123456"
+```
+### 启用资源清单
+```shell
+kubectl apply -f wordpress-mysql-svc-deployment.yaml -n wordpress 
+```
+## CoreDNS
+### CoreDNS解析流程
+- Client Pod查询自身的/etc/resolv.conf文件中指向的DNS服务器地址，此地址为kube-dns service的地址，即将解析请求转发给名为kube-dns的service
+
+- kube-dns service会将请求转发到后端CoreDNS Pod，为了DNS的高可用，通常有两个CoreDNS Pod，并位于kube-system名称空间
+
+- Coredns Pod根据Corefile的配置会连接到在default名称空间的名为kubernetes的service，而Kubernetes service对应的Endpoints为所有kube-apiserver:6443的地址
+
+- Kubernetes service监视Service IP的变动，维护DNS解析记录，并将变化发送至ETCD实现DNS记录的存储
+
+- CoreDNS查询到Service name对应的IP后返回给客户端
+
+- 如果查询的是外部域名，CoreDNS无法解析，就转发给指定的域名服务器，一般是宿主机节点上/etc/resolv.conf的服务器解析
+
+
+### 查看Pod内部的域名解析
+```shell
+# 进入容器内部
+[root@master201 ~]#kubectl exec -it myapp-547df679bb-5hk2w -- sh
+[root@myapp-547df679bb-5hk2w /]# host kubernetes.default
+kubernetes.default.svc.cluster.local has address 10.96.0.1
+[root@myapp-547df679bb-5hk2w /]# cat /etc/resolv.conf 
+# 执行CoreDNS的service IP
+nameserver 10.96.0.10
+search default.svc.cluster.local svc.cluster.local cluster.local
+# ndots:5 表示点少于5个的时候，补search后面的后缀，超过5个不补
+options ndots:5
+# 如果CoreDNS查不到，则使用宿主机的resolv.conf上的域名服务器进行查询
+[root@myapp-547df679bb-5hk2w /]# host www.baidu.com
+www.baidu.com has address 220.181.38.149
+www.baidu.com has address 220.181.38.150
+www.baidu.com has IPv6 address 240e:83:205:58:0:ff:b09f:36bf
+www.baidu.com has IPv6 address 240e:83:205:5a:0:ff:b05f:346b
+www.baidu.com is an alias for www.a.shifen.com.
+```
+
+### 基于二进制Kubernetes集群中的CoreDNS部署
+```shell
+# 下载coredns的yaml文件
+wget -O coredns.yaml https://raw.githubusercontent.com/coredns/deployment/master/kubernetes/coredns.yaml.sed
+
+# 修改
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+name: coredns
+ namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+ labels:
+   kubernetes.io/bootstrapping: rbac-defaults
+ name: system:coredns
+rules:
+  - apiGroups:
+    - ""
+   resources:
+    - endpoints
+    - services
+    - pods
+    - namespaces
+   verbs:
+    - list
+    - watch
+  - apiGroups:
+    - discovery.k8s.io
+   resources:
+    - endpointslices
+   verbs:
+    - list
+    - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+ annotations:
+   rbac.authorization.kubernetes.io/autoupdate: "true"
+ labels:
+   kubernetes.io/bootstrapping: rbac-defaults
+ name: system:coredns
+roleRef:
+ apiGroup: rbac.authorization.k8s.io
+ kind: ClusterRole
+ name: system:coredns
+subjects:
+- kind: ServiceAccount
+ name: coredns
+ namespace: kube-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+ name: coredns
+ namespace: kube-system
+data:
+ Corefile: |
+   .:53 {
+       errors
+       health {
+         lameduck 5s
+       }
+       ready
+#此处CLUSTER_DOMAIN修改cluster.local,REVERSE_CIDRS 修改为 in-addr.arpa ip6.arpa
+       kubernetes CLUSTER_DOMAIN REVERSE_CIDRS {  
+         fallthrough in-addr.arpa ip6.arpa
+       }
+       prometheus :9153
+       forward . UPSTREAMNAMESERVER {     #此处UPSTREAMNAMESERVER修改为/etc/resolv.conf
+         max_concurrent 1000
+       }
+       cache 30
+       loop
+       reload
+       loadbalance
+   }STUBDOMAINS
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+ name: coredns
+ namespace: kube-system
+ labels:
+   k8s-app: kube-dns
+   kubernetes.io/name: "CoreDNS"
+spec:
+  # replicas: not specified here:
+  # 1. Default is 1.
+  # 2. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+ replicas: 2                   #添加此行为多副本,默认为1
+ strategy:
+   type: RollingUpdate
+   rollingUpdate:
+     maxUnavailable: 1
+ selector:
+   matchLabels:
+     k8s-app: kube-dns
+ template:
+   metadata:
+     labels:
+       k8s-app: kube-dns
+   spec:
+     priorityClassName: system-cluster-critical
+     serviceAccountName: coredns
+     tolerations:
+        - key: "CriticalAddonsOnly"
+         operator: "Exists"
+     nodeSelector:
+       kubernetes.io/os: linux
+     affinity:
+         podAntiAffinity:
+           requiredDuringSchedulingIgnoredDuringExecution:
+           - labelSelector:
+               matchExpressions:
+               - key: k8s-app
+                 operator: In
+                 values: ["kube-dns"]
+             topologyKey: kubernetes.io/hostname
+     containers:
+  - name: coredns
+       image: coredns/coredns:1.9.4
+       imagePullPolicy: IfNotPresent
+       resources:
+         limits:
+           memory: 170Mi  #此处的资源限制修改为合适的值,比如:4096Mi
+         requests:
+           cpu: 100m      #此处的资源限制修改为合适的值
+           memory: 70Mi   #此处的资源限制修改为合适的值
+       args: [ "-conf", "/etc/coredns/Corefile" ]
+       volumeMounts:
+        - name: config-volume
+         mountPath: /etc/coredns
+         readOnly: true
+       ports:
+        - containerPort: 53
+         name: dns
+         protocol: UDP
+        - containerPort: 53
+         name: dns-tcp
+         protocol: TCP
+        - containerPort: 9153
+         name: metrics
+         protocol: TCP
+       securityContext:
+         allowPrivilegeEscalation: false
+         capabilities:
+           add:
+            - NET_BIND_SERVICE
+           drop:
+            - all
+         readOnlyRootFilesystem: true
+       livenessProbe:
+         httpGet:
+           path: /health
+           port: 8080
+           scheme: HTTP
+         initialDelaySeconds: 60
+         timeoutSeconds: 5
+         successThreshold: 1
+         failureThreshold: 5
+       readinessProbe:
+         httpGet:
+           path: /ready
+           port: 8181
+           scheme: HTTP
+     dnsPolicy: Default
+     volumes:
+        - name: config-volume
+         configMap:
+           name: coredns
+           items:
+            - key: Corefile
+             path: Corefile
+---
+apiVersion: v1
+kind: Service
+metadata:
+name: kube-dns
+ namespace: kube-system
+ annotations:
+   prometheus.io/port: "9153"
+   prometheus.io/scrape: "true"
+ labels:
+   k8s-app: kube-dns
+   kubernetes.io/cluster-service: "true"
+   kubernetes.io/name: "CoreDNS"
+spec:
+ selector:
+   k8s-app: kube-dns
+ clusterIP: CLUSTER_DNS_IP  #修改此处为kube-dns SVC的地址,比如:10.96.0.10,可通过查看Pod的/etc/resolv.conf 获取
+ ports:
+  - name: dns
+   port: 53
+   protocol: UDP
+  - name: dns-tcp
+   port: 53
+   protocol: TCP
+  - name: metrics
+   port: 9153
+   protocol: TCP
+```
+```shell
+#修改上面文件内容汇总
+[root@master1 ~]#vim coredns.yaml
+CLUSTER_DOMAIN: cluster.local
+REVERSE_CIDRS: in-addr.arpa ip6.arpa
+UPSTREAMNAMESERVER: /etc/resolv.conf
+CLUSTER_DNS_IP: 10.96.0.2
+#应用创建coredns的Pod
+[root@master1 ~]#kubectl apply -f coredns.yaml
+```
+
+### CoreDNS工作机制
+每个Service资源对象，在CoreDNS上都会自动生成如下格式的名称，结合该名称会生成对应的一些不同类型的DNS资源记录
+```shell
+<service>.<ns>.svc.<zone>
+<service>： #当前Service对象的名称
+<ns>：      #当前Service对象所属的名称空间
+<zone>：    #当前Kubernetes集群使用的域名后缀，默认为“cluster.local” ，用 kubeadm init --service-dns-domain 指定
+```
+
+Kuberadm安装方式时查看默认Zone名称
+```shell
+[root@master1 ~]#kubeadm config print init-defaults |grep dns
+dns: {}
+dnsDomain: cluster.local
+```
+
+### CoreDNS的配置策略
+Kubernetes支持单个Pod资源规范上自定义DNS解析策略和配置，并组合生效
+- pod.spec.dnsPolicy: 解析策略
+- pod.spec.dnsConfig: 名称解析机制
+
+#### pod.spec.dnsPolicy策略
+- Default： 从运行在宿主机节点/etc/resolv.conf继承DNS名称解析相关的配置
+- ClusterFirst: 
+  - 此为默认值，优先使用集群内DNS服务上的即系集群域内的名称，其他域名解析则交由宿主机节点/etc/resolv.conf的名称服务器
+- ClusterFirstWithHostNet:
+  - 在容器使用宿主机网络的情况下，仍然使用ClustFirst策略
+- None
+  - 用于忽略Kubernetes集群的默认设定，仅使用由dnsConfig自定义的配置
+  
+
+#### pod.spec.dnsConfig
+- nameservers <[]string>：DNS名称服务器列表，附加于由dnsPolicy生成的DNS名称服务器之后
+- searches <[]string>：DNS名称解析时的搜索域，附加由于dnsPolicy生成的搜索域之后
+- options <[]Object>：DNS解析选项列表，同dnsPolicy生成的解析选项合并成最终生效的定义
+
+### 创建pod并修改CoreDNS配置
+相当于指定pod的专有DNS解析方式（很不方便）
+```shell
+[root@master1 yaml]#cat service-pod-with-dnspolicy.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+ name: service-pod-with-dnspolicy
+ namespace: default
+spec:
+ containers:
+  - name: demo
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+   imagePullPolicy: IfNotPresent
+ dnsPolicy: None
+ dnsConfig:         # 修改DNS配置
+   nameservers:
+    - 10.96.0.10
+    - 180.76.76.76
+    - 223.6.6.6
+   searches: 
+    - svc.cluster.local
+    - cluster.local
+    - wang.org
+   options:
+    - name: ndots
+     value: "5"    #意味着如果域名中只有5个或更少的点，则系统会尝试在其末尾添加搜索域。
+```
+
+
+### CoreDNS配置
+```shell
+#coredns的配置是存放在 configmap中
+[root@master1 ~]#kubectl get cm -n kube-system
+NAME                                 DATA   AGE
+coredns                              1     27d
+.....
+
+[root@master1 ~]#kubectl get cm coredns -n kube-system -o yaml
+apiVersion: v1
+data:
+ Corefile: |
+   .:53 {
+errors
+       health {
+           lameduck 5s
+       }
+       ready
+       kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+       }
+       prometheus :9153
+       forward . /etc/resolv.conf {
+           max_concurrent 1000
+       }
+       cache 30
+       loop
+       reload
+       loadbalance
+   }
+kind: ConfigMap
+metadata:
+ creationTimestamp: "2021-03-04T15:36:36Z"
+ name: coredns
+ namespace: kube-system
+ resourceVersion: "219"
+ uid: d6307d21-8c84-4302-9b95-a8058188333e
+```
+
+![alt text](images\image4.png)
+
+不使用默认的转发策略，使用自定义的转发策略
+```shell
+#修改配置文件
+root@master1:~# kubectl edit cm coredns -n kube-system
+...
+       rewrite name myapp.wang.org myapp.default.svc.cluster.local #将集群外的域名
+重写为集群内的域名再进行解析
+       kubernetes cluster.local in-addr.arpa ip6.arpa
+       forward . /etc/resolv.conf {
+           max_concurrent 1000
+           except www.baidu.com.                    #排除www.baidu.com，不进行解析，
+注意：最后面的点
+       }
+       hosts {                                     #添加三行，实现指定域名的解析,此优
+先级比forward高
+           10.0.0.100 harbor.cluster.local harbor.wang.org
+           10.0.0.101 nfs.wang.org
+           fallthrough
+       }
+       ...
+#注意：多个dns地址间用空格隔开,排除的域名最好在末尾添加 “.”，对于之前的旧版本来说可能会出现无法查询的现象
+#重建CoreDNS，加快DNS配置信息生效
+[root@master1 ~]#kubectl delete pod -l Kubernetes-app=kube-dns -n kube-system
+```
+
+
+
+## Headless Service 
+
