@@ -2865,7 +2865,68 @@ root@master1:~# kubectl edit cm coredns -n kube-system
 [root@master1 ~]#kubectl delete pod -l Kubernetes-app=kube-dns -n kube-system
 ```
 
-
-
 ## Headless Service 
 
+### 无头服务使用场景
+
+#### 有标签选择器，或者没有标签选择器但是有与Service同名的Endpoint资源
+主要应用于有状态服务的stateful资源对象
+
+#### 无标签选择器且也没有与Service对象同名的Endpoint资源
+主要用于集群外部ExternalName类型的Service
+
+#### 无头服务管理域名格式
+```shell
+$(service_name).$(Kubernetes_namespace).svc.cluster.local
+```
+
+#### 案例
+```shell
+# 无头服务标志就是clusterip为none
+kubectl create service clusterip service-headless-cmd --clusterip="None"
+```
+
+## 存储管理
+存储卷的配置由两部分组成
+- 通过spec.volumes字段定义在pod之上的存储卷列表，它经由特定的存储插件并结合特定的存储供给方的接口进行定义
+- 嵌套定义在容器的`volumeMounts`字段上的存储卷挂载列表，它只能挂载当前Pod对象中定义的存储卷
+
+Pod内部容器使用存储卷有两步
+- 在Pod上定义存储卷，并关联至目标存储服务上Volumes
+- 在需要用到存储卷的容器上，挂载其其所属的pod中pause的存储卷volumesMount
+
+Pod的卷资源对象属性
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: <string>
+  namespace: <string>
+spec:
+  volumes:
+  - name: <string>
+  VOL_TYPE <object>
+  containers:
+  - name:
+    image:
+    volumeMounts:
+      - name: <string>
+        mountPath: <string>
+        readOnly: <bool>
+        subPath: <string>
+        subPathExpr: <string>
+```
+### emptyDir
+
+emptyDir 数据存放在宿主机路径如下
+```shell
+/var/lib/kubelet/pods/pod_id/volumes/kubernetes.io~empty-dir/<volume_name>/<FILE>
+# 此目录随着Pod的删除，也会随之删除，不能实现持久化
+```
+
+配置格式
+```shell
+
+```
+
+### Hostpath
