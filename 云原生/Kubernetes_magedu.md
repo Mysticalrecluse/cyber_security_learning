@@ -3001,3 +3001,46 @@ type  # 指定路径的类型，一共有7种，
      CharDevice   # 事先必须存在字符设备文件路径
      BlockDevice  # 事先必须存在的块设备文件路径
 ```
+
+#### 示例
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  containers:
+  - image: registry.k8s.io/test-webserver
+    name: test-container
+    volumeMounts:
+    - mountPath: /test-pod
+      name: test-volume
+  volumes:
+  - name: test-volume
+    hostPath:
+      path: /data
+      type: Directory
+```
+
+#### 实现Redis数据持久化
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath-redis
+spec:
+  nodeName: node.wang.org    # 指定运行在指定Worker主机上
+  volumes:
+  - name: redis-backup
+    hostPath:
+      path: /backup/redis
+  containers:
+    - name: hostpath-redis
+      image: redis:6.2.5
+      volumeMounts:
+      - name: redis-backup
+        mountPath: /data
+```
+
+
+### 网络存储共享
