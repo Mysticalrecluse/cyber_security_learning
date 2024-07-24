@@ -2903,14 +2903,14 @@ metadata:
   name: <string>
   namespace: <string>
 spec:
-  volumes:
-  - name: <string>
-  VOL_TYPE <object>
+  volumes:                     # 定义卷, spec.volumes
+  - name: <string>             # 卷名
+  VOL_TYPE <object>            # 类型
   containers:
   - name:
     image:
-    volumeMounts:
-      - name: <string>
+    volumeMounts:               # 引用卷, spec.containers.volumeMounts
+      - name: <string>          # 引用卷名
         mountPath: <string>
         readOnly: <bool>
         subPath: <string>
@@ -2924,9 +2924,80 @@ emptyDir 数据存放在宿主机路径如下
 # 此目录随着Pod的删除，也会随之删除，不能实现持久化
 ```
 
-配置格式
-```shell
+#### emptyDir特点
+- 此为默认存储类型
+- 此方式只能临时存放数据，不能实现数据持久化
+- 跟随Pod初始化而来，开始是空数据卷
+- Pod被删除，emptyDir对应的宿主机目录也被删除，当然目录内的数据随之永久消除 
+- emptyDir主机可以为同一个Pod内多个内容共享
+- emptyDir容器数据的临时存储目录主要用于数据缓存和同一个Pod内的多个容器共享使用
 
+#### emptyDir属性解析
+```shell
+kubectl explain pod.spec.volumes.emptyDir
+    medium      # 指定媒介类型，主要由default和memory
+    sizeLimit   # 当前存储卷的空间限额，默认值为nil表示不限制
+
+kubectl explain pod.spec.containers.volumeMounts
+    mountPath   # 挂载到容器中的路径，此目录会自动生成
+    name        # 指定挂载的volumes名称
+    readonly    # 是否只读挂载
 ```
 
-### Hostpath
+#### 示例
+```yaml
+# cat storage-emptydir-2.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: storage-emptydir
+spec:
+  volumes:
+  - name: nginx-data
+    emptyDir: {}
+  containers:
+  - name: storage-emptydir-nginx
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    volumeMounts:
+    - name: nginx-data
+      mountPath: /usr/share/nginx/html/
+  - name: storage-emptydir-busybox
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/busybox:1.32.0
+    volumeMounts:
+    - name: nginx-data
+      mountPath: /data/
+    command:
+    - "/bin/sh"
+    - "-c"
+    - "while true; do date > /data/index.html; sleep 1; done"
+```
+
+### hostPath
+hostPath可以将宿主机上的目录挂载到Pod中作为数据的存储目录
+
+#### hostPath的使用场景
+- 容器应用程序中某些文件需要永久保存
+- Pod删除，hostPath数据对应在宿主机文件不受影响，即hostPath的生命周期和Pod不同，而和节点相同
+- 宿主机和容器的目录都会自动加载 (目录自动生成)
+- 某些容器应用需要用到容器自身的内部数据，可将宿主机的/var/lib/[docker|containerd]挂载到Pod中
+
+#### hostPath使用注意事项
+- 不同宿主机的目录和文件不一定完全相同，所以Pod迁移前后的访问效果不一样
+- 不适合Deployment这种分布式资源，更适合DaemonSet
+- 宿主机的目录不属于独立的资源对象的资源，所以对资源设置的资源配额限制对hostPath目录无效
+
+#### 配置属性
+```shell
+# 配置属性
+kubectl explain pod.spec.volumes.hostPath
+path  # 指定哪个宿主机的目录或文件将共享给Pod使用
+type  # 指定路径的类型，一共有7种，
+     空字符串  # 默认配置，在关联hostPath存储卷之前不进行任何检查，如果宿主机没有对应的目录，会自动创建
+     DirectoryOrCreate   # 宿主机上不存在，创建此755权限的空目录，属主属组均为kubelet
+     Directory  # 必须存在，挂载已存在的目录
+     FileorCreate #宿主机上不存在挂载文件，就创建0644权限的空文件，属主属组同为kubelet
+     File         # 必须存在的文件
+     Socket       # 事先必须存在Socket文件路径
+     CharDevice   # 事先必须存在字符设备文件路径
+     BlockDevice  # 事先必须存在的块设备文件路径
+```
