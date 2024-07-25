@@ -3044,3 +3044,833 @@ spec:
 
 
 ### 网络存储共享
+
+#### 实现NFS的网络共享存储
+
+使用NFS提供的共享目录存储数据时，需要在系统中部署一个NFS环境，通过volume的配置，实现pod的容器间共享NFS目录
+
+属性解析
+```shell
+# 配置属性
+kubectl explain pod.spec.volumes.nfs
+server         # 指定nfs服务器的地址
+path           # 指定nfs服务器暴露的共享地址
+readOnly       # 是否只读，默认false
+
+# 配置格式
+  volumes:
+  - name: <卷名>
+    nfs:
+      server: nfs_server_address
+      path: "共享目录"
+      readOnly: false
+
+# 注意：要求Kubernetes所有集群都必须支持nfs客户端命令，所有节点都必须执行 apt -y install nfs-common
+```
+
+示例
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  containers:
+  - image: registry.k8s.io/test-webserver
+    name: test-container
+    volumeMounts:
+      - mountPath: /my-nfs-data
+        name: test-volume
+  volumes:
+  - name: test-volume
+    nfs:
+      server: my-nfs-server.example.com
+      path: /my-nfs-volume
+      readOnly: true
+```
+
+#### 案例
+使用集群外的NFS存储
+```shell
+# NFS服务器软件安装
+apt update && apt install -y nfs-kernel-server 或者 nfs-server
+
+# 配置共享目录
+mkdir /nfs-data
+echo '/nfs-data *(rw,all_squash,anonuid=0,anongid=0)' >> /etc/exports
+
+# 重启服务
+exportfs -r
+# 查看nfs
+exportfs -v
+```
+
+资源清单
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: volumes-nfs
+spec:
+  volumes:
+  - name: redisdatapath
+    nfs:
+      server: nfs.feng.org
+      path: /data/nfs/redis
+  containers:
+  - name: redis
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/redis:6.2.5
+    volumeMounts:
+    - name: redisdatapath
+      mountPath: /data
+```
+
+更改DNS设置，转发只指定DNS服务器
+```shell
+kubectl edit cm coredns -n kube-system
+```
+```yaml
+apiVersion: v1
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+           lameduck 5s
+        }
+        ready
+        kubernetes cluster.local in-addr.arpa ip6.arpa {
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa
+           ttl 30
+        }
+        prometheus :9153
+        # 添加转发
+        forward . 10.0.0.129 {
+           max_concurrent 1000
+        }
+        cache 30
+        loop
+        reload
+        loadbalance
+    }
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2024-07-15T05:08:40Z"
+  name: coredns
+  namespace: kube-system
+  resourceVersion: "599520"
+  uid: e766f12b-6f34-4acc-be90-65130bc4ee69
+```
+
+### PV和PVC
+PVC负责提出需求
+PV负责提供解决方案
+客户(Pod)提出PVC的需求，PVC根据需求匹配PV（解决方案）来达到存储目的
+
+PV(Persistent Volume)
+- 工作中的存储资源一般都独立于Pod的，将之称为资源对象PV，是由管理员设置的存储，它是Kubernetes集群的一部分，PV是Volume之类的卷插件，但是具有独立于PV的Pod的生命周期
+
+PV与Volume的区别
+- PV是集群级别的资源，负责将存储空间引入到集群中，通常有管理员定义
+- PV就是Kubernetes集群中的网络存储，不属于Namespace，Node，Pod等资源，但可以被他们访问
+- PV有自己独立的生命周期
+
+#### PV和PVC的配置流程
+
+- 集群管理员创建一个存储解决方案（比如NFS）
+- 管理员创建一个PV，PV定义了一个存储的具体实现，保留使用多大存储，哪种模式等
+- 用户提出PVC
+- 如果PVC能够匹配到合适的PV，则实现绑定
+- 用户创建一个pod并使用卷关联PVC 
+
+#### PV的两种解决方案
+- 静态
+  - 集群管理员预先手动创建一些PV。它们有可供集群用户使用的实际存储细节
+
+- 动态
+  - 集群尝试根据用户请求动态地自动完成创建卷，此配置基于StorageClass；PVC必须请求存储类，并且管理员必须预先创建并配置该StorageClass才能进行动态创建
+  - 声明该类为""（空字符），可以有效地禁用其动态配置
+
+#### PV属性
+```shell
+# pv 作为存储资源，主要包括存储能力，访问模式，存储类型，回收策略等关键信息
+kubectl explain pv.spec
+    capacity(容量)        # 定义pv使用多少资源，仅限于空间的设定
+    accessModes          # 访问模式，支持单路读写，多路读写，单路只读，多路只读，可同时支持多种模式
+    volumeMode            # 文件系统或块设备，默认文件系统·
+    mountOptions          # 挂载选项：比如["ro","soft"]
+    persistentVolumeReclaimPolicy  # 资源回收策略，主要三种Retain,Delete,Recycle
+    存储类型               # 每种存储类型的样式的属性名称都是专有的
+    storageClassName      # 存储类的名称，如果配置必须和PVC的storageClass一致
+
+# 示例
+# PV在意存储细节，需明确具体实现
+apiVersion: v1
+kind: PersistentVolume
+matadata:
+  name: pv0003
+  labels:
+    release: "stable"    # 便签可以支持匹配过滤PVC
+spec：
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: slow   # 必须和PVC匹配
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /tmp
+    server: 172.17.0.2
+```
+
+#### PVC属性
+```shell
+PVC属性信息，与所有空间都能使用的PV不一样，PVC是属于名称空间级别的资源对象，即只有特定的资源才能使用
+kubectl explain pvc.spec
+    accessModes     # 访问模式
+    resources       # 资源限制
+    volumeMode      # 后端存储卷的模式，文件系统或块，默认为文件系统
+    volumeName      # 指定绑定的卷(pv)的名称
+
+kubectl explain pods.spec.volumes.persistentVolumeClaim
+    claimName
+    readOnly       # 设定pvc是否只读
+    storageClassName    # 存储类的名称，如果配置必须和PV的storageClassName相同才能绑定
+    selector            # 标签选择器实现选择绑定PV
+    # selector 选择算符
+    # PVC可以设置标签选择算符，来进一步过滤集合，只有标签与选择算符相匹配的卷能够绑定到PVC上。选择算符包含两个字段
+    matchLabels - 卷必须包含带有此值的标签
+    matchExpressionis - 通过设定键(key)、值列表和操作符(operator)来构造的需求。合法的操作符有In、NotIn、Exists和DoesNotExists
+```
+
+- 示例
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    request:
+      storage: 8Gi
+  storageClassName: slow  # 必须和PV相同
+  selector:
+    matchLabels:
+      release: "stable"
+    matchExpressions
+      - {kye: environment, operator: In, values: [dev]}
+```
+
+
+### 属性进阶
+#### PV状态(面试重点)
+Create PV ---> Pending ---> Avaliable ---> Bound ---> Released ---> Delete
+Create PV ---> Pending ---> Avaliable ---> Bound ---> Released ---> Faild
+
+状态解析：
+- Availabled:
+  - 空闲状态，表示PV没有被其他PVC对象使用
+- Bound：
+  - 绑定状态，表示PV已经被其他PVC对象使用
+- Release
+  - 未回收状态，表示PVC已经被删除了，但资源还没有被回收
+- Faild
+  - 资源回收失败
+
+Create PVC ---> Pending ---> Bound ---> Delete
+
+#### AccessMode 访问模式
+
+- ReadWriteOnde(RWO)
+  - 单节点读写，卷可以被`一个节点`以读写方式挂载
+  - ReadWriteOnce访问模式仍然可以在同一节点上运行的多个Pod,访问该卷即不支持并行写入（非并发）
+- ReadOnlyMany(ROX)
+  - 多节点只读
+- ReadWriteMany(RWX)
+  - 多节点读写
+- ReadWriteOncePod(RWOP)
+  - 卷可以被单个Pod以读写方式挂载
+  - 如果你想确保整个集群中只有一个Pod可以读取或写入该PVC，请使用RWOP访问模式
+
+#### PV资源回收策略
+当Pod结束volume后可以回收资源对象，删除PVC，而绑定关系就不要存在了，当绑定关系不存在后，这个PV如何处理，这里PC的回收策略告诉集群在存储卷声明释放后应如何处理该PV卷。目前，volume的处理策略有`保留`，`回收`和`删除`
+
+- Retain
+  - 保留PV和存储空间数据，后续数据的删除需要人工干预，一般推荐使用此项，对于手动创建的PV，此为默认值
+- Delete
+  - 相关的存储实例PV和数据都一起删除，需要支持删除功能的存储才能实现，动态存储一般会默认采用此方式
+- Recycle
+  - 已废弃
+
+#### PV和PVC使用流程
+实现方法
+- 准备存储
+- 基于存储创建PV
+- 根据需求创建PVC
+  - PVC会根据capacity和accessMode及其它条件自动找到相匹配的PV进行绑定，一个PVC对应一个PV
+- 创建Pod
+  - 在Pod的volumes指定调用上面创建PVC的名称
+  - 在Pod中的容器中的VolumeMounts指定PVC挂载容器内的目录路径
+
+#### PV和PVC使用案例
+```yaml
+# 创建service网络, 无头服务
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: mysql
+  clusterIP: None   # 只能用域名访问：mysql.default.svc.cluster.lical
+---
+# 创建Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchlabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: mysql:8.0
+        name: mysql
+        env:
+          # 实际中使用secret
+        - name: MYSQL_ROOT_PASSWORD
+          value: password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:            # 用的本地存储
+    path: "/mnt/data"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+```
+
+#### 以NFS类型创建一个3G大小的存储资源对象PV
+```yaml
+# 准备NFS共享存储
+# 在所有worker节点安装nfs软件
+# 准备pv，定制一个具体空间大小的存储对象
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-test
+spec:
+  capacity:
+    storage: 3Gi
+  accessModes:
+    - ReadWriteOnce
+    - ReadWriteMany
+    - ReadOnlyMany
+  nfs:
+    path: /nfs-data
+    server: nfs.wang.org  # 需要域名解
+```
+
+#### subPath
+
+`volumeMounts.subPath`属性可用于指定所引用的卷内的子路径，而不是其根路径
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-lamp-site
+spec:
+  containers:
+  - name: mysql
+    image: mysql:8.0
+    env:
+    - name: MYSQL_ROOT_PASSWORD
+      value: "rootpasswd"
+    volumeMounts:
+    - mountPath: /var/lib/mysql
+      name: site-data
+      subPath: mysql
+  - name: php
+    image: php:8.1-apache
+    volumeMounts:
+    - mountPath:L /var/www/html
+      name: site-data
+      subPath: html      # 假设PV的指定路径是/data/nfs
+                         # 则该挂载路径是/data/nfs/html
+  volumes:
+  - name: site-data
+    persistentVolumeClaim:
+      claimName: my-lamp-site-data
+```
+
+### StorageClass
+
+#### 基于StorageClass的动态置备
+
+- 在Kubernetes中，StorageClass是集群级别的资源，而不是名称空间级别
+
+StorageClass对象会定义下面两部分内容
+- PV的属性，比如存储类型，volume的大小等
+- 创建这种PV需要用到的存储插件
+
+提供以上两个信息，Kubernetes就能够根据用户提交的PVC，找到一个对应的StorageClass，之后Kubernetes就会调用该StorageClass声明的存储插件，进而创建出需要的PV
+
+要使用StorageClass，就得安装对应的自动配置程序，比如存储后端使用的是nfs，那么就需要使用到一个nfs-client的自动配置程序，也称为Provisioner，这个程序使用已经配置好的nfs服务器，来自动创建持久卷PV
+
+
+StorageClass API
+
+每个SorageClass都包含`provisioner`,`parameters`和`reclaimPolicy`字段，这些字段会在StorageClass需要动态置备PersistentVolume时会使用到。
+StorageClass对象的命名很重要，用户使用这个命名来请求生成一个特定的类。当创建StorageClass对象时，管理员设置StorageClass对象的命名和其他参数
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp2
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+mountOptions:
+  - debug
+volumeBindingMode: Immediate | waitForFirstConsumer
+# immediate pod创建后立即绑定PV和PVC
+# waitForFirstConsumer Pod准备好后，根据Pod的情况再创建PV和PVC
+
+# 管理员可以为没有申请绑定到特定StorageClass的PVC指定一个默认的存储类
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: standard
+  selector:
+    matchLabels:
+      release: "stable"
+    matchExpressions:
+      - {key: environment, operator: In, values: [dev]}
+```
+
+存储制备器
+- 每个StorageClass都有一个制备器（Provisioner），用于提供存储驱动，用来决定使用哪个卷插件制备PV。该字段必须指定
+
+#### NFS的制备器解决方案
+
+Kubernetes不包含内部NFS驱动。需要使用外部驱动创建StorageClass
+- NFS Ganesha服务器和外部驱动
+- NFS subdir外部驱动
+```shell
+# kubernetes-sigs k8s兴趣小组
+https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner
+```
+
+### Local Volume
+
+#### hostPath存在的问题
+- 由于集群内每个节点的差异化，要使用hostPath Volume，我们需要通过NodeSeletor等方式进行精确调度，这种事情多了，你就会不耐放，暴躁，疯狂，啊啊啊啊啊啊啊！！！
+- 注意DirectoryOrCreate和FileOrCreate两种类型的hostPath，当Node上没有对应的File/Directory时，你需要保证kubelet有在Node上Create File/Directory的权限
+- Scheduler并不会考虑hostPath volume的大小，hostPath也不能申明需要的storagesize，这样调度时存储的考虑，就需要人为检查并保证
+
+#### Local PV使用场景
+Local Persistent Volume它的使用范围非常固定
+- 高优先级的系统应用
+  - 需要在多个不同节点上存储数据
+  - 对I.O要求较高
+  - 比如：
+    - 分布式数据存储MongoDB
+    - 分布式文件系统Ceph
+- 其次，使用Local Persistent Volume的应用必须具备数据备份和恢复的能力，允许你把这些数据定时备份在其他位置
+
+#### Local PV和hostPath的区别
+常规的PV(hostPath)是先调度Pod到某个节点，然后在持久化这台机器上的Volume目录
+- 也就是说挂载的实际目录是在确定Pod调度到某节点之后，再决定的，实际挂载目录依赖于Pod调度到的节点
+
+Local PV允许用户通过标准PVC接口以简单可移植的方式访问node节点的本地存储。
+- PV的定义中需要包含描述节点亲和性的信息，K8s系统则使用该信息将容器调度到正确的node节点
+- Local类型的PV是一种更高级的本地存储抽象，它可以允许通过StorageClass来进行管理
+- 与`hostPath`相比，`local Volume`可以声明为动态供应，并且可以利用节点标签(nodeAffinity)实现存储亲和性，确保Pod调度到包含所需数据的节点上。而`hostPath`卷在Pod重建后可能会调度至新的节点，而导致旧的数据无法使用。
+
+- 总结：Local PV因为是抽象成一种PV资源对象，因此可以限制大小，且可以挂载到指定节点
+
+#### Local PV的风险
+`local`卷仍然取决于底层节点的可用性，并不适合所有应用的程序。如果节点变得不健康，那么`local`卷也将变得不可被Pod访问。使用它的Pod将不能运行。使用local卷的应用程序必须能够容忍这种可用性的降低，以及因底层磁盘的耐用性特征而带来的潜在的数据丢失风险
+
+#### Local卷的创建
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+# 表示存储类不使用任何provisioner，即不支持动态分配持久卷。这意味着管理员需要手动创建并管理持久卷
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer  # 延迟绑定
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: example-pv
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadwriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  StorageClassName: local-storage
+  local:
+    # 实现准备目标节点目录，对于本地存储kubernetes本身不会自动创建路径
+    # 因为kubernetes不能控制节点上的本地存储，因此无法自动创建
+    path: /mnt/disks/ssd1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - example-node:w
+```
+- 使用`local`卷时，需要设置PersistentVolume对象的nodeAffinity字段。Kubernetes调度器使用PersistentVolume的nodeAffinity信息来将使用`local`卷的Pod调度到正确的节点。
+- 使用`local`卷时，建议创建一个StorageClass并将其`volumeBindingMode`设置为`WaitForFirstConsumer`。      
+
+使用Local卷的流程
+- 创建PV，使用nodeAffinity指定绑定的节点提供存储
+- 创建PVC，绑定PV的存储条件
+- 创建Pod，引用前面的PVC和PV实现Local存储
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer 
+# 延迟绑定，只有Pod启动后再绑定PV到Pod所在节点，否则PVC处于Pending状态
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-sc-local
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /data/www/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - node2.wang.org
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-sc-local
+spec:
+  storageClassName: local-storage
+  accessModes: ["ReadWriteOncde"]
+  resources:
+    requests:
+      storage: 100Mi
+---
+apiVersion: v1
+kind: pod
+metadata:
+  name: pod-sc-local-demo
+spec:
+  containers:
+  - name: pod-sc-local-demo
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx.1.20.0
+    volumeMounts:
+      - name: pvc-sc-local
+        mountPath: "/usr/share/nginx/html/"
+  restartPolicy: "Never"
+  volumes:
+    - name: pvc-sc-local
+      persistentVolumeClaim:
+        claimName: pvc-scp-local
+```
+
+### NFS的存储制备器方案
+#### 基于nfs-subdir-external-provisione创建NFS共享存储的storageclass
+
+创建NFS共享存储的storageclass步骤如下
+- 创建NFS共享
+- 创建Service Account并授予管控NFS provisioner在k8s集群中运行的权限
+- 部署NFS-Subdir-External-Provisioner对应的Deployment
+- 创建StorageClass负责建立PVC并调用NFS provisioner进行预定的工作，并让PV与PVC建立联系
+- 创建PVC时自动调用SC创建PC
+
+在NFS服务器上增加一个规则
+```shell
+# vim /etc/exports
+/data/sc-nfs *(rw,no_root_squash)
+
+# 创建该目录
+mkdir -p /data/sc-nfs
+# 添加权限
+chmod 777 /data/sc-nfs
+# 加载配置
+exportfs -r
+```
+
+创建ServiceAccount并授权
+```shell
+# ls
+namespace.yaml
+nfs-client-provisioner.yaml 
+nfs-storageClass.yaml 
+rbac.yaml
+```
+
+创建一个名称空间（生产环境中，独立项目建议单独创建一个名称空间中）
+```yaml
+# cat namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sc-nfs
+```
+
+创建ServiceAccount（rbac）,创建账号并授权
+```yaml
+# cat rbac.yaml
+apiVersion: v1
+kind: ServiceAccount   # 账号
+metadata:
+  name: nfs-client-provisioner
+  namespace: sc-nfs
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole   # 权限
+metadata:
+  name: nfs-client-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get","list","watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get","list","watch","create","delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get","list","watch","update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get","list","watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create","update","patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: run-nfs-client-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    namespace: sc-nfs
+roleRef:
+  kind: ClusterRole
+  name: nfs-client-provisioner-runner   # 将权限关联给账号使用
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  namespace: sc-nfs
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get","list","watch","create","update","patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  namespace: sc-nfs
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    namespace: sc-nfs
+roleRef:
+  kind: Role
+  name: leader-locking-nfs-client-provisioner  # 将权限关联给账号使用
+  apiGroup: rbac.authorization.k8s.io
+```
+
+部署NFS-Subdir-External-Provisioner对应的Deployment
+这个镜像就是提供nfs制备器的应用程序
+```yaml
+# cat nfs-client-provisioner.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-client-provisioner
+  labels:
+    app: nfs-client-provisioner
+  # replace with namespace where provisioner is deployed
+  #namespace: default
+  namespace: sc-nfs
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccountName: nfs-client-provisioner
+      containers:
+        - name: nfs-client-provisioner
+          image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nfs-subdir-external-provisioner:v4.0.2
+          #image: wangxiaochun/nfs-subdir-external-provisioner:v4.0.2
+          #image: k8s.gcr.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: nfs-client-root
+              mountPath: /persistentvolumes
+          env:
+            - name: PROVISIONER_NAME
+              value: k8s-sigs.io/nfs-subdir-external-provisioner #名称确保与 nfs-StorageClass.yaml文件中的provisioner名称保持一致
+            - name: NFS_SERVER
+              value: nfs.feng.org # NFS SERVER_IP 
+            - name: NFS_PATH
+              value: /data/sc-nfs  # NFS 共享目录
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            server: nfs.feng.org  # NFS SERVER_IP 
+            path: /data/sc-nfs  # NFS 共享目录
+```
+
+创建StorageClass用来引用制备器
+```yaml
+#cat nfs-StorageClass.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sc-nfs 
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"  # 是否设置为默认的storageclass
+provisioner: k8s-sigs.io/nfs-subdir-external-provisioner # or choose another name, must match deployment's env PROVISIONER_NAME'
+parameters:
+  archiveOnDelete: "true" # 设置为"false"时删除PVC不会保留数据,"true"则保留数据
+```
+后续只要使用StorageClass创建PVC，就会自动创建PV
+
+测试用例
+```yaml
+# cat pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-nfs-sc
+spec:
+  storageClassName: sc-nfs
+  accessModes: ["ReadWriteMany","ReadOnlyMany"]
+  resources:
+    requests:
+      storage: 100Mi
+```
+```yaml
+# cat pod-test.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nfs-sc-test
+spec:
+  containers:
+  - name: pod-nfs-sc-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    volumeMounts:
+      - name: nfs-pvc
+        mountPath: "/usr/share/nginx/html/"
+  restartPolicy: "Never"
+  volumes:
+    - name: nfs-pvc
+      persistentVolumeClaim:
+        claimName: pvc-nfs-sc  #指定前面创建的PVC名称
+```
+
+## 配置管理
+### ConfigMap
+Kubernetes提供了对Pod中容器应用的集中配置管理组件：ConfigMap
+通过ConfigMap来实现向pod中的容器中注入配置信息的机制
+可以把ConfigMap理解为Linux系统中的/etc/目录，专门用来存储配置文件的目录
+
+ConfigMap不仅仅可以保存单个属性，也可以用来保存整个配置文件
+虽然ConfigMap可以对各种应用程序提供定制配置服务，但是一般不用它来替代专门的配置文件
+
+从Kubernetesv1.19版本开始，ConfigMap和Secret支持使用immutable字段创建不可变实例，实现不可变基础设施效果
+
+注意：ConfigMap属于名称空间级别，只能被同一个名称空间的Pod引用
+
+
