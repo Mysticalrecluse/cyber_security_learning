@@ -3984,7 +3984,7 @@ metadata:
 注意
 - configmap必须在Pod之前创建
 - 与configmap在同一个namespace的pod才能使用configmap，即configmap不能跨命名空间调用
-- Configmap通常存放的数据不要超过1M
+- Configmap通常存放的数据不要超过1M(从性能方面考虑)
 - CM支持实时更新，在原来的pod里面直接看到效果
 
 #### 通过环境变量的方式直接传递pod
@@ -4103,4 +4103,717 @@ spec:
 file.conf -> ..data/file.conf
 ..data/file.conf -> ..<timetemp> # 该时间戳就是configmap的生成时间，configmap一变，这个时间戳文件也会变，里面的内容就也会变
 ```
+#### kubectl cp命令
+```shell
+kubectl cp pod-volume-test:/etc/nginx/nginx.conf ./nginx.conf
+```
 
+#### volume挂载CM中部分文件
+```shell
+# 准备配置文件
+ls nginx-conf.d/
+default.conf myserver.conf myserver-gzip.cfg myserver-status.cfg
+
+# 配置文件
+[root@master1 ~]#cat nginx-conf.d/myserver.conf 
+server {
+   listen 8888;
+   server_name www.wang.org;
+   include /etc/nginx/conf.d/myserver-*.cfg;
+   location / {
+       root /usr/share/nginx/html;
+   }
+}
+
+#子配置文件,注意:文件是以cfg为后缀,不能以conf文件后缀,会导致冲突
+[root@master1 ~]#cat nginx-conf.d/myserver-gzip.cfg 
+gzip on;
+gzip_comp_level 5;
+gzip_proxied     expired no-cache no-store private auth;
+gzip_types text/plain text/css application/xml text/javascript;
+[root@master1 ~]#cat nginx-conf.d/myserver-status.cfg 
+location /nginx-status {
+   stub_status on;
+   access_log off;
+}
+
+# 创建cm
+kubectl create cm cm-nginx-conf-files --from-file=nginx-conf.d/
+
+# 清单文件
+cat storage-configmap-nginx-subfile.yaml
+```
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-nginx-index
+data:
+  index.html: "Nginx sub configmap Page!\n"
+---
+apiVersion: v1
+kind: pod
+metadata:
+  name: pod-cm-nginx-conf
+spec:
+  volumes:
+  - name: nginx-conf
+    configMap:
+      name: cm-nginx-conf-files
+      items:                        # 指定cm中的key
+      - key: myserver.conf          # cm中key的名称
+        path: myserver.conf         # pod中的文件名
+        mode: 0644                  # Pod中的文件权限
+      - key: myserver-status.cfg
+        path: myserver-status.cfg
+        mode: 0644
+      - key: myserver-gzip.cfg
+        path: myserver-gzip.cfg
+        mode: 0644
+      optional: false
+  - name: nginx-index
+    configMap:
+      name: cm-nginx-index
+      optional: false
+  containers:
+  - image:  registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    name: pod-cm-nginx-conf-container
+    volumeMounts:
+    - name: nginx-conf
+      mountPath: /etc/nginx/conf.d/
+      readOnly: true
+    - name: nginx-index
+      mountPath: /usr/share/nginx/html/
+      readOnly: true
+```
+
+
+#### volume基于subpath实现挂载CM部分文件并修改配置文件名称
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-nginx-index
+data:
+  index.html: "Nginx sub configmap Page!\n"
+---
+apiVersion: v1
+kind: pod
+metadata:
+  name: pod-cm-nginx-conf
+spec:
+  volumes:
+  - name: nginx-conf
+    configMap:
+      name: cm-nginx-conf-files
+      optional: false
+  - name: nginx-index
+    configMap:
+      name: cm-nginx-index
+      optional: false
+  containers:
+  - image:  registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    name: pod-cm-nginx-conf-container
+    volumeMounts:
+    - name: nginx-conf
+      mountPath: /etc/nginx/conf.d/myserver2.conf   # 修改生成的配置文件名
+      subPath: myserver.conf     # 指定nginx-conf中的特定文件，而非所有文件
+      readOnly: true
+    - name: nginx-conf
+      mountPath: /etc/nginx/conf.d/myserver-gzip2.cfg
+      subPath: myserver-gzip.cfg
+      readOnly: true
+    - name: nginx-index
+      mountPath: /usr/share/nginx/html/
+      readOnly: true
+```
+
+#### volume基于subPath挂载CM部分文件并保留原目录中的其他文件
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-cm-nginx-conf
+spec:
+  volumes:
+  - name: volume-nginx-conf
+    configMap:
+      name: cm-nginx-conf
+      items:
+      - key: nginx.conf
+        path: etc/nginx/nginx.conf  # 必须是相对路径，且和下面subPath路径相同
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    name: pod-cm-nginx-conf-conftainer
+    command: ["sh","-c","sleep 3600"]
+    volumeMounts:
+    - name: volume-nginx-conf
+      mountPath: /etc/nginx/nginx.conf
+      subPath: etc/nginx/nginx.conf
+```
+
+### Secret
+#### Secret分类
+- generic
+  - opaque
+  - kubernetes.io/service-account-token
+  - kubernetes.io/ssh-auth
+  - kubernetes.io/basic-auth
+  - bootstrap.kubernetes.io/token
+- tls
+  - kubernetes.io/tls
+- docker-registry
+  - kubernetes.io/dockerconfigjson
+  - kubernetes.io/dockercfg
+
+#### Secret创建方式
+- 手动创建：用户执行创建的Secret常用来存储用户私有的一些信息
+- 自动创建：集群自动创建的Secret用来作为集群中各个组件之间的通信的身份校验使用
+
+#### Secret命令式创建
+```shell
+# generic类型
+kubectl create secret generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1]
+
+# --from-literal=key1=value1   以命令行设置键值对的环境变量方式配置数据
+# --from-env-file=/PATH/FILE   以环境变量的专用文件的方式配置数据
+# --from-file=[key=]/PATH/FILE 以配置文件的方式创建配置数据
+# --from-file=/PATH/FILE       以配置文件所在目录的方式创建配置数据
+
+# 该命令中的--type选项进行定义除了后面docker-registry和tls命令之外的其他子类型，有些类型有key的特定要求
+
+# tls命令
+kubectl create secret tls NAME --cert=/path/file --key=/path/file
+# 其保存cert文件内容的key名称不能指定自动为tls.crt,而保持private key的key不能指定自动为tls.key
+
+# docker-registry类型
+# 方式1：基于用户名和密码方式实现
+kubectl create secret docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-file=[key=]source]
+
+# 方式2：基于dockerconfig文件方式实现
+kubectl create secret docker-registry KEYNAME --from-file=.dockerconfigjson=path/to/.docker/config.json
+```
+
+#### Secret引用
+secret资源在Pod中引用的方式有三种
+- 环境变量
+- secret卷
+- 拉取镜像
+
+#### Generic案例
+```shell
+# 命令式创建
+kubectl create secret generic secret-mysql-root --from-literal=username=root --from-literal=password=123456
+
+#
+[root@master201 nginx]#kubectl get secrets
+NAME                TYPE     DATA   AGE
+secret-mysql-root   Opaque   2      3s
+[root@master201 nginx]#kubectl describe secrets secret-mysql-root 
+Name:         secret-mysql-root
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Type:  Opaque
+
+Data
+====
+password:  6 bytes
+user:      4 bytes 
+
+# 账号密码被base64编码
+[root@master201 nginx]#kubectl get secrets secret-mysql-root -o yaml
+apiVersion: v1
+data:
+  password: MTIzNDU2
+  user: cm9vdA==
+kind: Secret
+metadata:
+  creationTimestamp: "2024-07-28T06:25:33Z"
+  name: secret-mysql-root
+  namespace: default
+  resourceVersion: "737849"
+  uid: f438d3be-8755-4bb5-8870-7277256a907f
+type: Opaque
+[root@master201 nginx]#echo MTIzNDU2 | base64 -d
+123456
+```
+
+#### stringData明文数据
+```shell
+cat storage-secret-Opaque-stringData.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-stringdata
+  namespace: default
+type: Opaque
+# stringData表示明文存放数据，data表示必须以base64编码存放
+stringData:
+  user: 'admin'
+  password: 'password'
+```
+
+#### secret引用实例
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-mysql
+  type: kubernetes.io/basic-auth
+data:
+  username: cm9vdAo=      # key名称：username
+  password: MTIzNDU2      # key名称：password
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-secret-mysql-init
+spec:
+  containers:
+  - name: mysql
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:8.0.29-oracle
+    env:
+    - name: MYSQL_ROOT_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: secret-mysql      # 引用指定的secret
+          key: password           # 引用指定的secret中对应的key
+          optional: false         # 必须存在
+```
+
+#### 通过卷调用secret
+```yaml
+# 清单文件
+# cat storage-secret-test-pod.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: secret-test
+type: kubernetes.io/basic-auth
+data:
+  username: YWRtaW4=
+  password: cGFzc3dvcmQ=
+# 使用命令行的时候，命令行变量无需加密，但是清单的命令必须加密
+---
+# 调用secret的清单文件
+apiVersion: v1
+kind: Pod
+metadata:
+  name: secret
+spec:
+  volumes:
+  - name: secret
+    secret:
+      secretName: secret-test   # 指定secret的名称
+  containers:
+    - name: secret-test-container
+      image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+      volumeMounts:
+      - name: secret
+        mountPath: /secret/
+        readOnly: true
+```
+
+### TLS
+TLS类型的Secret主要用于对https场景的证书和密钥文件来进行加密传输
+```shell
+# tls类型格式
+kubectl create secret tls NAME --cert=/path/file --key=/path/file
+
+# 注意：
+# 保存cert文件内容的key名称不能指定，自动为tls.crt,卷挂载后生成的文件名也为tls.crt
+# 保持private key文件内容的key不能指定，自动为tls.key,卷挂载后生成的文件名也为tls.key
+```
+
+#### TLS案例
+创建TLS证书文件
+```shell
+# 生成私钥
+openssl genrsa -out nginx-certs/www.wang.org.key 2048
+
+# 生成自签名证书
+openssl req -new -x509 -key nginx-certs/www.wang.org.key -days 3650 -out nginx-certs/wang.org.crt -subj/C=CN/ST=Beijing/L=Beijing/O=DevOps/CN=www.wang.org
+# 注意：CN指向的域名必须是nginx配置中使用的域名信息
+
+# 创建tls类型的secret
+kubectl create secret tls secret-nginx-ssl --cert=nginx-crets/www.wang.org.crt --key=nginx-certs/www.wang.org.key
+```
+
+准备Nginx配置文件
+```shell
+# nginx主配置文件 myserver.conf
+cat > myserver.conf
+server {
+    listen 80;
+    server_name www.wang.org;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name www.wang.org;
+
+    ssl_certificate /etc/nginx/certs/tls.crt;
+    ssl_certificate_key /etc/nginx/certs/tls.key;
+
+    ssl_session_timeout 5m;
+
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:HIGH:!aNULL:!MD5:!RC4:!DHE; 
+    ssl_prefer_server_ciphers on;
+
+    include /etc/nginx/conf.d/myserver-*.cfg;
+
+    location / {
+       root /usr/share/nginx/html;
+    }
+}
+
+# nginx的压缩配置文件：myserver-gzip.cfg
+cat > myserver-gzip.cfg
+gzip on;
+gzip_comp_level 5;
+gzip_proxied     expired no-cache no-store private auth;
+gzip_types text/plain text/css application/xml text/javascript;
+
+# nginx的状态页配置文件myserver-status.cfg
+cat > myserver-status.cfg
+location /status {
+   stub_status on;
+   access_log off;
+}
+```
+
+创建配置文件对应的Configmap
+```shell
+kubectl create configmap cm-nginx-ssl-conf --from-file=nginx-ssl-conf.d/
+```
+
+创建引用Secret和configmap资源配置文件
+```yaml
+# 创建资源配置文件
+# cat storage-secret-nginx-ssl.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx-ssl
+  namespace: default
+spec:
+  volumes:
+  - name: nginx-certs
+    secret:
+      secretName: secret-nginx-ssl
+  - name: nginx-confs
+    configMap:
+      name: cm-nginx-ssl-conf
+      optional: false
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    name: nginx-ssl-server
+    volumeMounts:
+    - name: nginx-certs
+      mountPath: /etc/nginx/certs/
+      readOnly: true
+    - name: nginx-confs
+      mountPath: /etc/nginx/conf.d/
+      readOnly: true
+```
+
+### Docker-registry
+#### Secret实现Docker私有仓库
+方法1：通过命令创建
+```shell
+kubectl create secret docker-registry KEYNAME --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=EMAIL
+```
+
+#### 注意事项总结
+- 将harbor的域名加入到docker-daemon.json的非安全组中
+- 将dns指向harbor域名所在DNS或者直接写hosts文件
+- 建议将harbor.yaml中的hostname改为域名
+
+### downwardAPI
+downwardAPI不是一种独立的API资源类型，只是一种引用Pod自身的运行环境信息
+downwardAPI包括Pod的metadata，spec或status字段值，将这些信息注入到容器内部的方式
+
+DownwardAPI提供了两种方式用于将Pod的信息注入到容器内部
+- 环境变量：用于单个变量，可以将Pod信息和容器信息直接注入容器内部
+- Volume挂载：将Pod信息生成为文件，再挂载到容器内部中
+
+#### downwardAPI案例
+获取基本的变量信息通过变量方式引用
+```yaml
+# cat storage-downwardapi-env-test.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: downwardapi-env-test
+  labels:
+    app: downwardapi-env
+spec:
+  containers:
+    - name: downwardapi-env-test
+      image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+      resource:
+        requests:
+          memory: "32Mi"
+          cpu: "250m"
+        limits:
+          memory: "64Mi"
+          cpu: "500m"
+      env:
+        - name: THIS_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: THIS_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: THIS_APP_LABEL
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.labels['app']
+        - name: THIS_CPU_LIMIT
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        - name: THIS_MEM_REQUEST
+          value.From
+            resourceFieldRef:
+              resource: requests.memory
+              divisor: 1Mi
+        - name: VAR_REF
+          value: $(THIS_POD_NAMESPACE).wang.org  # 变量引用格式：$(VAR_NAME)
+```
+
+存储卷方式使用
+```yaml
+# cat storage-downwardapi-volume-test.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: downwardapi-volume-test
+  labels:
+    zone: Beijing
+    rack: zhongguancun
+    app: redis-master
+  annotations:
+    region: Asia-China
+spec:
+  volumes:
+  - name: podinfo
+    downwardAPI:
+      defaultMode: 0420  #文件权限，默认0644
+      items:
+      - fieldRef:
+          fieldPath: metadata.namespace
+        path: pod_namespace
+      - fieldRef:
+          fieldPath: metadata.labels
+        path: pod_labels
+      - fieldRef:
+          fieldPath: metadata.annotations
+        path: pod_annotations
+      - resourceFieldRef:
+          containerName: downwardapi-volume-test
+          resource: limits.cpu
+        path: "cpu_limit"
+      - resourceFieldRef:
+          containerName: downwardapi-volume-test
+          resource: requests.memory
+          divisor: "1Mi"
+        path: "mem_request"
+  containers:
+    - name: downwardapi-volume-test
+      image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+      resources:
+        requests:
+          memory: "32Mi"
+          cpu: "250m"
+        limits:
+          memory: "64Mi"
+          cpu: "500m"
+      volumeMounts:
+      - name: podinfo
+        mountPath: /etc/podinfo
+        readOnly: false
+# 属性解析：defaultMode 表示挂载文件后，文件的权限限制，items定制自己的一些名称
+#应用资源对象
+[root@master1 ~]#kubectl apply -f storage-downwardapi-volume-test.yaml
+
+#查看效果
+[root@master1 ~]#kubectl get pod
+NAME                     READY   STATUS   RESTARTS   AGE
+downwardapi-volume-test   1/1     Running   0         2s
+
+[root@master1 ~]#kubectl exec -it downwardapi-volume-test -- ls /etc/podinfo/
+cpu_limit       pod_annotations pod_namespace
+mem_request     pod_labels
+```
+
+### Projected
+之前的CM，Secret等卷资源在Pod内的一个目录同时只能挂载一个卷，而我们有时希望在一个目录内生成来自多个卷的多个文件
+Projected volumes是一种特殊的卷类型，支持同时投射多个卷至同一个挂载点
+
+Projected Volume仅支持对如下四种类型的卷（数据源）进行投射操作
+- Secret：投射Secret对象
+- ConfigMap：投射ConfigMap对象
+- DownwardAPI：投射Pod元数据
+- ServiceAccountToken: 投射ServiceAccountToken
+
+#### Projected案例
+```yaml
+cat storage-projected-demo.yaml
+apiVersion: v1
+data:
+  username: d2FuZ3hpYW9jaHVu
+kind: Secret
+metadata:
+  name: mysecret
+  namespace: default
+type: Opaque
+---
+apiVersion: v1
+data:
+  myconfig: Hello,Myconfig
+kind: ConfigMap
+metadata:
+  name: myconfigmap
+  namespace: default
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: projected-volume-demo
+spec:
+  containers:
+  - name: container-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochunpod-test:v0.1
+    volumeMounts:
+    - name: all-in-one
+      mountPath: "/projected-volume"
+      readOnly: true
+  volumes:
+  - name: all-in-one
+    projected:
+      sources:
+      - secret:
+          name: mysecret
+          items:
+            - key: username
+              path: my-group/my-username
+      - downwardAPI:
+          items:
+            - path: "labels"
+              fieldRef:
+                fieldPath: metadata.labels
+            - path: "cpu_limit"
+              resourceFieldRef:
+                containerName: container-test
+                resource: limits.cpu
+      - configMap:
+          name: myconfigmap
+          items:
+            - key: myconfig
+              path: my-group/my-config
+```
+
+#### projected案例2
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ name: volume-test
+spec:
+ containers:
+  - name: container-test
+   image: busybox:1.28
+   volumeMounts:
+    - name: all-in-one
+     mountPath: "/projected-volume"
+     readOnly: true
+ volumes:
+  - name: all-in-one
+   projected:
+     sources:
+      - secret:
+         name: mysecret
+         items:
+            - key: username
+             path: my-group/my-username
+      - secret:
+         name: mysecret2
+         items:
+            - key: password
+             path: my-group/my-password
+             mode: 511
+```
+
+## Kubernetes流量调度Ingress
+### Ingress原理
+Ingress主要包含两个组件Ingress API和Ingress Controller
+Ingress其具备了动态更新并加载新配置的特性。而且Ingress本身是不具备实现集群内外流量通信的功能的，这个功能是通过controller来实现的。Ingress Controller本身是运行于集群中的Pod资源对象
+
+Ingress不会公开任意端口或协议，将HTTP和HTTPS以外的服务公开到Internet时，通常使用`Service.Type=NodePort`或`Service.Type=LoadBlancer`类型的Service
+
+#### Ingress访问过程
+- 从外部流量调度到Kubernetes中Ingress Service，有多中实现方案，比如使用节点网络中的ExternalIP或者NodePort方式
+- 从Service调度到Ingress-Controller
+- ingress-controller根据Ingress Pod中的定义，比如虚拟主机或者后端的URL
+- 根据虚拟主机名直接调度到后端的一组应用pod中
+
+注意：
+- 整个流程中涉及了两处Service内容
+- Service Ingress-nginx是帮助Ingress controller Pod接入外部流量的
+- 后端的服务对应的Service只起到帮助Ingress Controller Pod找到具体的服务的Pod，即只用于服务发现，而流量不需要经过后端服务的Service，直接从Ingress Controller Pod转到具体的Pod
+- 后端Service负责服务发现，然后有Ingress直接访问后端的Pod
+
+
+#### Ingress controller常见的解决方案
+Ingress资源配置指定Ingress Controller类型的方法
+- 专用的annotation：Kubernetes.io/ingress.class(旧)
+- Ingress资源的spec的专有字段：ingressClassName，引用的IngressClass是一种特定的资源类型(新)
+
+### 基于Yaml mainifests部署Ingress-nginx
+```shell
+# 获取配置文件
+wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.1/deploy/static/provider/cloud/deploy.yaml
+
+# 下载后，修改镜像地址
+# 建立多副本，就是将Deployment添加replicas=2
+# 添加Prometheus的检测端口
+```
+
+### Ingress命令式实现
+```shell
+# 创建Ingress的命令
+kubectl create ingress NAME --rule=host/path=service:port[,tls[-secret]] [options]
+
+# 常用选项
+-- annotation=[]  # 注解信息，格式"annotation=value"
+-- rule=[]        # 代理规则，注意：rule中外部域名要在所有名称空间唯一
+-- class=''       # 此Ingress适配的Ingress Class Controller
+
+# 基于URI方式代理不同应用的请求时，后端应用的URI若与代理时使用的URI不同，则需要启用URL Rewrite完成URI的重写
+```
+
+#### 准备后续实验中需要的Service服务及后端pod
+```shell
+# 准备Deployment
+kubectl create deployment myapp1 --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas=3
+
+# 创建对应的service
+kubectl create service clusterip myapp1 --tcp=80:80
+```
+
+#### 使用ingress将集群暴露出去
+```shell
+kubectl create ingress ingress-myapp1 --rule=myapp1.feng.org/=myapp1:80 --class=nginx
+
+[root@master201 ingress-nginx]#kubectl get ingress
+NAME             CLASS    HOSTS             ADDRESS   PORTS   AGE
+ingress-myapp1   <none>   myapp1.feng.org             80      8s
+```

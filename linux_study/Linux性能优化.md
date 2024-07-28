@@ -366,16 +366,149 @@ sysbench --threads=10 --max-time=300 threads run
 
 #### 第二个终端运行vmstat，观察上下文切换情况
 ```shell
-root@mystical:~# vmstat 5
+[root@ubuntu2204 ~]#vmstat 5
 procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
  r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
- 8  0      0 1023456  17416 653932    0    0    87    91  149 2134  1  2 97  0  0
- 7  0      0 1023456  17416 653932    0    0     0     0 14072 331220 11 86  3  0  0
- 8  0      0 1023456  17416 653932    0    0     0     2 14176 334791 10 86  4  0  0
- 7  0      0 1023456  17416 653932    0    0     0     0 15043 339602 11 86  2  0  0
+ 6  0    780 568420  83664 971092    0    0   180   288  218 1270  1  1 98  0  0
+ 7  0    780 568420  83664 971092    0    0     0     0 92643 983569 29 64  7  0  0
+ 7  0    780 568420  83664 971092    0    0     0     0 90240 988329 29 65  6  0  0
+ 7  0    780 568420  83664 971092    0    0     0     0 92775 1024990 29 66  5  0  0
+ 8  0    780 568420  83664 971092    0    0     0     0 91951 1000145 28 66  6  0  0
 ```
 
 指标分析
 
 - r列：就绪队列的长度已经到了8，远远超过了系统CPU的个数2，此时肯定有大量CPU竞争
+- us(user)和sy(system)列：这两列的CPU使用率加起来上升到了100%，其中系统CPU使用率，也就是sy列高达84%，说明CPU主要被内核占用了
+- in列：中断次数也上升到了1万左右，说明中断处理也是个潜在问题
 
+根据上述指标分析可得
+系统就绪队列过程过长，也就是正在运行和等待CPU的进程数过多，导致了大量的上下文切换，而上下文切换又导致了系统CPU的占用率升高 
+
+#### 分析是什么进程导致这些问题
+使用pidstat，观察CPU和进程上下文切换的情况
+```shell
+# -w参数表示输出进程切换指标，而-u参数则表示输出CPU使用指标
+[root@ubuntu2204 ~]#pidstat -w -u 1
+Average:      UID       PID    %usr %system  %guest   %wait    %CPU   CPU  Command
+Average:        0       861    0.20    0.00    0.00    0.00    0.20     -  containerd
+Average:        0     14833    0.20    0.00    0.00    0.00    0.20     -  kworker/1:0-events
+Average:        0     15197   54.65  127.33    0.00    0.00  181.98     -  sysbench
+Average:        0     15208    0.40    0.40    0.00    0.00    0.79     -  pidstat
+
+Average:      UID       PID   cswch/s nvcswch/s  Command
+Average:        0        13      1.19      0.00  ksoftirqd/0
+Average:        0        14     15.45      0.00  rcu_sched
+Average:        0        15      0.40      0.00  migration/0
+Average:        0        21      0.40      0.00  migration/1
+Average:        0        22      0.79      0.00  ksoftirqd/1
+Average:        0        29      0.20      0.00  khungtaskd
+Average:        0        32      1.78      0.00  kcompactd0
+Average:        0        91      0.20      0.00  kworker/0:1H-kblockd
+Average:        0       210      2.97      0.00  irq/16-vmwgfx
+Average:        0       565      1.98      0.00  multipathd
+Average:        0       783     11.09      0.00  vmtoolsd
+Average:        0      1218     50.30      0.00  kworker/u256:1-events_power_efficient
+Average:        0     14272      0.59      0.00  sshd
+Average:        0     14400      0.99     62.18  sshd
+Average:        0     14483      0.20      0.40  vmstat
+Average:        0     14730     42.77      0.00  kworker/u256:2-events_unbound
+Average:        0     14833     19.21      0.00  kworker/1:0-events
+Average:        0     14836      5.54      0.00  kworker/0:2-events
+Average:        0     15208      0.99      1.19  pidstat
+```
+
+从`pidstat`的输出可以发现，CPU使用率的升高果然是sysbench导致的，它的CPU使用率已经达到了181%。但上下文切换则来自其他进程，包括非自愿上下文切换频率最高的pidstat，以及自愿上下文切换频率最高的内核线程kworker和sshd
+
+但这里的切换远远到不了100万次以上，因为pidstat默认显示进程的指标数据，它忽略了线程的数据，需要加上`-t`参数后才能查看到线程的指标
+```shell
+08:17:13 PM   UID      TGID       TID   cswch/s nvcswch/s  Command
+08:17:14 PM     0        13         -      6.00      0.00  ksoftirqd/0
+08:17:14 PM     0         -        13      6.00      0.00  |__ksoftirqd/0
+08:17:14 PM     0        14         -     30.00      0.00  rcu_sched
+08:17:14 PM     0         -        14     30.00      0.00  |__rcu_sched
+08:17:14 PM     0        22         -      4.00      0.00  ksoftirqd/1
+08:17:14 PM     0         -        22      4.00      0.00  |__ksoftirqd/1
+08:17:14 PM     0        32         -      2.00      0.00  kcompactd0
+08:17:14 PM     0         -        32      2.00      0.00  |__kcompactd0
+08:17:14 PM     0       210         -      3.00      0.00  irq/16-vmwgfx
+08:17:14 PM     0         -       210      3.00      0.00  |__irq/16-vmwgfx
+08:17:14 PM     0       565         -      1.00      0.00  multipathd
+08:17:14 PM     0         -       565      1.00      0.00  |__multipathd
+08:17:14 PM     0         -       576      1.00      0.00  |__multipathd
+08:17:14 PM     0       783         -     11.00      0.00  vmtoolsd
+08:17:14 PM     0         -       783     11.00      0.00  |__vmtoolsd
+08:17:14 PM     0         -       793      1.00      0.00  |__HangDetector
+08:17:14 PM     0       861       894     34.00      0.00  (containerd)__containerd
+08:17:14 PM     0         -       897     17.00      0.00  |__containerd
+08:17:14 PM     0         -      1016     35.00      0.00  |__containerd
+08:17:14 PM     0      1218         -      2.00      0.00  kworker/u256:1-events_unbound
+08:17:14 PM     0         -      1218      2.00      0.00  |__kworker/u256:1-events_unbound
+08:17:14 PM     0      1294         -    718.00      0.00  kworker/u256:3-events_power_efficient
+08:17:14 PM     0         -      1294    718.00      0.00  |__kworker/u256:3-events_power_efficient
+08:17:14 PM     0     14400         -      1.00      1.00  sshd
+08:17:14 PM     0         -     14400      1.00      1.00  |__sshd
+08:17:14 PM     0     14833         -      6.00      0.00  kworker/1:0-mpt_poll_0
+08:17:14 PM     0         -     14833      6.00      0.00  |__kworker/1:0-mpt_poll_0
+08:17:14 PM     0     14836         -     16.00      3.00  kworker/0:2-events
+08:17:14 PM     0         -     14836     16.00      3.00  |__kworker/0:2-events
+08:17:14 PM     0     15197     15198  13660.00  67977.00  (sysbench)__sysbench
+08:17:14 PM     0         -     15199  17341.00  74090.00  |__sysbench
+08:17:14 PM     0         -     15200  11809.00  71461.00  |__sysbench
+08:17:14 PM     0         -     15201   9858.00  78763.00  |__sysbench
+08:17:14 PM     0         -     15202  13724.00  67014.00  |__sysbench
+08:17:14 PM     0         -     15203  15101.00  61757.00  |__sysbench
+08:17:14 PM     0         -     15204  13966.00  69949.00  |__sysbench
+08:17:14 PM     0         -     15205  11728.00  63455.00  |__sysbench
+08:17:14 PM     0         -     15206   9771.00  77609.00  |__sysbench
+08:17:14 PM     0         -     15207  15677.00  60855.00  |__sysbench
+08:17:14 PM     0     15216         -      1.00   1879.00  pidstat
+08:17:14 PM     0         -     15216      1.00   1898.00  |__pidstat
+```
+
+此时就可以看到sysbench的子线程上下文切换次数很很多。
+
+#### 查看中断的详细信息
+```shell
+# -d 参数表示高亮显示变化的区域
+$ watch -d cat /proc/interrupts
+           CPU0       CPU1
+...
+RES:    2450431    5279697   Rescheduling interrupts
+...
+```
+
+观察一段时间，你可以发现，变化速度最快的是重调度中断(RES)，这个中断类型表示，唤醒空闲状态的CPU来调度新的任务运行。这是多处理器系统(SMP)中，调度器用来分散任务到不同CPU的机制，通常也被称为处理期间中断(Inter-Processor Interrupts,IPI)
+
+这里中断升高还是因为多任务调度问题
+
+#### 每秒上下文切换多少次才算正常
+这个数值其实取决于系统本身的CPU性能。
+如果系统的上下文切换次数比较稳定，那么数百到一万以内，都应该算正常的。但当上下文切换次数超过一万次，或者切换次数出现数量级的增长时，就很可能已经出现了性能问题。
+
+此时应该这样具体分析
+- 自愿上下文切换变多了，说明进程都在等待资源，有可能发生了 I/O 等其他问题；
+- 非自愿上下文切换变多了，说明进程都在被强制调度，也就是都在争抢 CPU，说明 CPU 的确成了瓶颈；
+- 中断次数变多了，说明 CPU 被中断处理程序占用，还需要通过查看 /proc/interrupts 文件来分析具体的中断类型。
+
+#### 此次案例使用排查工具总结
+```shell
+vmstat   # 是一个常用的系统性能分析工具，主要用来分析系统的内存使用情况，也常用来分析CPU上下文和中断的次数
+mpstat   # 是一个常用的多核CPU性能分析工具，用来实时查看每个CPU的性能指标，以及所有CPU的平均指标
+pidstat  # 一个常用的进程性能分析工具，用来实时查看进程的CPU，内存，IO，上下文切换等性能指标 
+/proc/interrupts      # 查看中断数值
+```
+
+
+## CPU使用率
+### 查看CPU使用率工具
+- top
+- ps
+- pidstat
+
+### 查看占用CPU的到底是代码里的哪个函数
+使用工具perf，它以性能事件采样为基础，不仅可以分析系统的各种事件和内核性能，还可以用来分析应用程序的性能问题
+
+### perf用法
+#### 用法1：perf top
+能够实时显示占用CPU时钟最多的函数或指令，可以用来查找热点函数
