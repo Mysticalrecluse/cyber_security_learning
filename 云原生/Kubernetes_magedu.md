@@ -4811,9 +4811,92 @@ kubectl create service clusterip myapp1 --tcp=80:80
 
 #### 使用ingress将集群暴露出去
 ```shell
+# 单域名不支持子URL
 kubectl create ingress ingress-myapp1 --rule=myapp1.feng.org/=myapp1:80 --class=nginx
 
 [root@master201 ingress-nginx]#kubectl get ingress
 NAME             CLASS    HOSTS             ADDRESS   PORTS   AGE
 ingress-myapp1   <none>   myapp1.feng.org             80      8s
+```
+
+#### 支持子路径
+```shell
+# 要想支持子路径，后面加*
+kubectl create ingress ingress-myapp1 --rule=myapp1.feng.org/*=myapp1:80 --class=nginx
+```
+
+#### 单域名多URL(不支持子URL)
+```shell
+# 准备第二套Deployment和service
+kubectl create deployment myapp2 --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2 --replicas=3
+
+kubectl create svc clusterip myapp2 --tcp=80:80
+
+# 实现单域名多URL, 这种方法会报错
+# 因为域名上/v1，后端的service也会/v1，但是后端service没有/v1这个url
+kubectl create ingress ingress-myapp --rule=myapp.feng.org/v1=myapp1:80 --rule=myapp.feng.org/v2=myapp2:80 --class=nginx
+# 报错
+[root@ubuntu2204 ~]#curl -H"host: myapp.feng.org" 10.0.0.12/v2
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<title>404 Not Found</title>
+<h1>Not Found</h1>
+<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>
+
+# 解决方案，加一个注解，表示重写后端的请求转发转到后端的根上
+kubectl create ingress ingress-myapp --rule=myapp.feng.org/v1=myapp1:80 --rule=myapp.feng.org/v2=myapp2:80 --class=nginx --annotation nginx.ingress.kubernetes.io/rewrite-target="/"
+
+```
+
+#### 单域名多URL支持子URL
+```shell
+kubectl create ingress demo-ingress2 --rule='myapp.feng.org/v1(/|$)(.*)=myapp1:80' --rule='myapp.feng.org/v2(/|$)(.*)=myapp2:80' --class=nginx --annotation nginx.ingress.kubernetes.io/rewrite-target='/$2'
+``` 
+
+#### 多域名多URL支持子URL
+```shell
+kubectl create ingress ingress-myapp --rule="myapp1.feng.org/*=myapp1:80" --rule="myapp2.feng.org/*=myapp2:80" --class=nginx
+```
+
+### Ingress实现HTTPS
+#### 命令式实现HTTPS
+```shell
+# 基于TLS的Ingress要求事先准备专用的"kubernetes.io/tls"类型的Secret资源对象
+(umask 077; openssl genrsa -out feng.key 2048)
+
+# 生成证书
+openssl req -new -x509 -key feng.key -out feng.crt -subj /C=CN/ST=Beijing/O=SRE/CN=www.feng.org -days 365
+
+# 创建secret
+kubectl create secret tls tls-feng --cert=./feng.crt --key=./feng.key
+
+# 创建虚拟主机代理规则，同时将主机定义为TLS类型，默认HTTP自动跳转至HTTPS
+kubectl create ingress tls-feng-ingress --rule='www.feng.org/*=myapp1:80,tls=tls-feng' --class=nginx
+
+# 注意：启用tls后，该域名下的所有URI默认为强制将http请求利用308跳转至https，若不希望使用跳转功能，可以使用如下注解选项
+--annotation nginx.ingress.kubernetes.io/ssl=redirect=false
+# 即如下所示
+kubectl create ingress tls-feng-ingress --rule='www.feng.org/*=myapp1:80,tls=tls-feng' --class=nginx --annotation nginx.ingress.kubernetes.io/ssl-redirect=false
+```
+
+#### 证书更新
+HTTPS的证书的有效期一般为1年，到期前需要提前更新证书
+```shell
+# 重新颁发证书
+(umask 077; openssl genrsa -out feng.key 2048)
+
+# 生成证书
+openssl req -new -x509 -key feng.key -out feng.crt -subj /C=CN/ST=Beijing/O=SRE/CN=www.feng.org -days 365
+
+# 方法1：
+# 在线修改证书配置，需要提前先将新证书文件用base64编码并删除换行符
+cat feng.crt|base64 | tr -d '\n'
+cat feng.key|base64 | tr -d '\n'
+# 上述生成的内容其他换下面命令的内容，立即生效
+kubectl edit secrets tls-wang
+
+# 方法2：
+# 删除旧证书配置
+kubectl delete secrets tls-wang
+# 创建新证书配置
+kubectl create secret tls tls-feng --cert=./feng.crt --key=./feng.key
 ```
