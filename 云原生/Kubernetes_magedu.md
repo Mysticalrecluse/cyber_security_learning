@@ -4813,7 +4813,7 @@ kubectl create service clusterip myapp1 --tcp=80:80
 ```shell
 # 单域名不支持子URL
 kubectl create ingress ingress-myapp1 --rule=myapp1.feng.org/=myapp1:80 --class=nginx
-
+G
 [root@master201 ingress-nginx]#kubectl get ingress
 NAME             CLASS    HOSTS             ADDRESS   PORTS   AGE
 ingress-myapp1   <none>   myapp1.feng.org             80      8s
@@ -4900,3 +4900,55 @@ kubectl delete secrets tls-wang
 # 创建新证书配置
 kubectl create secret tls tls-feng --cert=./feng.crt --key=./feng.key
 ```
+
+#### 获取客户端真实IP
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  generation: 1
+  name: ingress-myapp
+  namespace: default
+  annotations:
+    nginx.ingress.kubernetes.io/enable-real-ip: "true"  # 允许IP透传
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: www.wang.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: myapp
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+```
+
+### 案例：Ingress Nginx实现蓝绿发布
+```yaml
+# cat ingress-pod-test.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pod-test
+  #annotations:
+  #  kubernetes.io/ingress.class: nginx
+spec:
+  ingressClassName: nginx  # 建议使用新版写法
+  rules:
+  - host: www.feng.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: myapp1      #myapp2  切换这里直接变更发布, 指向所需切换版本的svc
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+```
+
+### 案例：Ingress Nginx实现金丝雀（灰度）发布
+
