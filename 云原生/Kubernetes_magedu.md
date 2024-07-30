@@ -5622,7 +5622,7 @@ type: kubernetes.io/service-account-token
 metadata:
   name: admin-secret
   annotations:
-    kubernetes.io/sevice-account.name: "admin"
+    kubernetes.io/service-account.name: "admin"
 ---
 apiVersion: v1
 kind: Pod
@@ -5635,3 +5635,144 @@ spec:
     imagePullPolicy: IfNotPresent
   serviceAccountName: admin #使用sa
 ```
+
+为SA账号创建kubeconfig
+```yaml
+# 创建SA并获取token
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin
+---
+# v1.24版本之后添加下面内容手动创建secret
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: admin-secret
+  annotations:
+    kubernetes.io/service-account.name: "admin`"
+```
+```shell
+kubectl apply -f yaml/security-sa-admin.yaml
+
+# 获取SA账号的Token
+# 方法1
+KUBEADMIN_TOKEN=$(kubectl get secret admin-secret -n default -o jsonpath='{.data.token}' | base64 -d) 
+# 方法2:
+kubectl describe secrets admin-service | awk '/^token/(pring $12)'
+
+# 设置用户信息
+kubectl config set-credentials kubeadmin --toke=$KUBEADMIN_TOKEN --kubeconfig=/root/kubeadmin.conf
+
+# 设置集群信息
+kubectl config set-cluster kubernetes --certificate-authority=/etc/kubernetes/pki/ca.crt --serve="https://kubeapi.feng.ory:6443" --embed-certs=true --kubeconfig=/root/kubeadmin.conf
+
+# 设置上下文信息Context
+kubectl config set-context kubeadmin@kubernetes --cluster=kubernetes --user=kubeadmin --kubeconfig=/root/kubeadmin.conf
+
+# 指定默认Context
+kubectl config use-context kubeadmin@kubernetes --kubeconfig=/root/kubeadmin.conf
+
+# 验证kubeconfig,权限不足
+kubectl get pod --kubeconfig=/root/kubeadmin.conf`
+```
+
+### 授权机制-RBAC机制
+#### RBAC基础概念
+- 实体(Entity): 在RBAC也称为Subject，通常指的是User、Group或者ServiceAccount，即对哪些人进行授权
+- 资源(Resource): 在RBAC中也称为Object，指代Subject期望操作的目标，例如Secret、Pod及Service对象等
+  - 仅限于/api/v1 或 /apis/group/version/开始的路径
+  - 其他路径对应的端点均被视为“非资源类请求”，例如/healthz端点
+- 动作(action):
+  - Object
+    - 读操作：get,list,watch
+    - 写操作：create, update, patch, delete, deletecollection等
+- 规则(rules): Resource + action
+- 角色：规则的集合
+  - Role: 名称空间级别
+  - ClusterRole: 集群级别
+- 角色绑定（Role Binding）
+  - RoleBinding
+  - ClusterRoleBinding
+
+#### 查看默认role和clusterrole
+```shell
+kubectl get role -A
+kubectl get clusterrole
+```
+
+查看超级管理员cluster-admin格式
+```yaml
+#  kubectl get clusterrole cluster-admin -o yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  creationTimestamp: "2024-07-16T18:17:02Z"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: cluster-admin
+  resourceVersion: "78"
+  uid: b35abec6-afb3-4e69-83b7-f04b291ec626
+rules:   # 规则
+- apiGroups:  # 分组
+  - '*'
+  resources:   # 分组下的资源
+  - '*'
+  verbs:      # 动作：读(get,list,watch), 写（create,delete,update,patch...）
+  - '*'
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
+```
+
+#### ClusterRole和ClusterRoleBinding组合实现
+```shell
+kubectl create clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname] [--serviceaccount=namespace:serviceaccountname]
+
+# 示例，view系统自带clusterrole
+kubectl create clusterrolebinding admin-default-view --clusterrole=view --serviceaccount=default:admin
+```
+
+#### clusterrolebinding清单格式
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: feng-edit
+roleRef: # 关联的规则
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: edit
+subjects: # 关联的对象
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: feng
+```
+
+#### Role和RoleBinding组合实现
+```shell
+kubectl create rolebinding NAME --clusterrole=NAME|--role=NAME [--user=usernmae] [--group=gruopname] [--serviceaccount=namespace:serviceaccountname]
+```
+#### role和ClusterRole的命令行操作方法
+```shell
+# role
+kubectl create role NAME --verb=verb --resource=resource.group/subresource [--resource-name=resourcename]
+[--dry-run=server|client|none] [options]
+
+# cluserrole
+kubectl create clusterrole NAME --verb=verb --resource=resource.group [--resource-name=resourcename]
+[--dry-run=server|client|none] [options]`
+```
+
+
+## DashBoard
+### 官方DashBoard
+```shell
+wget https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml
+```
+
+### kuborad
