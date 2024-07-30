@@ -4894,7 +4894,7 @@ cat feng.key|base64 | tr -d '\n'
 # 上述生成的内容其他换下面命令的内容，立即生效
 kubectl edit secrets tls-wang
 
-# 方法2：
+# 方法2
 # 删除旧证书配置
 kubectl delete secrets tls-wang
 # 创建新证书配置
@@ -4952,3 +4952,686 @@ spec:
 
 ### 案例：Ingress Nginx实现金丝雀（灰度）发布
 
+Ingress Nginx的Annotation支持的Canary规则，Annotation和Label相似，也是保存资源对象上的元数据，但不能被标签选择器选择，且没有Labels的名称最长63个字符的限制
+
+- nginx.ingress.kubernetes.io/canary-weight
+  - 基于服务权重进行流量切分，适用于蓝绿或灰度发布，权重范围0-100按百分比将请求路由到Canary Ingress中指定的服务
+  - 权重为0意味着该金丝雀规则不会向Canary入口的服务发送任何请求
+  - 权重为100意味着所有请求都将被发送到Canary入口
+
+- nginx.ingress.kubernetes.io/canary-by-cookie:
+  - 基于cookie的流量切分，适用于灰度发布与A/B测试
+  - Cookie值设置为always时，它将被路由到Canary入口
+  - Cookie值设置为never时，请求不会被发送到Canary入口
+  - 对于任何其它值，将忽略cookie并将请求与其他金丝雀规则进行优先级比较
+
+- nginx.ingress.kubernetes.io/canary-by-header
+  - 基于该Annotation中指定Request Header进行流量切分，适用于灰度发布以及A/B测试
+  - 在请求报文中，若存在该Header且其值为always时，请求将被发送到Canary版本，注意always大小写敏感
+  - 若存在该Header且其值为never，请求将不会被发送至Canary版本
+  - 若存在该Header且其值为其他任意值，将忽略该Annotation指定的Header，并按优先级将请求与其他金丝雀规则相比较
+  - 若不存在Header时，请求将不会被发送到Canary
+  
+- nginx.ingress.kubernetes.io/canary-by-header-value
+  - 基于该Annotation中指定的Request Header的值进行流量切分，Header名称则由前一个Annotation(nginx.ingress.kubernetes.io/canary-by-header)进行指定
+  - 请求报文中存在指定的Header，且其值与该Annotation的值匹配时，它将被路由到Canary版本
+  - 对于其他任何值，将忽略该Annotation
+
+- nginx.ingress.kubernetes.io/canary-by-header-pattern
+  - 同canary-by-header-value的功能类似，但该Annotation基于正则表达式匹配Request Header的值
+  - 若该Annotation与canary-by-header-value同时存在，则该Annotation被忽略
+
+#### 规则应用次序
+- 优先级从低到高：canary-weight -> canary-by-cookie -> canary-by-header
+
+#### 实战案例(前期准备)
+- 初始环境，准备新旧两个版本应用及ingress
+```shell
+# 准备Deployment
+kubectl create deployment myapp1 --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas=3
+
+# 创建对应的service
+kubectl create service clusterip myapp1 --tcp=80:80
+
+# 准备第二套Deployment和service
+kubectl create deployment myapp2 --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2 --replicas=3
+
+kubectl create svc clusterip myapp2 --tcp=80:80
+```
+
+- 创建Ingress对应旧版本的应用
+```yaml
+# cat ingress-pod-test.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pod-test
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: www.feng.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: myapp1
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+```
+
+- 循环测试
+```shell
+[root@ubuntu2204 ~]#while true; do curl -H'host:www.feng.org' 10.0.0.12;sleep 1;done
+kubernetes pod-test v0.1!! ClientIP: 10.244.5.62, ServerName: myapp1-57c65fd549-xkqsm, ServerIP: 10.244.4.85!
+kubernetes pod-test v0.1!! ClientIP: 10.244.5.62, ServerName: myapp1-57c65fd549-xxp4k, ServerIP: 10.244.3.62!
+kubernetes pod-test v0.1!! ClientIP: 10.244.5.62, ServerName: myapp1-57c65fd549-v6fbm, ServerIP: 10.244.5.58!
+kubernetes pod-test v0.1!! ClientIP: 10.244.5.62, ServerName: myapp1-57c65fd549-xkqsm, ServerIP: 10.244.4.85!
+kubernetes pod-test v0.1!! ClientIP: 10.244.5.62, ServerName: myapp1-57c65fd549-xxp4k, ServerIP: 10.244.3.62!
+kubernetes pod-test v0.1!! ClientIP: 10.244.5.62, ServerName: myapp1-57c65fd549-xxp4k, ServerIP: 10.244.3.62!
+kubernetes pod-test v0.1!! ClientIP: 10.244.5.62, ServerName: myapp1-57c65fd549-v6fbm, ServerIP: 10.244.5.58!
+kubernetes pod-test v0.1!! ClientIP: 10.244.5.62, ServerName: myapp1-57c65fd549-v6fbm, ServerIP: 10.244.5.58!
+```
+
+#### 范例：基于权重的金丝雀发布
+```yaml
+# cat canary-by-weight.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-weight: "30" # 通过更改比例，逐级发布
+  name: pod-test-canary-by-weight
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: www.feng.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: myapp2
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+```
+
+#### 范例：基于Cookie实现金丝雀发布
+```yaml
+# cat canary-by-cookie.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-cookie: "vip_user" # cookie中vip_user=always时才用金丝雀发布下面新版本
+  name: pod-test-canary-by-cookie
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: www.feng.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: myapp2
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+```
+
+- 验证是否成功
+```shell
+[root@ubuntu2204 ~]#while true; do curl -H'host:www.feng.org' -b"vip_user=always" 10.0.0.12;sleep 1;done
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sfwpt, ServerIP: 10.244.4.81!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-vjmxc, ServerIP: 10.244.5.60!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sfwpt, ServerIP: 10.244.4.81!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sctbx, ServerIP: 10.244.3.59!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-vjmxc, ServerIP: 10.244.5.60!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sctbx, ServerIP: 10.244.3.59!
+```
+
+#### 范例：基于请求Header固定值的金丝雀发布
+```yaml
+# cat canary-by-header.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-header: "X-Canary" # X-Canary首部字段为always时才使用金丝雀发布下面新版本，否则为旧版
+  name: pod-test-canary-by-header
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: www.feng.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: myapp2
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+```
+
+- 验证结果
+```shell
+[root@ubuntu2204 ~]#while true; do curl -H'host:www.feng.org' -H"X-Canary: always" 10.0.0.12;sleep 1;done
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sctbx, ServerIP: 10.244.3.59!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sfwpt, ServerIP: 10.244.4.81!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sctbx, ServerIP: 10.244.3.59!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-vjmxc, ServerIP: 10.244.5.60!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sfwpt, ServerIP: 10.244.4.81!
+```
+
+#### 范例：基于请求Header精确匹配指定值的金丝雀发布
+```yaml
+# cat > canary-by-header-value.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-header: "IsVIP"
+    nginx.ingress.kubernetes.io/canary-by-header-value: "true" # IsVIP首部字段的值为true就是用金丝雀发布新版，否则旧版
+  name: pod-test-canary-by-header-value
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: www.feng.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: pod-test-v2
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+```
+
+- 验证结果
+```shell
+[root@ubuntu2204 ~]#while true; do curl -H'host:www.feng.org' -H"IsVIP: true" 10.0.0.12;sleep 1;done
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-vjmxc, ServerIP: 10.244.5.60!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sfwpt, ServerIP: 10.244.4.81!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sctbx, ServerIP: 10.244.3.59!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sfwpt, ServerIP: 10.244.4.81!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-vjmxc, ServerIP: 10.244.5.60!
+```
+
+#### 范例：基于请求Header正则表达式模式匹配的指定值的金丝雀发布
+```yaml
+# cat canary-by-header-pattern.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    nginx.ingress.kubernetes.io/canary: "true"
+    nginx.ingress.kubernetes.io/canary-by-header: "Username"
+    nginx.ingress.kubernetes.io/canary-by-header-pattern: "(vip|VIP)_.*"
+    # 首部字段有Username且正则匹配时，用新版，否则用旧版
+  name: pod-test-canary-by-header-pattern
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: www.feng.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: myapp2
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+```
+
+- 验证结果
+```shell
+[root@ubuntu2204 ~]#while true; do curl -H'host:www.feng.org' -H"Username: vip_hahaha" 10.0.0.12;sleep 1;done
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sctbx, ServerIP: 10.244.3.59!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-vjmxc, ServerIP: 10.244.5.60!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-vjmxc, ServerIP: 10.244.5.60!
+kubernetes pod-test v0.2!! ClientIP: 10.244.5.62, ServerName: myapp2-79c9d694f5-sfwpt, ServerIP: 10.244.4.81!`
+```
+
+
+## Kubernetes安全机制
+### Kubernetes中的用户
+#### User Account(UA)
+Kubernetes并不包含用来代替普通用户账号UA的对象。普通用户的信息无法通过API调用添加到集群中
+
+尽管无法通过 API 调用来添加普通用户， Kubernetes 仍然认为能够提供由集群的证书机构签名的合法证书的用户是通过身份认证的用户。 基于这样的配置，Kubernetes 使用证书中的 'subject' 的通用名称（Common Name）字段 （例如，"/CN=bob"）来确定用户名。 接下来，基于角色访问控制（RBAC）子系统会确定用户是否有权针对某资源执行特定的操作。
+
+#### 用户组
+Kubernetes中没有直接的方式去查看用户或用户组
+对于用户组，Kubernetes RBAC可以使用“Group”字段来限定对某些资源的访问。例如，您可能有一个RoleBinding或ClusterRoleBinding，其subjects字段包括一个特定的group，这就意味着这个绑定是对应的用户组
+- 示例
+```shell
+kubectl get clusterrolebindings.rbac.authorization.k8s.io kubeadm:cluster-admins -o yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: "2024-07-15T05:08:32Z"
+  name: kubeadm:cluster-admins
+  resourceVersion: "217"
+  uid: e83fa8a5-7f9b-4e4a-a293-9e9a7216ce62
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin #经该权限绑定到cluster-admins组上
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group    # subject中使用Group类型表示组
+  name: kubeadm:cluster-admins
+```
+- 查看cluster-admin权限
+```yaml
+# [root@master201 pki]#kubectl get clusterrole cluster-admin -o yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  creationTimestamp: "2024-07-15T05:08:27Z"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: cluster-admin
+  resourceVersion: "69"
+  uid: 0713e60a-f683-4589-ba64-44b19a2faac0
+rules:
+- apiGroups:
+  - '*'
+  resources:
+  - '*'
+  verbs:
+  - '*'
+- nonResourceURLs:
+  - '*'
+  verbs:
+  - '*'
+```
+- 证书上使用O(organization)表示组
+```shell
+openssl x509 -in apiserver-kubelet-client.crt -text -noout
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 914152039183806867 (0xcafb86fae3ff193)
+        Signature Algorithm: sha256WithRSAEncryption
+        Issuer: CN = kubernetes
+        Validity
+            Not Before: Jul 15 05:03:13 2024 GMT
+            Not After : Jul 15 05:08:14 2025 GMT
+            # O表示组
+        Subject: O = kubeadm:cluster-admins, CN = kube-apiserver-kubelet-client
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:db:eb:ed:5a:06:11:6b:31:3c:d7:80:f8:d4:58:
+                    12:ac:54:96:b3:20:70:3b:ba:5e:6c:0b:20:9b:d8:
+                    66:bf:02:ba:d1:e2:27:6e:d9:0c:53:bf:cc:19:82:
+                    6d:83:fc:74:64:b5:b8:ef:4c:18:cd:ac:d9:4c:20:
+                    ...
+```
+
+### 认证机制-认证插件
+
+#### kubelet启用身份认证
+- kubelet的REST API端点默认通过TCP协议的10250端口提供，支持管理操作
+- Kubectl API
+  - /pods
+    - 列出当前kubelet节点上的pid
+  - /run
+    - 在一个容器内运行指定的命令
+  - /exec
+    - 在一个容器内运行指定的命令
+  - /configz
+    - 设置Kubelet的配置文件参数
+  - /debug
+    - 调试信息
+```shell
+# 没有权限，需要验证后才能访问
+[root@master201 pki]#curl -k https://127.0.0.1:10250/pods
+Unauthorized
+```
+
+- 查看Kubelet的认证机制
+```shell
+#在每个worker节点查看
+[root@node1 ~]#cat /var/lib/kubelet/config.yaml
+apiVersion: kubelet.config.k8s.io/v1beta1
+authentication:
+ anonymous:
+   enabled: false      #匿名认证，true为允许匿名访问，但是权限不足
+ webhook:
+...
+```
+
+#### X509客户端认证
+- 案例：创建基于X509客户端普通的用户证书
+```shell
+# 查看到以下内容，表示默认kubernetes的CA签发的证书，都是k8s客户端的用户
+[root@master201 pki]#grep '\-\-client-ca-file' /etc/kubernetes/manifests/kube-apiserver.yaml 
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+
+# 在master节点创建test用户证书
+# 创建test私钥
+mkdir pki
+(umask 077; openssl genrsa -out pki/test.key 4096)
+
+# 生成证书申请文件，加入ops组只具有普通权限
+openssl req -new -key pki/test.key -out pki/test.csr -subj "/CN=test/O=ops"
+
+# 使用kubernetes-ca颁发证书
+openssl x509 -req -days 3650 -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -in pki/test.csr -out pki/test.crt
+
+# 复制证书文件到worker节点
+scp -r pki/ node1
+
+# 指定apiserver地址和证书信息等信息，执行可以看到已识别用户test,但无权访问资源
+kubectl get pod --server=https://kubeapi.feng.org:6443 --client-certificate=pki/test.crt --client-key=pki/test.key --certificate-authority=/etc/kubernetes/pki/ca.crt
+Error from server (Forbidden): pods is forbidden: User "test" cannot list resource "pods" in API group "" in the namespace "default"
+```
+
+- 案例：创建X509客户端管理员的用户证书，并使用此证书访问Kubernetes集群
+```shell
+# 创建管理员用户feng的证书
+(umask 077; openssl genrsa -out pki/feng.key 4096)
+
+# 生成证书申请文件，注意，加入system:masters组或kubeadm:cluster-admins组才具有管理权限
+openssl req -new -key pki/feng.key -out pki/feng.csr -subj "/CN=feng/O=kubeadm:cluster-admins"
+
+# 使用kubernetes-ca颁发证书
+openssl x509 -req -days 3650 -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -in pki/feng.csr -out pki/feng.crt
+
+# 使用该证书执行kubectl指令
+[root@node204 pki]#kubectl get pod --server=https://kubeapi.feng.org:6443 --client-certificate=./feng.crt --client-key=./feng.key --certificate-authority=/etc/kubernetes/pki/ca.crt
+NAME                      READY   STATUS    RESTARTS        AGE
+configmap-env-test2       1/1     Running   4 (6h21m ago)   2d4h
+myapp1-57c65fd549-v6fbm   1/1     Running   2 (6h21m ago)   41h
+myapp1-57c65fd549-xkqsm   1/1     Running   2 (6h21m ago)   41h
+myapp1-57c65fd549-xxp4k   1/1     Running   2 (6h21m ago)   41h
+myapp2-79c9d694f5-sctbx   1/1     Running   1 (6h21m ago)   18h
+myapp2-79c9d694f5-sfwpt   1/1     Running   1 (6h21m ago)   18h
+myapp2-79c9d694f5-vjmxc   1/1     Running   1 (6h21m ago)   18h
+pod-cm-nginx-conf         1/1     Running   4 (6h21m ago)   2d4h
+pod-nginx-ssl             1/1     Running   4 (6h21m ago)   2d
+pod-secret-volume         1/1     Running   4 (6h21m ago)   2d1h
+```
+
+#### 静态令牌认证
+静态令牌认证的配置说明
+- 令牌信息保存于格式为CSV的文本文件，每行定义一个用户，由“令牌，用户名，用户ID和所属的用户组”四个字段组成，用户组为可选字段
+```shell
+格式：token,user,uid,"group1,group2..."
+```
+- 由kube-apiserver在启动时通过--token-auth-file选项加载
+- 加载完成后如果再由文件变动，需要通过重启kube-apiserver进行重载
+- 可在客户端在HTTP请求中，通过“Authorization Bearer TOKEN”标头附带令牌以完成认证
+
+静态令牌认证的配置过程
+- 生成token，命令：`echo "$(openssl rand -hex 3).$(openssl rand -hex 8)"`
+```shell
+echo "$(openssl rand -hex 3).$(openssl rand -hex 8)"
+```
+- 生成static token文件
+- 配置kube-apiserver加载该静态令牌文件以启用相应的认证功能
+- 测试命令
+```shell
+# 方法1：
+curl -k -H "authorization: Bearer $TOKEN" https://API_SERVER:6443/api/v1/namespace/default/pods/
+
+# 方法2
+kubectl --insecure-skip-tls-verify --token=$TOKEN -s https://kubeapi.feng.org:6443 get pod
+```
+
+范例：基于静态token令牌向API Server添加认证用户
+```shell
+# 在所有Master节点上配置下面过程，如果只有一个Master节点配置，只能连接此Master节点测试
+# 准备Token文件存放的独立目录
+mkdir /etc/kubernetes/auth
+
+# 创建静态令牌文件并添加用户信息
+echo "$(openssl rand -hex 3).$(openssl rand -hex 8),feng,1001,ops" > /etc/kubernetes/auth/token.csv
+echo "$(openssl rand -hex 3).$(openssl rand -hex 8),test,1002,dev" >> /etc/kubernetes/auth/token.csv
+
+# 先备份配置文件，注意，不要将备份文件放在原目录下
+cp /etc/kubernetes/manifests/kube-apiserver.yaml /tmp/
+
+# 修改kube-apiserver.yaml, 共改三处
+[root@master1 ~]#vim /etc/kubernetes/manifests/kube-apiserver.yaml 
+......
+  - command:
+    - kube-apiserver
+    - --advertise-address=10.0.0.200
+    - --allow-privileged=true
+    - --authorization-mode=Node,RBAC
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --token-auth-file=/etc/kubernetes/auth/token.csv  #指定前面创建文件的路径
+.....
+   volumeMounts:
+   ......
+    - mountPath: /etc/kubernetes/auth                   #添加三行,实现数据卷的挂载配
+置
+     name: static-auth-token
+     readOnly: true
+ hostNetwork: true
+......
+ volumes:
+ .......
+  - hostPath:                                           #添加三行数据卷定义
+     path: /etc/kubernetes/auth
+     type: DirectoryOrCreate
+   name: static-auth-token
+#上面文件修改后,Kubernetes会自动重启名为kube-apiserver-master1.wang.org的Pod,可能需要等一会儿才能启动成功
+[root@master201 auth]#kubectl get pod -n kube-system kube-apiserver-master201.feng.org 
+NAME                                READY   STATUS    RESTARTS   AGE
+kube-apiserver-master201.feng.org   1/1     Running   0          3m43s
+
+# 验证
+TOKEN="cfbf31.2b7641894ef09341";curl -k -H "Authorization: Bearer $TOKEN" https://kubeapi.feng.org:6443/api/v1/namespaces/default/pods/
+
+# 验证2
+TOKEN="cfbf31.2b7641894ef09341";kubectl -s "https://kubeapi.feng.org:6443" --token="$TOKEN" --insecure-skip-tls-verify=true get pod -n kube-system
+```
+
+### Kubeconfig管理
+#### Kubeconfig文件格式
+```yaml
+clusters:
+- cluster:
+  name:
+...
+
+users:
+- name:
+  user:
+...
+
+contexts:
+- context:
+    cluster:
+    user:
+  name:
+...
+
+current-context: user@cluster
+```
+- cluster: 每个Kubernetes集群的信息，包括集群对应访问端点(API Server)的地址
+- users: 认证到API Server的用户的身份凭据列表
+- contexts：将每个user同可认证的cluster建立关联关系的上下文列表
+- current-context: 当前默认使用的context
+  
+客户端程序kubectl加载的kubeconfig文件的途径及从高到低优先级次序
+- `--kubeconfig`选项，只支持一个文件
+- KUBECONFIG环境变量：其值是包含有kubeconfig文件的列表，支持多个文件，用冒号隔离
+- 默认路径：$HOME/.kube/config
+
+#### Kubeconfig创建和管理
+`kubectl config`命令可以创建和管理kubeconfig文件
+
+kubectl config简述
+```shell
+# 结果显示：对于一个用户账号，至少包含三部分
+1. 用户条目-credentials 设定具体的user account名称
+2. 集群-cluster 设定该user account所工作的区域
+3. 上下文环境-context 设定用户和集群的关系
+```
+
+在集群外节点安装kubectl工具
+```shell
+#在集群外节点安装kubectl工具
+#方法1
+curl -s https://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg | apt-key add -
+
+cat << EOF > /etc/apt/sources.list.d/kubernetes.list
+deb https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-xenial main
+EOF
+
+cat /etc/apt/sources.list.d/kubernetes.list
+deb https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-xenial main
+
+apt update &> /dev/null
+apt install -y kubectl
+
+# 方法2
+scp /usr/bin/kubectl 10.0.0.129:/usr/local/bin/
+```
+
+创建和使用kubeconfig流程
+```shell
+# 1. 在kubeconfig中添加集群信息
+kubectl config set-cluster mykube --embed-certs=true --certificate-authority=/etc/kubernetes/pki/ca.crt --server="https://kubeapi.feng.org:6443" --kubeconfig=$HOME/.kube/mykube.conf
+
+# 2. 在kubeconfig中添加用户凭证
+# 方式1: X509数字证书认证
+kubectl config set-credentials feng --embed-certs=true --client-certificate=./feng.crt --client-key=./feng.key --kubeconfig=$HOME/.kube/mykube.conf
+
+# 方式2：静态令牌凭证
+kubectl config set-credentials feng --token="XXXX" --kubeconfig=$HOME/.kube/mykube.conf
+
+# 3. 在kubeconfig中添加context，实现集群和用户关联
+kubectl config set-context feng@mykube --cluster=mykube --user=feng --kubeconfig=$HOME/.kube/mykube.conf
+
+# 测试
+kubectl --context='feng@mykube' get pods --kubeconfig=$HOME/.kube/mykube.conf
+
+# 设置默认context
+kubectl config use-context feng@mykube --kubeconfig=$HOME/.kube/mykube.conf
+
+# 查看kubeconfig内容
+kubectl config view --kubeconfig=$HOME/.kube/mykube.conf --raw
+
+# 使用kubeconfig内容
+1. kubectl get pods --kubeconfig=$HOME/.kube/mykube.conf
+# 使用环境变量可以同时使多个文件生效，注意文件顺序，左边优先生效
+# export KUBECONFIG="$HOME/.kube/kubeusers.conf:/etc/kubernetes/admin.conf"
+2. export KUBECONFIG="$HOME/.kube/mykube.conf"; kubectl get pods
+3. kubectl get pods # 将生成的文件改名为config，并放入默认路径
+```
+
+### Service Account管理
+ServiceAccount
+- 基于资源对象保持ServiceAccount的数据
+- 认证信息保存于ServiceAccount对象专用的Secret中(v1.23版本前会自动创建和SA同名的Secret，之后需要手动创建secret)
+- 隶属于名称空间级别，专供集群上的Pod中的进程访问API Server时使用
+- 需要用到特殊权限时，可为Pod指定要使用的自定义ServiceAccount资源对象
+- 每个命名空间自动生成一个名称为default的sa用户
+- 每个命名空间可以有很多SA
+- SA内部有secret类型的token
+
+在Pod上使用Service Account
+- 自动设定
+  - Service Account通常有API Server自动创建并通过ServiceAccount准入控制器自动关联到集群中创建的每个Pod上
+  - Kubernetes会自动为每个名称空间创建一个名为default的SA账号，并作为默认Pod使用的SA账号
+  - K8S自动为每个Pod注入一个同一个名称空间名为default的ServiceAccount及配套的令牌
+  - default的SA账号权限有限，无法实行Kubernetes管理性任务
+- 自定义
+  - 在Pod规范上，使用ServiceAccountName指定要使用的特定ServiceAccount
+- Pod中的字段spec.imagePullSecrets
+  - 可为Pod提供从私有image registry获取时使用的docker-registry类型的secret的认证凭证
+  - 为Pod提供向私有image registry提供认证凭据的方法
+    - pods.spec.imagePullSecrets: 直接调用的方式
+    - Pods.spec.serviceAccountName之地都给你使用的特有ServiceAccount,而后在ServiceAccount资源对象上，使用serviceaccounts.imagePullSecrets指定secret，此为间接调用的方式
+- Kubernetes基于三个组件完成Pod上Service account的自动化
+  - ServiceAccont Admission Controller
+  - Token Controller
+  - ServiceAccount Controller
+
+- ServiceAccount和Token
+  - ServiceAccount使用专用的secret对象(Kubernetesv1.23)存储相关的敏感信息
+  - Secret对象的类型标识为“kubernetes.io/serviceaccount”
+  - 该Secret对象会自动附带认证到APIServer用到的Token，也称为ServiceAccountToken
+  - 特殊场景：若需要一个永不过期的Token，可手动创建ServiceAccount专用类型的Secret，并将其关联到ServiceAccount上
+
+#### 创建和使用SA账号
+```shell
+# 命令格式
+# kubectl create seviceaccount NAME [--dry-run] [options]
+
+# 文件格式
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: <SA名称>
+  namespace: <名称空间名称>
+```
+
+
+#### 应用SA
+在pod资源中一个属性专门来设置该资源属于哪个SA管理
+```shell
+kubectl explain pod.spec.serviceAccountName 
+```
+
+验证SA
+```shell
+#方法1:在集群节点上执行
+kubectl --insecure-skip-tls-verify  --token=$TOKEN -s
+https://kubeapi.wang.org:6443 get pod
+#方法2:在集群节点上执行
+curl -s -H "Authorization: Bearer $TOKEN"  --cacert /etc/kubernetes/pki/ca.crt 
+https://API_SERVER:6443/api/v1/namespaces/default/pods/
+#方法3:在Pod内执行下面命令
+curl --cacert /etc/kubernetes/pki/ca.crt -H "Authorization: Bearer ${token}"
+https://kubernetes.default/api/v1/pod/namespaces/{namespace}
+```
+
+对应SA创建对应的Token
+```yaml
+# 清单文件
+# cat yaml/security-sa-admin.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin
+---
+# v1.24版之后添加下面内容手动创建secret
+apiVersion: v1
+kind: secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: admin-secret
+  annotations:
+    kubernetes.io/sevice-account.name: "admin"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-sa-admin
+spec:
+  containers:
+  - name: pod-sa-admin
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+  serviceAccountName: admin #使用sa
+```
