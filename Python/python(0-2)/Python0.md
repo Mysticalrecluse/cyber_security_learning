@@ -54,6 +54,24 @@
 - PyPY
     - Python实现的Python，将Python的字节码再编译成机器码
 
+## 软件环境搭建(Windows)
+### 安装Anaconda
+Anaconda是一个用于科学计算的Python发行版
+### 下载安装包
+```shell
+https://www.anaconda.com
+```
+```shell
+# 安装后，运行anaconda prompt
+# 创建虚拟环境，环境名称自定义，这里示例中使用mypython
+conda create -n mypython python=3.12
+# 安装成功后激活
+conda activate mypython
+# 下载使用jupyter
+jupyter notebook
+```
+### 安装python
+
 ## Python注释
 ### 单行注释
 ```python
