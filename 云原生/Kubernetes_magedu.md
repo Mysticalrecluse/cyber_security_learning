@@ -5776,3 +5776,134 @@ wget https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/re
 ```
 
 ### kuborad
+
+
+
+## Kubernetes有状态服务管理
+
+### StatefulSet工作机制
+#### StatefulSet特定
+- 每个Pod都有稳定、唯一的网络访问标识
+- 每个Pod彼此间的通信基于Headless Service实现
+- StatefulSet控制的Pod副本启动、扩展、删除、更新等操作都是有顺序的
+- StatefulSet里的每个Pod存储的数据不同，所以采用专用的稳定独立的持久化存储卷，用于存储Pod的状态数据
+
+#### StatefulSet对用Pod的网络标识
+- 每个StatefulSet对象对应于一个专用的Headless Service对象
+- 使用Headless Service给每一个StatefulSet控制的Pod提供一个唯一的DNS域名来作为每个成员的网络标识
+- 每个Pod都有一个从0开始，从小到大的序号的名称，创建和扩容时序号从小到大，删除，缩容和更新镜像时，从大到小
+- 通过ClusterDNS解析为Pod的地址，从而实现集群内部成员之间使用域名通信
+```shell
+$(statefulset_name)-$(orederID).$(headless_service_name).$(namespace_name).svc.cluster.local
+
+# 示例
+mysql-0.mysql.wordpress.svc.cluster.local
+mysql-1.mysql.wordpress.svc.cluster.local
+mysql-2.mysql.wordpress.svc.cluster.local
+```
+
+#### StatefulSet的Pod管理策略Pod Management Policy
+定义创建，删除及扩缩容等管理操作期间，在Pod副本上的创建两种模式
+- `OrderedReady`
+  - 创建或扩容时，顺次完成各Pod副本的创建，且要求只有前一个Pod转为Ready状态后，才能进行后一个Pod副本的创建
+  - 删除或缩容时，逆序，依次完成相关Pod副本的终止
+- `Parallel`
+  - 各Pod副本的创建或删除操作不存在顺序方面的要求，可同时进行
+
+#### StatefulSet的存储方式
+- 基于podTemplate定义Pod模版
+- 在podTemplate上使用volumeTemplate为各Pod副本动态置备PersistentVolume
+- 因为每个Pod存储的状态数据不尽相同，所以在创建每一个Pod副本时绑定至专有的固定的PVC
+- PVC的名称遵循特定的格式，从而能够与StatefulSet控制器对象的Pod副本建立紧密的关联关系
+- 支持从静态置备或动态置备的PV中完成绑定
+- 删除Pod(例如缩容)，并不会一并删除相关的PVC
+
+#### StatefulSet组件
+- Headless Service
+  - 一般的Pod名称是随机的，而为了StatefulSet的唯一性，所以借用headless service通过唯一的“网络标识”来直接指定的Pod应用，所以它要求我们的dns环境完好
+  - 当一个StatefulSet挂掉，新创建的StatefulSet会被赋予跟原来的Pod一样的名字，通过这个名字来匹配到原来的存储，实现了状态的保存
+
+- volumeClaimTemplate
+  - 有状态中的副本数据是不一样的，如果用共享存储的话，会导致多副本间 的数据被覆盖，为了StatefulSet数据持久化，需要将pod和其申请的数据卷隔离开，每一种pod都有其独立的对应的数据卷配置模版，来满足该要求
+
+
+### StatefulSet配置
+- 注意：StatefulSet除了需要定义自身的标签选择器和Pod模版等属性字段，StatefulSet必须要配置一个专用的Headless Service，而且还可能要根据需要，编写代码完成扩容，缩容等功能所依赖的操作
+```yaml
+# 格式
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name <string>                         # 资源名称，在作用域中要唯一
+  namespace <string>                    # 名称空间：StatefulSet隶属名称空间级别
+spec:
+  replicas: <integer>                   # 期望的Pod副本数，默认为1
+  selector: <object>                    # 标签选择器，须匹配Pod模版中的标签
+  template: <object>                    # pod模版对象，必选字段
+  revisioinHistoryLimit: <integer>      # 滚动更新历史记录数量，默认为10
+  updateStrategy: <Object>              # 滚动更新策略
+    type: <string>                      # OnDelete和Rollingupdate
+    rollingupdate: <object>             # 滚动更新参数，只有在手动删除旧Pod后才会触发更新
+      maxUnavailable: <integer>         # 更新期间可比期望的Pod数量缺少的数量或比例
+      partition: <integer>              # 分区值，表示只更新大于等于此索引值的Pod，默认为0，一般用于金丝雀场景，更新和缩容都是索引号的Pod从大到小进行
+  serviceName: <string>                 # 相关的Headless Service的名称，必选字段
+    apiVersion: <string>
+    kind: <string>                      # PVC资源类型表示，可省略
+    metadata: <Object>                  # 卷申请模版元数据
+    spec: <Object>
+  podManagementPolicy <string>          # Pod管理策略，默认OrderedReady表示顺序创建并逆序删除，“Parallel”表示并行模式
+  volumeClaimTemplates: <[]object>      # 指定PVC的模版，存储卷申请模版，实现数据持久化
+  - metadata:
+      name: <string>                    # 生成的PVC名称格式为<volumeClaimTemplates>.<StatefulSet>-<orderID>
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "sc-nfs"        # 如果有动态置备的StorageClass，可以指定名称
+      resources:
+        requests:
+          storage: 1Gi
+```
+
+范例：简单statefulset
+```yaml
+# cat statefulset-demo.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  ports:
+  - port: 80
+    name: http
+  clusterIP: None
+  selector:
+    app: nginx
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+spec:
+  serviceName: "nginx"
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+        ports:
+        - containerPort: 80
+          name: http
+```
+
+
+
+
+
