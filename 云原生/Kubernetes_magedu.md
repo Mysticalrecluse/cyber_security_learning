@@ -5903,7 +5903,593 @@ spec:
           name: http
 ```
 
+#### StatefulSet扩缩容
+```shell
+kubectl scale sts <sts_name> --replicas <num>
 
+# 示例
+kubectl scale sts web --replicas 5
+```
 
+#### StatefulSet简单案例
+- 准备NFS服务
+  - 建议直接搭建nfs动态置备
+- Service资源
+```yaml
+# 准备headless服务
+apiVersion: v1
+kind: Service
+metadata:
+  name: statefulset-headless
+spec:
+  ports:
+  - port: 80
+  clusterIP: None
+  selector:
+    app: myapp-pod
+```
 
+- 创建statefulSet资源
+```yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: myapp
+spec:
+  serviceName: statefulset-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp-pod
+  template:
+    metadata:
+      labels:
+        app: myapp-pod
+    spec:
+      containers:
+      - name: myapp
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+        volumeMounts:
+        - name: myappdata
+          mountPath: /usr/share/nginx/html
+  volumeClaimTemplates:
+  - metadata:
+      name: myappdata
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "sc-nfs"
+      resources:
+        requests:
+          storage: 1Gi
+```
 
+#### 案例：MySQL主从复制集群
+- 准备NFS服务（推荐动态置备）
+- 创建ConfigMap
+```yaml
+# cat statefulset-mysql-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+    app.kubernetes.io/name: mysql
+data:
+  primary.cnf: |
+    [mysqld]
+    log-bin    
+  replica.cnf: |
+    [mysqld]
+    super-read-only  
+```
+
+- 创建Service
+```yaml
+# cat statefulset-mysql-svc.yaml
+# 为StatefulSet成员提供稳定的DNS表项的无头服务(Headless Service)
+# 主节点的对应的Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+    app.kubernetes.io/name: mysql
+spec:
+  ports:
+  - name: mysql
+    port: 3306
+  clusterIP: None
+  selector:
+    app: mysql
+---
+# 用于连接到任一Mysql实例执行读操作的客户端服务
+# 对于写操作，必须连接到主服务器：mysql-0.mysql
+# 从节点的对应的Service，注意：此处无需无头服务
+# 下面的Service可以不创建，直接使用无头服务mysql也可以
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-read
+  labels:
+    app: mysql
+    app.kubernetes.io/name: mysql
+spec:
+  ports:
+  - name: mysql
+    port: 3306
+  selector:
+    app: mysql
+```
+- 创建statefulset
+```yaml
+# cat statefulset-mysql-statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+      app.kubernetes.io/name: mysql
+  serviceName: mysql
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: mysql
+        app.kubernetes.io/name: mysql
+    spec:
+      initContainers:
+      - name: init-mysql
+        #image: mysql:5.7
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:5.7
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          # 基于 Pod 序号生成 MySQL 服务器的 ID。
+          [[ $HOSTNAME =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          echo [mysqld] > /mnt/conf.d/server-id.cnf
+          # 添加偏移量以避免使用 server-id=0 这一保留值。
+          echo server-id=$((100 + $ordinal)) >> /mnt/conf.d/server-id.cnf
+          # 将合适的 conf.d 文件从 config-map 复制到 emptyDir。
+          if [[ $ordinal -eq 0 ]]; then
+            cp /mnt/config-map/primary.cnf /mnt/conf.d/
+          else
+            cp /mnt/config-map/replica.cnf /mnt/conf.d/
+           fi          
+        volumeMounts:
+        - name: conf
+          mountPath: /mnt/conf.d
+        - name: config-map
+          mountPath: /mnt/config-map
+      - name: clone-mysql
+        #image: gcr.io/google-samples/xtrabackup:1.0
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/xtrabackup:1.0
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          # 如果已有数据，则跳过克隆。
+          [[ -d /var/lib/mysql/mysql ]] && exit 0
+          # 跳过主实例（序号索引 0）的克隆。
+          [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          [[ $ordinal -eq 0 ]] && exit 0
+          # 从原来的对等节点克隆数据。
+          ncat --recv-only mysql-$(($ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql
+          # 准备备份。
+          xtrabackup --prepare --target-dir=/var/lib/mysql          
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+      containers:
+      - name: mysql
+        #image: mysql:5.7
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:5.7        
+        env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "1"
+        ports:
+        - name: mysql
+          containerPort: 3306
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          exec:
+            command: ["mysqladmin", "ping"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            # 检查我们是否可以通过 TCP 执行查询（skip-networking 是关闭的）。
+            command: ["mysql", "-h", "127.0.0.1", "-e", "SELECT 1"]
+          initialDelaySeconds: 5
+          periodSeconds: 2
+          timeoutSeconds: 1
+      - name: xtrabackup
+        #image: gcr.io/google-samples/xtrabackup:1.0
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/xtrabackup:1.0
+        ports:
+        - name: xtrabackup
+          containerPort: 3307
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          cd /var/lib/mysql
+          # 确定克隆数据的 binlog 位置（如果有的话）。
+          if [[ -f xtrabackup_slave_info && "x$(<xtrabackup_slave_info)" != "x" ]]; then
+            # XtraBackup 已经生成了部分的 “CHANGE MASTER TO” 查询
+            # 因为从一个现有副本进行克隆。(需要删除末尾的分号!)
+            cat xtrabackup_slave_info | sed -E 's/;$//g' > change_master_to.sql.in
+            # 在这里要忽略 xtrabackup_binlog_info （它是没用的）。
+            rm -f xtrabackup_slave_info xtrabackup_binlog_info
+          elif [[ -f xtrabackup_binlog_info ]]; then
+            # 直接从主实例进行克隆。解析 binlog 位置。
+            [[ `cat xtrabackup_binlog_info` =~ ^(.*?)[[:space:]]+(.*?)$ ]] || exit 1
+            rm -f xtrabackup_binlog_info xtrabackup_slave_info
+            echo "CHANGE MASTER TO MASTER_LOG_FILE='${BASH_REMATCH[1]}',\
+                  MASTER_LOG_POS=${BASH_REMATCH[2]}" > change_master_to.sql.in
+          fi
+          # 检查是否需要通过启动复制来完成克隆。
+          if [[ -f change_master_to.sql.in ]]; then
+            echo "Waiting for mysqld to be ready (accepting connections)"
+            until mysql -h 127.0.0.1 -e "SELECT 1"; do sleep 1; done
+            echo "Initializing replication from clone position"
+            mysql -h 127.0.0.1 \
+                  -e "$(<change_master_to.sql.in), \
+                          MASTER_HOST='mysql-0.mysql', \
+                          MASTER_USER='root', \
+                          MASTER_PASSWORD='', \
+                          MASTER_CONNECT_RETRY=10; \
+                        START SLAVE;" || exit 1
+            # 如果容器重新启动，最多尝试一次。
+            mv change_master_to.sql.in change_master_to.sql.orig
+          fi
+          # 当对等点请求时，启动服务器发送备份。
+          exec ncat --listen --keep-open --send-only --max-conns=1 3307 -c \
+            "xtrabackup --backup --slave-info --stream=xbstream --host=127.0.0.1 --user=root"          
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+      volumes:
+      - name: conf
+        emptyDir: {}
+      - name: config-map
+        configMap:
+          name: mysql
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "sc-nfs"  #如果使用StorageClass,启用此行
+      resources:
+        requests:
+          storage: 10Gi
+```
+
+测试
+```shell
+# 部署一个测试节点
+kubectl run client-test-$RANDOM --image registry.cn-beijing.aliyuncs.com/wangxiaochun/ubuntu:22.04 --restart=Never --rm -it --command -- /bin/bash
+```
+
+## CRD定制资源
+扩展Kubernetes API常用方法
+- 二次开发API Server源码，适合在添加新的核心类型时采用
+- 开发自定义API Server并聚合至主API Server，富于弹性但代码工作量大
+- 使用CRD（Custom Resource Definition）自定义资源类型，易用但限制较多，对应的控制器还需自行开发
+
+### CRD资源清单实现
+```yaml
+# cat crd-user.yaml
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomReasourceDefinition
+metadata:
+  name: users.auth.democrd.io
+spec:
+  group: auth.democrd.io            #定义该资源属于哪个组
+  names:
+    kind: User
+    plural: users  # 复数
+    singular: user # 单数
+    shortNames:    # 缩写
+    - u
+  scope: Namespaced    # 表明该资源是名称空间级的资源
+  version:
+  - served: true
+    storage: true
+    name: vlalpha1
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type:
+            properties:
+              userID:
+                type: integer
+                minimum: 1
+                maximum: 65535
+              groups:
+                type: array
+                items:
+                  type: string
+              email:
+                type: string
+              password:
+                type: string
+                format: password
+            required: ["userID","groups"]
+```
+
+## Operator
+### Operator应用网站
+```shell
+https://operatorhub.io
+```
+
+### Operator安装部署流程
+```shell
+# 安装Operator
+# 创建(一些)crd
+kubectl create -f 
+https://download.elastic.co/downloads/eck/2.12.1/crds.yaml`
+
+# 查看创建的相关CRD
+kubectl get crd --sort-by='{.metadata.creationTimestamp}'|tail
+
+# 安装operator相关RBAC规则
+kubectl apply -f 
+https://download.elastic.co/downloads/eck/2.12.1/operator.yaml
+
+# 在elastic-system，名称空间查看相关资源
+kubectl get all -n elastic-system
+```
+
+### 部署Elasticsearch
+```shell
+# 准备业务的名称空间
+kubectl create ns demo
+
+# 准备elasticsearch-cluster清单文件
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+ name: my-es-cluster
+  #namespace: elastic-system
+ namespace: demo
+spec:
+  #version: 8.13.2
+ version: 8.14.0
+ nodeSets:
+  - name: default
+   count: 3                  #3个节点的集群
+   config:
+      node.store.allow_mmap: false
+   volumeClaimTemplates:
+    - metadata:
+       name: elasticsearch-data
+     spec:
+       accessModes: ["ReadWriteOnce"] 
+       resources:
+         requests:
+           storage: 2Gi
+       storageClassName: sc-nfs     #需要提前准备sc-nfs的storageClass
+# 注意：节点内存需要4G以
+```
+
+- 执行清单文件
+```shell
+kubectl apply -f operator-elasticsearch-cluster.yaml
+```
+
+## Kubernetes包管理器Helm
+### Helm相关概念
+- Helm: Helm的客户端工具，负责和API Server通信
+  - 和kubectl类似，也是Kubernetes API Server的命令行客户端工具
+  - 支持kubeconfig认证文件
+
+- Chart：打包文件，将所有相关的资源清单文件YAML的打包文件
+
+- Release: 表示基于chart部署的一个实例。通过chart部署的应用都会生成一个唯一的Release
+
+- Repository：chart包存放的仓库，相当于APT和YUM仓库
+
+### Helm3和Helm2的变化
+- Tiller服务器被废弃，仅保留helm客户端，helm通过kubeconfig认证到API Server
+- Release可以在不同名称空间重用
+- 支持将Chart推送到Docker镜像仓库
+- Helm3默认使用Secret来存储发行信息，提供了更高的安全性
+  - Helm2默认使用configmaps存储发行信息
+- 不再需要requirements.yaml,依赖关系式直接在Chart.yaml中定义
+
+### Chart仓库
+用于实现Chart包的集中存储和分发，类似于Docker仓库Harbor
+
+Chart仓库
+- 官方仓库：`https://artifacthub.io`
+- 微软仓库：推荐使用，`http://mirror.azure.cn/kubernetes/charts/`
+- 阿里云仓库：`http://kubernetes.oss-cn-hangzhou.aliyuncs.com/charts`
+- Harbor仓库：新版支持基于OCI://协议， 将Chart存放在公共的docker镜像仓库
+
+### Helm部署应用流程
+- 安装Helm工具
+- 查找合适的chart仓库
+- 配置chart仓库
+- 定位chart
+- 通过向Chart中模版文件中字符串赋值完成其实例化，即模版渲染，实例化的结果可以部署到目标Kubernetes上（模版字符串的定制方式三种）
+  - 默认使用Chart中的value.yaml中定义的默认值
+  - 直接在helm install的命令行，通过--set选项进行
+  - 自定义values.yaml，由Helm install -f values.yaml命令加载文件
+
+### Helm二进制安装
+```shell
+#在kubernetes的管理节点部署
+[root@master1 ~]#wget https://get.helm.sh/helm-v3.12.0-linux-amd64.tar.gz
+[root@master1 ~]#tar xf helm-v3.12.0-linux-amd64.tar.gz -C /usr/local/
+[root@master1 ~]#ls /usr/local/linux-amd64/
+helm LICENSE README.md
+[root@master1 ~]#ln -s /usr/local/linux-amd64/helm /usr/local/bin/
+```
+
+```shell
+# 查看helm版本
+helm version
+```
+
+### Helm命令用法
+```shell
+# 仓库管理
+helm repo list    #列出已添加的仓库
+helm repo add [REPO_NAME] [URL]   # 添加远程仓库并命名，如下所示
+# 添加仓库示例
+helm repo add bitnami https://charts.bitnami.com/bitnami
+# 添加harbor仓库
+helm repo add myharbor https://harbor.wangxiaochun.com/charrepo/myweb --username admin --password 123456
+
+# 删除仓库
+helm repo remove [REPO1 [REPO2...]]
+
+# 更新仓库
+helm repo update   相当于apt update
+
+# 从artifacthub网站搜索，无需配置本地仓库，相当于docker search
+helm search hub [KEYWORD]
+
+# 从本地仓库搜索，需要配置本地仓库才能搜索，相当于apt search
+helm search repo [KEYWORD]
+
+# 查看chart信息
+helm show chart [CHART]
+
+# 拉取chart到本地
+helm pull repo/chartname   # 下载charts到当前目录，表现为tgz文件，默认最新版本
+
+# 新版路径支持OCI
+helm pull oci://
+
+# 下载指定版本的Chart包并解压
+helm pull myrepo/myapp --version 1.2.3 --untar
+
+# 安装
+helm install [NAME] [CHART] [--version <string>] # 安装指定版本的chart
+helm install [CHART] --generate-name             # 自动生成 RELEASE_NAME
+helm install --set KEY1=VALUE1 --set KEY2=VALUE2 RELEASE_NAME CHART... #指定属性实现定制配置
+helm install -f value.yaml RELEASE_NAME CHART...   # 引用文件实现定制配置
+helm install --debug --dry-run RELEASE_NAME CHART   # 调试并不执行，可以查看到执行的渲染结果
+
+# 删除
+helm uninstall RELEASE_NAME    # 卸载RELEASE
+
+# 查看release
+helm list     # 列出安装的release
+helm status RELEASE_NAME       # 查看RELEASE状态
+helm get values RELEASE_NAME -n NAMESPACE > values.yaml
+
+# 查看RELEASE的生成的资源清单文件
+helm get manifest RELEASE_NAME -n NAMESPACE
+
+# 升级和回滚
+helm upgrade RELEASE_NAME CHART --set key=newvalue
+helm upgrade RELEASE_NAME CHART -f mychart/values.yaml
+
+# release回滚到指定版本，如果不指定版本，默认回滚至上一个版本
+helm rollback RELEASE_NAME [REVISION]
+
+# 查看历史
+helm history RELEASE_NAME
+
+# 打包
+helm package mychart/  # 将指定目录的chart打包为.tgz到当前目录下
+```
+
+helm install说明
+```shell
+#安装的CHART有六种形式
+1. By chart reference: helm install mymaria example/mariadb  #在线安装,先通过helm 
+repo add添加仓库，才能在线安装
+2. By path to a packaged chart: helm install myweb ./nginx-1.2.3.tgz  #离线安装
+3. By path to an unpacked chart directory: helm install myweb ./nginx #离线安装
+4. By absolute URL: helm install myweb https://example.com/charts/nginx-1.2.3.tgz #在线安装
+5. By chart reference and repo url: helm install --repo https://example.com/charts/ myweb nginx #在线安装
+6. By OCI registries: helm install myweb --version 1.2.3 oci://example.com/charts/nginx #在线安装。
+```
+
+### 案例：部署Mysql(单机版)
+- 查看chart包的参数变量
+```shell
+helm show values bitnami/mysql --version 11.1.14 > values.yaml
+
+# 去掉注释
+grep -v "#" values.yaml 
+
+# 安装时必须指定存储卷，否则会处于pending状态
+helm install mysql bitnami/mysql --version 11.1.14 --set primary.persistence.storageClass=sc-nfs
+```
+
+### 案例：部署Mysql主从复制
+```shell
+helm install mysql \
+    --set auth.rootPassword='P@ssw0rd' \
+    --set global.storageClass=sc-nfs \
+    --set auth.database=wordpress \
+    --set auth.username=wordpress \
+    --set auth.password='P@ssw0rd' \
+    --set architecture=replication \
+    --set secondary.replicaCount=1 \
+    --set auth.replicationPassword='P@ssw0rd' \
+   bitnami/mysql \
+    -n wordpress --create-namespace
+```
+
+### 案例：部署wordpress
+```shell
+helm install wordpress \
+    --version 21.0.10 \
+    --set mariadb.enabled=false \
+    --set externalDatabase.host=mysql-primary.wordpress.svc.cluster.local \
+    --set externalDatabase.user=wordpress \
+    --set externalDatabase.password='P@ssw0rd' \
+    --set externalDatabase.database=wordpress \
+    --set externalDatabase.port=3306 \
+    --set wordpressUsername=admin \
+    --set wordpressPassword='P@ssw0rd' \
+    --set persistence.storageClass=sc-nfs \
+    --set ingress.enabled=true \
+    --set ingress.ingressClassName=nginx \
+    --set ingress.hostname=wordpress.wang.org \
+    --set ingress.pathType=Prefix \
+    --set wordpressUsername=admin \
+    --set wordpressPassword='P@ssw0rd' \
+    ./wordpress-21.0.10.tgz \
+    -n wordpress --create-namespace
+```
