@@ -6493,3 +6493,69 @@ helm install wordpress \
     ./wordpress-21.0.10.tgz \
     -n wordpress --create-namespace
 ```
+
+### 自定义Chart
+#### Helm chart
+```shell
+mychart/
+  Chart.yaml
+  values.yaml
+  charts/
+  templates/
+  ...
+```
+
+- `Chart.yaml`文件
+  - 必选项
+  - 包含了该chart的描述，你可以从模版中访问它
+  - `helm show chart [CHART]`查看到即此文件内容
+
+- `templates/`目录
+  - 必选项
+  - 包括了各种资源清单的模版文件。比如：`deployment,service,ingress,configmap`
+  - 可以是固定内容的文本，也可以包含了一些变量，函数等模版语法
+  - 当Helm评估chart时，会通过模版渲染引擎将所有文件发送到`templates/`目录中。然后收集模版的结果并发送给Kubernetes。
+
+- `values.yaml`文件
+  - 可选项
+  - 如果`templates/`目录下文件都是固定格式，此文件无需创建
+  - 如果`templates`目录中包含变量时，可以通过此文件提供变量的默认值
+  - 这些值可以在用户执行`helm install`或`helm upgrade`时被覆盖
+  - `helm show values [CHART]`查看到即此文件内容
+  
+- `charts/`目录
+  - 可选项
+  - 可以包含依赖的其他的chart，称之为子chart
+
+
+#### 常用内置对象
+- Release对象
+```shell
+# 描述应用发布自身的一些信息
+.Release.Name      #release 的名称
+,Release.Namespace #release 的命名空间
+.Release.Revision  #获取此次修订的版本号。初次安装时为1，每次升级或回滚都会递增
+.Release.Service   #获取渲染当前模板的服务名称。一般都是 Helm
+.Release.IsInstall #如果当前操作是安装，该值为 true
+.Release.IsUpgrade #如果当前操作是升级或回滚，该值为true
+.Release.Time      #Chart发布时间
+
+#引用
+{{ .Release.Name }}
+```
+- Values对象
+```shell
+# 变量赋值
+key1: value1
+info:
+ key2: value2
+
+# 变量引用
+#注意: 大写字母V
+{{ .Value.key1 }}
+{{ .Value.info.key2 }}
+
+```
+- Chart对象
+- Capabilities对象
+- Template对象
