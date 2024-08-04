@@ -297,7 +297,7 @@ xxxx is not executed because it is not in the whitelist.
 ```shell
 #Ubuntu22.04编译
 apt update && apt -y install openjdk-8-jdk
-apt update && pat -y install maven
+apt update && apt -y install maven
 
 # 添加阿里云加速
 vim /etc/maven/settings.xml 
@@ -480,8 +480,386 @@ kafka_<scala 版本>_<scala 版本>
 ```
 
 ```shell
+# 在所有节点上执行安装java
+apt install openjdk-8-jdk -y
 # 下载Kafka
 # Kafka4.0之后不再支持Zookeeper
 # Kafka包里集成了Zookeeper，不需要自己单装Zookeeper
 wget https://mirrors.tuna.tsinghua.edu.cn/apache/kafka/3.8.0/kafka_2.13-3.8.0.tgz
+
+# 解压缩
+tar xf kafka_2.13-3.8.0.tgz -C /usr/local/
+ln -s /usr/local/kafka_2.13-3.8.0/ /usr/local/kafka
+
+# 配置PATH变量
+echo 'PATH=/usr/local/kafka/bin:$PATH' > /etc/profile.d/kafka.sh
+. /etc/profile.d/kafka.sh
+
+# 修改配置文件
+vim /usr/local/kafka/config/server.properties
+
+broker.id=1 #每个broker在集群中每个节点的正整数唯一标识，此值保存在log.dirs下的meta.properties文件，修改此行
+listeners=PLAINTEXT://10.0.0.101:9092 #指定当前主机的IP做为监听地址,注意:不支持0.0.0.0
+log.dirs=/usr/local/kafka/data #kakfa用于保存数据的目录，所有的消息都会存储在该目录当中，修改此行
+num.partitions=1 #设置创建新的topic时默认分区数量,建议和kafka的节点数量一致
+default.replication.factor=3 #指定默认的副本数为3，可以实现故障的自动转移
+log.retention.hours=168 #设置kafka中消息保留时间，默认为168小时即7天
+zookeeper.connect=10.0.0.101:2181,10.0.0.102:2181,10.0.0.103:2181 #指定连接的zk的地址,zk中存储了broker的元数据信息，
+修改此行
+zookeeper.connection.timeout.ms=6000 #设置连接zookeeper的超时时间，单位为ms,默认6秒钟
+
+zookeeper.session.timeout.ms=6000    # 会话过期时间
+
+# 准备数据目录
+mkdir /usr/local/kafka/data
+scp /usr/local/kafka/config/server.properties 10.0.0.102:/usr/local/kafka/config
+scp /usr/local/kafka/config/server.properties 10.0.0.103:/usr/local/kafka/config
+
+# 修改第2个节点的配置
+vim /usr/local/kafka/config/server.properties
+broker.id=2
+listeners=PLAINTEXT://10.0.0.102:9092  # 指定当前主机的IP作为监听地址，不支持0.0.0.0
+
+# 修改第3个节点的配置
+vim /usr/local/kafka/config/server.properties
+broker.id=3
+listeners=PLAINTEXT://10.0.0.103:9092  # 指定当前主机的IP作为监听地址，不支持0.0.0.0
+
+# 可以调整内存
+vim /usr/local/kafka/bin/kafka-server-start.sh
+......
+if [ " x$KAFKA_HEAP_OPTS"="x" ]; then
+    export KAFKA_HEAP_OPTS=" -Xmx1G -Xms1G"
+fi
+```
+
+更多详情查看shell脚本
+```shell
+NODE1=10.0.0.201
+NODE2=10.0.0.202
+NODE3=10.0.0.203
+
+KAFKA_VERSION=3.8.0
+#KAFKA_VERSION=3.7.0
+#KAFKA_VERSION=3.6.1
+#KAFKA_VERSION=3.5.1
+#KAFKA_VERSION=3.5.0
+#KAFKA_VERSION=3.4.0
+#KAFKA_VERSION=3.3.2
+#KAFKA_VERSION=3.2.0
+#KAFKA_VERSION=-3.0.0
+
+SCALA_VERSION=2.13
+
+KAFKA_URL="https://mirrors.tuna.tsinghua.edu.cn/apache/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz"
+#KAFKA_URL="https://mirrors.tuna.tsinghua.edu.cn/apache/kafka/2.8.1/kafka_2.13-2.8.1.tgz"
+#KAFKA_URL="https://mirrors.tuna.tsinghua.edu.cn/apache/kafka/2.7.1/kafka_2.13-2.7.1.tgz"
+
+
+KAFKA_INSTALL_DIR=/usr/local/kafka
+
+
+HOST=`hostname -I|awk '{print $1}'`
+
+.  /etc/os-release
+
+
+color () {
+    RES_COL=60
+    MOVE_TO_COL="echo -en \\033[${RES_COL}G"
+    SETCOLOR_SUCCESS="echo -en \\033[1;32m"
+    SETCOLOR_FAILURE="echo -en \\033[1;31m"
+    SETCOLOR_WARNING="echo -en \\033[1;33m"
+    SETCOLOR_NORMAL="echo -en \E[0m"
+    echo -n "$1" && $MOVE_TO_COL
+    echo -n "["
+    if [ $2 = "success" -o $2 = "0" ] ;then
+        ${SETCOLOR_SUCCESS}
+        echo -n $"  OK  "    
+    elif [ $2 = "failure" -o $2 = "1"  ] ;then 
+        ${SETCOLOR_FAILURE}
+        echo -n $"FAILED"
+    else
+        ${SETCOLOR_WARNING}
+        echo -n $"WARNING"
+    fi
+    ${SETCOLOR_NORMAL}
+    echo -n "]"
+    echo 
+}
+
+env () {
+    if hostname -I |grep -q $NODE1;then
+            ID=1
+           hostnamectl set-hostname node1
+        elif hostname -I |grep -q $NODE2;then
+            ID=2
+           hostnamectl set-hostname node2
+        elif hostname -I |grep -q $NODE3;then
+            ID=3
+            hostnamectl set-hostname node3
+    else
+            color 'IP地址错误' 1
+            exit
+        fi
+    cat >> /etc/hosts <<EOF
+
+$NODE1   node1
+$NODE2   node2
+$NODE3   node3
+
+EOF
+}
+
+install_jdk() {
+    java -version &>/dev/null && { color "JDK 已安装!" 1 ; return;  }
+    if command -v yum &>/dev/null ; then
+        yum -y install java-1.8.0-openjdk-devel || { color "安装JDK失败!" 1; exit 1; }
+    elif command -v apt &>/dev/null ; then
+        apt update
+        #apt install openjdk-11-jdk -y || { color "安装JDK失败!" 1; exit 1; } 
+        apt install openjdk-8-jdk -y || { color "安装JDK失败!" 1; exit 1; } 
+    else
+       color "不支持当前操作系统!" 1
+       exit 1
+    fi
+    java -version && { color "安装 JDK 完成!" 0 ; } || { color "安装JDK失败!" 1; exit 1; } 
+}
+
+
+
+install_zookeeper() {
+        mv ${KAFKA_INSTALL_DIR}/config/zookeeper.properties{,.bak}
+    cat > ${KAFKA_INSTALL_DIR}/config/zookeeper.properties <<EOF
+tickTime=2000
+initLimit=10
+syncLimit=5
+dataDir=${KAFKA_INSTALL_DIR}/data
+clientPort=2181
+maxClientCnxns=128
+autopurge.snapRetainCount=3
+autopurge.purgeInterval=24
+server.1=${NODE1}:2888:3888
+server.2=${NODE2}:2888:3888
+server.3=${NODE3}:2888:3888
+EOF
+    mkdir -p ${KAFKA_INSTALL_DIR}/data
+
+    echo $ID > ${KAFKA_INSTALL_DIR}/data/myid
+
+    cat > ${KAFKA_INSTALL_DIR}/bin/zookeeper-startup.sh <<EOF
+#!/bin/bash
+nohup ${KAFKA_INSTALL_DIR}/bin/zookeeper-server-start.sh ${KAFKA_INSTALL_DIR}/config/zookeeper.properties   &
+EOF
+    chmod +x ${KAFKA_INSTALL_DIR}/bin/zookeeper-startup.sh
+    cat > /lib/systemd/system/zookeeper.service <<EOF
+[Unit]
+Description=zookeeper.service
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=${KAFKA_INSTALL_DIR}/bin/zookeeper-startup.sh
+ExecStop=${KAFKA_INSTALL_DIR}/bin/zookeeper-server-stop.sh 
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable --now  zookeeper.service
+    systemctl is-active zookeeper.service
+    if [ $? -eq 0 ] ;then 
+        color "zookeeper 安装成功!" 0  
+    else 
+        color "zookeeper 安装失败!" 1
+        exit 1
+    fi
+
+} 
+   
+
+install_kafka(){
+    if [ ! -f kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz ];then
+        wget -P /usr/local/src/  --no-check-certificate $KAFKA_URL  || { color  "下载失败!" 1 ;exit ; }
+    fi
+    tar xf /usr/local/src/${KAFKA_URL##*/}  -C /usr/local/
+    ln -s /usr/local/kafka_${SCALA_VERSION}-${KAFKA_VERSION}  ${KAFKA_INSTALL_DIR}
+    install_zookeeper
+
+    echo PATH=${KAFKA_INSTALL_DIR}/bin:'$PATH' >> /etc/profile
+
+    mv ${KAFKA_INSTALL_DIR}/config/server.properties{,.bak}
+    cat > ${KAFKA_INSTALL_DIR}/config/server.properties <<EOF
+broker.id=$ID
+listeners=PLAINTEXT://${HOST}:9092
+log.dirs=${KAFKA_INSTALL_DIR}/data
+num.partitions=1
+log.retention.hours=168
+zookeeper.connect=${NODE1}:2181,${NODE2}:2181,${NODE3}:2181
+zookeeper.connection.timeout.ms=6000
+delete.topic.enable=true
+EOF
+    
+    cat > ${KAFKA_INSTALL_DIR}/bin/kafka-startup.sh <<EOF
+#!/bin/bash
+nohup ${KAFKA_INSTALL_DIR}/bin/kafka-server-start.sh  ${KAFKA_INSTALL_DIR}/config/server.properties &
+EOF
+    chmod +x ${KAFKA_INSTALL_DIR}/bin/kafka-startup.sh
+
+    cat > /lib/systemd/system/kafka.service <<EOF
+[Unit]                                                                          
+Description=Apache kafka
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=${KAFKA_INSTALL_DIR}/bin/kafka-startup.sh
+ExecStop=/bin/kill  -TERM \${MAINPID}
+Restart=always
+RestartSec=20
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+    systemctl daemon-reload
+    systemctl enable --now kafka.service
+    #kafka-server-start.sh -daemon ${KAFKA_INSTALL_DIR}/config/server.properties 
+    systemctl is-active kafka.service
+    if [ $? -eq 0 ] ;then 
+        color "kafka 安装成功!" 0  
+    else 
+        color "kafka 安装失败!" 1
+        exit 1
+    fi    
+}
+
+
+env
+
+install_jdk
+
+install_kafka
+```
+- 补充说明
+```shell
+# delete.topic.enable=true
+默认情况下，Kafka 禁用删除主题的功能（即 delete.topic.enable 默认值为 false），为了防止误操作导致重要数据丢失。如果你需要允许删除主题，可以在 Kafka 配置文件（通常是 server.properties）中设置该参数为 true。
+```
+
+### Kafka读写数据
+
+- 可以使用ZooInspector，编译成功后，传到Windows上，即可实现图形化查看
+
+- Kafka上面一般存放的是业务数据，而元数据通常是存放在Zookeeper中
+
+#### 常见命令
+```shell
+kafka-topics.sh               # 消息的管理命令
+kafka-console-producer.sh     # 生产者的模拟命令
+kafka-console-consumer.sh     # 消费者的模拟命令
+```
+
+#### 创建Topic
+创建topic名为wang，partition(分区)为3，replication(每个分区的副本数/每个分区的分区因子)为2
+```shell
+#新版命令,通过--bootstrap-server指定kafka的地址
+[root@node1 ~]#/usr/local/kafka/bin/kafka-topics.sh --create --topic wang --bootstrap-server 10.0.0.101:9092 --partitions 3 --replication-factor 2
+
+#在各节点上观察生成的相关数据
+[root@node1 ~]#ls /usr/local/kafka/data/
+[root@node2 ~]#ls /usr/local/kafka/data/
+[root@node3 ~]#ls /usr/local/kafka/data/
+
+#旧版命令，通过--zookeeper指定zookeeper的地址
+[root@node1 ~]#/usr/local/kafka/bin/kafka-topics.sh --create --zookeeper 
+10.0.0.101:2181,10.0.0.102:2181,10.0.0.103:2181 --partitions 3 --replication-factor 2 --topic wang
+Created topic wang.
+```
+
+#### 查看Topic详情
+```shell
+#新版命令
+[root@node1 ~]#/usr/local/kafka/bin/kafka-topics.sh --describe --bootstrap-server 10.0.0.101:9092 --topic wang
+Topic: wang TopicId: beg6bPXwToW1yp7cuv7F8w PartitionCount: 3 ReplicationFactor: 2 Configs: 
+ Topic: wang Partition: 0 Leader: 3 Replicas: 3,1 Isr: 3,1
+ Topic: wang Partition: 1 Leader: 1 Replicas: 1,2 Isr: 1,2
+ Topic: wang Partition: 2 Leader: 2 Replicas: 2,3 Isr: 2,3
+
+#旧版命令
+[root@node1 ~]#/usr/local/kafka/bin/kafka-topics.sh --describe --zookeeper 
+10.0.0.101:2181,10.0.0.102:2181,10.0.0.103:2181 --topic wang
+Topic: wang PartitionCount: 3 ReplicationFactor: 2 Configs: 
+ Topic: wang Partition: 0 Leader: 3 Replicas: 3,2 Isr: 3,2
+ Topic: wang Partition: 1 Leader: 1 Replicas: 1,3 Isr: 1,3
+ Topic: wang Partition: 2 Leader: 2 Replicas: 2,1 Isr: 2,1
+```
+
+#### 生产Topic
+```shell
+kafka-console-producer.sh --broker-list <kafkaIP1>:<端口>,<kafkaIP2>:<端口> --topic <topic名称> --producer-property group.id=<组名>
+
+# 示例
+kafka-console-producer.sh -broker-list 10.0.0.131:9092,10.0.0.132:9092,10.0.0.133:9092 --topic mytopic
+>
+```
+
+#### 消费Topic
+```shell
+# 直接消费到使用该命令时间点之后生产的数据，之前的接收不到
+kafka-console-consumer.sh --topic mytopic --bootstrap-server 10.0.0.132:9092
+
+# 使用--from-beginning可以接收到之前的数据
+kafka-console-consumer.sh --topic mytopic --bootstrap-server 10.0.0.132:9092 --from-beginning
+
+# 一个消息同时只能被同一个组内的一个消费者消费(单播机制),实现负载均衡，而不同组可以同时消费同行一个消息(多播机制)
+kafka-console-consumer.sh --topic mytopic --bootstrap-server 10.0.0.132:9092 --from-beginning --consumer-property group.id=group1
+```
+
+#### 删除Topic
+```shell
+# 注意：需要修改配置文件server.properties中的delete.topic.enable.true并重启
+# 新版本
+kafka-topics.sh --delete --bootstrap-server 10.0.0.131:9092,10.0.0.132:9092,10.0.0.133:9092 --topic mytopic
+```
+
+### 消息积压
+#### 产生Kafka消息积压的原因
+- 消费者处理速度慢
+- 消费者宕机
+- 网路问题
+- 硬件资源不足
+- 分区不均匀
+- 生产者速度过快
+- 配置不当
+- 异常情况
+
+#### Kafka消息积压的解决方案
+- 增加消费者数量
+- 扩展Kafka集群
+- 数据分区
+- 数据清理
+- 优化消费者代码
+- 调整Kafka配置
+  - 增加分区数量
+  - 调整副本数量
+  - 调整日志清理策略
+- 故障排除
+
+
+#### 发现Kafka消息加压的方法
+- 监控工具
+- Consumer_Lag
+  - ComsumerLag是指消费者组相对于生产者的消息偏移量的差异。通过监控Consumer Lag，你可以了解消费者是否跟上了生产者的速度。如果ComsumerLag增长较快，可能表示消息积压
+- Kafka Logs目录
+  - Kafa的每个分区都有一个日志目录，其中包含了该分区的消息数据，可以检查每个分区的日志目录，查看是否有大量的未消费的消息
+- Kafka Broker Metrics
+  - Kafka提供了一系列的broker metrics，包括消息入队速率，出队速率，通过监控这些指标，可以了解Kafka集群的负载情况
+- 操作系统资源：
+  - 如果Kafka所在的机器资源不足，可能导致消息积压
+- 警报系统
+
+通过Kafka提供的工具查看格式
+```shell
+kafka-consumer-groups.sh --bootstrap-server 10.0.0.131:9092 --describe --all-groups
 ```
