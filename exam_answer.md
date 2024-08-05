@@ -116,7 +116,43 @@ acks=all(或-1): 生产者会等待所有ISRI(同步副本)确认消息写入后
 
 
 ### Kafka出现了消息积压如何处理，使用哪些命令
-- 首先检查消息加压情况
+- 首先检查消息积压情况
 ```shell
 kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group <consumer-group>
 ```
+
+- 解决方案1: 增加消费者实例
+
+- 解决方案2：增加分区数
+```shell
+kafka-topics.sh --alter --topic <topic-name> --partitions <new-partition-count> --bootstrap-server localhost:9092
+```
+
+- 解决方案3：调整生产者配置
+```shell
+# 确保生产者配置合理，以减少消息产生的积压
+# 增加acks配置，设置acks=all，确保消息被多副本确认
+# 增加retry和retry.backoff.ms配置，正价重试次数和重试间隔
+```
+- 解决方案4：清理过期消息
+```shell
+# 设置消息保留策略
+log.retention.hours=168   # 保留7天
+log.retention.bytes=1073741824  # 保留1G数据
+
+# 手动删除过期消息
+kafka-delete-records.sh --bootstrap-server localhost:9092 --offset-json-file offsets.json
+{
+  "partitions": [
+    {
+      "topic": "<topic-name>",
+      "partition": 0,
+      "offset": <offset-to-delete-up-to>
+    }
+  ],
+  "version": 1
+}
+```
+
+
+### Kafka如何优化
