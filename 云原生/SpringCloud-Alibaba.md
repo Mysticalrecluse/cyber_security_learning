@@ -250,9 +250,87 @@ http://10.0.0.100:9999/haproxy-status
 
 # Sentinel
 主要解决限流限速，流量控制的问题
+## Sentinel基本概念
+### 资源
+资源是Sentinel的关键概念。它可以是Java应用程序中的任何内容，例如，由应用程序提供的服务，或由应用程序调用的其他应用提供的服务，甚至可以是一段代码。在接下来的文档中，我们都会用资源来描述代码块
+
+只要通过Sentinel API定义的代码，就是资源，能够被Sentinel保护起来。大部分情况下，可以使用方法签名，URL，甚至服务名作为资源名来标识资源
+
+资源在Java中的资源一般是接口方法。通常就是一个URL，比如：/hello/get
+### 规则
+围绕资源的实时状态设计的规则，可以包括流量控制规则，熔断降级规则以及系统保护规则。所有规则可以动态实时调整
+
+## Sentinel的功能和设计理念
+### 流量控制
+
+### 熔断降级
+当调用链路中某个资源出现不稳定，例如，表现为timeout，异常比例升高的时候，则对这个资源的调用进行限制，并让请求快速失败，避免影响到其他的资源而导致产生雪崩的效果
+
+当资源被降级后，在接下来的降级时间窗口内，对该资源的调用都自动熔断(默认行为是抛出DegradeException)。当访问系统失败超过一定次数后，对该接口进行熔断的操作
+
+### 系统负载
+
+### Sentinel插槽
+在Sentinel里面，所有的资源都对应一个资源名称以及一个Entry。Entry可以通过对主流框架的适配自动创建，也可以通过注解的方式或调用API显示创建；每一个Entry创建的时候，同时也会创建一系列功能插槽(slot chain)。这些插槽有不同功能
+- `NodeSelectorSlot`负责收集资源的路径，并将这些资源的调用路径，以树状结构存储起来，用于根据调用路径来限流降级
+- `ClusterBuilderslot`则用于存储资源的统计信息以及调用者信息，例如该资源的RT，QRS，thread count等，这些信息将用于作为多维度限流，降级的依据
+- `StatisticSlot`用于记录，统计不同纬度的runtime指标监控信息，Sentinel底层采用高性能的滑动窗口数据结构LeapArray来统计实时的秒级指标数据，可以很好地支撑写多于读的高并发场景
+- `Flowslot`则用于根据预设的限流规则以及前面的slot统计的状态，来进行流量控制
+- `AuthoritySlot`则根据配置的黑白名单和调用来源信息，来做黑白名单控制
+- `DegradeSlot`则通过统计信息以及预设的规则，来做熔断降级
+- `SystemSlot`通过系统的状态，例如load1等，来控制总的入口流量
+
+## Sentinel架构
+
+Sentinel的构成可以分为两部分：
+- 核心库(Java客户端)
+   - 开发人员通过Java调用，不依赖任何框架/库，能够运行于Java8及以上的版本的运行时环境，同时对Dubbo/Spring Cloud等框架也有较好的支持
+
+- 控制台(Dashboard)
+   - 可以由运维部署，Dashboard主要负责管理推送规则，监控，管理机器信息等
+
+### 控制台
+Sentinel提供一个轻量级的开源控制台，他提供发现和健康情况管理，监控，规则管理和推送规则
+
+### Sentinel二进制部署
+```shell
+...
+# 安装java8
+...
+install_sentinel() {
+   if [ -f ${SENTINEL_FILE} ] ;then
+         mkdir -p ${INSTALL_DIR}/bin/
+         cp ${SENTINEL_FILE} ${INSTALL_DIR}
+   else
+      wget -p ${INSTALL_DIR} --no-check-certificate ${SENTINEL_URL} || { color "下载失败" 1； exit 1；}
+   fi
+   cat > ${INSTALL_DIR}/bin/startup.sh << EOF
+#!/bin/bash
+#
+nohub java -Dserver.port=8080 -Dcsp.sentinel.dashboard.server=localhost:8080 -Dproject.name=sentinel-dashboard -jar ${INSTALL_DIR}/sentinel-dashboard-${SENTINEL_VERSION}.jar &
+EOF
+   chmod +x ${INSTALL_DIR}/bin/startup.sh
+   cat > /lib/systemd/system/sentinel.service << EOF
+[Unit]
+Description=sentinel.service
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=${INSTALL_DIR}/bin/startup.sh
+
+[Install]
+WantedBy=multi=user.target
+EOF
+    systemctl daemon-reload
+    systemctl enable --now sentinel.service
+}
+```
 
 
-
+### java程序使用Sentinel做控制的方法
+#### 
 
 # Seata
 主要解决分布式事务的问题
+

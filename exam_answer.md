@@ -120,3 +120,6 @@ acks=all(或-1): 生产者会等待所有ISRI(同步副本)确认消息写入后
 ```shell
 kafka-consumer-groups.sh --bootstrap-server localhost:9092 --describe --group <consumer-group>
 ```
+
+
+### Kafka如何清理空间
