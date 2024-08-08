@@ -183,6 +183,12 @@ ansible <host-pattern> [-m module_name] [-a args]
 -v|vv|...(5)v               # 显示详细执行过程
 ```
 
+### ansible主配置文件
+```shell
+[defaults]
+#
+```
+
 ### Ansible命令基础用法
 
 查看主机
