@@ -1,0 +1,365 @@
+<mxfile host="Electron" modified="2024-08-29T15:03:21.120Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.2.5 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="46MdyfbrKU7WZWNikhiv" version="24.2.5" type="device">
+  <diagram name="第 1 页" id="OuLoPQJ_hE59tjU0GgEx">
+    <mxGraphModel dx="2012" dy="684" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-109" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;underlay（底层网络）&amp;nbsp;&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;路由模型&amp;nbsp;&lt;/font&gt;&lt;/b&gt;&lt;b style=&quot;background-color: initial;&quot;&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;flannel&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" parent="1" vertex="1">
+          <mxGeometry x="-563" y="70" width="152.5" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-110" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="-590" y="170" width="1028.5" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-62" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" parent="z-7p0K7IGmIagzuKeZHp-110" source="z-7p0K7IGmIagzuKeZHp-1" target="z-7p0K7IGmIagzuKeZHp-2" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="247.5" y="60" width="230" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-2" value="&amp;nbsp;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="718.5" y="53" width="220" height="270" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-3" value="Pod1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="277.5" y="90" width="70" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-4" value="Pod2" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="753.5" y="83" width="70" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-82" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="z-7p0K7IGmIagzuKeZHp-110" source="z-7p0K7IGmIagzuKeZHp-5" target="z-7p0K7IGmIagzuKeZHp-15" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-5" value="veth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="292.5" y="145" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-6" value="veth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="768.5" y="138" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-8" value="虚拟网络接口" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="948.5" y="118" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-87" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="z-7p0K7IGmIagzuKeZHp-110" source="z-7p0K7IGmIagzuKeZHp-12" target="z-7p0K7IGmIagzuKeZHp-6" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-12" value="eth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="818.5" y="313" width="30" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-13" value="节点网络接口" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="938.5" y="308" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-15" value="eth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="347.5" y="308" width="30" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-16" value="1. Pod1与Pod2不在同一子网，因此从pod1到pod2的通信需要路由，因此pod1一定的指向一个网关&lt;div&gt;该网关一定是pod所在节点的某一个接口（即虚拟网桥充当接口的地址）&amp;nbsp;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="287.5" width="580" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-17" value="" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="317.5" y="205" width="50" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-19" value="&lt;font style=&quot;font-size: 9px;&quot;&gt;虚拟网桥&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="312.5" y="200" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-46" value="curl" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="282.5" y="60" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-47" value="Nginx" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="753.5" y="53" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-49" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: n1-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:n2-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="577.5" y="205" width="70" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-56" value="" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="782.5" y="200" width="50" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-57" value="&lt;font style=&quot;font-size: 9px;&quot;&gt;虚拟网桥&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="777.5" y="195" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-76" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: n2-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:虚拟网桥-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="738.5" y="240" width="70" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-83" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: p1-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:虚拟网桥-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="357.5" y="120" width="80" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-88" value="&lt;font style=&quot;font-size: 9px;&quot; color=&quot;#ff3333&quot;&gt;问题：如何获取pod2所在节点的ip地址&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="481.5" y="250" width="220" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-89" value="&lt;font color=&quot;#008f00&quot; style=&quot;font-size: 9px;&quot;&gt;答：需要节点1上有一个路由表&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="481.5" y="270" width="220" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-91" value="总结：pod间的相互通信需要每个节点上有一个路由表&lt;div&gt;该路由表记录了哪个节点被分了哪个子网&lt;/div&gt;&lt;div&gt;节点级的接口的ip地址是什么&lt;/div&gt;&lt;div&gt;该信息通常存储在api Server的ectd中&lt;/div&gt;&lt;div&gt;因此每个节点上有一个进程，负责监视对应的分配结果的变动，&lt;/div&gt;&lt;div&gt;一旦检测到变动，就将其变成本地内核中的iptables规则&lt;/div&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;size=15;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="57" y="460" width="360" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-92" value="重置目标mac地址&lt;div&gt;设置为物理接口的mac地址&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="372.5" y="205" width="80" height="17.5" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-93" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: p1-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:n1-eth0-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="262.5" y="250" width="80" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-94" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: 虚拟网桥-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:Pod2-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="837.5" y="148" width="70" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-95" value="&lt;font style=&quot;font-size: 8px;&quot;&gt;进程&lt;/font&gt;" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="257.5" y="178.75" width="45" height="41.25" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-107" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="z-7p0K7IGmIagzuKeZHp-110" source="z-7p0K7IGmIagzuKeZHp-96" target="z-7p0K7IGmIagzuKeZHp-95" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="127.5" y="420" />
+              <mxPoint x="127.5" y="199" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-96" value="API Server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="437.5" y="400" width="390" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-98" value="etcd" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="867.5" y="390" width="60" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-99" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=0;entryDy=30;entryPerimeter=0;" parent="z-7p0K7IGmIagzuKeZHp-110" source="z-7p0K7IGmIagzuKeZHp-96" target="z-7p0K7IGmIagzuKeZHp-98" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-103" value="&lt;div style=&quot;font-size: 11px;&quot;&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;监视对应的分配结果的变动，&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 11px;&quot;&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;一旦检测到变动，就将其变成本地内核中的iptables规则&lt;/font&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry y="380" width="560" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-106" value="&lt;font style=&quot;font-weight: normal;&quot; size=&quot;1&quot; color=&quot;#ff3333&quot;&gt;node2ip可查询路由表实现&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-weight: normal; color: rgb(255, 51, 51); font-size: x-small; background-color: initial;&quot;&gt;但是如果节点间有路由，该路由不会存储在路由表，也就无法通信&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="z-7p0K7IGmIagzuKeZHp-110" vertex="1">
+          <mxGeometry x="456.5" y="360" width="326" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-111" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;overlay（叠加网络）&amp;nbsp;&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;隧道模型&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" parent="1" vertex="1">
+          <mxGeometry x="-573" y="1620" width="152.5" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-112" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;underlay（底层网络）&amp;nbsp;&lt;/font&gt;&lt;/b&gt;&lt;div&gt;&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;路由模型2&amp;nbsp;&lt;/font&gt;&lt;/b&gt;&lt;b style=&quot;background-color: initial;&quot;&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;Calico&lt;/font&gt;&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;" parent="1" vertex="1">
+          <mxGeometry x="-563" y="860" width="152.5" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-150" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="-523" y="960" width="1028.5" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-151" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" parent="z-7p0K7IGmIagzuKeZHp-150" source="z-7p0K7IGmIagzuKeZHp-152" target="z-7p0K7IGmIagzuKeZHp-153" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-152" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="247.5" y="60" width="230" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-153" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="718.5" y="53" width="220" height="270" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-154" value="Pod1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="277.5" y="90" width="70" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-155" value="Pod2" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="753.5" y="83" width="70" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-156" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="z-7p0K7IGmIagzuKeZHp-150" source="z-7p0K7IGmIagzuKeZHp-157" target="z-7p0K7IGmIagzuKeZHp-163" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-157" value="veth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="292.5" y="145" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-158" value="veth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="768.5" y="138" width="40" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-159" value="虚拟网络接口" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="948.5" y="118" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-160" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="z-7p0K7IGmIagzuKeZHp-150" source="z-7p0K7IGmIagzuKeZHp-161" target="z-7p0K7IGmIagzuKeZHp-158" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-161" value="eth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="818.5" y="313" width="30" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-162" value="节点网络接口" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="938.5" y="308" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-163" value="eth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="347.5" y="308" width="30" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-164" value="1. Pod1与Pod2不在同一子网，因此从pod1到pod2的通信需要路由，因此pod1一定的指向一个网关&lt;div&gt;该网关一定是pod所在节点的某一个接口（即虚拟网桥充当接口的地址）&amp;nbsp;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="287.5" width="580" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-165" value="" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="317.5" y="205" width="50" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-166" value="&lt;font style=&quot;font-size: 9px;&quot;&gt;虚拟网桥&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="312.5" y="200" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-167" value="curl" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="282.5" y="60" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-168" value="Nginx" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="753.5" y="53" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-169" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: n1-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:n2-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="577.5" y="205" width="70" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-170" value="" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="782.5" y="200" width="50" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-171" value="&lt;font style=&quot;font-size: 9px;&quot;&gt;虚拟网桥&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="777.5" y="195" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-172" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: n2-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:虚拟网桥-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="738.5" y="240" width="70" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-173" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: p1-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:虚拟网桥-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="357.5" y="120" width="80" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-174" value="&lt;font style=&quot;font-size: 9px;&quot; color=&quot;#ff3333&quot;&gt;问题：如何获取pod2所在节点的ip地址&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="481.5" y="250" width="220" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-175" value="&lt;font color=&quot;#008f00&quot; style=&quot;font-size: 9px;&quot;&gt;答：需要节点1上有一个路由表&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="481.5" y="270" width="220" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-177" value="重置目标mac地址&lt;div&gt;设置为物理接口的mac地址&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="372.5" y="205" width="80" height="17.5" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-178" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: p1-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:n1-eth0-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="262.5" y="250" width="80" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-179" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源mac: 虚拟网桥-mac;&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;&amp;nbsp;目标mac:Pod2-mac&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="837.5" y="148" width="70" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-180" value="&lt;font style=&quot;font-size: 8px;&quot;&gt;进程&lt;/font&gt;" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="257.5" y="178.75" width="45" height="41.25" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-181" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="z-7p0K7IGmIagzuKeZHp-150" source="z-7p0K7IGmIagzuKeZHp-182" target="z-7p0K7IGmIagzuKeZHp-180" edge="1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="127.5" y="420" />
+              <mxPoint x="127.5" y="199" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-182" value="API Server" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="437.5" y="400" width="390" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-183" value="etcd" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="867.5" y="390" width="60" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-184" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0;entryDx=0;entryDy=30;entryPerimeter=0;" parent="z-7p0K7IGmIagzuKeZHp-150" source="z-7p0K7IGmIagzuKeZHp-182" target="z-7p0K7IGmIagzuKeZHp-183" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-185" value="&lt;div style=&quot;font-size: 11px;&quot;&gt;&lt;font color=&quot;#cc0000&quot;&gt;该进程不负责监听API Server从而实现路由表&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 11px;&quot;&gt;&lt;font color=&quot;#cc0000&quot;&gt;而是像路由器一样，使用BGP协议将自己的子网信息传递给其他节点，并从其他节点收取其他节点的子网信息，从而收敛生成路由表&lt;/font&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="-50" y="148.75" width="257.5" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-186" value="&lt;font style=&quot;font-weight: normal;&quot; size=&quot;1&quot; color=&quot;#ff3333&quot;&gt;node2ip可查询路由表实现&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-weight: normal; color: rgb(255, 51, 51); font-size: x-small; background-color: initial;&quot;&gt;但是如果节点间有路由，该路由不会存储在路由表，也就无法通信&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="z-7p0K7IGmIagzuKeZHp-150" vertex="1">
+          <mxGeometry x="456.5" y="360" width="326" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-224" value="&lt;b&gt;&lt;font style=&quot;font-size: 16px;&quot;&gt;核心理念：将Pod1与pod2之前的通信转换成Node1与Node2之间的通信&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="-523" y="1635" width="830" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-225" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="-423" y="1750" width="230" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-243" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="z-7p0K7IGmIagzuKeZHp-226" target="z-7p0K7IGmIagzuKeZHp-240" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-226" value="Pod1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+          <mxGeometry x="-393" y="1780" width="70" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-227" value="eth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="-323" y="2000" width="30" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-228" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;fontColor=#333333;strokeColor=#666666;" parent="1" vertex="1">
+          <mxGeometry x="157" y="1750" width="230" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-229" value="Pod2" style="ellipse;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+          <mxGeometry x="188.5" y="1770" width="70" height="65" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-245" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="z-7p0K7IGmIagzuKeZHp-230" target="z-7p0K7IGmIagzuKeZHp-241" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-230" value="eth0" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+          <mxGeometry x="278.5" y="2000" width="30" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-232" value="路由" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="-176" y="2090" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-236" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" parent="1" source="z-7p0K7IGmIagzuKeZHp-233" target="z-7p0K7IGmIagzuKeZHp-230" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-233" value="路由" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="57" y="2090" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-235" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="z-7p0K7IGmIagzuKeZHp-232" target="z-7p0K7IGmIagzuKeZHp-233" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-237" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="z-7p0K7IGmIagzuKeZHp-227" target="z-7p0K7IGmIagzuKeZHp-232" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-239" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="-301.5" y="1810" width="80" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-244" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="z-7p0K7IGmIagzuKeZHp-240" target="z-7p0K7IGmIagzuKeZHp-227" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-247" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;endArrow=classicThin;endFill=1;startArrow=classicThin;startFill=1;" parent="1" source="z-7p0K7IGmIagzuKeZHp-240" target="z-7p0K7IGmIagzuKeZHp-241" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-240" value="&lt;font style=&quot;font-size: 8px;&quot;&gt;隧道出入口&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-size: 8px;&quot;&gt;(特殊设备)&lt;/span&gt;&lt;/div&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+          <mxGeometry x="-343" y="1900" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-241" value="&lt;font style=&quot;font-size: 8px;&quot;&gt;隧道出入口&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 8px;&quot;&gt;特殊设备&lt;/font&gt;&lt;/div&gt;" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="1" vertex="1">
+          <mxGeometry x="258.5" y="1900" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-242" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="z-7p0K7IGmIagzuKeZHp-240" target="z-7p0K7IGmIagzuKeZHp-240" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-246" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.57;entryY=1.001;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="z-7p0K7IGmIagzuKeZHp-241" target="z-7p0K7IGmIagzuKeZHp-229" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-248" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;隧道之间会传递子网和节点之间对应的信息从而生成路由表&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 10px;&quot;&gt;（即哪个节点对应哪个子网）&lt;/font&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="-163" y="1880" width="280" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-254" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="-406.5" y="1943" width="90" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-249" value="&lt;font style=&quot;font-size: 4px;&quot;&gt;pod1-&amp;gt;pod2数据报文&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-254" vertex="1">
+          <mxGeometry x="47.64705882352941" width="42.35294117647059" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-250" value="&lt;font style=&quot;font-size: 4px;&quot;&gt;udp首部&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-254" vertex="1">
+          <mxGeometry x="26.470588235294116" width="21.176470588235293" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-252" value="&lt;font style=&quot;font-size: 4px;&quot;&gt;ip&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-254" vertex="1">
+          <mxGeometry x="14.11764705882353" width="12.352941176470589" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-253" value="&lt;font style=&quot;font-size: 4px;&quot;&gt;帧&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="z-7p0K7IGmIagzuKeZHp-254" vertex="1">
+          <mxGeometry width="14.11764705882353" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-255" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;通过VXLAN协议封装&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="-423" y="1920" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-259" value="&lt;p style=&quot;line-height: 80%;&quot;&gt;&lt;span style=&quot;font-size: 6px; text-align: left;&quot;&gt;因为外部封装了报文，因此有效载荷降低了，内部能封装的报文实体变小了&lt;/span&gt;&lt;/p&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+          <mxGeometry x="-556.75" y="1935.5" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-260" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;endArrow=none;endFill=0;" parent="1" source="z-7p0K7IGmIagzuKeZHp-253" target="z-7p0K7IGmIagzuKeZHp-259" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-266" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;通过IPIP协议封装&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" parent="1" vertex="1">
+          <mxGeometry x="-421.5" y="1958" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-262" value="&lt;font style=&quot;font-size: 4px;&quot;&gt;pod1-&amp;gt;pod2数据报文&lt;/font&gt;&lt;div style=&quot;line-height: 70%;&quot;&gt;&lt;font style=&quot;font-size: 4px;&quot;&gt;内部只到ip层&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="-370.32294117647064" y="1980" width="42.35294117647059" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-264" value="&lt;font style=&quot;font-size: 4px;&quot;&gt;ip&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="-382.67235294117654" y="1980" width="12.352941176470589" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-269" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;endArrow=none;endFill=0;dashed=1;" parent="1" source="z-7p0K7IGmIagzuKeZHp-267" target="z-7p0K7IGmIagzuKeZHp-268" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-267" value="&lt;font style=&quot;font-size: 4px;&quot;&gt;帧&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="-395.02235294117656" y="1980" width="12.352941176470589" height="15" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-268" value="&lt;p style=&quot;line-height: 80%;&quot;&gt;&lt;span style=&quot;font-size: 6px; text-align: left;&quot;&gt;一定程度上减少了有效载荷的降低&lt;/span&gt;&lt;/p&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+          <mxGeometry x="-556.75" y="1972.5" width="120" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-270" value="&lt;font style=&quot;font-size: 6px;&quot;&gt;源ip: p1-ip;&amp;nbsp;&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标ip: p2-ip&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;源端口：随机端口&lt;/font&gt;&lt;/div&gt;&lt;div style=&quot;font-size: 6px;&quot;&gt;&lt;font style=&quot;font-size: 6px;&quot;&gt;目标端口：80&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=6;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+          <mxGeometry x="278.5" y="1820" width="80" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-271" value="&lt;font style=&quot;font-size: 10px;&quot;&gt;解封装&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="1" vertex="1">
+          <mxGeometry x="319" y="1890" width="60" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="z-7p0K7IGmIagzuKeZHp-273" value="&lt;font style=&quot;font-size: 8px;&quot;&gt;补充：其他的隧道协议：&lt;/font&gt;&lt;div style=&quot;font-size: 8px;&quot;&gt;&lt;font style=&quot;font-size: 8px;&quot;&gt;GENEVE, GRE(使用不多)&lt;/font&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+          <mxGeometry x="-473" y="2020" width="120" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

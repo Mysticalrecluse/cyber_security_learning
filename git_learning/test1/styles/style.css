@@ -1,0 +1,61 @@
+body{
+  background-color: orange;
+  font-family: 'Monaco', sans-serif;
+  color: white;
+}
+
+body a{
+  color: white;
+}
+
+header{
+  text-align: center;
+  margin-top: 50px;
+}
+
+h3{
+  color: red;
+}
+
+header-img{
+  width: 400px;
+}
+
+header-words{
+  line-height: 10px;
+  font-size: 50px;
+  font-family: 'Monaco', sans-serif;
+  margin-bottom: 75px;
+}
+
+section{
+  padding: 0 50px 0px 50px;
+  text-align: left;
+}
+
+div.accordion {
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+div.accordion.active, div.accordion:hover {
+  background-color: white;
+  color: #1D2031;
+}
+
+div.panel {
+  padding: 0 18px 0 0;
+  display: none;
+}
+
+footer{
+  right: 0;
+  bottom: 0;
+  position: relative;
+  padding: 10px 1rem 10px 0;
+  margin-top: 50px;
+  font-size: 0.7em;
+  text-align: right;
+}
+

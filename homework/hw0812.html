@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0812作业</title>
+    <style>
+        button {
+            background-color: #3064bb;
+            width: 500px;
+            height: 80px;
+            color: #fff;
+            font-size: 18px;
+            text-align: center;
+            line-height: 80px;       
+        }
+        button:hover {
+            background-color: #608dd9;
+        }
+    </style>
+</head>
+<body>
+    <button onclick="Click_me()">
+        点我点我,我是行内式javascript
+    </button>  
+    <script>
+        function Click_me() {
+            alert("我是内嵌式javascript");  
+            let script = document.createElement('script');
+            script.src = 'hw0812.js';
+            document.body.appendChild(script);       
+        }       
+    </script>
+
+    
+</body>
+</html>

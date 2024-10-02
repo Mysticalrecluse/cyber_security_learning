@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        * {
+            padding: 0px;
+            margin: 0px;
+            /*可以直接统一內减模式*/
+            box-sizing: border-box;
+        }
+
+        li {
+            list-style: none;
+        }
+
+
+        h1 {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 30px;
+            font-weight: 700;
+            color: rgb(0, 0, 0);
+        }
+
+        form {
+            width: 600px;
+            height: 50px;
+            margin: 20px auto 0px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        form input {
+            width: 100px;
+            height: 30px;
+            border: 1px solid rgb(156, 156, 156);
+            border-radius: 5px;
+            outline: none;
+            padding-left: 5px;
+        }
+
+        form select {
+            width: 100px;
+            height: 30px;
+            border: 1px solid rgb(156, 156, 156);
+            border-radius: 5px;
+            outline: none;
+            padding-left: 5px;
+        }
+
+        form button {
+            width: 50px;
+            height: 30px;
+            border: 1px solid rgb(156, 156, 156);
+            border-radius: 5px;
+            outline: none;
+            background-color: rgb(43, 153, 255);
+            color: rgb(255, 255, 255);
+            cursor: pointer;
+        }
+
+        form button:hover {
+            background-color: rgb(0, 64, 255);
+        }
+
+        .title {
+            width: 800px;
+            height: 35px;
+            margin: 5px auto 5px auto;
+            padding: 0px 10px;
+            text-align: right;
+            line-height: 35px;
+            font-size: 16px;
+            font-weight: 700;
+            background-color: #ececec;
+            color: rgb(35, 35, 35);
+        }
+
+        .title span {
+            color: rgb(255, 0, 0);
+        }
+
+        table {
+            width: 800px;
+            margin: 0px auto;
+            border-collapse: collapse;
+            border: 2px solid rgb(197, 227, 255);
+            
+        }
+
+        thead {
+            background-color: rgb(43, 153, 255);
+            color: rgb(255, 255, 255);           
+        }
+
+        thead th {
+            height: 30px;
+        }
+
+
+        tbody tr {
+            text-align: center;
+            line-height: 30px;   
+        }
+
+        tbody tr td {
+            border: 2px solid rgb(197, 227, 255);
+        }
+
+        tbody tr td a {
+            display: block;
+            width: 50px;
+            height: 25px;
+            margin: 0px auto;
+            line-height: 25px;
+            text-align: center;
+            border-radius: 5px;
+            font-weight: 700;
+            background-color: #ff9900;
+            color: rgb(255, 255, 255);
+            text-decoration: none;
+        }
+
+        tbody tr td a:hover {
+            background-color: #ff6600;
+        }
+
+
+
+    </style>
+</head>
+<body>
+    <h1>学生就业统计表</h1>
+    <form class="info" autocomplete="off">
+        <input type="text" class="uname" name="uname" placeholder="姓名">
+        <input type="text" class="age" name="age" placeholder="年龄">
+        <input type="text" class="salary" name="salary" placeholder="薪资">
+        <select name="gender" class="gender">
+            <option value="男">男</option>
+            <option value="女">女</option>
+        </select>        
+        <select name="city" class="city"">
+            <optgroup label="山东省">
+                <option value="潍坊">潍坊</option>
+                <option value="青岛">青岛</option>
+                </optgroup>
+                <optgroup label="山西省">
+                <option value="太原">太原</option>
+                <option value="榆次">榆次</option>
+            </optgroup>
+        </select>
+        <button class="add">添加</button>
+    </form>
+    <div class="title">共有数据<span>0</span>条</div>
+    <table>
+        <thead>
+            <th>ID</th>
+            <th>姓名</th>
+            <th>年龄</th>
+            <th>性别</th>
+            <th>薪资</th>
+            <th>就业城市</th>
+            <th>录入时间</th>
+            <th>操作</th>
+        </thead>
+        <tbody>
+            
+        </tbody>
+    </table>
+    <script>
+        // const date = new Date()
+        // let btn = document.querySelector('.add')
+        
+        // let tbody = document.querySelector('tbody')
+        // let uname = document.querySelector('.uname')
+        // let age = document.querySelector('.age')
+        // let salary = document.querySelector('.salary')
+        // let gender = document.querySelector(".gender")
+        // let city = document.querySelector(".city")
+        // let title = document.querySelector('.title span')
+        // let id = 1
+        // btn.addEventListener('click', function() {
+        //     // 将数据存入本地存储
+        //     const Idata = {
+        //         id: ++id,
+        //         uname: uname.value,
+        //         age: age.value,
+        //         salary: salary.value,
+        //         gender: gender.value,
+        //         city: city.value,
+        //         date: date.toLocaleString()
+        //     }
+        //     localStorage.setItem(`${Idata.id}`, JSON.stringify(Idata)||'[]')
+        //     // 将数据渲染到页面
+        //     let tr = document.createElement('tr')
+        //     Odata = JSON.parse(localStorage.getItem(`${Idata.id}`))
+        //     tr.innerHTML = 
+        //     `
+        //     <td>${Odata.id}</td>
+        //     <td>${Odata.uname}</td>
+        //     <td>${Odata.age}</td>
+        //     <td>${Odata.salary}</td>
+        //     <td>${Odata.gender}</td>
+        //     <td>${Odata.city}</td>
+        //     <td>${Odata.date}</td>
+        //     <td>
+        //         <a href="#">删除</a>
+        //     </td>
+        //     `
+
+        //     tbody.appendChild(tr) 
+        //     // 将数据条数渲染到页面
+        //     title.innerHTML = localStorage.length + 1
+
+        // })
+
+        const initData = [
+            {
+                stuId: 1,
+                uname: '迪丽热巴',
+                age: 22,
+                gender: '女',
+                salary: 12000,
+                city: '北京',
+                date: '2099/9/9 08:08:08'
+            }
+        ]
+
+        // localStorage.setItem('data', JSON.stringify(initData))
+        const arr = JSON.parse(localStorage.getItem('data')) || []
+        // 利用map()和join()方法将数据渲染到页面
+        const tbody = document.querySelector('tbody')
+        const title = document.querySelector('.title span')
+        function render() {
+            const trArr = arr.map(function(ele,index) {
+                return`
+                <tr>
+                    <td>${ele.stuId}</td>
+                    <td>${ele.uname}</td>
+                    <td>${ele.age}</td>
+                    <td>${ele.gender}</td>
+                    <td>${ele.salary}</td>
+                    <td>${ele.city}</td>
+                    <td>${ele.date}</td>
+                    <td>
+                        <a href="#" data-id="${index}">删除</a>
+                    </td>
+                </tr>
+                `
+            })
+            tbody.innerHTML = trArr.join('')
+            title.innerHTML = arr.length
+        }
+     
+        render()
+        // 添加数据
+        const info = document.querySelector('.info')
+        const uname = document.querySelector('.uname')
+        const age = document.querySelector('.age')
+        const salary = document.querySelector('.salary')
+        const gender = document.querySelector(".gender")
+        const city = document.querySelector(".city")
+
+        info.addEventListener('submit', function(e) {
+            e.preventDefault()
+            // 非空判断
+            if (!uname.value || !age.value || !salary.value) {
+                alert('请填写完整信息')
+                return
+            }
+            // 给arr数组追加数据
+            arr.push({
+                stuId: arr.length ? arr[arr.length - 1].stuId + 1 : 1,
+                uname: uname.value,
+                age: age.value,
+                gender: gender.value,
+                salary: salary.value,
+                city: city.value,
+                date: new Date().toLocaleString()
+            })
+
+            // 渲染页面并重置表单（reset()）
+            render()
+            info.reset() // 重置表单
+
+            // 将数据存入本地存储
+            localStorage.setItem('data', JSON.stringify(arr))
+
+        })
+
+        // 删除数据
+        tbody.addEventListener('click', function(e) {
+            if (e.target.tagName === 'A') {
+                // 确认是否删除
+                if (confirm('确定要删除吗？')) {
+                    // 获取当前点击的a标签的父元素的父元素的第一个子元素的内容
+                    const id = e.target.dataset.id
+                    // 删除数组中的数据
+                    arr.splice(id, 1)
+                    // 重新渲染页面
+                    render()
+                    // 将数据存入本地存储
+                    localStorage.setItem('data', JSON.stringify(arr))
+                }
+               
+               
+            }
+
+        })
+        
+
+
+    </script>
+</body>
+</html>

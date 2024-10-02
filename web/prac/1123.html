@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        *{
+            margin: 0;
+            padding: 0;
+        }
+        ul li{
+            list-style: none;
+            float: left;
+            width: 100px;
+            height: 30px;
+            line-height: 30px;
+            text-align: center;
+        }
+
+    </style>
+</head>
+<body>
+    <ul>
+        <li>name</li>
+        <li>age</li>
+        <li>gender</li>
+        <li>hobby</li>
+        <li>birthday</li>
+    </ul>
+    <script>
+        const user = [
+            {name: "李四", js: 89},
+            {name: "王五", js: 99},
+            {name: "张三", js: 60}
+        ];
+        let newArray = user.filter(function(item){
+            return item.js > 80;
+        });
+        newArray.forEach(function(item){
+            console.log(item.name, item.js);
+        });
+
+    </script>
+</body>
+</html>

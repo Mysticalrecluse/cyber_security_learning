@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+      .box {
+        margin-top: 50px;
+        width: 100px;
+        height: 100px;
+        background-color: red;
+        background-image: linear-gradient(
+          to bottom,
+          rgb(219, 219, 28),
+          rgb(230, 58, 32)
+
+        );
+        transition: all 1s;
+        line-height: 100px;
+        text-align: center;
+        font-weight: bold;
+        color:white;
+      }
+      .box:hover {
+        width: 200px;
+        height: 200px;
+        line-height: 200px;
+        text-align: center;
+        font-weight: bold;
+        color:black;
+        transform: translateY(-200px) rotate(360deg) scale(2) ;
+      }
+      .date {
+        width: 400px;
+        height: 50px;
+        border: 2px solid black;
+        text-align: center;
+        line-height: 50px;
+      }
+      .box2 {
+        position: relative;
+        margin-top: 50px;
+        width: 200px;
+        height: 200px;
+        background-color: rgb(190, 69, 69);
+      }
+      .close {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 20px;
+        height: 20px;
+        background-color: rgb(59, 59, 59);
+        color:white;
+        text-align: center;
+        line-height: 20px;
+      }
+      .close:hover {
+        cursor: pointer;
+        background-color: rgb(0, 136, 255);
+      }
+      button {
+        margin-top: 20px;
+        border: none;
+        width: 100px;
+        height: 50px;
+        background-image: radial-gradient(
+          circle,
+          rgb(255, 255, 255),
+          rgb(22, 108, 206)
+        );
+      }
+      button:hover {
+        cursor: pointer;
+        background-image: radial-gradient(
+          circle,
+          rgb(255, 255, 255),
+          rgb(255, 0, 98)
+        );
+        color:white;
+      }
+    
+      .cube {
+        position: relative;
+        width: 200px;
+        height: 200px;
+        margin: 100px auto;
+        /* background-color: pink; */
+        transition: all 2s;
+        transform-style:preserve-3d;
+        /* transform: rotateY(88deg); */
+
+      }
+
+      .cube div {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 200px;
+        height: 200px;
+      }
+
+      .front {
+        background-color: #e6c50e;
+        transform: translateZ(100px);
+      }
+
+      .back {
+        background-color: #0ee661;
+        transform: translateZ(-100px);
+      }
+
+      .left {
+        background-color: #0e61e6;
+        transform: rotateY(-90deg) translateZ(100px);
+      }
+
+      .right {
+        background-color: #e60e0e;
+        transform: rotateY(90deg) translateZ(100px);
+      }
+
+      .cube:hover {
+        transform: rotateY(360deg);
+      }
+    </style>
+</head>
+<body>
+    <div class="date"></div>
+    <div class="box2">
+      <div class="close">x</div>
+    </div>
+    <button>出现</button>
+    <div class="box">中 国</div>
+    <div class="cube">
+      <div class="front"></div>
+      <div class="back"></div>
+      <div class="left"></div>
+      <div class="right"></div>
+    </div>
+    <script>
+      // 查看屏幕宽度
+      // window.addEventListener('resize',function(){
+      //   const screen_width = document.documentElement.clientWidth
+      //   console.log(screen_width)
+      // })
+      
+      // 文字大小随屏幕变化
+      // function setFontsize() {
+      //   const screen_width = document.documentElement.clientWidth
+      //   const html = document.querySelector('html')
+      //   html.style.fontSize = screen_width / 10 + 'px'
+      // }
+
+      // setFontsize()
+      // window.addEventListener('resize', setFontsize)
+      // const box = document.querySelector('.box')
+      // console.log(box.getBoundingClientRect())
+
+      // 获取当前时间
+      // const date = document.querySelector('.date')
+      // setInterval(function(){
+      //   date.innerHTML = new Date().toLocaleString()
+
+      // },1000)
+      const fuTime = +new Date('2023-10-15 00:00:00')
+      const date = document.querySelector('.date')
+      setInterval(function(){
+        const nowTime = +new Date()
+        const time = fuTime - nowTime
+        const day = parseInt(time / 1000 / 60 / 60 / 24)
+        const hour = parseInt(time / 1000 / 60 / 60 % 24)
+        const minute = parseInt(time / 1000 / 60 % 60)
+        const second = parseInt(time / 1000 % 60)
+        date.innerHTML = `距离2023年10月15日还有${day}天${hour}小时${minute}分钟${second}秒`
+      },1000)
+
+      // 点击关闭按钮关闭盒子
+      const close = document.querySelector('.close')
+      close.addEventListener('click',function(){
+        close.parentNode.style.display = 'none'
+      })
+
+      // 点击按钮出现盒子
+      const btn = document.querySelector('button')
+      btn.addEventListener('click',function(){
+        const box2 = document.querySelector('.box2')
+        box2.style.display = 'block'
+      })
+      console.log(navigator.userAgent)
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<mxfile host="Electron" modified="2024-04-15T16:04:13.493Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.0.2 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="iQd1ojgzxl_NSx4L_f4N" version="23.0.2" type="device">
+  <diagram name="第 1 页" id="NMcdNb8Kv9cpoHteDPAA">
+    <mxGraphModel dx="1018" dy="686" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=0;endArrow=none;endFill=0;" edge="1" parent="1" source="4HPRAHxnt43u5Jw1w6IH-1" target="4HPRAHxnt43u5Jw1w6IH-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-6" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="4HPRAHxnt43u5Jw1w6IH-1" target="4HPRAHxnt43u5Jw1w6IH-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-1" value="综合加密和签名" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a20025;strokeColor=#6F0000;fontColor=#ffffff;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="220" y="50" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-2" value="Pb{ SK[hash(data)] +data }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="50" y="130" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-14" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="4HPRAHxnt43u5Jw1w6IH-4" target="4HPRAHxnt43u5Jw1w6IH-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-4" value="key{ SK[hash(data)] +data } + Pb(对称key)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="280" y="130" width="260" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-9" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="4HPRAHxnt43u5Jw1w6IH-7" target="4HPRAHxnt43u5Jw1w6IH-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-7" value="hash(data)保证数据完整性" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="320" y="190" width="180" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-11" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="4HPRAHxnt43u5Jw1w6IH-8" target="4HPRAHxnt43u5Jw1w6IH-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-8" value="SK[hash(data)] SK保证数据来源的可靠性" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="287" y="250" width="246" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-13" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="4HPRAHxnt43u5Jw1w6IH-10" target="4HPRAHxnt43u5Jw1w6IH-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-10" value="key{ SK[hash(data)] +data } 对称加密，，对称加密，快速搞笑" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="287" y="310" width="246" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="4HPRAHxnt43u5Jw1w6IH-12" value="key{ SK[hash(data)] +data }&amp;nbsp; + Pb(对称key)&lt;br&gt;Pb对方公钥保证数据保密性" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="287" y="370" width="246" height="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

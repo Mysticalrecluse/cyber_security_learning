@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+      .goods {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+      .goods li {
+        display: flex;
+        flex-direction: column;
+        list-style: none;
+        width: 100px;
+        height: 100px;
+        background-color: red;
+        margin: 10px;
+        padding-top: 5px;
+        font-weight: bold;
+        color:aliceblue;
+        font-size: 15px;
+        text-align: center;
+      }
+      button {
+        cursor: pointer;
+        width: 50px;
+        height: 30px;
+        background-color: #702626;
+        color:aliceblue
+        
+      }
+      .goods li div:nth-child(2) {
+        font-size: 25px;
+        color: rgb(187, 249, 0);
+      }
+      ul+div {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 20px;
+      }
+
+
+    </style>
+</head>
+<body>
+  <ul class="goods">
+    <li>
+      <div>一等奖</div>
+      <div class="name1">待定</div>
+    </li>
+    <li>
+      <div>二等奖</div>
+      <div class="name2">待定</div>
+    </li>
+    <li>
+      <div>三等奖</div>
+      <div class="name3">待定</div>
+    </li>
+  </ul>
+  <div>
+    <button id="start">开始</button>
+    <button id="stop">停止</button>
+  </div>
+  <script>
+    const goodsPersons = document.querySelectorAll('.goods li div:nth-child(2)')
+    const btnStop = document.querySelector('#stop')
+    const btnStart = document.querySelector('#start')
+    let n1 // 将你的定时器变量提升到外面，这样才能在其他地方清除定时器
+
+    btnStart.addEventListener('click', function() {
+      clearInterval(n1) // 每次点击开始按钮都先清除定时器，防止定时器叠加
+      n1 = setInterval(function() {        
+        let persons = ['赵云','吕布','黄忠','关羽','叶问','悟空','八戒','刘备']
+        for(let i = 0; i < goodsPersons.length; i++) {
+          // 这里的len是动态的，因为每次循环都会改变数组的长度
+          let len = persons.length
+          function random() {
+            return Math.floor(Math.random() * len)
+          }
+          j = random()
+          goodsPersons[i].innerHTML = persons[j]
+          persons.splice(j, 1)
+        }
+      }, 100)
+    })
+    btnStop.addEventListener('click', function() {
+      clearInterval(n1)
+    })
+  </script>
+  
+</body>
+</html>

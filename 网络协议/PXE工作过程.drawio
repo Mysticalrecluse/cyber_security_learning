@@ -1,0 +1,187 @@
+<mxfile host="Electron" modified="2024-08-20T17:56:45.374Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.0.2 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="vlGxNfrS7X4jkzknq4O9" version="23.0.2" type="device">
+  <diagram name="第 1 页" id="Rb0hoy2FS1DGy81axX5X">
+    <mxGraphModel dx="1878" dy="1266" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-4" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="140" y="160" width="20" height="770" as="geometry" />
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-1" value="PXE客户端" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="100" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-2" value="PXE Server&lt;br&gt;使用TFTP协议" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="354" y="100" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-3" value="DHCP&lt;br&gt;Server" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="620" y="100" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="400" y="290.00241379310347" as="targetPoint" />
+            <mxPoint x="159.9999999999999" y="290.3300000000002" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-13" value="给我启动文件PXELinux.0&lt;br&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-12">
+          <mxGeometry x="0.3157" relative="1" as="geometry">
+            <mxPoint x="-28" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-17" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="162" y="440" as="targetPoint" />
+            <mxPoint x="159.9999999999999" y="380.00448275862084" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="200" y="380" />
+              <mxPoint x="200" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-18" value="执行PXElinux.0，该文件指示PXE客户端，向TFTP服务器请求配置信息pxelinux.cfg" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-17">
+          <mxGeometry x="0.0943" y="-3" relative="1" as="geometry">
+            <mxPoint x="13" y="-6" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="404" y="330.00000000000045" as="sourcePoint" />
+            <mxPoint x="159.9999999999999" y="330.0000000000002" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-15" value="好，给你" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-14">
+          <mxGeometry x="-0.248" y="-2" relative="1" as="geometry">
+            <mxPoint x="-32" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-5" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="404" y="160" width="20" height="770" as="geometry" />
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="668" y="250" as="sourcePoint" />
+            <mxPoint x="157.9999999999999" y="250" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-11" value="给你一个IP地址，还有启动文件PXElinux.0的位置" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-10">
+          <mxGeometry x="-0.3297" y="1" relative="1" as="geometry">
+            <mxPoint x="-83" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-6" value="" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="670" y="160" width="20" height="760" as="geometry" />
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="160" y="210.00000000000023" as="sourcePoint" />
+            <mxPoint x="670" y="210.00000000000045" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-9" value="我来了，IP和操作系统啥都没有（请求一个IP地址）" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-7">
+          <mxGeometry x="0.1843" y="3" relative="1" as="geometry">
+            <mxPoint x="-48" y="3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="400" y="510.00241379310347" as="targetPoint" />
+            <mxPoint x="159.9999999999999" y="510.3300000000002" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-23" value="给个pxelinux.cfg配置文件&lt;br&gt;要根据此来启动系统" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-20">
+          <mxGeometry x="0.0918" y="-1" relative="1" as="geometry">
+            <mxPoint x="-10" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="404" y="560.0000000000005" as="sourcePoint" />
+            <mxPoint x="159.9999999999999" y="560.0000000000002" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-25" value="给你配置寄文件&lt;br&gt;里面有内核和initramfs地址" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-24">
+          <mxGeometry x="-0.248" y="-2" relative="1" as="geometry">
+            <mxPoint x="-32" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-26" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="162" y="660" as="targetPoint" />
+            <mxPoint x="159.9999999999999" y="600.0044827586208" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="200" y="600" />
+              <mxPoint x="200" y="660" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-27" value="读取配置文件" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-26">
+          <mxGeometry x="0.0943" y="-3" relative="1" as="geometry">
+            <mxPoint x="-7" y="-6" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="400" y="690.0024137931034" as="targetPoint" />
+            <mxPoint x="159.9999999999999" y="690.3300000000002" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-29" value="给我lInux内核" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-28">
+          <mxGeometry x="0.3157" relative="1" as="geometry">
+            <mxPoint x="-28" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="404" y="730.0000000000005" as="sourcePoint" />
+            <mxPoint x="159.9999999999999" y="730.0000000000002" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-31" value="好，给你" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-30">
+          <mxGeometry x="-0.248" y="-2" relative="1" as="geometry">
+            <mxPoint x="-32" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="400" y="780.0024137931034" as="targetPoint" />
+            <mxPoint x="159.9999999999999" y="780.3300000000002" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-33" value="给我initramfs" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-32">
+          <mxGeometry x="0.3157" relative="1" as="geometry">
+            <mxPoint x="-28" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="404" y="820.0000000000005" as="sourcePoint" />
+            <mxPoint x="159.9999999999999" y="820.0000000000002" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="380" y="820" />
+              <mxPoint x="380" y="820" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-35" value="好，给你" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-34">
+          <mxGeometry x="-0.248" y="-2" relative="1" as="geometry">
+            <mxPoint x="-32" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-36" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="162" y="910" as="targetPoint" />
+            <mxPoint x="159.9999999999999" y="850.0044827586208" as="sourcePoint" />
+            <Array as="points">
+              <mxPoint x="200" y="850" />
+              <mxPoint x="200" y="910" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="vlV--gGb_nmDDYyG4WEQ-37" value="启动Linux内核" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="vlV--gGb_nmDDYyG4WEQ-36">
+          <mxGeometry x="0.0943" y="-3" relative="1" as="geometry">
+            <mxPoint x="-7" y="-6" as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

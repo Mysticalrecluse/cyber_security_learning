@@ -1,0 +1,210 @@
+<mxfile host="Electron" modified="2024-03-28T09:01:10.207Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.0.2 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="2agWzGVkKiXbPvoJVoqy" version="23.0.2" type="device">
+  <diagram name="第 1 页" id="-NdZUMtPmvERGnjt8l_o">
+    <mxGraphModel dx="3267" dy="1407" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-1" value="应用层" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="238" y="170" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-2" value="层间接口（SAP[server access point] : Socket API）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="209.25" y="280" width="322.5" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-41" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-3" target="EleuDhAI7mdlDRZeNzF1-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-3" value="传输层&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;TCP/UDP&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="233" y="345" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-4" value="层间接口" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="238" y="435" width="265" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-7" value="SDU&lt;br&gt;(server data unit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="48" y="270" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-58" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0;exitDx=0;exitDy=0;entryX=1;entryY=1;entryDx=0;entryDy=0;curved=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-8" target="EleuDhAI7mdlDRZeNzF1-56">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-8" value="&lt;font style=&quot;font-size: 9px;&quot;&gt;ICI&lt;br&gt;携带socket表项等信息&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#008a00;fontColor=#ffffff;strokeColor=#005700;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-62" y="270" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-10" target="EleuDhAI7mdlDRZeNzF1-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-10" value="SDU&lt;br&gt;(server data unit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="48" y="180" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-17" value="解析ICI信息，取出需要的信息，组成本层的头部信息" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontColor=#990000;" vertex="1" parent="1">
+          <mxGeometry x="-182" y="320" width="290" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-18" value="网络层&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;IP/路由转发协议&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="233" y="485" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-19" value="层间接口" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="238" y="575" width="265" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-20" value="&lt;b style=&quot;font-size: 18px;&quot;&gt;数据链路层&lt;/b&gt;&lt;br&gt;&lt;b&gt;以太网协议，wlan无线通信协议&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="233" y="625" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-21" value="层间接口" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="238" y="715" width="265" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-73" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;strokeWidth=3;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-22" target="EleuDhAI7mdlDRZeNzF1-33">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="368" y="890" />
+              <mxPoint x="1041" y="890" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-22" value="物理层&lt;br&gt;TCP/UDP" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="233" y="755" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-25" value="应用层" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="910.5" y="170" width="260" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-26" value="层间接口（SAP[server access point] : Socket API）" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="891.75" y="280" width="297.5" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-42" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-27" target="EleuDhAI7mdlDRZeNzF1-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-27" value="传输层&lt;br&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;TCP/UDP&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="908" y="345" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-28" value="层间接口" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="910.5" y="435" width="265" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-29" value="网络层&lt;br&gt;&lt;font style=&quot;font-size: 12px;&quot;&gt;IP/路由转发协议&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="905.5" y="485" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-30" value="层间接口" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="910.5" y="575" width="265" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-31" value="&lt;b style=&quot;font-size: 18px;&quot;&gt;数据链路层&lt;/b&gt;&lt;br&gt;&lt;b&gt;以太网协议，wlan无线通信协议&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="905.5" y="625" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-32" value="层间接口" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="910.5" y="715" width="265" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-33" value="物理层&lt;br&gt;TCP/UDP" style="rounded=1;whiteSpace=wrap;html=1;fontSize=18;fontStyle=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="905.5" y="755" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-40" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;协议&lt;/font&gt;：对等层实体在通信过程中应该遵循的规则的合集，一种规范" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontColor=#990000;" vertex="1" parent="1">
+          <mxGeometry x="528" y="365" width="360" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-46" value="" style="shape=singleArrow;direction=north;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="848" y="680" width="30" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-48" value="" style="shape=singleArrow;direction=north;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="848" y="540" width="30" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-49" value="" style="shape=singleArrow;direction=north;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="848" y="410" width="30" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-50" value="" style="shape=singleArrow;direction=north;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;" vertex="1" parent="1">
+          <mxGeometry x="848" y="245" width="30" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-51" value="&lt;span style=&quot;font-size: 16px;&quot;&gt;服务：下层实体向上层提供服务&lt;/span&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontColor=#990000;" vertex="1" parent="1">
+          <mxGeometry x="545.5" y="705" width="360" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-52" value="&lt;span style=&quot;font-size: 16px;&quot;&gt;协议实现的过程&lt;br&gt;下层提供的服务加上本层的处理实现&lt;br&gt;&lt;/span&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontColor=#990000;" vertex="1" parent="1">
+          <mxGeometry x="528" y="570" width="360" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-68" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.25;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-56" target="EleuDhAI7mdlDRZeNzF1-66">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-56" value="&amp;nbsp; &amp;nbsp; socket&amp;nbsp; 源IP&amp;nbsp; 源端口&amp;nbsp; 目标IP 目标端口 状态&lt;br&gt;&amp;nbsp; &amp;nbsp; XXXX&amp;nbsp; &amp;nbsp;XX&amp;nbsp; &amp;nbsp; XXX&amp;nbsp; &amp;nbsp; &amp;nbsp;XXXX&amp;nbsp; &amp;nbsp;XXXX&amp;nbsp; &amp;nbsp; XXX&lt;br&gt;&amp;nbsp; &amp;nbsp; XXXX&amp;nbsp; &amp;nbsp;XX&amp;nbsp; &amp;nbsp; XXX&amp;nbsp; &amp;nbsp; &amp;nbsp;XXXX&amp;nbsp; &amp;nbsp;XXXX&amp;nbsp; &amp;nbsp; XXX&lt;br&gt;&amp;nbsp; &amp;nbsp; XXXX&amp;nbsp; &amp;nbsp;XX&amp;nbsp; &amp;nbsp; XXX&amp;nbsp; &amp;nbsp; &amp;nbsp;XXXX&amp;nbsp; &amp;nbsp;XXXX&amp;nbsp; &amp;nbsp; XXX&lt;br&gt;&amp;nbsp; &amp;nbsp; XXXX&amp;nbsp; &amp;nbsp;XX&amp;nbsp; &amp;nbsp; XXX&amp;nbsp; &amp;nbsp; &amp;nbsp;XXXX&amp;nbsp; &amp;nbsp;XXXX&amp;nbsp; &amp;nbsp; XXX" style="rounded=0;whiteSpace=wrap;html=1;align=left;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="-402" y="120" width="270" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-59" value="socket表项" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontColor=#274F00;" vertex="1" parent="1">
+          <mxGeometry x="-352" y="220" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-63" value="" style="group;fontStyle=1;fontColor=#FFFFFF;" vertex="1" connectable="0" parent="1">
+          <mxGeometry x="-182" y="350" width="380" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-60" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#647687;fontColor=#ffffff;strokeColor=#314354;" vertex="1" parent="EleuDhAI7mdlDRZeNzF1-63">
+          <mxGeometry width="380" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-12" value="SDU&lt;br&gt;(server data unit)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;fontStyle=1" vertex="1" parent="EleuDhAI7mdlDRZeNzF1-63">
+          <mxGeometry x="250" y="10" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-13" value="ICI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#008a00;fontColor=#ffffff;strokeColor=#005700;fontStyle=1" vertex="1" parent="EleuDhAI7mdlDRZeNzF1-63">
+          <mxGeometry x="180" y="10" width="70" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-14" value="头部信息" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0050ef;fontColor=#ffffff;strokeColor=#001DBC;fontStyle=1" vertex="1" parent="EleuDhAI7mdlDRZeNzF1-63">
+          <mxGeometry x="100" y="10" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-65" value="&lt;font style=&quot;font-size: 15px;&quot; color=&quot;#ffffff&quot;&gt;本层PDU&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" vertex="1" parent="EleuDhAI7mdlDRZeNzF1-63">
+          <mxGeometry x="10" y="15" width="70" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-71" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;curved=0;endArrow=none;endFill=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-66" target="EleuDhAI7mdlDRZeNzF1-69">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-72" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-66" target="EleuDhAI7mdlDRZeNzF1-70">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-66" value="Socket物理层面是一个整数&lt;br&gt;表示一个会话状态的本地标识" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#008a00;fontColor=#ffffff;strokeColor=#005700;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-650" y="123" width="190" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-69" value="TCP socket&lt;br&gt;四元组&amp;nbsp;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-710" y="205" width="120" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-70" value="UCP socket&lt;br&gt;二元组" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-540" y="205" width="120" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-89" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-81" target="EleuDhAI7mdlDRZeNzF1-85">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-90" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-81" target="EleuDhAI7mdlDRZeNzF1-86">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-92" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-81" target="EleuDhAI7mdlDRZeNzF1-83">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-93" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-81" target="EleuDhAI7mdlDRZeNzF1-87">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-81" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;分组转发&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#d80073;strokeColor=#A50040;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="660.5" y="910" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-83" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;处理时延&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="481.5" y="1000" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-85" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;排队时延&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="611.5" y="1000" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-86" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;传输时延&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="741.5" y="1000" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-87" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;传播时延&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="869.5" y="1000" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-94" value="" style="shape=singleArrow;direction=north;whiteSpace=wrap;html=1;fillColor=#d80073;strokeColor=#A50040;fontColor=#ffffff;rotation=-180;" vertex="1" parent="1">
+          <mxGeometry x="18" y="435" width="30" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-95" value="&lt;font color=&quot;#cc0066&quot; style=&quot;font-size: 16px;&quot;&gt;向下递归&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1;fontColor=#990000;fontSize=16;" vertex="1" parent="1">
+          <mxGeometry x="-112" y="460" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-98" style="edgeStyle=orthogonalEdgeStyle;shape=connector;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.75;exitY=1;exitDx=0;exitDy=0;entryX=0.843;entryY=0.026;entryDx=0;entryDy=0;entryPerimeter=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="1" source="EleuDhAI7mdlDRZeNzF1-7" target="EleuDhAI7mdlDRZeNzF1-60">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-99" value="提供相邻两点，将数字信号转化成物理信号，&lt;br&gt;再由物理信号，还原为数字信号" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#a20025;strokeColor=#6F0000;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1210" y="770" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-100" value="相邻两点间(例如相邻的交换机之间)&lt;br&gt;实现帧的传输" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#6a00ff;strokeColor=#3700CC;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1210" y="640" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-101" value="完成主机到主机，端到端的传输" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#d80073;strokeColor=#A50040;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1210" y="500" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-102" value="区分进程（UDP,TCP）&lt;br&gt;加强网络层提供的服务，完善数据的可靠性(TCP)" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#008a00;strokeColor=#005700;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1210" y="360" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="EleuDhAI7mdlDRZeNzF1-103" value="实现各种网络应用" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#0050ef;strokeColor=#001DBC;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1260" y="190" width="150" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,85 @@
+<mxfile host="Electron" modified="2024-03-30T01:02:09.831Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.0.2 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="9HXOHxnT-wUEikxZJzfM" version="23.0.2" type="device">
+  <diagram name="第 1 页" id="dLEWQ15LJS4MGE29CpzN">
+    <mxGraphModel dx="2901" dy="1196" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="m1--nBwou0JsxG1O5RYE-1" value="网卡配置" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0050ef;fontColor=#ffffff;strokeColor=#001DBC;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="250" y="70" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-10" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;curved=0;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-4" target="m1--nBwou0JsxG1O5RYE-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-12" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-4" target="m1--nBwou0JsxG1O5RYE-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-4" value="更改网卡名" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="100" y="160" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-5" value="配置IP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="390" y="170" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-6" value="静态IP地址" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="310" y="250" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-7" value="动态IP地址" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="460" y="250" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-23" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-8" target="m1--nBwou0JsxG1O5RYE-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-31" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-8" target="m1--nBwou0JsxG1O5RYE-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-8" value="CentOS" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="-55" y="240" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-9" value="Ubuntu" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="170" y="240" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-16" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-13" target="m1--nBwou0JsxG1O5RYE-15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-13" value="修改配置文件 /etc/default/grub" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="47.5" y="410" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-18" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-15" target="m1--nBwou0JsxG1O5RYE-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-15" value="在GRUB_CMDLINE_LINUX=&lt;br&gt;这一行最后添加 net.ifnames=0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="12.5" y="490" width="190" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-20" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-17" target="m1--nBwou0JsxG1O5RYE-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-17" value="使用grub2-mkconfig将配置写入grub.cfg&lt;br&gt;grub2-mkconfig -o /boot/grub2/grub.cfg" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="-10" y="570" width="235" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-19" value="reboot重启" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="60" y="680" width="95" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-22" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-21" target="m1--nBwou0JsxG1O5RYE-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-21" value="CentOS7~" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="67.5" y="330" width="80" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-28" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-24" target="m1--nBwou0JsxG1O5RYE-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-24" value="CentOS6以前" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="-185" y="330" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-30" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="m1--nBwou0JsxG1O5RYE-27" target="m1--nBwou0JsxG1O5RYE-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-27" value="修改配置文件&amp;nbsp;&lt;br&gt;vim /etc/udev/rules.d/70-persistent-net.rules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="-270" y="410" width="260" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="m1--nBwou0JsxG1O5RYE-29" value="删除多余网卡信息&lt;br&gt;将现有网卡信息改为eth0" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="-225" y="490" width="170" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            padding: 0px;
+            margin: 0px;
+        }
+        .box {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-around;
+            width: 800px;
+            height: 400px;
+            margin: 50px auto;
+            border-left: #ce92ca 2px solid;
+            border-bottom: #ce92ca 2px solid;
+        }
+        .box>div {
+            display: flex;
+            justify-content: space-between;
+            flex-direction: column;
+            width: 100px;
+            background-color: #ce92ca;
+            align-items: center;
+        }
+        .box span {
+            margin-top: -20px;
+        }
+        .box h2 {
+            margin-bottom: -30px;
+            font-size: 15px;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        // 4次弹窗效果
+        let arr = []
+        for (let i = 0; i < 4; i++) {
+            // let num = prompt(`请输入第${i}季度的数据：`)
+            // arr.push(num)
+            arr.push(prompt(`请输入第${i+1}季度的数据：`))
+        } 
+        // console.log(arr)  
+        
+        //盒子开头
+        document.write(`<div class="box">`)
+        //盒子中间
+        for (let i = 0; i < arr.length; i++) {
+            document.write(`
+                <div style="height: ${arr[i]}px;">
+                    <span>${arr[i]}</span>
+                    <h2>第${i+1}季度</h2>
+                </div>
+            `)
+        }1
+        //盒子结尾
+        document.write(`</div>`)
+    </script>
+    <!-- <div class="box">
+        <div style="height: 100px;">
+            <span>1</span>
+            <h2>第一季度</h2>
+        </div>
+        <div style="height: 100px;">
+            <span>1</span>
+            <h2>第二季度</h2>
+        </div>
+        <div style="height: 100px;">
+            <span>1</span>
+            <h2>第三季度</h2>
+        </div>
+        <div style="height: 100px;">
+            <span>1</span>
+            <h2>第四季度</h2>
+        </div>
+    </div> -->
+</body>
+</html>

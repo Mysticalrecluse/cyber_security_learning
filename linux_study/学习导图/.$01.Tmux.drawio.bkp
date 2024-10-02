@@ -1,0 +1,139 @@
+<mxfile host="Electron" modified="2024-02-29T02:40:04.039Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.0.2 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="FhGQ1jSoo2m82mXmtla6" version="23.0.2" type="device">
+  <diagram name="第 1 页" id="jVHiiq0NcTN1Iu_3gQoc">
+    <mxGraphModel dx="2672" dy="686" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-2" value="Tmux" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d80073;fontColor=#ffffff;strokeColor=#A50040;fontStyle=1;fontSize=15;" vertex="1" parent="1">
+          <mxGeometry x="364" y="50" width="100" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=0;endArrow=classicThin;endFill=1;fillColor=#60a917;strokeColor=#2D7600;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-3" target="lMFEjgHvDyypgR_XHPCR-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-3" value="安装过程&lt;br&gt;(详情见markdown)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#008a00;fontColor=#ffffff;strokeColor=#005700;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-1092.19" y="250" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-8" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#2D7600;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classicThin;endFill=1;fillColor=#60a917;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-4" target="lMFEjgHvDyypgR_XHPCR-6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-4" value="安装tmux" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="-1067.19" y="340" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-10" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#2D7600;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classicThin;endFill=1;fillColor=#60a917;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-6" target="lMFEjgHvDyypgR_XHPCR-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-6" value="Clone并安装字体" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="-1074.69" y="420" width="105" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-12" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#2D7600;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classicThin;endFill=1;fillColor=#60a917;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-9" target="lMFEjgHvDyypgR_XHPCR-11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-9" value="Clone并安装风格包" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="-1083.44" y="500" width="122.5" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-14" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#2D7600;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classicThin;endFill=1;fillColor=#60a917;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-11" target="lMFEjgHvDyypgR_XHPCR-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-11" value="Clone并安装插件" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="-1083.44" y="580" width="122.5" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-13" value="配置并加载~/.tmux.conf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="-1100" y="660" width="155.62" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-44" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-15" target="lMFEjgHvDyypgR_XHPCR-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-15" value="会话管理" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#a0522d;fontColor=#ffffff;strokeColor=#6D1F00;fontStyle=1;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="60" y="250" width="126" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-38" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-16" target="lMFEjgHvDyypgR_XHPCR-29">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-39" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-16" target="lMFEjgHvDyypgR_XHPCR-25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-40" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-16" target="lMFEjgHvDyypgR_XHPCR-32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-41" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-16" target="lMFEjgHvDyypgR_XHPCR-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-42" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-16" target="lMFEjgHvDyypgR_XHPCR-36">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-43" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-16" target="lMFEjgHvDyypgR_XHPCR-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-16" value="指令" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-285" y="340" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-17" value="快捷键" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="600" y="340" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-20" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-18" target="lMFEjgHvDyypgR_XHPCR-19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-18" value="新建会话" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-850" y="420" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-19" value="tmux new -s &amp;lt;session-name&amp;gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-890" y="500" width="170" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-21" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" source="lMFEjgHvDyypgR_XHPCR-22" target="lMFEjgHvDyypgR_XHPCR-23" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-22" value="查看会话列表" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-690" y="420" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-23" value="tmux ls" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-690" y="500" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-27" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-25" target="lMFEjgHvDyypgR_XHPCR-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-25" value="接入会话" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-520" y="420" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-26" value="tmux attach -t &amp;lt;session-name&amp;gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-570" y="500" width="190" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-31" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-29" target="lMFEjgHvDyypgR_XHPCR-30">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-29" value="杀死会话" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-285" y="420" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-30" value="tmux kill-session -t &amp;lt;session-name&amp;gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-350" y="500" width="220" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-34" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" parent="1" source="lMFEjgHvDyypgR_XHPCR-32" target="lMFEjgHvDyypgR_XHPCR-33">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-32" value="切换会话" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-45" y="420" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-33" value="tmux switch -t &amp;lt;session-name&amp;gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="-100" y="500" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-35" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=0;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=#6D1F00;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;endFill=0;fillColor=#a0522d;" edge="1" source="lMFEjgHvDyypgR_XHPCR-36" target="lMFEjgHvDyypgR_XHPCR-37" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-36" value="重命名会话" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="235" y="420" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-37" value="tmux rename-session -t &amp;lt;old_name&amp;gt; &amp;lt;new_name&amp;gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="130" y="500" width="300" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-45" value="&amp;lt;Ctrl&amp;gt;-B d" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="520" y="420" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-46" value="&amp;lt;Ctrl&amp;gt;-B s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="650" y="420" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="lMFEjgHvDyypgR_XHPCR-47" value="&amp;lt;Ctrl&amp;gt;-B $" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="780" y="420" width="90" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
