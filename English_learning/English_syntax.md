@@ -189,3 +189,42 @@ My flight has been canceled 我的班机被取消了。
 be动词：am, is, are, was, were
 
 look看起来，sound听起来，smell闻起来，taste尝起来，feel感觉，seem似乎，appear似乎，become变成，turn变成
+
+## 有修饰成分的简单句
+Covid-19, a deadly new virus, has claimed many lives ,during last week.
+
+### 定语
+修饰名词或者代词
+
+#### 前置定语
+I have a better idea.
+
+#### 后置定语
+I have a cute cat (at home)
+
+#### 练习
+We had other problems
+
+I'm a good person
+
+I'm the only responsible person around here.
+
+What is her name?
+
+### 状语
+- 修饰形容词，副词，动词，整句话
+    - 表示动词发生的时间、地点、原因、目的、结果、程度等
+
+- 通常由副词，介词短语或相当于副词的词或短语来表示
+
+举例
+
+I'll call you (tomorrow)
+
+I work (in a bookshop) (地点)
+
+I haven't been sleeping (well) （程度）
+
+### 同位语
+通常出现在主宾表之后，和主宾表有相同作用
+
