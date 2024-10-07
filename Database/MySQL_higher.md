@@ -8157,6 +8157,8 @@ Error connecting to source 'repluser@10.0.0.121:3306'. This was attempt 1/86400,
 # 解决方案1：
 ALTER USER 'repluser'@'10.0.0.%' IDENTIFIED WITH 'mysql_native_password' BY '123456';
 # 更改身份验证插件，而不使用caching_sha2_password
+# mysql8.4 需要在mysqld设置mysql_native_password=ON,实测可用
+# 然后重启mysql即可
 
 # 解决方案2：(生产中推荐，测试环境不推荐)
 # 在服务器端，确保已启用 TLS/SSL。检查 MySQL 配置文件（my.cnf 或 my.ini）中的以下参数是否配置正确
