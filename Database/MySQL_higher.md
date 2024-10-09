@@ -3713,8 +3713,420 @@ DELIMITER ;
 
 ### 分支结构之CASE
 
-CASE语句的语法结构
+CASE语句的语法结构1
+```sql
+-- 情况一：类似于switch
+CASE 表达式
+WHEN 值1 THEN 结果1或语句1（如果是语句，需要加分号）
+WHEN 值2 THEN 结果2或语句2（如果是语句，需要加分号）
+...
+ELSE 结果n或语句n（如果是语句，需要加分号）
+END [case] （如果是放在begin end中需要加上case，如果放在select后面不需要）
+```
+CASE语句的语法结构2
+```sql
+-- 情况二：类似于多重if
+CASE
+WHEN 条件1 THEN 结果1或语句1（如果是语句，需要加分号）
+WHEN 条件2 THEN 结果2或语句2（如果是语句，需要加分号）
+...
+ELSE 结果n或语句n（如果是语句，需要加分号）
+END [case] (如果是放在begin end中需要加上case,如果放在select后面不需要)
+```
 
+举例1：
+使用CASE流程控制据的第一种格式，判断val值等于1、等于2或者两者都不等于
+```sql
+DELIMITER //
+CREATE PROCEDURE test_case()
+BEGIN
+    -- 演示1：case ... when ... then ...
+    DECLARE var INT DEFAULT 2;
+
+    CASE var
+        WHEN 1 THEN SELECT 'var = 1';
+        WHEN 2 THEN SELECT 'var = 2';
+        WHEN 3 THEN SELECT 'var = 3';
+    ELSE SELET 'other value';
+
+END //
+DELIMITER ;
+
+-- 调用
+CALL test_case();
+```
+
+举例2：
+```sql
+DELIMITER //
+CREATE PROCEDURE test_case()
+BEGIN
+    -- 演示2：case when ... then ...
+    DECLARE var1 INT DEFAULT 10;
+
+    CASE 
+        WHEN var1 >= 100 THEN SELECT '三位数';
+        WHEN var1 >= 10 THEN SELECT '二位数';
+        ELSE SELECT '个位数';
+    ELSE SELET 'other value';
+
+END //
+DELIMITER ;
+
+-- 调用
+CALL test_case();
+```
+
+举例3：声明存储过程"update_salary_by_eid4"，定义IN参数emp_id，输入员工编号。判断该员工薪资如果低于9000元，就更新薪资为9000元；薪资大于等于9000元且低于10000元的，但是奖金比例为NULL的，就更新奖金比例为0.01，其他的涨薪100元。
+```sql
+DELIMITER //
+CREATE PROCEDURE update_salary_by_eid4(IN emp_id INT)
+BEGIN
+    -- 局部变量声明
+    DECLARE emp_sal DOUBLE;  -- 记录员工工资
+    DECLARE bonus DOUBLE;    -- 记录员工奖金率
+
+    -- 局部变量赋值
+    SELECT salary INTO emp_sal FROM employee WHERE employee_id = emp_id;
+    SELECT commission_pct INTO bonus FROM employees WHERE employee_id = emp_id;
+
+    CASE
+    WHEN emp_sal < 9000 THEN UPDATE emplyees SET salary = 9000 WHERE employee_id = emp_id;
+    WHEN emp_sal < 10000 AND bonus IS NULL THEN UPDATE employees SET commission_pct = 0.01 WHERE employee_id = emp_id;
+    ELSE UPDATE employees SET salary = salary + 100 WHERE employee_id = emp_id;
+    END CASE;
+
+END //
+DELIMITER ;
+
+-- 调用
+CALL update_salary_by_eid4(102)  -- 102是emp_id
+```
+
+### 循环结构LOOP
+LOOP循环语句用来重复执行某些语句。LOOP内的语句一直重复执行直到循环被退出（使用LEAVE句子），跳出循环过程
+
+LOOP语句的基本格式如下
+```sql
+[loop_label:] LOOP
+    -- 循环执行语句
+    -- 结合LEAVE跳出
+END LOOP [loop_label]
+-- loop_label表示LOOP语句标注的名称，该参数可以省略
+```
+
+举例1：
+使用LOOP语句进行循环操作,id值小于10时将重复执行循环过程
+```sql
+DELIMITER //
+CREATE PROCEDURE test_loop()
+BEGIN
+    -- 声明局部变量
+    DELARE num INT DEFAULT 1;
+    add_loop: LOOP
+        -- 重新赋值
+        SET num = num + 1;
+        IF id >= 10 THEN LEAVE add_loop;
+        END IF;
+    END LOOP add_loop;
+
+END //
+
+DELIMITER ;
+
+-- 调用
+CALL test_loop();
+```
+
+举例2：
+当市场环境变好时，公司为了奖励大家，决定给大家涨工资。声明存储过程"update_salary_loop()"，声明OUT参数num，输出循环次数。存储过程中实现循环给大家涨薪，薪资涨为原来的1.1倍。直到全公司的平均薪资达到12000结束。并统计循环次数。
+```sql
+DELIMITER //
+CREATE PROCEDURE update_salary_loop(out num INT)
+BEGIN
+    -- 声明变量
+    DECLARE avg_sal DOUBLE; -- 记录员工的平均工资
+    DECLARE loop_count INT DEFAULT 0; -- 记录循环次数
+    -- 获取员工的平均工资
+    SELECT AVG(salary) INTO avg_sal FROM employees;
+    loop_lab: LOOP 
+        -- 结束循环的条件
+        IF avg_salary >= 12000
+            THEN LEAVE loop_lab;
+        END IF;
+        -- 如果低于12000，更新员工工资
+        UPDATE employees SET salary = salary * 1.1;
+
+        -- 更新avg_salary的值
+        SELECT AVG(salary) INTO avg_sal FROM employees;
+        -- 记录循环次数
+        SET loop_count = loop_count + 1;
+    END LOOP loop_lab;
+    -- 给num赋值
+    SET num = loop_count;
+
+END //
+
+DELIMITER ;
+
+SELECT AVG(salary) FROM employees;
+
+SET @num = 10;
+CALL update_salary_loop(@num);
+```
+### 循环结构WHILE
+WHILE循环的语法结构
+```sql
+[while_label:] WHILE 循环条件 DO
+    循环体
+END WHILE [while_label];
+```
+
+举例1
+```sql
+DELIMITER //
+CREATE PROCEDURE test_while()
+BEGIN
+    -- 初始化条件
+    DECLARE num INT DEFAULT 1;
+    -- 循环条件
+    WHILE num <= 10 DO
+        -- 循环体
+        -- 迭代条件
+        SET num = num + 1;
+    END WHILE;
+    -- 查询
+    SELECT num;
+END
+DELIMITER ;
+
+CALL test_while();
+```
+
+举例2：
+市场环境不好时，公司为了度过难关，决定暂时降低大家的薪资。声明存储过程"update_salary_while()"，声明OUT参数num，输出循环次数。存储过程中实现循环给大家降薪，薪资降为原来的90%。直到全公司的平均薪资达到5000结束。并统计循环次数
+```sql
+DELIMITER //
+CREATE PROCEDURE update_salary_while(OUT num INT)
+BEGIN
+    -- 声明变量
+    DECLARE avg_sal DOUBLE;
+    DECLARE while_count INT DEFAULT 0;
+
+    SELECT AVG(salary) INTO avg_sal FROM employees;
+
+    WHILE avg_sal > 5000 DO
+        UPDATE employees SET salary = salary * 0.9;
+        SET while_count = while_count + 1;
+        SELECT AVG(salary) INTO avg_sal FROM employees;
+    END WHILE;
+    
+    SET num = while_count;
+END //
+
+DELIMITER ;
+
+CALL update_salary_while(@num);
+
+SELECT @num;
+```
+### 循环结构REPEAT
+REPEAT循环的语法结构
+```sql
+[repeat_label:] REPEAT
+    循环体的语句
+UNTIL 结束循环的条件表达式
+END REPEAT [repeat_label]
+```
+
+举例1
+```sql
+DELIMITER //
+CREATE PROCEDURE test_repeat()
+BEGIN
+    -- 声明变量
+    DECLARE num INT DEFAULT 1;
+    
+    REPEAT
+        SET num = num + 1；
+        UNTIL num >= 10   -- UNTIL后面不加分号，否则报错
+    END REPEAT;
+
+    -- 查看
+    SELECT num;
+END //
+
+DELIMITER ;
+
+-- 调用
+CALL test_repeat()
+```
+
+### LEAVE 和 ITERATE语句
+LEAVE 相当于 break
+ITERATE 相当于 continue
+
+## 游标
+
+### 游标定义
+游标，提供了一种灵活的操作方式，让我们能够对结果集中的每一条记录进行定位，并对指向的记录中的数据进行操作的数据结构。游标让SQL这种面向集合的语言有了面向过程开发的能力。
+
+在SQL中，游标是一种临时的数据库对象，可以指向存储在数据库表中的数据行指针。这里游标`充当了指针的作用给`，我们可以通过操作游标来对数据行进行操作
+
+### 使用游标的步骤
+#### 第一步：声明游标
+```sql
+DECLARE cursor_name CURSOR FOR select_statement;
+-- 要使用SELECT语句来获取数据结果集，而此时还没有开始遍历数据，这里select_statement代表的是SELECT语句，返回一个用于创建游标的结果集
+```
+
+#### 第二步：打开游标
+```sql
+OPEN cursor_name
+-- 当我们定义好游标之后，如果想要使用游标，必须先打开游标。打开游标的时候SELECT语句的查询结果集就去送到游标工作区，为后面游标的逐行读取集中的记录做准备
+```
+
+#### 第三步：使用游标（从游标中取得数据）
+```sql
+FETCH cursor_name INTO var_name [, var_name] ...
+-- 这句的作用是使用cursor_name这个游标来读取当前行，并且将数据保存到var_name这个变量中，游标指针指到下一行。如果游标读取的数据行有多个列名，则在INTO关键字后面复制给多个变量名即可
+```
+
+#### 第四步：关闭游标
+```sql
+CLOSE cursor_name
+-- 当我们使用完游标后需要关闭掉该游标。因为游标会占用系统资源，如果不及时关闭，游标会一直保持到存储过程结束，影响系统运行的效率。而关闭游标的操作，会释放游标占用的系统资源
+-- 关闭游标后，我们就不能再检索查询结果中的数据行，如果需要检索只能再次打开游标
+```
+
+#### 举例
+创建存储过程"get_count_by_limit_total_salary()"，声明IN参数 limit_total_salary，DOUBLE类型；声明OUT参数total_count，INT类型。函数的功能可以实现累加薪资最高的几个员工的薪资值，直到薪资总和达到limit_total_salary参数的值，返回累加的人数给total_count
+```sql
+DELIMITER //
+CREATE PROCEDURE get_count_by_limit_total_salary(IN limit_total_salary DOUBLE, OUT total_count INT)
+BEGIN
+    -- 声明局部变量
+    DECLARE sum_sal DOUBLE DEFAULT 0.0; --记录累加的工资总和
+    DECLARE emp_sal DOUBLE; -- 记录每一个员工的工资
+    DECLARE emp_count INT DEFAULT 0; -- 记录累加的人数
+
+    -- 声明游标
+    DECLARE emp_cursor CURSOR FOR SELECT salary FROM employees ORDER BY salary DESC;
+
+    -- 打开游标
+    OPEN emp_cursor
+
+    REPEAT
+
+        -- 使用游标(在遍历中赋值)
+        FETCH emp_cursor INTO emp_sal;
+
+        SET sum_sal = sum_sal + emp_sal;
+        SET emp_count = emp_count + 1;
+        UNTIL sum_sal >= limit_total_salary
+    END REPEAT;
+    SET total_count = emp_count;
+    -- 关闭游标
+    CLOSE emp_cursor
+
+END//
+
+DELIMITER ;
+
+-- 调用
+CALL get_count_by_limit_total_salary(20000, @total_count);
+SELECT @total_count;
+```
+
+#### 总结
+游标的缺点：在使用游标的过程中，会对数据行进行加锁，这样在业务并发量大的时候，不仅会影响业务之间的效率，还会消耗系统资源，造成内存不足，这是因为游标是在内存中进行的处理
+
+## 触发器
+触发器是由`事件来触发的`某个操作，这些事件包括INSERT、UPDATE、DELETE事件。所谓事件就是指用户的动作或者触发某项行为。如果定义了触发程序，当数据库执行这些语句时候，就相当于事件发生了，就会`自动`激发触发器执行相应的操作
+
+当对数据表中的数据执行插入、更新和删除操作，需要自动执行一些数据库逻辑时，可以使用触发器来实现
+
+### 触发器的创建
+触发器的语法结构
+```sql
+CREATE TRIGGER 触发器名称
+{BEFORE|AFTER} {INSERT|UPDATE|DELETE} ON 表名
+FOR EACH ROW
+触发器执行的语句块；
+
+-- 表名：表示触发器监控的对象
+-- BEFORE|AFTER：表示触发的时间。BEFORE表示在事件之前触发；AFTER表示在事件之后触发
+-- INSERT|UPDATE|DELETE：表示触发的事件
+-- 触发器执行的语句块：可以是单条SQL语句，也可以是由BEGIN...END结构组成的复合语句块。
+```
+
+示例
+```sql
+-- 创建数据表
+CREATE TABLE test_trigger(
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    t_note VARCHAR(30)
+);
+
+CREATE TABLE test_trigger_Log (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    t_log VARCHAR(30)
+);
+
+-- 创建触发器
+-- 创建名称为before_insert_test_tri的触发器，向test_trigger数据表插入数据之前，向test_trigger_log数据表中插入before_insert的日志信息。
+DELIMITER //
+
+CREATE TRIGGER before_insert_test_tri
+BEFORE INSERT ON test_trigger
+FOR EACH ROW
+BEGIN
+    INSERT INTO test_trigger_log(t_log)
+    VALUES('before insert...');
+END //
+
+DELIMITER ;
+
+-- 测试
+INSERT INTO test_trigger(t_note)
+VALUES('TOM...');
+
+SELECT * FROM test_trigger;
+SELECT * FROM test_trigger_log;
+```
+
+### 查看触发器
+方式1：查看当前数据库所有触发器的定义
+```sql
+SHOW TRIGGERS\G;
+```
+
+方式2：查看当前数据库中某个触发器的定义
+```sql
+SHOW CREATE TRIGGER 触发器名
+```
+
+方式3：从系统库information_schema的TRIGGERS表中查询"salary_check_trigger"触发器的信息
+```sql
+SELECT * FROM information_schema.TRIGGERS;
+```
+
+### 删除触发器
+触发器也是数据库对象，删除触发器也用DROP语句，语法如下
+```sql
+DROP TRIGGER IF EXISTS 触发器名称；
+```
+
+### 触发器的优点
+- 触发器可以确保数据完整性
+- 触发器可以帮助我们记录操作日志
+- 触发器还可以用在操作数据前，对数据进行合法性检查
+
+### 触发器的缺点
+- 触发器最大的缺点：可读性差
+  - 因为触发器存储在数据库中，并且由事件驱动，这就意味着触发器有可能`不受应用层的控制`。这对系统维护是非常有挑战性的
+
+- 相关操作的变更，可能会导致触发器出错
 
 
 ## SQLyog实现MySQL的远程连接
