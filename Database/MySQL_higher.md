@@ -6652,7 +6652,7 @@ DELIMITER ;
 ```sql
 CALL insert_stu(100001,4000000);
 ```
- 
+
 #### 测试及分析
 
 执行查询，都超过1s
@@ -6709,7 +6709,7 @@ MySQL服务器停止慢查询日志功能的两种方法
   ```shell
   [mysqld]
   slow_query_log=OFF   # 也可以注释掉，或删除
-
+  
   # 重启服务器
   ```
 
@@ -7175,7 +7175,7 @@ system, const, eq_ref, ref, fulltext, ref_or_null, index_merge, unique_subquery,
 事务是数据库区别于文件系统的重要特性之一，当我们有了事务就会让数据库始终保持`一致性`，同时我们还能通过事务的机制`恢复到某个时间点`，这样可以保证已提交到数据库的修改不会因为系统崩溃而丢失
 
 ### 存储引擎支持情况
- 
+
 查看当前MYSQL支持的存储引擎都有哪些，以及对事务的支持情况
 ```sql
 SHOW ENGINES
@@ -7322,7 +7322,7 @@ START TRANSACTION;
   BEGIN;
   SELECT ...  -- 事务中的一条语句
   UPDATE ... -- 事务中的一条语句
-
+  
   CREATE TABLE ...  -- 此语句会隐式的提交前边语句所属于的事务
   ```
 
@@ -7459,7 +7459,7 @@ SET GLOBAL TRANSACTION ISOLATION LEVEL SERIALIZABLE;
 SET GLOBAL TRANSACTION_ISOLATION = 'SERIALIABLE';
 -- 当前已经存在的会话无效
 -- 只对执行完该语句之后产生的会话起作用
-``` 
+```
 
 
 - 使用`SESSION`关键字（会话范围影响）
@@ -7734,6 +7734,7 @@ INSERT INTO user (name) VALUES ('tom');
 
 - 插入的数据都会生成一条insert undo log,并且数据的回滚指针会指向它。undo log会记录undo log的序号，插入主键的列和值...,那么在进行rollback时，通过主键值直接把对应的数据删除即可
   
+
 ![alt text](images/image37.png)
 
 当我们执行UPDATE时
@@ -8119,7 +8120,7 @@ systemctl stop mysqld
 rsync -a /var/lib/mysql root@10.0.0.8:/root/data/
 
 # 在远程主机上还原
-# 停止mysql
+# 在远程主机上还原
 systemctl stop mysqld
 # 将原来的/var/lib/mysql/*全部清空
 rm -rf *
@@ -8383,7 +8384,7 @@ xtrabackup --prepare --apply-log-only --target-dir=/root/backup/base
 xtrabackup --prepare --apply-log-only --target-dir=/root/backup/base --incremental-dir=/root/backup/inc1
 
 # 整理第二次赠量备份数据，需要回滚（最后一次回滚）
-xtrabackup --prepare --target-dir=/root/backup/base --incremental-dir=/root/backup/inc2
+xtrabackup --prepare --target-dir=/root/backup/inc1 --incremental-dir=/root/backup/inc2
 
 # 停掉mysqld服务
 systemctl stop mysqld
@@ -10788,7 +10789,7 @@ Next-Key-Lock是在存储Innodb，事务级别在`可重复读`的情况下使�
 
 #### 插入意向锁
 
- 
+
 ### 页锁
 
 页锁就是在`页的粒度`上进行锁定，锁定的数据资源比行锁要多，因为一个页中可以有多个行记录。当我们使用页锁的时候，会出现数据浪费的现象，但这样的浪费最多也就是一个页上的数据行。页锁的开销介于表锁和行锁之间，会出现死锁。锁定粒度介于表锁和行锁之间，并发度一般。
