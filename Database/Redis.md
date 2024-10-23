@@ -481,7 +481,7 @@ auto-aof-rewrite-min-size 64mb
 aof-load-truncated yes
 ```
 
-# AOF日志格式
+### AOF日志格式
 ```shell
 # set testkey testvalue的日志格式
 *3                  # 这个3意味着当前命令有3个部分
