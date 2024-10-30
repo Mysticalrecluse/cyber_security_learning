@@ -11858,12 +11858,12 @@ $workDirectory /var/spool/rsyslog
   :msg,contains,"[UFW" /var/log/ufw.log
   
   ## property:预定义属性
-
+  
   msg
   含义：完整的日志消息文本
   示例：将"error"的日志消息吸入"error.log"文件
   :msg, contains, "error" /var/log/error.log
-
+  
   hostname               
   含义：产生日志的主机名
   示例：将来主机名为"webserver"的日志消息写入"webserver.log"文件
@@ -11873,32 +11873,32 @@ $workDirectory /var/spool/rsyslog
   含义：日志消息来源的IP地址
   示例：将来自特定IP地址的日志消息写入"network.log"文件 
   :fromhost-ip, isequal, "192.168.1.1" /var/log/network.log
-
+  
   syslogfacility
   含义：Syslog设施码，拥有标识日志消息的来源(例如：内核，邮件系统等)
   示例：将所有邮件相关的日志消息写入"mail.log"文件
   :syslogfacility-text, isequal, "mail" /var/log/mail.log
-
+  
   syslogseverity
   含义：Syslog严重性级别(severity)，表示日志消息的重要性级别
   将严重性为"alert"的日志消息写入"alert.log"文件
   :syslogseverity-text, isequal, "alert" /var/log/alert.log
-
+  
   programname
   含义：生成日志消息的程序名
   示例：将由"sshd"生成的所有日志消息写入"sshd.log"文件
   :programname, isequal, "sshd" /var/log/sshd.log
-
+  
   pri-text
   含义：日志消息的优先级，以文本形式表示(结合facility和severity)
   示例：将优先级为"kern.crit"的日志消息写入"critical.log"文件
   :pri-text, isequal, "kern.crit" /var/log/critical.log
-
+  
   timestamp
   含义：日志消息的时间戳。
   示例将时间戳包含特定日期的日志消息写入 `dated_logs.log` 文件。
   :timestamp, contains, "2024-08-16" /var/log/dated_logs.log
-
+  
   app-name
   含义：应用名称，一般表示生成日志的应用程序的名称
   示例：将特定应用程序的日志写入"app.log"文件
@@ -11907,7 +11907,7 @@ $workDirectory /var/spool/rsyslog
   syslogtag               
   描述：包含了日志条目的应用程序名和进程号（可选）。
   用途：用于根据应用程序将日志分流到不同文件。
-
+  
   # 比较表达式
   # contains                字段是否包含value的内容
   # contains_i              字段是否包含value的内容，不区分大小写
@@ -17891,7 +17891,7 @@ systemctl restart tomcat:
 
 - 观察内存中内存分布的情况（青年态，老年态）
   - （可以在catalina.sh的文件中指定内存的大小），后期根据实际情况去调整内存的分布,防止内存溢出和产生频发回收机制（比如年轻态过小，就会频繁出发回收，而频繁的GC会消耗系统资源）
-![alt text](images/image99.png)
+  ![alt text](images/image99.png)
 
   - 通过看系统资源的情况分析，比如由于内存过小，导致频繁出发GC，导致CPU使用率增高
   - 又或者发生频繁的读取文件，频繁导致磁盘IO
@@ -18108,6 +18108,7 @@ Cookie
   - 持久性(persistent)Cookie：可以在设定的过期日期之前一直存在
 - 传输方式：每次客户端向服务端发送请求时，浏览器会自动将所有相关的Cookie包含在请求头中
   
+
 Session
 - 存储位置：Session数据存储在服务端，通常在服务器的内存或数据库中
 - 生命周期：由服务器控制，通常在一段时间内（会话超时）或用户登出后失效

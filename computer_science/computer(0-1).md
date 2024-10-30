@@ -112,6 +112,19 @@
 
 
 ### CPU执行程序
+#### 运算数据哪里来
+```C
+int add() {
+    int x = 2;
+    int y = 3;
+    return x + y;
+}
+
+int main() {
+    int a;
+    a = add();
+}
+```
 - Register Transfer Language(RTL) 寄存器传输语言
 ```rtl
 [8000] = 100 // 将数据100存储到内存空间8000的地址上
