@@ -4277,6 +4277,109 @@ tune2fs -l /dev/sdb1
     
 #### XFS文件系统结构
 ![alt text](images/image21.png)
+
+#### 超级块和分配组
+我们可以使用xfs_info命令查看一个xfs文件系统的superblock信息
+```shell
+[root@ubuntu2204 /]#xfs_info /dev/sdb4
+meta-data=/dev/sdb4              isize=512    agcount=4, agsize=655360 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1    bigtime=0 inobtcount=0
+data     =                       bsize=4096   blocks=2621440, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=2560, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =无                    extsz=4096   blocks=0, rtextents=0
+```
+superblock简称sb，我们可以看到显示的内容中包括很多当前文件系统的关键信息
+- isize=512: 一个inode占用的空间大小
+- bsize=4096: 一个block大小。由此可知当前文件系统中一个block可以存放8个inode
+- agcount=4：ag是xfs文件系统的最初级组织结构，全称是allcation group。一个xfs文件系统是由若干个ag组成的。可以在格式化xfs的时候指定ag个数，默认一般是4个ag
+- agsize=1310656：每个ag所包含的block块数
+- sectsz=512：磁盘扇区大小
+- inobt=1：自 Linux 3.16 起，XFS 增加了 B+树用于索引未被使用的 inode。这是这个开关是否打开的选项。1表示打开
+- blocks=5242624：分区包含的所有block总数。
+
+我们还可以使用xfs_db 命令（交互式命令）查看sb的内容
+```shell
+xfs_db /dev/sdb4
+xfs_db> sb
+xfs_db> p
+magicnum = 0x58465342
+blocksize = 4096
+dblocks = 2621440
+rblocks = 0
+rextents = 0
+uuid = 36e5c9a8-0ff3-4bd6-bd06-294f5bb060d7
+logstart = 2097158
+rootino = 128
+rbmino = 129
+rsumino = 130
+rextsize = 1
+agblocks = 655360
+agcount = 4
+rbmblocks = 0
+logblocks = 2560
+versionnum = 0xb4a5
+sectsize = 512
+inodesize = 512
+inopblock = 8
+fname = "\000\000\000\000\000\000\000\000\000\000\000\000"
+blocklog = 12
+sectlog = 9
+inodelog = 9
+inopblog = 3
+agblklog = 20
+rextslog = 0
+inprogress = 0
+imax_pct = 25
+icount = 64
+ifree = 61
+fdblocks = 2618848
+frextents = 0
+uquotino = null
+gquotino = null
+qflags = 0
+flags = 0
+shared_vn = 0
+inoalignmt = 8
+unit = 0
+width = 0
+dirblklog = 0
+logsectlog = 0
+logsectsize = 0
+logsunit = 1
+features2 = 0x18a
+bad_features2 = 0x18a
+features_compat = 0
+features_ro_compat = 0x5
+features_incompat = 0x3
+features_log_incompat = 0
+crc = 0x840bc531 (correct)
+spino_align = 4
+pquotino = null
+lsn = 0x100000004
+meta_uuid = 00000000-0000-0000-0000-000000000000
+```
+
+- rootinto=128：本文件系统第一个inode编号，一般这个inode就是这个文件系统的第一个目录对应的inode编号
+- agblocks=1310656：每个ag中的block个数
+- icount=2432：目前已经分配的inode个数。这里要注意的是，与ext3/4文件系统不同，xfs的inode是动态分配的，所以这里的个数会随着文件个数的变化而变化
+- ifree=136：表示inode的空闲空间
+- xfs中inode总数等于icount+ifree
+
+文件系统第一块除了sb占用前512字节外，后续还保存了其他相关本ag的重要数据结构信息，依次为：
+
+- agf：ag本身的头部信息，包含了本ag的很多block索引和相关重要信息
+- agi：ag本身的头部信息。包含了本ag的很多inode索引的相关重要信息，具体内容可在内核源代码中参考 xfs_agi_t 数据结构的定义。
+- agfl：ag的freelist结构信息。具体可以参考内核源代码中的 xfs_agfl_t 结构体定义。
+
+每一组ag的第一块中都包含sb，agf，agi，agfl四个结构，每个结构占用512字节。不同的是除了第一个ag的sb以外，其他的sb都用作备份。其他的ag中的agf、agi和agfl都记录各自的索引信息
+
+第一块的后2048字节是未被占用的
+
 - 在XFS文件系统中，每个分区（或更准确地说，每个XFS文件系统）由多个Allocation Groups (AGs) 组成。Allocation Group是XFS设计的核心概念之一，它将文件系统的存储空间划分为若干个较小、管理上相对独立的区块
 
 - Allocation Group(AG)
