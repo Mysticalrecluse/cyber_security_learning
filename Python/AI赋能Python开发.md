@@ -20,6 +20,9 @@ conda config --show envs_dirs
 ```shell
 conda create -n deepseek python=3.11 openai
 # 格式：conda create -n <环境名称> python=<版本号> 安装的包
+
+# 基于指定路径创建
+conda create -p /path/to/your/environment
 ```
 
 激活环境
@@ -37,6 +40,10 @@ conda deactivate
 export PATH=/path/to/python:$PATH
 ```
 
+删除环境
+```shell
+conda remove <环境名称> --all
+```
 重要文档
 ```shell
 python文档：https://docs.python.org/zh-cn/3.13/index.html

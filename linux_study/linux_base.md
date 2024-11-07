@@ -5004,6 +5004,59 @@ mount /dev/testvg/lv3 /lv3
 - VXLAN
   - 云环境下，进行虚拟局域网隔离
 
+#### VXLAN
+VXLAN解决的问题
+- 二层扩展
+  - 物理服务器可能分布在地理位置跨度非常大的机房，因此需要使用三层进行互联
+  - 而三层设备会隔离广播，如果设备有二层互通的需求，就需要使用VXLAN技术
+  ![alt text](images/image102.png)
+
+- 多租户隔离
+  - 云化场景一般支持多租户，即不同用户共享物理资源。这对网络提出两个需求，租户间隔离和租户内互访
+    - 租户间隔离：租户可能配置相同的MAC和IP地址，需要考虑网络承载隔离问题，并且存在海量的用户需要进行隔离
+    - 租户内互访：租户内相同网段能够直接进行二层通信，即便处于不同物理位置的机房中。
+  ![alt text](images/image103.png)
+
+传统网络面临的问题
+- 虚拟机规模受设备表项规格限制
+  - 服务器虚拟化后，VM的数量比原有物理机发生了巨大的增长，而接入侧二层设备的MAC地址表规格较小，无法满足快速增长的VM数量
+
+- 网络隔离能力限制
+  - VLAN Tag只有12bit（仅能表示4096个逻辑单元）
+  - 对于大型虚拟化云计算服务的场景而言，租户数目远大于VLAN可以个数
+  - 传统而成网络中的VLAN无法满足网络动态调整需求
+
+- 虚拟机迁移范围受限
+  - 虚拟机迁移必须发生在一个二层网络中
+  - 传统的二层网络，将虚拟机迁移范围限制在了一个较小的局部范围内
+
+VXLAN简介
+- VXLAN在本质上是一种VPN技术，能够在任意路由可达的物理网络（underlay网络）上叠加二层虚拟网络(Overlay网络)，通过VXLAN网关之间的VXLAN隧道实现VXLAN网络内部的互通，同时，也可以实现与传统的非VXLAN网络的互通
+  - 实质上是在arp报文上面加一个IP头部
+
+- VXLAN通过采用MAC in UDP封装来延伸二层网络，将以太报文封装在IP报文之上，通过路由在网络中传输，无需关注虚拟机的MAC地址。且三层网络无网络结构限制，具备大规模扩展能力。通过路由网络，虚拟机迁移不受网络架构限制
+
+VXLAN在数据中心的应用
+- 在数据中心中采用Spine-Leaf两层物理架构，结合VXLAN应用
+- Spine节点执行路由转发，转发时不感知VXLAN。Leaf节点负责资源接入，完成VXLAN封装及解封装
+- 这里Leaf上面会做关于VLAN到VXLAN的一个映射
+- 数据中心的业务均由VXLAN承载
+![alt text](images/image104.png)
+
+VXLAN报文格式
+![alt text](images/image105.png)
+
+VXLAN基本概念
+- NVE(Network Virtualzation Edge，网络虚拟边缘)
+  - 是实现网络虚拟化功能的网络实体，可以是硬件交换机也可以是软件交换机
+  - NVE在三成网络上构建二层虚拟网络，是运行VXLAN的设别。图中SW1和SW2都是NVE
+  ![alt text](images/image106.png)
+
+- VTEP(VXLAN Tunnel Endpoints，VXLAN隧道端点)
+  - VTEP是VXLAN隧道端点 ，位于NVE中，用于VXLAN报文的封装和解封装
+  - VXLAN报文(外层IP头部)中源IP地址为源端VTEP的IP地址，目的IP地址为目的端VTEP的IP地址
+  ![alt text](images/image107.png)
+
 ### TCP/IP协议栈
 - TCP包头结构
 ![Alt text](images/image02.png)
