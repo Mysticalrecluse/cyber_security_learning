@@ -5015,7 +5015,7 @@ VXLAN解决的问题
   - 云化场景一般支持多租户，即不同用户共享物理资源。这对网络提出两个需求，租户间隔离和租户内互访
     - 租户间隔离：租户可能配置相同的MAC和IP地址，需要考虑网络承载隔离问题，并且存在海量的用户需要进行隔离
     - 租户内互访：租户内相同网段能够直接进行二层通信，即便处于不同物理位置的机房中。
-  ![alt text](images/image103.png)
+    ![alt text](images/image103.png)
 
 传统网络面临的问题
 - 虚拟机规模受设备表项规格限制
@@ -7401,6 +7401,8 @@ ubuntu软件源的下载地址，默认外网
   - 步骤二：找到内核参数，在后面填写rd.break，然后按Ctrl-x进行启动
   ![Alt text](images/image11.png)
   - 步骤三：启动之后，目前的根目录是挂载在内存中虚拟的文件系统上，应该挂载到硬盘的根目录上，使用mount
+    - mount -o remount,rw /sysroot
+    - chroot /sysroot
   - 步骤四：进入硬盘的根目录后，就可以重置passwd了使用：echo <密码> | passwd --stdin root
 
 
