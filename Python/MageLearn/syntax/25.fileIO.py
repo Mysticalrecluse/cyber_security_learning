@@ -95,5 +95,16 @@ print(f3.readlines()) # ['world\n', 'hello']
 f3.close()
 
 # 上下文管理 context manager
-# with open() as f:
+# with 文件对象 as 变量:
+#     代码块
+# with 语句会自动调用文件对象的close()方法，释放资源
 
+f3 =  open("IOtest.txt")
+print(f3.fileno()) # 4, 文件描述符
+# fileno() 函数, 获取文件描述符, 文件描述符是一个整数，是操作系统中的一个整数，用来标识文件
+f3.close()
+
+# 文件对象本身就是一个迭代器，行迭代器，每次迭代返回文件中的一行
+with open("IOtest.txt", encoding='utf-8') as f:
+    for line in f:
+        print(line, end="")
