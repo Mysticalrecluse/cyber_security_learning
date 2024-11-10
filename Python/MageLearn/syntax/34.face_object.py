@@ -203,6 +203,9 @@ tom = Person('Tom')
 
 print(tom.showme()) # ** name=Tom, age=20 **
 
+# 通过__dict__查看私有变量
+print(tom.__dict__) # output: {'_Person__name': 'Tom', '_Person__age': 20}, 私有属性会被改名，_类名__属性名,因此无法直接访问
+
 # public
 class Person:
     def __init__(self, name, age=18):

@@ -30,6 +30,7 @@ log3 = logging.getLogger('m1') # getXXX方法，也叫工厂方法
 # 获取logger对象，如果没有就创建一个, 一般使用这种方式获取logger对象, 这样可以保证同一个名字的logger是同一个对象
 # 字典m1 -> logger对象
 log4 = logging.getLogger('m1') # 获取logger对象，如果没有就创建一个, 一般使用这种方式获取logger对象
+print(type(log4)) # <class 'logging.Logger'>，getlogger是logger类的方法，返回的是logger对象
 #print(log3) # <Logger m1 (WARNING)>
 #print(log4) # <Logger m1 (WARNING)>
 #print(log1 == log3) # True
@@ -67,11 +68,11 @@ def getLogger(name=None):
 #root = logging.Logger.root
 root = logging.getLogger() # 获取root对象
 
-print(log3.parent, log3.parent is root) # <RootLogger root (WARNING)> True
+print("log3", log3, log3.parent, log3.parent is root) # <RootLogger root (WARNING)> True
 # log3.parent是root对象，log3.parent是RootLogger对象，是一个全局对象
 
 log5 = logging.getLogger('m1.m2') # m1 -> m2, m1是m2的父logger
-print(log5.parent is log3) # True
+print(log3, log5, "log5.parent is log3", log5.parent,log5.parent is log3) # True
 
 ## 总结：logger对象之间是有父子关系的，父logger可以传递日志记录给子logger
 
