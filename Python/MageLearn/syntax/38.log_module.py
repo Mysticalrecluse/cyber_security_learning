@@ -1,6 +1,15 @@
 # logging模块
 import logging # 模块加载，并且执行模块，模块的顶层代码会被执行
 
+FORMAT = '[%(asctime)s] %(name)s %(levelname)s %(message)s'
+# pattern = "[(?P<data>.*)]\t(?P<name>.*)\t(?P<level>.*)\t(?P<message>.*)"
+# 
+# basicConfig方法，设置root的级别，格式，时间格式，文件名
+# basicConfig方法，只能设置一次，如果多次调用，只有第一次有效
+#logging.basicConfig(level=logging.INFO, format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S', filename='D:\\log.txt')
+logging.basicConfig(level=logging.INFO, format=FORMAT, datefmt='%Y-%m-%d %H:%M:%S')
+# 默认输出到控制台，如果filename参数有值，输出到文件
+
 # 重要模块
 
 # 类：Logger，RootLogger(父类：Logger)，Handler，Filter，Formatter
@@ -93,3 +102,76 @@ print(log3, log5, "log5.parent is log3", log5.parent,log5.parent is log3) # True
 #NOTSET = 0
 
 ## 总共有三种级别：日志消息级别，logger级别， handler级别
+
+# 日志消息级别：日志记录器和处理器都可以设置级别，级别可以过滤日志消息
+# logger级别：logger可以设置级别，级别可以过滤日志消息
+# handler级别：handler可以设置级别，级别可以过滤日志消息
+
+print("")
+print("========================================")
+print("")
+
+# logging.basicConfig(level=logging.INFO),放在顶部生效，设置root的级别
+log = logging.getLogger('t1')
+
+print(log.level) # 0
+
+log.info('test info ~~~') 
+# 控制台输出 INFO:t1:test info ~~~
+
+# 未输出的原因
+# 1. 日志记录器默认级别是WARNING，INFO级别的消息不会输出
+# 2. 日志记录器可以设置级别，级别可以过滤日志消息
+"""
+def info(self, msg, *args, **kwargs):
+    if self.isEnabledFor(INFO): # 判断是否输出, 级别是否大于等于INFO
+        self._log(INFO, msg, args, **kwargs)
+
+ def isEnabledFor(self, level):
+        if self.disabled:
+            return False
+
+        try:
+            return self._cache[level]
+        except KeyError:
+            _acquireLock()
+            try:
+                if self.manager.disable >= level:
+                    is_enabled = self._cache[level] = False
+                else:
+                    is_enabled = self._cache[level] = (
+                        level >= self.getEffectiveLevel() # 布尔值，判断级别是否大于等于日志记录器的级别
+                    )
+            finally:
+                _releaseLock()
+            return is_enabled
+"""
+log1 = logging.getLogger('t1.t2')
+print(log1.level, log1.getEffectiveLevel()) # 0 30
+
+log.warning('test warning ~~~') # 输出 WARNING:t1.t2:test warning ~~~
+log.setLevel(40) # 设置日志记录器的级别
+print(log1.level, log1.getEffectiveLevel()) # 0, 40
+log1.setLevel(logging.DEBUG) # 设置日志记录器的级别
+log1.debug('test log1 debug ~~~') 
+
+
+# 总结：
+# 1. 日志记录器默认级别是WARNING，INFO级别的消息不会输出
+# 2. 日志记录器可以设置级别，级别可以过滤日志消息
+# 3. 日志记录器和处理器都可以设置级别，级别可以过滤日志消息
+# 4. 日志记录器和处理器都可以设置级别，级别可以过滤日志消息
+
+
+# 格式字符串
+# 日志消息内容 %(message)s
+# 日志消息级别 %(levelnamej)s
+# 日志记录器名字 %(name)s
+# 日志记录器所在文件 %(filename)s
+# 日志记录器所在行号 %(lineno)d
+# 日志记录器所在方法 %(funcName)s
+# 日志记录器所在线程 %(thread)d
+# 日志记录器所在线程ID %(threadName)s
+# 日志记录器所在进程 %(process)d
+# 日志记录器所在进程ID %(processName)s
+
