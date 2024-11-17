@@ -793,6 +793,23 @@ docker run --name nginx01 --restart always -d nginx:1.22
 docker run ubuntu:22.04 cmd
 ```
 
+#### 详解--restart的四种policy
+```shell
+# no: 默认策略，不会自动重启容器
+docker run --name mycontainer --restart no myimage
+
+# no-failure[:max-retries]: 如果容器因错误退出（非零退出码），则重启容器，可以选择性地指定最大重启次数
+docker run --name mycontainer --restart on-failure:5 myimage
+
+# always：无论容器因何原因停止，都会重启容器。如果手动停止容器，只有在Docker守护进程重启或手动重启容器时才会重新启动(这里意味容器因错误退出可能导致无限重启，所以建议在这里配置一个监控项并设置报警或者触发器，以防止容器重现重启导致的负载上升)
+docker run --name mycontainer --restart always myimage
+
+# unless-stopped：类似于always，但如果容器被手动停止，则不会在Docker守护进程重启后重新启动
+docker run --name mycontainer --restart unless-stopped myimage
+
+# always和unless-stopped都可以实现开机自启，不同点在于，如果手动停止容器后，重启docker进程，比如systemctl restart docker,此时always会重启容器，而unless-stopped不会
+```
+
 ### 停止容器
 ```shell
 # docker stop [container_NAMES]
@@ -1116,6 +1133,7 @@ docker run -d --tmpfs/data --name test <镜像名>:<tag>
 
 
 ## 容器的网路管理
+
 
 ```shell
 # 查询网桥
