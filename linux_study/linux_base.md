@@ -11874,6 +11874,26 @@ pool 0.ubuntu.pool.ntp.org iburst maxsources 1
 pool 1.ubuntu.pool.ntp.org iburst maxsources 1
 pool 2.ubuntu.pool.ntp.org iburst maxsources 2
 
+# maxsources 4 详解
+# 作用：
+# 指定最大源数：maxsources 定义了从指定的池（例如 ntp.ubuntu.com）中最多可以使用的时间源（NTP 服务器）数量。
+# 控制同步的时间源：在 NTP 中，一个池（pool）可能包含许多 NTP 服务器，例如 pool.ntp.org 通常包含全球范围内的多个服务器。maxsources 选项可以限制从这个池中选择的服务器数量。
+
+# 为什么需要 maxsources？
+# 减少资源消耗：
+# 如果不限制 maxsources，系统可能会尝试与池中的许多服务器同步，增加网络负载和资源消耗。
+# 限制服务器数量有助于平衡网络流量和同步精度。
+
+# 提高同步效率：
+# NTP 通常需要与多个服务器比较时间，选择最稳定的时间源。选择 3-5 个时间源通常已足够提供高精度的同步。
+# 避免冗余：
+# 对于单个客户端，使用过多的时间源不会显著提高同步精度，但会增加不必要的查询和流量。
+
+# 默认行为：如果没有指定 maxsources，系统会根据默认策略决定使用多少个服务器：
+# 大多数情况下，默认值是 10。
+# 这意味着系统可能会尝试与池中的多达 10 个服务器建立连接。
+
+
 # Use time sources from DHCP.
 sourcedir /run/chrony-dhcp
 
@@ -11949,6 +11969,23 @@ Root dispersion : 0.001142370 seconds
 Update interval : 64.7 seconds                             # 最近两次时钟更新的间隔
 Leap status     : Normal
 
+# 扩展:NTP的分层结构
+# 1. Stratum 0（参考时钟）：
+# 这是最顶层的时间源，通常是非常精确的硬件时钟（如 GPS 接收器、原子钟或高精度的参考时钟）。
+# 它不能直接通过网络访问
+
+# 2. Stratum 1（直接连接的服务器）：
+# 这些服务器直接连接到 Stratum 0 的参考时钟设备，并通过它们提供时间。
+# 它们是网络上最可靠的时间服务器。
+
+# 3. Stratum 2（客户端服务器）：
+# stratum 2 的服务器从 Stratum 1 的服务器获取时间。
+# 它们也可以向 Stratum 3 的客户端提供时间。
+# 您的系统是一个 Stratum 2 设备。
+
+# 4. Stratum N（层级 N 的设备）：
+# 每向下同步一级，层级数字加一。例如，Stratum 3 从 Stratum 2 获取时间，Stratum 4 从 Stratum 3 获取时间，以此类推。
+
 # 列出当前可用的ntp服务器
 chronyc> activity
 200 OK
@@ -12007,6 +12044,28 @@ vim /etc/chrony/chrony.conf
 
 # 添加下列行
 server ntp.aliyun.com iburst (为高可用性，通常至少写两条)
+
+# 详解iburst和burst
+# 启用 iburst 的效果
+
+# 1. 没有 iburst 时：
+# 系统在启动后会每隔 64 秒发送一次时间同步请求，直到成功。
+# 如果网络条件不佳，初次同步可能会很慢。
+
+# 2. 启用 iburst 时：
+# 系统在启动时会立即向 NTP 服务器快速发送 4 个同步请求包。
+# 如果服务器响应正常，初次同步可以在几秒钟内完成。
+
+# iburst
+# 仅在初次尝试同步时生效。
+# 目的是加快初次时间同步
+# 不会对服务器造成过多压力。
+
+# burst
+# 在每次同步时都发送多次请求
+# 适用于高精度时间同步，但对服务器压力较大。
+#
+# 通常推荐使用 iburst，而非 burst。
 
 # 重启服务
 systemctl restart chronyd.service
