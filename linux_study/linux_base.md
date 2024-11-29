@@ -13769,7 +13769,40 @@ ssh-copy-id backup-server
 <auth start="false" usrs="root" passwordfile="/etc/rsync.pas">
 ```
 
+
+
+#### 排查方法
+
+``````bash
+cat /tmp/rsync_fail_log.sh
+
+#errno -1
+cd /data/dir1 && rsync -artuz -R --delete ./   --include="a.txt" --exclude=*  rsyncer@10.0.0.231::dir1 --password-file=/etc/rsyncd.pwd >/dev/null 2>&1 
+
+#errno -1
+cd /data/dir1 && rsync -artuz -R "./aa/bb" rsyncer@10.0.0.231::dir1 --password-file=/etc/rsyncd.pwd >/dev/null 2>&1 
+
+#errno -1
+cd /data/dir1 && rsync -artuz -R "./aa" rsyncer@10.0.0.231::dir1 --password-file=/etc/rsyncd.pwd >/dev/null 2>&1 
+
+# 将报错语句的重定向去掉，查看报错
+cd /data/dir1 && rsync -artuz -R "./aa" rsyncer@10.0.0.231::dir1 --password-file=/etc/rsyncd.pwd
+
+ERROR: password file must not be other-accessible
+rsync error: syntax or usage error (code 1) at authenticate.c(197) [sender=3.2.3]
+
+# 报错显示密码文件不能被其他人访问，但是当前可以所以报错，说明是权限问题
+#更改密码文件权限
+
+chmod 600 /etc/rsyncd.pwd
+``````
+
+
+
+
+
 ## Web服务
+
 ### Web访问响应模型（Web I/O）
 - 单进程I/O模型：启动一个进程处理用户请求，而且一次只处理一个，多个请求被串行
 - 多进程I/O模型：并行启动多个进程，每个进程响应一个链接请求
