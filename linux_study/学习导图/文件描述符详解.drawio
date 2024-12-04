@@ -1,0 +1,142 @@
+<mxfile host="Electron" modified="2024-12-04T08:31:36.734Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.0.2 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="XUbcdVCQDMEB12aiaCm5" version="23.0.2" type="device">
+  <diagram name="第 1 页" id="yGCN4YHG0LLqCs2lFoyU">
+    <mxGraphModel dx="1221" dy="823" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="iUKypHumC4xNv6vaeFEt-64" value="" style="group" parent="1" vertex="1" connectable="0">
+          <mxGeometry x="30" y="90" width="1550" height="960" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-5" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="340" y="120" width="620" height="360" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-1" value="&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp;&lt;b&gt;struct fdtable {&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;struct file **fd;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;//&amp;nbsp;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;unsigned long *close_on_exec;&amp;nbsp; // close-on-exec 位图&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;unsigned long *open_fds;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // 打开文件描述符的位图&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;unsigned long max_fds;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 最大文件描述符数量&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;struct rcu_head rcu;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // 用于 RCU（Read-Copy Update）机制的回收&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp;};&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="415" y="300" width="490" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-2" target="iUKypHumC4xNv6vaeFEt-5" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-2" value="程序" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry y="180" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-4" value="通过文件描述符操作对应文件" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="140" y="170" width="170" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-6" value="进程结构" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="585" y="130" width="120" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-10" value="&lt;b&gt;文件描述符数组（指针数组）&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="640" y="320" width="170" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-13" value="" style="group" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1" connectable="0">
+          <mxGeometry x="430" y="150" width="310" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-7" value="&lt;div&gt;struct task_struct {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; ...&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&amp;nbsp; &amp;nbsp; struct files_struct *files;&amp;nbsp; //&amp;nbsp;&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; ...&lt;/div&gt;&lt;div&gt;};&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-13" vertex="1">
+          <mxGeometry width="310" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-12" value="文件描述符表" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-13" vertex="1">
+          <mxGeometry x="170" y="50" width="120" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-16" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-12" target="iUKypHumC4xNv6vaeFEt-1" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-25" value="&lt;strong style=&quot;border-color: var(--border-color); text-align: left;&quot;&gt;管理进程打开的文件描述符&lt;/strong&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="570" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-26" value="&lt;span style=&quot;border-color: var(--border-color); text-align: left;&quot;&gt;&lt;b&gt;支持文件操作&lt;/b&gt;&lt;br&gt;（通过定位全员文件打开表）&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="770" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-27" value="&lt;span style=&quot;border-color: var(--border-color); text-align: left;&quot;&gt;&lt;b&gt;资源共享和管理&lt;/b&gt;&lt;br&gt;（通过引用计数管理支持多线程共享文件描述符表）&lt;br&gt;（支持进程间的文件描述符继承，通过fork）&lt;br&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="960" width="330" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-28" value="&lt;span style=&quot;border-color: var(--border-color); text-align: left;&quot;&gt;&lt;b&gt;辅助文件描述符的特殊行为&lt;br&gt;&lt;/b&gt;(维护位图加速文件描述符的分配和释放)&lt;br&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="1060" y="182.5" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-29" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;curved=1;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-12" target="iUKypHumC4xNv6vaeFEt-25" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-30" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-12" target="iUKypHumC4xNv6vaeFEt-26" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-32" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-12" target="iUKypHumC4xNv6vaeFEt-28" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-34" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-12" target="iUKypHumC4xNv6vaeFEt-27" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-41" value="" style="group" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1" connectable="0">
+          <mxGeometry x="495" y="520" width="330" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-38" value="&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;task_struct&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp;└── files -&amp;gt; files_struct&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;└── fdt -&amp;gt; fdtable&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;├── fd[] (文件描述符数组)&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;│&amp;nbsp; &amp;nbsp; &amp;nbsp;├── fd[0] -&amp;gt; struct file (stdin)&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;│&amp;nbsp; &amp;nbsp; &amp;nbsp;├── fd[1] -&amp;gt; struct file (stdout)&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;│&amp;nbsp; &amp;nbsp; &amp;nbsp;├── fd[2] -&amp;gt; struct file (stderr)&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;│&amp;nbsp; &amp;nbsp; &amp;nbsp;├── fd[3] -&amp;gt; struct file (file1)&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;│&amp;nbsp; &amp;nbsp; &amp;nbsp;└── ...&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;├── close_on_exec (位图)&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;├── open_fds (位图)&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;└── max_fds (最大文件描述符数)&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;align=left;spacingLeft=18;" parent="iUKypHumC4xNv6vaeFEt-41" vertex="1">
+          <mxGeometry width="330" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-40" value="简化示意图" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontFamily=Helvetica;fontColor=default;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-41" vertex="1">
+          <mxGeometry x="130" y="10" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-39" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-1" target="iUKypHumC4xNv6vaeFEt-38" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-42" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-38" target="iUKypHumC4xNv6vaeFEt-36" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-45" value="inode缓存区" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="1360" y="526.5" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-49" value="" style="group" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1" connectable="0">
+          <mxGeometry x="960" y="465" width="350" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-36" value="&lt;div&gt;struct file {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct path f_path;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // 文件的路径信息&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct inode *f_inode;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;//&amp;nbsp;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; const struct file_operations *f_op; // 文件操作函数指针&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; loff_t f_pos;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // 文件的偏移量&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; ...&lt;/div&gt;&lt;div&gt;};&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;div style=&quot;border-color: var(--border-color);&quot;&gt;struct file {&lt;/div&gt;&lt;div style=&quot;border-color: var(--border-color);&quot;&gt;&amp;nbsp; &amp;nbsp; ...&lt;/div&gt;&lt;div style=&quot;border-color: var(--border-color);&quot;&gt;};&lt;/div&gt;&lt;/div&gt;&lt;div style=&quot;border-color: var(--border-color);&quot;&gt;&lt;br&gt;&lt;/div&gt;&lt;div style=&quot;border-color: var(--border-color);&quot;&gt;&lt;div style=&quot;border-color: var(--border-color);&quot;&gt;struct file {&lt;/div&gt;&lt;div style=&quot;border-color: var(--border-color);&quot;&gt;&amp;nbsp; &amp;nbsp; ...&lt;/div&gt;&lt;div style=&quot;border-color: var(--border-color);&quot;&gt;};&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=17;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-49" vertex="1">
+          <mxGeometry width="350" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-43" value="全局文件打开表&lt;br&gt;（由 &lt;code&gt;struct file&lt;/code&gt; 条目组成的表）" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontFamily=Helvetica;fontColor=default;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-49" vertex="1">
+          <mxGeometry x="55" y="5" width="240" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-44" value="指向文件的 inode 对象" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-49" vertex="1">
+          <mxGeometry x="176" y="79" width="130" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-47" value="操作系统直接管理" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontFamily=Helvetica;fontColor=default;fontStyle=1" parent="iUKypHumC4xNv6vaeFEt-49" vertex="1">
+          <mxGeometry x="106" y="285" width="145" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-46" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-44" target="iUKypHumC4xNv6vaeFEt-45" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-50" value="页缓存（命中）" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="1340" y="660" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-51" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-45" target="iUKypHumC4xNv6vaeFEt-50" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-52" value="磁盘物理块（未命中）" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontStyle=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="1420" y="780" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-54" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-50" target="iUKypHumC4xNv6vaeFEt-52" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-55" value="&lt;b&gt;管理文件状态&lt;br&gt;&lt;/b&gt;(记录文件偏移量、访问模式等关键信息)" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="590" y="870" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-56" value="&lt;b&gt;文件共享&lt;/b&gt;&lt;br&gt;(支持多个进程共享同一个文件)&lt;br&gt;(提高资源利用率)" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="825" y="900" width="190" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-57" value="&lt;strong&gt;统一接口&lt;br&gt;&lt;/strong&gt;通过 &lt;code&gt;file_operations&lt;/code&gt; 抽象文件系统操作" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="1050" y="900" width="220" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-58" value="&lt;strong&gt;高效资源管理&lt;br&gt;&lt;/strong&gt;使用引用计数确保文件条目在不再被使用时回收" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="iUKypHumC4xNv6vaeFEt-64" vertex="1">
+          <mxGeometry x="1290" y="890" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-60" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-36" target="iUKypHumC4xNv6vaeFEt-55" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-61" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-36" target="iUKypHumC4xNv6vaeFEt-56" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-62" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-36" target="iUKypHumC4xNv6vaeFEt-57" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="iUKypHumC4xNv6vaeFEt-63" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" parent="iUKypHumC4xNv6vaeFEt-64" source="iUKypHumC4xNv6vaeFEt-36" target="iUKypHumC4xNv6vaeFEt-58" edge="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

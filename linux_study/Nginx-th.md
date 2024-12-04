@@ -349,8 +349,20 @@ server {
 }
 ```
 
-
 # Nginx的架构基础
+
+
+
+为什么讨论Nginx架构基础：
+
+nginx运行在企业内网的最外层，也就是边缘节点，因此它处理的流量是其他应用服务器处理流量的数倍，甚至是几个数量级，
+
+任何一种问题，在不同的数量级下，它的解决方案是完全不同的，所以在nignx所处理的应用场景中，所有的问题就会被放大，
+
+所以我们必须理解为什么nginx采用master，worker这样一种架构模型，为什么woker进程的数量要和CPU的核数相匹配，当我们需要在多个worker进程间共享数据的时候，为什么在tls或者说在一些限流限速的场景下，他们的共享方式是有所不同过的，这些需要对nginx架构有一个清晰的了解
+
+
+
 ## Nginx的请求流程
 ![alt text](nginx_images/image-4.png)
 
@@ -372,10 +384,176 @@ server {
     - 记录access日志和error日志，这两个日志也是记录磁盘中的，可以通过rsyslog，把它记录到远程主机上
     - 更多的时候，nginx作为负载均衡和反向代理使用
     - 这个时候可以把请求协议级传输到后面的服务器
-    - 也可以通过例如：应用层的一些协议，fasetcgi、uWSGL，SCGL等代理到相应的应用服务器
+    - 也可以通过例如：应用层的一些协议，fasetcgi、uWSGL(Python)，SCGL等代理到相应的应用服务器
+
+
+
+## 状态机的详细讲解与示例
+
+状态机（State Machine）可以用来描述复杂系统中状态之间的转换和行为。以下是一个详细的讲解和实际的例子，帮助你更清晰地理解状态机的概念及其应用。
+
+------
+
+### **1. 什么是状态机**
+
+状态机由以下几个部分组成：
+
+1. 状态（State）
+   - 系统可能处于的某种情况。
+2. 事件（Event）
+   - 导致状态发生改变的触发条件。
+3. 动作（Action）
+   - 状态转换时的操作。
+4. 转换（Transition）
+   - 从一个状态到另一个状态的变化过程。
+
+------
+
+### **2. 示例背景：HTTP 状态机**
+
+以一个 **HTTP 请求处理过程** 为例，Nginx 的 HTTP 状态机可以被描述为：
+
+1. 接收 HTTP 请求。
+2. 解析请求行和请求头。
+3. 检查请求体是否完整。
+4. 生成并发送响应。
+5. 完成请求处理，关闭连接。
+
+------
+
+### **3. 状态机的状态与事件**
+
+#### **状态定义**
+
+在 HTTP 请求处理中，我们可以定义以下状态：
+
+1. **WAIT_REQUEST**：等待接收 HTTP 请求。
+2. **PARSE_HEADERS**：解析请求行和请求头。
+3. **PROCESS_BODY**：处理请求体。
+4. **SEND_RESPONSE**：生成并发送响应。
+5. **DONE**：完成请求处理。
+
+#### **事件定义**
+
+- **RequestReceived**：接收到 HTTP 请求行。
+- **HeadersParsed**：解析请求头完成。
+- **BodyProcessed**：请求体处理完成。
+- **ResponseSent**：响应发送完成。
+
+------
+
+### **4. 状态转移表**
+
+我们可以用一张表描述状态机的行为：
+
+| **当前状态**    | **事件**          | **动作**             | **下一个状态**  |
+| --------------- | ----------------- | -------------------- | --------------- |
+| `WAIT_REQUEST`  | `RequestReceived` | 接收请求行并保存     | `PARSE_HEADERS` |
+| `PARSE_HEADERS` | `HeadersParsed`   | 验证并解析请求头     | `PROCESS_BODY`  |
+| `PROCESS_BODY`  | `BodyProcessed`   | 处理请求体并准备响应 | `SEND_RESPONSE` |
+| `SEND_RESPONSE` | `ResponseSent`    | 发送响应             | `DONE`          |
+| `DONE`          | -                 | 释放资源             | -               |
+
+------
+
+### **5. 图示化状态机**
+
+```
+plaintextCopy codeWAIT_REQUEST  --(RequestReceived)--> PARSE_HEADERS
+PARSE_HEADERS --(HeadersParsed)--> PROCESS_BODY
+PROCESS_BODY  --(BodyProcessed)--> SEND_RESPONSE
+SEND_RESPONSE --(ResponseSent)--> DONE
+```
+
+------
+
+### **6. 示例代码**
+
+以下是一个用伪代码实现的状态机示例：
+
+```
+pythonCopy codeclass HTTPStateMachine:
+    def __init__(self):
+        self.state = "WAIT_REQUEST"
+
+    def handle_event(self, event):
+        if self.state == "WAIT_REQUEST":
+            if event == "RequestReceived":
+                print("Request received, transitioning to PARSE_HEADERS")
+                self.state = "PARSE_HEADERS"
+        elif self.state == "PARSE_HEADERS":
+            if event == "HeadersParsed":
+                print("Headers parsed, transitioning to PROCESS_BODY")
+                self.state = "PROCESS_BODY"
+        elif self.state == "PROCESS_BODY":
+            if event == "BodyProcessed":
+                print("Body processed, transitioning to SEND_RESPONSE")
+                self.state = "SEND_RESPONSE"
+        elif self.state == "SEND_RESPONSE":
+            if event == "ResponseSent":
+                print("Response sent, transitioning to DONE")
+                self.state = "DONE"
+        elif self.state == "DONE":
+            print("Request handling completed.")
+        else:
+            print(f"Unknown state: {self.state}")
+
+# 示例流程
+fsm = HTTPStateMachine()
+
+# 模拟事件触发
+fsm.handle_event("RequestReceived")  # WAIT_REQUEST -> PARSE_HEADERS
+fsm.handle_event("HeadersParsed")    # PARSE_HEADERS -> PROCESS_BODY
+fsm.handle_event("BodyProcessed")    # PROCESS_BODY -> SEND_RESPONSE
+fsm.handle_event("ResponseSent")     # SEND_RESPONSE -> DONE
+```
+
+------
+
+### **7. 实际应用中，状态机的好处**
+
+1. **简化复杂逻辑**：
+   - 将复杂的请求处理分解成多个独立状态。
+   - 每个状态的逻辑清晰、易于维护。
+2. **事件驱动**：
+   - 通过事件触发状态转换，避免阻塞等待。
+3. **扩展性强**：
+   - 可以轻松添加新的状态或事件，而不影响已有逻辑。
+
+------
+
+### **8. 扩展示例：TCP 状态机**
+
+除了 HTTP，TCP 协议本身也是一个典型的状态机。例如：
+
+- **状态**：
+  - `LISTEN`：等待客户端连接。
+  - `SYN_RCVD`：收到 SYN 请求。
+  - `ESTABLISHED`：连接已建立。
+  - `FIN_WAIT`：等待连接关闭。
+- **状态转移**：
+  1. `LISTEN` --(收到 SYN)--> `SYN_RCVD`
+  2. `SYN_RCVD` --(收到 ACK)--> `ESTABLISHED`
+  3. `ESTABLISHED` --(收到 FIN)--> `FIN_WAIT`
+
+------
+
+### **9. 状态机的总结**
+
+- 状态机是描述系统中状态及其转换的一种有效方式。
+- 在 Nginx 中，状态机用于管理异步请求的处理过程，将复杂的逻辑拆解为简单的状态和事件。
+- 通过状态机，Nginx 实现了高效的请求管理，支持 HTTP、TCP、UDP 等多种协议的异步处理。
+
+这种设计不仅提高了代码的可维护性和扩展性，也显著提升了系统的并发处理能力。
+
+
+
 
 
 ##  Nginx的进程结构
+
+nginx有两种进程结构：单进程结构和多进程结构， 默认配置是多进程nginx
+
 ### 单进程结构
 不适合生产环境，只适合我们做开发，调试用的
 
@@ -392,26 +570,171 @@ Nginx在使用多线程的时候，因为线程之间是共享同一个地址空
 ```shell
 Master 进程 --> Worker进程 --> Cache manager --> Cache loader
 # nginx的父子进程间的通信是通过信号进行管理的
+# cache manager 和 cache loader 不会默认启动，只有在配置了缓存功能时才会启动。
 ```
 
-#### Nginx的进程结构实例演示
+Nginx在做进程设计时，同样遵循了实现高可用，高可靠的目的，比如：在Master进程中，通常第三方模块是不会在这里加入自己的功能代码的，虽然在Nginx在设计时，允许第三方模块在master进程中，添加自己独有的自定义的方法，但是通常没有第三方模块会这么做。master进程被设计的目的是用来做worker进程的管理的，也就是说，所有的worker进程，使用来处理真正的请求的，而master进程负责监控每个worker进程是不是在正常的工作，需不需要做重新载入配置文件，需不需要做部署。
+
+
+
+Cache缓存，实际上是在多个worker进程间共享的，而且缓存不仅要在worker进程间使用，还要被CacheManger和Cache Loader进程使用，CacheManager和Cache Loader也是为反向代理时后端发来的动态请求做缓存所使用的，Cache Loader只是用来做缓存的载入，Cache Manager是用来做缓存的管理，实际上每一个请求处理时使用的缓存还是由worker进程来进行的，这些进程间的通信，都是使用共享内存来解决的，在这个结构里，worker进程有很多，而Cache Manager和Cache Loader只有一个，而Master进程因为是父进程，肯定只有一个，worker进程有很多的原因：nginx采用事件驱动的模型后，它希望每个worker进程，从头到尾占有一个CPU，所以往往我们除了把woker进程的数量和我们的CPU核数设置一致以外，还需要把每一个worker进程和某个CPU核绑定在一起，这样可以更好的使用每个CPU核上面的CPU缓存，还减少缓存失效的命中率
+
+
+
+### Nginx父子进程间是通过信号进行管理
+
+命令中的很多子命令都是发送信号给进程
+
+``````bash
+[root@ubuntu2204 /apps/nginx/conf]$ pstree -p|grep nginx
+           |-nginx(6376)-+-nginx(6484)
+           |             `-nginx(6485)
+[root@ubuntu2204 /apps/nginx/conf]$ pstree -p|grep nginx
+           |-nginx(6376)-+-nginx(6484)
+           |             `-nginx(6485)
+           
+# 旧的worker进程和cache进程退出，新的worker进程和cache生成
+# 等价于 kill -SIGHUP <父进程>
+[root@ubuntu2204 /apps/nginx/conf]$ nginx -s reload
+[root@ubuntu2204 /apps/nginx/conf]$ pstree -p|grep nginx
+           |-nginx(6376)-+-nginx(6504)
+           |             `-nginx(6505)
+           
+           
+# 发送一个SIGTERM信号该指定worker进程，会使其退出，
+# 但是master进程检测worker进程退出后，会自动创建一个新worker进程，维持总共2个worker进程的架构
+[root@ubuntu2204 /apps/nginx/conf]$ pstree -p|grep nginx
+           |-nginx(6376)-+-nginx(6504)
+           |             `-nginx(6505)
+[root@ubuntu2204 /apps/nginx/conf]$ kill -SIGTERM 6504
+[root@ubuntu2204 /apps/nginx/conf]$ pstree -p|grep nginx
+           |-nginx(6376)-+-nginx(6505)
+           |             `-nginx(6515)
+
+``````
+
+
+
+
+
+## Nginx进程管理：信号
+
 ```shell
+# Master进程
+监控worker进程
+- CHLD ----- 当子进程终止的时候，回向父进程发送CHLD信号，如果Worker进程由于一些模块，出现bug，导致意外终止，Master进程可以立刻通过CHLD发现这个事件，然后重新把Worker进程拉起
 
+Master进程还可以接受一些信号管理Worker进程
+TERM,INT ----- 立即停止nginx进程
+QUIT     ----- 优雅的停止nginx进程
+HUP      ----- 重载配置文件
+USR1     ----- 重新打开日志文件，做日志文件的切割
+
+管理worker进程
+
+接收信号
+- TERM, INT
+- QUIT
+- HUP
+- USR1
+- USR2       ------- 针对热部署时使用 
+- WINCH      ------- 针对热部署时使用 
+
+# Worker进程
+接收信号   ----------- 通常不会向worker进程发送信号，因为我们希望让Master进程来管理Worker进程，实际上直接向worker进程发送信号是一样的，但是我们通常是将信号发送给Master进程，然后Master进程会给Worker进程发送信号
+- TERM, INT
+- QUIT
+- USR1
+- WINCH
+
+# nginx命令行
+# 当我们启动了nginx之后，nginx会把它的PID寄到一个文件中，通常默认是Nginx安装目录的logs文件下的nginx.pid文件中，这里会记录master进程的pid
+[root@ubuntu2204 /apps/nginx/logs]$ pwd
+/apps/nginx/logs
+[root@ubuntu2204 /apps/nginx/logs]$ cat nginx.pid 
+6376
+
+# 当我们再次执行nginx -s，nginx这个工具命令行会读取pid文件中的master文件中的pid，然后想这个pid中发送下面各种信号
+reload: HUP
+reopen: USR1
+stop: TERM
+quit: QUIT
 ```
 
 
-#### reload流程
+
+## reload流程
+
 - 向master进程发送HUP信号(reload命令)
 - master进程校验配置语法是否正确
-- master进程打开新的监听端口
+- master进程打开新的监听端口，而worker进程会继承父进程打开的端口，这个是linux操作系统中定义的
 - master进程用新配置启动新的worker子进程
-- master进程向老worker子进程发送QUIT信号
-- 老worker进程关闭监听句柄，处理完当前连接后结束进程
+- master进程向老worker子进程发送QUIT信号，这里QUIT是优雅退出，这里要注意顺序，一定是先启新的worker子进程，再发送QUIT信号，保证平滑
+- 老的worker进程收到信号后，老worker进程关闭监听句柄（此时新的连接只会到新的worker子进程），处理完当前连接后结束进程
+- 在新版本中，会有个参数`worker_shutdown_timeout`这个是如果在启新的子进程时，老的子进程上会有一个定时器，超时会强制关闭
+
+
+
+## 热升级的完整流程
+
+##  
+
+- 将旧nginx文件换成新nginx文件（binary文件）--- （注意备份）
+  - 新编译的nginx文件所指定的响应的配置选项，比如配置文件的目录在哪里，log的所在目录等等必须和老的nginx保持一致，否则无法复用nginx.conf文件
+  - 新版本linux中，会要求使用`cp -f`才能替换正在运行的binary文件
+- 向master进程发送USR2信号
+- master收到信号后，会做如下几件事
+  - master进程修改pid文件，加后缀`.oldbin` ---- 给新的master进程让路，让新的master使用pid.bin这个文件名
+  - master进程使用新的nginx文件启动新master进程 --- 此时会出现两个master进程和老的worker进程
+- 向老的master进程发送QUIT信号  --->  关闭老master进程，老master进程会优雅关闭老worker进程，老master进程会一直保持下来，等待后续可能得回滚操作
+- 回滚：向老master进程发送HUP，向新master发送QUIT
+
+
+
+## Worker进程：优雅关闭
+
+优雅关闭只对worker进程而言，因为只有worker进程会去处理请求，如果我们在处理一个连接的时候，不管连接对于请求是一个怎样的作用，我们直接关闭这个链接，会导致用户收到错误，所以优雅的关闭就是指nginx的worker进程可以**识别出当前的链接没有正在处理的请求**，这个时候我们再把连接关闭
+
+
+
+对于有些请求，nginx是做不到优雅关闭的，比如nginx代理websocket协议的时候，在websocket进行通信的frame帧里面，nginx是不解析这个帧的，所以这个时候是没有办法识别当前连接是否有正在处理的请求，nginx在做tcp或UDP层反向代理的时候，也没有办法识别一个请求需要经历多少报文，才算结束，但是对于HTTP请求，nginx是可以做到的，**所以优雅的关闭主要针对http请求**
+
+
+
+### 优雅关闭的流程
+
+
+
+- 设置一个定时器，在nginx.conf中配置一个`worker_shutdown_timeout`，设置完定时器后，会加一个标志位，表示现在进入优雅关闭的这个流程
+- 然后关闭监听句柄，也就是保证当前所在的worker进程不会再去处理新的连接请求
+- 然后会去看连接池，因为nignx实际上为了保证自己对资源的利用是最大化的，经常会保存一些空闲的连接，但是没有断开，这是会关闭所有的空闲连接
+- （第四步可能是时间非常长的一步）因为nginx不是主动的立即关闭，所以通过第一步增加一个标志位，在循环中每当发现一个请求处理完毕，就会把这个请求使用的连接关掉，在循环中等待全部连接关闭的时间可能会超过第一步中的`worker_shutdown_timeout`的时间，当我们设置了这个参数，那么即使请求还没有处理完，这些连接都会被强制关闭，也就是说优雅关闭只完成一半。
+  - 也就是说，两个条件---> 所有连接都关闭或者达到`worker_shutdown_timeout`的时间
+- 然后worker进程关闭退出
+
+
+
+很多时候我们都会使用到这个特性（优雅关闭退出），当这个特性失效的时候，我们需要考虑nginx有没有能力去判定一个连接此时应当被正确关掉，或者如果出现错误，有些模块或客户端不能正常处理请求时，nginx需要有一些例外的措施，比如：`worker_shutdown_timeout`l来保证nginx老的进程能够正常的退出掉
+
+
 
 ## 网络收发与Nginx事件间的对应关系
 
 Nginx是一个事件驱动的框架，所谓事件指的是网络事件，Nginx每一个连接会自然对应两个网络事件，一个读事件，一个写事件。
 所以，我们在深入了解Nginx的各种原理，及它在极端场景下的一些错误场景的处理时，我们必须首先理解什么是网络事件
+
+
+
+比如当主机A向服务端主机B发送一个GET请求时，这个过程中经历了哪些网络事件
+
+- 应用层里发送了一个HTTP请求
+- 传输层：我们浏览器打开了一个端口（可以从Windows的任务管理器上看到这一点），然后它会把这个端口记下来，以及将nignx打开的端口比如80或443也记到传输层
+- 网络层会记录我们主机所在IP，和目标主机，也就是nginx所在服务器的公网IP
+- 在链路层，经过以太网到达家里的路由器 ---> 路由器里会记录运行商的下一段的IP，经过广域网最终跳转到主机B所在的机器中，这个时候，报文会通过链路层，网络层，传输层，最终到传输层后，操作系统就知道是将报文给到打开80或443端口的进程，也就是nginx服务，nginx在它的http状态处理机里面就会处理这个请求
+
+
+
+在上述过程中，网络报文扮演了一个怎样的角色？
 
 了解TCP报文
 在数据链路层，它会在数据的前面header部分和最尾的footer部分添加上mac地址，包括源mac地址，目标mac地址
@@ -442,6 +765,11 @@ MSS（最大报文段长度）：MSS是TCP层特有的概念，它表示在不�
   - Accept()
   - Read()
   - Write()
+  - close()
+
+
+
+### 读事件
 
 #### 请求建立TCP连接事件 ---> accept建立连接事件
 比如：请求建立TCP连接事件，实际上是发送了一个TCP的报文，通过上述流程到达Nginx，这个网络事件其实对应的是一个读事件，对nginx来说我读取到了一个报文，也就是accept建立连接的事件
@@ -452,10 +780,19 @@ MSS（最大报文段长度）：MSS是TCP层特有的概念，它表示在不�
 #### TCP连接关闭事件
 对于nginx来说，依然是读事件，因为对于nginx来说，它只是读取一个报文
 
-#### 写事件
+### 写事件
 当我们的nginx需要向浏览器发送一个响应报文时，我们需要把消息写到操作系统中，要由操作系统发送到网络中，这就是一个Write写事件
 
+
+
+![image-20241204164337742](C:\Users\31403\AppData\Roaming\Typora\typora-user-images\image-20241204164337742.png)
+
+
+
+网络中的读写事件，在nginx中，或者在任何一个异步事件的处理框架中，它一定会有一个事件收集分发器，
+
 ### 事件收集分发器
+
 我们会定义每一类事件，他处理的消费者，也就事件它本身是一个生产者，是网络中自动生产到nginx中的，我们对每种事件要建立一个消费者
 - 比如连接建立的事件消费者，就是我们对accept()的调用，那么http模块就会去建立一个新的连接
 - 还有很多读消息或者写消息，那么在http的状态机中，不同的时间段，我们会调用不同的方法，也就是每一个消费者去处理。
@@ -482,13 +819,15 @@ MSS（最大报文段长度）：MSS是TCP层特有的概念，它表示在不�
 Nginx的读事件：
 Nginx作为一个事件驱动的服务器，会等待内核的通知，通常通过epoll（或kqueue在BSD系统上）监听新连接的到来。内核收到ACK包后，Nginx的事件循环就会被唤醒，并触发相应的读事件（也就是开始处理来自浏览器的HTTP请求）。这个读事件对应的是一个建立新连接，所以nginx此时应该调用accept()这个方法，去建立一个新的连接
 
+
+
 ## Nginx的事件驱动模型
 ### Nginx事件循环
 ![alt text](nginx_images/image-5.png)
 
 当nginx刚刚启动的时候，我们在`WAIT FOR EVENTS ON CONECTIONS`，也就是我们打开了80或者443端口，这个时候，我们在等待新的事件进来（比如：新的客户端连上了我们的nginx，它向我们发起了连接，我们在等待这样的事件）
 
-这个步骤往往对应着我们epoll中的`epollwait`这样一个方法
+这个步骤往往对应着我们epoll中的`epollwait`这样一个方法（此时Nginx处于sleep进程状态的）
 
 epoll_wait 是 Linux 中 epoll 机制的一部分，用来高效地处理大量的并发连接。它是一个阻塞调用，等待内核监听的文件描述符（例如，socket、文件等）上发生事件。当事件发生时，epoll_wait 会返回这些事件，通知应用程序去处理。
 
@@ -508,7 +847,13 @@ epoll_wait 是 Linux 中 epoll 机制的一部分，用来高效地处理大量�
 比如gzip这种模块，它们都不会一次性使用大量CPU，都是分段使用都与这是有关系的
 
 
-#### epoll的基本概念
+
+在上述循环流程中，最关键的就是Nginx怎样能够快速的从操作系统的Kernel中获取到等待处理的事件，这么一个简单的步骤，其实经历了很长时间的解决，比如：到现在Nginx主要在使用Epoll这样一个网络事件收集器的模型
+
+
+
+
+## epoll的基本概念
 epoll 是 Linux 提供的一种高效的 I/O 事件通知机制，尤其适用于需要处理大量并发连接的场景，比如 Web 服务器、代理服务器等。相比于传统的 select 和 poll，epoll 可以处理大规模并发连接，而不会随着监听的文件描述符数量增加而线性增长
 
 - 事件驱动：Nginx 是事件驱动的服务器，它通过 epoll 等机制来处理 I/O 事件，如新连接、可读/可写事件等。
@@ -571,6 +916,115 @@ epoll维护了一个数据结构，叫eventpoll，然后他通过两个数据结
 然后我们还会经常做，比如说nginx收到80端口建立连接的请求，那么收到80连接的端口建立连接后，我要添加一个读事件，这个读事件是用来读取http消息的，这个时候我可能会添加一个新的事件，比如写事件添加进来，将其放入一个红黑树中，这个二叉平衡树可以保证我的查找效率是2logn，如果我现在不想处理读写事件，我只需要从这个红黑树中移除一个节点即可，所以它的效率非常高
 
 红黑树中的每个节点都是基于epitem结构中的rdllink成员
+
+
+
+### Nginx中链表和红黑树的关系
+
+
+
+### **1. 红黑树的作用**
+
+红黑树在 Nginx 中的主要作用是用来**管理所有已建立的连接**，无论这些连接是否活跃。它是一个快速查找结构，能够高效地进行插入、删除和查找操作。
+
+#### **特点**
+
+1. **存储所有连接**：
+   - 每当有一个新的连接建立时，Nginx 会将该连接插入到红黑树中。
+   - 无论连接是活跃的还是非活跃的，都需要先存储到红黑树中。
+2. **快速查找**：
+   - 红黑树是一个自平衡二叉搜索树，查找操作的时间复杂度是 **O(log n)**。
+   - Nginx 需要频繁地对连接进行操作（如超时检查、删除等），红黑树提供了高效的查找性能。
+3. **连接管理**：
+   - 红黑树用于存储所有的连接，因此是 Nginx 连接管理的基础。
+
+------
+
+### **2. 链表的作用**
+
+链表在 Nginx 的 `epoll` 实现中主要用于管理**当前活跃的连接**，即那些在某个事件循环周期中有 I/O 事件的连接。
+
+#### **特点**
+
+1. **只存储活跃连接**：
+   - 当一个连接上有可读或可写事件时，`epoll` 会将其标记为活跃，并添加到链表中。
+2. **快速遍历**：
+   - 链表的结构适合顺序遍历。在每个事件循环周期中，Nginx 通过遍历链表处理所有的活跃连接。
+3. **短期存储**：
+   - 链表中的连接只在当前事件循环周期内存在，当该周期结束时，链表会被清空。
+
+------
+
+### **3. 红黑树和链表的关系**
+
+红黑树和链表在 Nginx 的 `epoll` 实现中是密切相关的，分别管理不同范围的连接：
+
+1. **红黑树存储全局连接**：
+   - 所有的连接（活跃或非活跃）都存储在红黑树中，用于管理生命周期。
+2. **链表存储活跃连接**：
+   - 链表中只存储当前有事件发生的连接。
+   - 这些连接也是红黑树中的节点，但链表中存储的只是这些节点的引用。
+3. **红黑树是静态集合，链表是动态集合**：
+   - 红黑树是所有连接的全局集合，不会因为事件循环的结束而清空。
+   - 链表是动态集合，每个事件循环周期都会被重新构建。
+4. **连接的生命周期**：
+   - 一个新连接建立后，会插入到红黑树中。
+   - 当该连接有 I/O 活动时，`epoll` 会将其标记为活跃，并引用到链表中。
+   - 事件处理完成后，连接仍然留在红黑树中，等待下次事件。
+
+------
+
+### **4. 示例流程**
+
+以下是连接在红黑树和链表之间的流转过程：
+
+1. **新连接到来**：
+   - 新的连接通过 `accept` 接收。
+   - 插入红黑树中，表示它是一个被 Nginx 管理的连接。
+2. **I/O 事件触发**：
+   - 当连接上有 I/O 活动（如可读或可写事件）时，`epoll` 检测到这些事件。
+   - 连接被添加到链表中，等待在本次事件循环中处理。
+3. **事件处理**：
+   - Nginx 遍历链表，逐一处理活跃连接上的事件。
+   - 事件处理完成后，连接从链表中移除，但仍然存在于红黑树中。
+4. **连接关闭**：
+   - 当连接被关闭（如超时或客户端断开），它会从红黑树中删除，完全退出 Nginx 的管理。
+
+------
+
+### **5. 结构总结**
+
+| 数据结构   | 存储内容                | 特点                 | 用途                             |
+| ---------- | ----------------------- | -------------------- | -------------------------------- |
+| **红黑树** | 所有连接（活跃+非活跃） | 高效查找（O(log n)） | 全局管理连接，支持快速查找       |
+| **链表**   | 当前活跃连接            | 高效顺序遍历         | 在事件循环中处理活跃连接上的事件 |
+
+------
+
+### **6. 为什么需要两种结构**
+
+1. **红黑树的作用是全局管理**：
+   - 红黑树的作用是存储所有的连接，提供高效的查找、插入和删除操作。
+   - 这是连接生命周期管理的核心。
+2. **链表的作用是高效处理活跃连接**：
+   - 在事件循环中，链表的顺序遍历性能高，可以快速处理当前活跃的连接。
+   - 链表不适合管理全局连接，因为随机访问性能低。
+
+------
+
+### **7. 总结**
+
+- **红黑树** 用于存储和管理所有连接，支持快速查找、插入和删除。
+- **链表** 用于管理当前活跃的连接，支持事件循环中的高效遍历。
+- 红黑树是全局静态集合，链表是动态的临时集合，两者通过引用关联，协同工作以实现高效的事件处理和连接管理。
+
+
+
+
+
+上面讲到了Nginx如何使用epoll，运行自己的事件驱动框架的，那么这样的事件驱动框架到底能给我们带来怎样的好处，下面我们来看请求切换的场景下，这种事件驱动框架给我们带来的真意  ·
+
+
 
 ## Nginx的请求切换
 ![alt text](nginx_images/image-8.png)
@@ -785,7 +1239,7 @@ nginx使用连接池来增加它对资源的利用率
   - 这是一个数组，就是所谓的连接池，它的大小默认512，这里每个数组的元素就相当于一个连接，而每个连接自动对应一个读事件和一个写事件，因此也有一个read_events和write_events数组的大小，它们大小和connection是一模一样的，而connections数组上的连接和read_events和write_events是根据序号，也就是数组下标对应的，所以我们在考虑nginx能够释放多大性能的时候，首选需要把work_connectinos保证足够使用
   ```shell
   https://nginx.org/en/docs/ngx_core_module.html#worker_connections
-
+  
   Syntax:	worker_connections number;
   Default:  worker_connections 512;  
   Context:	events
@@ -797,7 +1251,7 @@ nginx使用连接池来增加它对资源的利用率
     - 定时器的配置
     ```shell
     https://nginx.org/en/docs/http/ngx_http_core_module.html#client_header_timeout
-
+    
     Syntax:	client_header_timeout time;
     Default: client_header_timeout 60s;
     Context:	http, server
@@ -994,6 +1448,7 @@ char *ngx_module_name [] = {
   - realip_remote_addr
   - realip_remote_port
   
+
 拿到真实用户IP后如何使用?
 基于变量
 如：binary_remote_addr、remote_addr这样的变量，其值就是为真实的IP！这样做连接限制（limit_conn模块）才有意义

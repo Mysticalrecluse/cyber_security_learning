@@ -1092,7 +1092,7 @@ dirname `which cat`
     - Unix的每行末尾只有换行符结束
   - 相互转换需要使用dos2unix
   ```Shell
-  sudo apt install dos2unix
+      sudo apt install dos2unix
   # Windows文本格式转Unix
   dos2unix test.txt
   
@@ -1176,7 +1176,7 @@ dirname `which cat`
   - 命令：`rename`
   ```shell
   关于批量创建和批量修改文件名
-  
+  # rocky
   # 批量创建文件与批量重命名
   # rename <要改的字段> <改之后的字段> <使用通配符表示改的程度>
   [Sun Oct 15 15:34:07 129] root@rocky9:py_test #touch pydemo{1..9}.txt
