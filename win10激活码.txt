@@ -1,0 +1,111 @@
+win10激活码/密匙：
+
+1、专业版：
+
+236TW-X778T-8MV9F-937GT-QVKBB
+
+87VT2-FY2XW-F7K39-W3T8R-XMFGF
+
+KH2J9-PC326-T44D4-39H6V-TVPBY
+
+TFP9Y-VCY3P-VVH3T-8XXCC-MF4YK
+
+J783Y-JKQWR-677Q8-KCXTF-BHWGC
+
+C4M9W-WPRDG-QBB3F-VM9K8-KDQ9Y
+
+2VCGQ-BRVJ4-2HGJ2-K36X9-J66JG
+
+MGX79-TPQB9-KQ248-KXR2V-DHRTD
+
+FJHWT-KDGHY-K2384-93CT7-323RC
+
+ 
+
+神Key(适用各版本)：
+
+KH2J9-PC326-T44D4-39H6V-TVPBY
+
+TFP9Y-VCY3P-VVH3T-8XXCC-MF4YK
+
+236TW-X778T-8MV9F-937GT-QVKBB
+
+87VT2-FY2XW-F7K39-W3T8R-XMFGF
+
+6K2KY-BFH24-PJW6W-9GK29-TMPWP
+
+RHTBY-VWY6D-QJRJ9-JGQ3X-Q2289
+
+ 
+
+常用笔记本激活码：
+
+戴尔 DELL 序列号： 342DG-6YJR8-X92GV-V7DCV-P4K27
+
+联想 LENOVO 序列号： 22TKD-F8XX6-YG69F-9M66D-PMJBM
+
+三星 SAMSUNG 序列号：49PB6-6BJ6Y-KHGCQ-7DDY6-TF7CD
+
+宏基 ACER 序列号： YKHFT-KW986-GK4PY-FDWYH-7TP9F或FJGCP-4DFJD-GJY49-VJBQ7-HYRR2
+
+ 
+
+win10各版本激活密钥
+
+专业版：W269N-WFGWX-YVC9B-4J6C9-T83GX
+
+企业版：NPPR9-FWDCX-D2C8J-H872K-2YT43
+
+家庭版：TX9XD-98N7V-6WMQ6-BX7FG-H8Q99
+
+教育版：NW6C2-QMPVW-D7KKK-3GKT6-VCFB2
+
+专业版N：MH37W-N47XK-V7XM9-C7227-GCQG9
+
+企业版N：DPH2V-TTNVB-4X9Q3-TJR4H-KHJW4
+
+教育版N：2WH4N-8QGBV-H22JP-CT43Q-MDWWJ
+
+企业版LSTB：WNMTR-4C88C-JK8YV-HQ7T2-76DF9
+
+企业版LSTB N：2F77B-TNFGY-69qqF-B8YKP-D69TJ
+
+ 
+
+激活方法：
+
+系统安装完毕后，首先以管理员身份打开CMD命令行窗口，按下Win+X，选择命令提示符(管理员)。
+
+说明：kms.xspace.in是kms服务器地址，可能会失效，如果激活失败，可以自行搜索kms服务器地址，将kms.xspace.in替换成新的地址即可，比如换成kms.03k.org，参考可用的kms激活服务器有哪些
+
+Win10专业版用户请依次输入：
+
+slmgr /ipk W269N-WFGWX-YVC9B-4J6C9-T83GX
+
+slmgr /skms kms.03k.org
+
+slmgr /ato
+
+ 
+
+Win10企业版用户请依次输入：
+
+slmgr /ipk NPPR9-FWDCX-D2C8J-H872K-2YT43
+
+slmgr /skms kms.03k.org
+
+slmgr /ato 
+
+ 
+
+win10家庭版用户依次输入：
+
+slmgr /ipk TX9XD-98N7V-6WMQ6-BX7FG-H8Q99
+
+slmgr /skms kms.03k.org
+
+slmgr /ato
+
+ 
+
+Win10激活密钥key激活次数有限制，不能保证100%激活成功，大家用密钥如果没有激活可以用激活工具激活，成功率更高。小编收集了一个激活成功率最高的Win10激活工具

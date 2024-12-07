@@ -15370,7 +15370,15 @@ worker_cpu_affinity 0101 1010  一个进程可以同时绑定多个CPU  # 实例
 
 # auto 自动，随机结亲源
 worker_processes auto;
-worker_cpu_affinity auto;
+worker_cpu_affinity 不支持 auto，需要手动配置绑定掩码。
+
+# 通过脚本生成 worker_cpu_affinity 配置，实现细粒度的 CPU 绑定。
+CORES=$(nproc) # 获取 CPU 核心数
+for ((i=0; i<$CORES; i++)); do
+    MASK=$(printf "%0${CORES}d" 0 | sed "s/0/1/${i}")
+    echo -n "$MASK "
+done
+
 ```
 
 - 压力测试
@@ -15497,8 +15505,7 @@ http {
     sendfile        on;  # 一种零拷贝的技术
     #tcp_nopush     on; # 开启sendfile的情况下，合并请求后统一发给客户端，必须开启sendfile
     #tcp_nodelay    off; # 开启keepalive模式下的连接是否启用TCP_NODELAY选项，为off时，延迟0.2秒，默认On时，不延迟发送，立即发送用户响应报文。
-
-    # 优化手段之一：同时开启tcp_nodelay和tcp_nopush，如果数据中，小包较多，可以将0.2秒内的多个数据包一起发送给客户，减少IO的次数，节省资源消耗
+    # tcp_nopush 和 tcp_nodelay 两者互斥，不能同时生效
 
     #keepalive_timeout  0;
     keepalive_timeout  65;
@@ -16321,7 +16328,6 @@ server {
 server {
   listen 127.0.0.1:8080;
   server_name www.web.org;
-  a
 }
 ```
 

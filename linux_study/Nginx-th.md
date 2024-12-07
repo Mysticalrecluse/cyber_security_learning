@@ -1230,13 +1230,226 @@ ngx_module_t  ngx_http_module = {
 # 这里分为三类，处理请求，响应过滤（filter），上游交互(upstream)
 ```
 
+
+
+之前谈到的Nginx中的读写事件，这些网络读写事件究竟是怎么引用在nginx之上的，nginx使用了连接池来增加它对资源的利用率，那么Nginx的连接池究竟是如何使用的
+
+
+
 ## Nginx如何通过连接池处理网路请求
+
+
+
+### Nginx 连接池的作用
+
+Nginx 连接池的作用在于高效地管理网络连接资源，提升服务器性能和资源利用率，同时降低连接管理的开销。以下是 Nginx 连接池的核心作用和实现方式：
+
+- **复用连接，减少创建和销毁的开销**
+  - 每次创建或销毁连接都会涉及内核调用，增加系统开销。
+  - 通过连接池，Nginx 可以复用已建立的连接，而不是每次请求都新建连接。这显著减少了开销，提升性能。
+- **降低并发连接管理的负担**
+  - 对于高并发场景，管理大量的短时连接会耗费系统资源。
+  - 连接池通过集中管理连接，减少对内存分配和释放的频繁操作。
+- **提升吞吐量和响应速度**
+  - 连接池允许多个请求复用同一个长连接，减少了连接建立的时间（如 TCP 三次握手）。
+  - 特别是在后端代理中（如与上游服务器通信），连接池能极大减少延迟。
+- **优化资源分配**
+  - 通过连接池，Nginx 可以合理控制最大并发连接数，避免因资源耗尽导致的系统崩溃。
+  - 在高负载情况下，连接池可以设置连接的最大空闲时间或数量，确保资源得到合理利用。
+- **支持长连接和 HTTP Keep-Alive**
+  - 长连接通过复用同一个 TCP 连接处理多个 HTTP 请求，避免了频繁的连接建立和销毁。
+  - 连接池可以高效管理这些长连接，在空闲时将它们放入连接池，等待复用。
+
+
+
+### 实现细节
+
+在 Nginx 的配置中，相关参数控制连接池的行为
+
+**`keepalive`**：
+
+- 用于上游服务器的连接池。
+
+- 示例：
+
+  ```
+  nginxCopy codeupstream backend {
+      server backend1.example.com;
+      server backend2.example.com;
+      keepalive 32; # 配置连接池最大空闲连接数
+  }
+  ```
+
+- 作用：在与上游通信时，Nginx 会复用这些空闲连接。
+
+**`keepalive_timeout`**：
+
+- 配置长连接的空闲超时时间。
+
+- 示例：
+
+  ```
+  nginx
+  
+  
+  Copy code
+  keepalive_timeout 65s;
+  ```
+
+**`worker_connections`**：
+
+- 定义每个 worker 进程允许的最大并发连接数。
+
+- 示例：
+
+  ```
+  nginxCopy codeevents {
+      worker_connections 1024;
+  }
+  ```
+
+**`proxy_http_version`**：
+
+- 配置与上游通信时使用的 HTTP 版本（支持 HTTP/1.1 时启用长连接）。
+
+- 示例：
+
+  ```
+  nginxCopy codeproxy_http_version 1.1;
+  proxy_set_header Connection "";
+  ```
+
+
+
+### worker_connection和Keepalived的关系与区别
+
+
+
+#### `worker_connections` 的作用
+
+- **定义范围**：`worker_connections` 用于限制每个 Nginx worker 进程可以同时打开的最大连接数（包括所有类型的连接，如客户端和上游服务器的连接）。
+
+- **控制层级**：作用在**整个 worker 进程级别**，包括与客户端的连接、与后端服务器（如 upstream）的连接等。
+
+- 示例
+
+  ```
+  nginxCopy codeevents {
+      worker_connections 1024;  # 每个 worker 最多可以有 1024 个并发连接
+  }
+  ```
+
+- 关键点
+
+  - 如果有 4 个 worker 进程，总的连接数理论上最多是 `worker_connections * 4`。
+  - 但实际上，由于客户端和上游的连接各占一部分，所以需要合理规划连接数量。
+
+
+
+#### `keepalive` 的作用
+
+**定义范围**：`keepalive` 用于限制 Nginx 与上游服务器（如后端应用服务器或代理服务器）之间的空闲长连接数量。
+
+**控制层级**：作用在**特定 upstream 块中**，仅影响与该上游服务器的连接池。
+
+**示例**：
+
+```
+nginxCopy codeupstream backend {
+    server backend1.example.com;
+    server backend2.example.com;
+    keepalive 32;  # 最多保留 32 个空闲长连接
+}
+```
+
+**关键点**：
+
+- 这仅控制 Nginx 保持多少个空闲长连接可复用，而不影响客户端连接数。
+- 空闲连接的数量与性能优化相关，过多的空闲连接会浪费资源，过少则可能导致频繁的连接建立和关闭。
+
+
+
+#### Nginx 中的连接分类
+
+1. 客户端连接
+   - 客户端与 Nginx 建立的连接。
+   - 不适用于连接池，一旦客户端断开连接，Nginx 就会释放连接资源。
+2. 上游服务器连接
+   - Nginx 代理请求时与上游服务器（如后端服务、缓存服务）的连接。
+   - 可以使用 **连接池**（通过 `keepalive` 配置）来复用长连接。
+
+
+
+#### 哪些连接会进入连接池？
+
+- 仅限上游服务器的连接
+
+  ：
+
+  - Nginx 支持将与上游服务器的连接存入连接池复用，避免每次请求都重新建立 TCP 连接。
+  - 这些长连接由 `keepalive` 指令管理。
+
+示例：
+
+```
+nginxCopy codeupstream backend {
+    server backend1.example.com;
+    keepalive 64;  # 每个 worker 进程为该上游保持最多 64 个空闲长连接
+}
+
+server {
+    location / {
+        proxy_pass http://backend;
+    }
+}
+```
+
+- 连接池仅维护与 `backend` 的长连接。
+- 如果是客户端连接（如浏览器访问 Nginx），并不会进入连接池。
+
+
+
+#### 为什么客户端连接不在连接池中？
+
+- 客户端连接的生命周期由用户控制，当客户端断开连接后，Nginx 会立即释放资源。
+
+- 客户端的连接模式通常是短连接或有限的保持连接，不需要复用连接。
+
+- 即便启用了 `keep-alive`，Nginx 也仅在客户端发送多个请求时保持连接，但这不是连接池的概念。
+
+
+
+#### 连接池的作用范围
+
+Nginx 的连接池主要服务于以下模块：
+
+1. `proxy_pass`
+   - 与上游服务器保持长连接（如 HTTP/HTTPS 协议）。
+2. `fastcgi_pass`
+   - 与 FastCGI 后端（如 PHP-FPM）复用连接。
+3. `uwsgi_pass`
+   - 复用与 uwsgi 后端的连接。
+4. `grpc_pass` 和 `stream` 模块
+   - 对 gRPC 和 TCP/UDP 连接进行优化。
+
+
+
+**`worker_connections` 是总连接数上限**，用于限制 worker 进程可以同时打开的文件描述符数。
+
+**连接池（由 `keepalive` 定义）是总连接的一部分，仅用于上游连接的复用，减少重复创建连接的开销**。
+
+**两者独立存在但有相互影响**：过多的客户端连接或其他资源占用会减少连接池的可用空间。
+
+
+
 nginx使用连接池来增加它对资源的利用率
 ![alt text](nginx_images/image-9.png)
-每一个worker进程，里面都有一个独立的ngx_cycle_t
+每一个worker进程，里面都有一个独立的ngx_cycle_t的数据结构
 这里有三个主要的数组
+
 - +connections
-  - 这是一个数组，就是所谓的连接池，它的大小默认512，这里每个数组的元素就相当于一个连接，而每个连接自动对应一个读事件和一个写事件，因此也有一个read_events和write_events数组的大小，它们大小和connection是一模一样的，而connections数组上的连接和read_events和write_events是根据序号，也就是数组下标对应的，所以我们在考虑nginx能够释放多大性能的时候，首选需要把work_connectinos保证足够使用
+  - 这是一个数组，就是所谓的连接池，它的大小默认512(**这里可以看到512是很少的，Nginx上经常会有成千上万的连接，而且这个链接不止用于客户端的连接，也用于面向上游服务器的，所以做反向代理的时候，每个客户端都会消耗2个connection**)，这里每个数组的元素就相当于一个连接，而每个连接自动对应一个读事件和一个写事件，因此也有一个read_events和write_events数组的大小，它们大小和connection是一模一样的，而connections数组上的连接和read_events和write_events是根据序号，也就是数组下标对应的（也就是说比如第5个连接，自然对应着第5个读事件和第5个写事件），所以我们在考虑nginx能够释放多大性能的时候，首选需要把work_connectinos保证足够使用
+  
   ```shell
   https://nginx.org/en/docs/ngx_core_module.html#worker_connections
   
@@ -1244,10 +1457,60 @@ nginx使用连接池来增加它对资源的利用率
   Default:  worker_connections 512;  
   Context:	events
   ```
-  - connections这个数组也影响nginx打开的内存大小，当我们配置更大的worker_connections也就意味着nginx使用了更大的内存，所以每个connecitonslian连接占用多大的内存？在64位操作系统，占用内存大约是232字节，具体nginx版本不同，可能会有微小差异，每一个nginx_connection对应两个事件，一个读事件，一个写事件，在nginx中每个事件对应的结构体是`ngx_event_s{}`,每个事件结构体所占用的内存大约是96字节，因此，一个连接所占用的内存就是232+96*2，我们worker_connections所设置的越大，预分配的内存就越多
+  - connections这个数组也影响nginx打开的内存大小，当我们配置更大的worker_connections也就意味着nginx使用了更大的内存，所以每个`nginx_connection_s`连接占用多大的内存？在64位操作系统，占用内存大约是232字节，具体nginx版本不同，可能会有微小差异，每一个nginx_connection对应两个事件，一个读事件，一个写事件，在nginx中每个事件对应的结构体是`ngx_event_s{}`,每个事件结构体所占用的内存大约是96字节，因此，一个连接所占用的内存就是232+96*2，我们worker_connections所设置的越大，预分配的内存就越多
+  
+  ``````C
+  struct ngx_connection_s { // 总共232字节左右
+      void *data;
+      ngx_event_t *read;
+      ngx_evetn_t *write; // 读写事件
+      ngx_socket_t fd;
+      // rev和send是操作系统的一个底层方法，定义怎样发送和接收
+      ngx_recv_pt recv;
+      ngx_send_pt send; // 抽象解耦os底层方法
+      // off_t可以理解为一个无符号的整型，它表达该连接上已经发送了多少字节，也就是配置中经常使用到的bytes_sent变量，
+      // bytes_sent变量的作用：通常会在access.log中记录该变量
+      
+      // nginx.conf中如下配置
+      // log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+      //    '$status [$request_length:$bytes_sent] "$http_referer"'
+      //    '"$http_user_agent" "$http_x_forwarded_for" "$upstream_cache_status"';
+      
+      off_t sent; // bytes_sent变量
+      ngx_log_t *log; 
+      ngx_pool_t *pool; // 初始connection_pool_size配置
+      int type;
+      struct sockaddr *sockaddr
+      socklen_t socklen;
+      ngx_str_t addr_text;
+      ngx_str_t proxy_protocol_addr;
+      in_port_t proxy_protocol_port;
+      ngx_buf_t *buffer;
+      ngx_queue_t queue;
+  }
+  ``````
+  
+  ``````C
+  struct ngx_evetn_s { // 共96字节左右
+      void *data;
+      unsigned instance:1;
+      unsigned timedout:1;
+      unsigned timer_set:1;
+      unsigned available:1;
+      ngx_event_handler_pt handler;
+      ngx_unit_t index;
+      ngx_log_t *log;
+      ngx_rbtree_node_1 timer;
+      ngx_queue_t queue;
+      ...
+  }
+  ``````
+  
+  
+  
   - `ngx_events_s{}`结构体中的重要成员
     - `handler`这是一个回调方法，也就是很多第三方模块会把handler作为自己的实现
-    - 我们在对读写时间记性超时设置时，其实是在设置读写事件结构体中的`timer`，这个timer就是nginx实现超时定时器也就是基于rbtree去实现的结构体，红黑树中每个成员叫做它的node，`timer`就是这个rbtree的node，用来指向读写事件是否超时
+    - 我们在对http请求做读超时写超时设置时，其实是在设置读写事件结构体中的`timer`，这个timer就是nginx实现超时定时器也就是基于rbtree去实现的结构体，红黑树中每个成员叫做它的node，`timer`就是这个rbtree的node，用来指向读写事件是否超时
     - 定时器的配置
     ```shell
     https://nginx.org/en/docs/http/ngx_http_core_module.html#client_header_timeout
@@ -1260,40 +1523,799 @@ nginx使用连接池来增加它对资源的利用率
 - +read_events
 - +write_events
 
+
+
+上述讲解了Nginx_connection_t和nginx_event连接和事件是如何对应在一起的，当我们需要配置高并发的Nginx时，必须把connection的数目配置到足够大，而每个connection对应两个event都会消耗一定的内存，需要我们注意
+
+nginx中很多结构体中，他们的一些成员和我们的内置变量是可以对应起来的，比如说：bytes_sent,或者body_bytes_sent等都是我们在access.log或者lua代码中，我们需要获取nginx的状态时，经常使用到的方法
+
+
+
 ## 内存池对性能的影响
+
+虽然对nginx模块开发是在写C语言代码，但是我们不需要关心内存的释放，如果是在配置一些比较罕见的nginx使用场景，可能会需要修改Nginx在请求和连接上初始分配的内存池大小，但是Nginx官方上可能是写推荐通常不需要修改这样的配置，那么是否需要修改这样的配置需要我们去了解内存池是怎样运转的
+
+
+
+``````C
+struct ngx_connection_s { // 总共232字节左右
+    void *data;
+    ngx_event_t *read;
+    ngx_evetn_t *write; // 读写事件
+    ngx_socket_t fd;
+    // rev和send是操作系统的一个底层方法，定义怎样发送和接收
+    ngx_recv_pt recv;
+    ngx_send_pt send; // 抽象解耦os底层方法    
+    off_t sent; // bytes_sent变量
+    ngx_log_t *log; 
+    ngx_pool_t *pool; // 初始connection_pool_size配置
+    int type;
+    struct sockaddr *sockaddr
+    socklen_t socklen;
+    ngx_str_t addr_text;
+    ngx_str_t proxy_protocol_addr;
+    in_port_t proxy_protocol_port;
+    ngx_buf_t *buffer;
+    ngx_queue_t queue;
+}
+``````
+
+
+
+每一个连接都会使用`ngx_connection_s`这样的结构体，在这个结构体中，有一个成员变量`ngx_pool_t *pool`这个pool，表示该连接所使用的内存池，这个内存池可以使用`connection_pool_size`进行配置
+
+
+
+### 为什么需要内存池
+
+我们可以用一些工具发现nginx产生的内存碎片是很小的，这就是内存池的一个功劳，内存池会把内存提前分配好一批，而且当我们使用小块内存的时候，它会使用next指针，将这些小块的内存一个个连接在一起，那每次使用的内存比较少的时候，第二次再分配小块内存的时候，会连接在一起去使用，这样就大大减少了我们的内存碎片
+
+
+
+#### 通俗理解内存池如何减少内存碎片
+
+**什么是内存碎片？**
+
+- 当程序频繁地分配和释放内存（比如动态分配小块内存）时，内存会变得“不连续”。
+- 比如：
+  - 你申请了 4 KB、8 KB 的内存，用完释放了。
+  - 这些小块的内存空闲了，但是不连续，造成碎片。
+  - 如果后续需要一块 16 KB 的连续内存，系统可能无法找到，尽管总内存足够。
+
+
+
+**内存池是怎么避免这个问题的？**
+
+**1. 提前分配一大块内存：**
+
+- **内存池**会一次性分配一大块连续的内存，比如 1 MB。
+- 这样做避免了频繁从系统申请小块内存，减少系统级分配的碎片化问题。
+
+**2. 将大块内存拆分成小块：**
+
+- 内存池会把这 1 MB 划分成多个小块，比如 4 KB 一块。
+- 当程序需要小内存（比如几百字节或几 KB），直接从这些小块中分配。
+
+**3. 用“指针链”管理未用内存：**
+
+- 如果某块内存没有用完，内存池会用“指针”把这些未使用的小块连接起来，形成一个链表。
+- 这样后续再需要分配内存时，可以直接复用这些小块。
+
+
+
+**举例说明****没有内存池的情况：**
+
+1. 程序向系统申请 8 KB、16 KB、32 KB 内存，每次都是独立的分配。
+2. 使用完释放时，可能留下不连续的小空闲块（碎片）。
+3. 如果后续需要 64 KB 的连续内存，可能无法满足（尽管总内存足够）。
+
+**有内存池的情况：**
+
+1. 程序启动时，内存池一次性从系统申请 1 MB。
+2. 程序需要 8 KB 内存时，从内存池中切一块 8 KB。
+3. 程序释放 8 KB 后，内存池会将这块内存挂到“可用链表”上。
+4. 下次程序需要 8 KB 内存时，直接从链表中取，避免重新向系统申请，减少碎片。
+
+
+
+因为nginx主要在处理web请求，web请求对于http请求有两个非常明显的特点：
+
+每当我们有一个tcp连接的时候，这个tcp连接上面可能会运行很多http请求，也就是所谓的Keepalived请求
+
+连接没有关闭，执行完一条请求后，继续负责处理下一条请求，而我有一些内存为连接分配一次就够了，比如：我去读取每个请求的前1k字节，那么在连接内存池上，我分配一次，只要这个连接不关闭，那么这段1k的内存我永远不需要释放，直到连接关闭的时候，我才会使用掉这个内存。
+
+对于请求内存池，每个http请求，我在分配的时候，并不清楚需要分配多大，但是http请求特别是http1.1而言，通常需要分配4k大小的内存，因为我们的URL或者header往往需要分配那么多，如果没有内存池，我们可能需要频繁并且小块的分配，而分配内存是有代价的，如果我们一次性分配较多的内存就没有这样的问题。而请求执行完毕后，哪怕链接还可以复用，我们也可以将这部分请求内存池销毁，而这样所有的nginx开发者就不需要考虑内存释放的问题，它只需要关注我是从请求内存池里面申请分配的内存还是从连接内存池申请分配的内存。
+
+
+
+``````bash
+# 在http_core_module中，有一个connection_pool_size
+
+# 连接内存池
+Syntax: connection_pool_size size;
+# 这里并不是只能分配512,仅仅是说因为我提前分配了这么大，可以减少分配内存的次数
+Default: connection_pool_size 256|512; #这个和操作系统位数相关
+Context: http, server
+
+# 请求内存池
+Syntax: request_pool_size size;
+Default: request_pool_size 4k;  # 这里请求内存池比较大是因为，对于连接而言，它需要保存的上下文信息比较少，只需要帮助后面的请求读取最初一部分字节就可以了，而对于请求而言我们需要保存大量的上下文信息，比如：所有读取到的url或者header,我们需要一直保存下来，而url通常比较长
+# 官方说明这里的性能影响很小，但是如果是极端情况，比如你的url非常长，可以考虑将该参数放大，或者你的内存很小，url和header很小，也可以考虑将request_pool_size适当减少，这样nginx效率的内存会小一些，也意味着可以做更大并发量的请求
+Context: http,server
+``````
+
+
+
+内存池就与减少内存碎片，对于第三方模块的快速开发是有很大意义的
+
+
+
+## 共享内存
+
+nginx是一个多进程程序，不同的worker进程间如果需要共享数据，只能通过共享内存，下面我们看看nginx中的共享内存是如何使用的
+
+
+
+### nginx进程间的通信方式
+
+- 基础同步工具
+  - 信号
+  - 共享内存
+- 高级通讯方式
+  - 锁
+  - Slab内存管理器
+
+
+
+nginx进程间的通信方式，主要有两种，一种是信号，上文的nginx进程管理中已经做了详细的介绍，那么如果需要做数据的同步呢？那么就需要通过共享内存，所谓共享内存，也就是我们打开了一块内存，比如说10M，那么一整块0~10M之间，多个worker进程之间可以同时的访问它，包括读取和写入，那么为了使用好这块共享内存，就会引入另外两个问题
+
+
+
+第一问题就是**锁**，因为多个worker进程同时操作一块内存，一定会存在竞争关系，所以需要加锁，在nignx的锁中，在早期还有基于信号量的锁，信号量是Linux中比较久远的进程同步方式，它会导致进程进入休眠状态，也就是发生了主动切换，而现在大多数操作系统的版本中，Nginx所使用的锁都是**自旋锁**，而不会基于信号量。
+
+
+
+自旋锁，也就是说，当锁的条件没有满足，比如说这块内存被一号worker进程使用，那么2号worker进程需要去获取锁的时候，只要1号进程没有释放锁，二号进程会一直不停的去请求这把锁
+
+就好像如果是基于信号量的早期的Nginx的锁，那么假设这把锁锁住了一扇门，如果worker进程1已经拿到了这把锁，进到屋里，那么worker进程2视图去拿锁，敲门，发现里面已经有人了，worker进程2就会就地休息，等待worker进程1从门里出来后，去通知他，
+
+
+
+而自旋锁不一样，worker进程2发现门里已经有worker进程1了，它就会一直持续的在敲门，所以使用自旋锁要求所有的nginx模块必须快速的使用共享内存，也就是快速的取得锁之后，快速的释放锁，一旦出现有第三方模块不遵守这样的规则，就可能导致死锁或者性能下降的问题。
+
+
+
+那么有了这块共享内存，会引入第二个问题
+
+
+
+因为一整块共享内存，往往是给很多对象同时使用的，如果我们在模块中，手动的去编写分配，把这些内存给到不同的对象，是非常繁琐的，所以这个时候，我们使用了slab内存管理器
+
+
+
+### nginx使用共享内存的模块
+
+``````bash
+# Ngx_http_lua_api
+
+# rebtree
+Ngx_stream_limit_conn_module
+Ngx_http_limit_conn_module
+Ngx_stream_limit_req_module
+
+http cache
+    Ngx_http_file_cache
+    Ngx_http_proxy_module
+    Ngx_http_scgi_module
+    Ngx_http_uwsgi_module
+    Ngx_http_fastcgi_module
+    
+ssl
+    Ngx_http_ssl_module
+    Ngx_mail_ssl_module
+    Ngx_stream_ssl_module
+    
+# 单链表
+Ngx_http_upstream_zone_module
+Ngx_stream_upstream_zone_module
+``````
+
+
+
+我们在做限速或者流控等等场景时，我们是不能容忍在内存中做的，否则一个worker进程对某一个用户触发了流控，而其他worker进程还不知道，所以我们只能在共享内存中做。比如说limit_conn，limit_req，还有所有的http cache做反向代理时用的
+
+
+
+红黑树有个特点：就是他的插入删除非常的快，当然也可以做遍历，所以这些模块都有一个特点，就是需要做快速的插入和删除，比如发现了一个客户端，对他限速，限速如果达到了，我需要将它的客户端从我的限速的数据结构容器中移出，都需要非常的快速。
+
+
+
+第二个常用的数据结构是单链表，也就是只需要将这些需要共享的元素串起来就可以了比如`Ngx_http_upstream_zone_module`
+
+
+
+共享内存是nginx跨worker通信的做有效的手段，只要我们需要让一段业务逻辑在多个worker进程中同时生效，比如许多在集群的流控上，那么必须使用共享内存，而不能再每一个worker内存中去使用
+
+
+
+
+
+### slab管理器
+
+Nginx不同的worker进程间需要共享信息的时候，只能通过共享内存，我们也谈到了共享内存上可以使用链表或者红黑树这样的数据结构，但是每个红黑树上有很多节点，每个节点都需要分配内存去存放，那么如何把一整块共享内存切割成小块给红黑树上的每个节点去使用呢，下面看下slab内存分配管理是怎样应用于共享内存上的
+
+
+
+
 
 
 
 # 详解HTTP模块
 
+Nginx的模块非常多，包括官方模块和第三方模块，而每个模块又有各自独特的指令，这繁多的指令其实记忆起来都是很苦难的，那么在这一部分中，我们将以请求处理流程的方式，把所有的常用的http模块的指令梳理在一起，把http模块以在nginx设计架构中定义的11个阶段的方式依次的去讲解每一个模块的使用方法，在Nginx11个阶段讲完之后，我们还会讲到Nginx的http过滤模块，它会通过加工我们向客户端返回的响应，来给客户端返回不一样的内容，最后还会介绍Nginx的核心的一个概念：变量，Nginx通过变量来实现非常繁复的功能，与它低层的以高性能为主的这样一种实现，来进行解耦，基于变量Nginx提供了非常多样化的功能。
+
+
+
+## HTTP配置指令的嵌套结构
+
+
+
+### 一个典型的配置块嵌套
+
+``````nginx
+main
+http {
+    upstream {...}
+    split_clients {...}
+    map {...}
+    geo {...}  # 上面这些模块时http中某一个模块，自己可以配置自己的配置块
+    #----------------------------------------------------------------------
+    # http --> server --> location，这三个是非常核心的，这是http的框架定义的，因为我们处理一个请求的时候需要先按照请求中指示的域名，
+    # 比如根据host，找到相应的server块，
+    # 然后再根据uri，找到某一给location，
+    # 然后根据location下面具体的指令来处理请求
+    server {
+        if () {...}
+        location {
+            limit_except{...}
+        }
+        location {
+            location {
+                
+            }
+        }
+    }
+    server{
+        
+    }
+}
+``````
+
+
+
+在这个嵌套中，我们会发现很多冲突，或者奇怪的指令
+
+
+
+### 理解指令的Context
+
+``````bash
+# 示例
+syntax: log_format name [escape=default|json|none] string...;
+Default: log_format conbined "...";
+Context: http
+
+Syntax: access_log path [format[buffer=size][gzip[=level]][flush=time][if=condition]];
+        access_log off
+Default: access_log logs/access.log combined;
+Context: http, server, location, if in location, limit_except
+``````
+
+
+
+### 指令的合并
+
+当指令在多个上下文同时存在的时候，它是可以和合并的，但是并不是所有的指令都可以合并
+
+
+
+#### 指令合并的整体规则
+
+所有的指令分为两类指令
+
+- **值指令**：存储配置项的值
+  - 可以合并
+  - 示例
+    - root
+    - access_log
+    - gzip
+- **动作类指令**：指定行为
+  - 不可以合并
+  - 示例
+    - rewrite
+    - proxy_pass
+  - 生效阶段（后面介绍11个阶段的时候会讲到）
+    - server_rewrite阶段
+    - rewrite阶段
+    - content阶段
+
+
+
+#### 存储值的指令继承规则：向上覆盖
+
+- 子配置不存在时，直接使用父配置块
+- 子配置存在时，直接覆盖父配置块
+
+``````nginx
+server {
+    listen 8080;
+    root /home/mystical/nginx/html;
+    access_log logs/mystical.access.log main;
+    location /test {
+        root /home/mystical/nginx/test; # 子配置存在时，直接使用子配置，覆盖掉父配置 
+        access_log logs/access.test.log main;
+    }
+    location /dlib {
+        alias dlib/;
+    }
+    location / {
+        # 这里location会继承父配置快server下的root指令
+    }
+}
+``````
+
+
+
+### HTTP模块合并配置的实现
+
+Nginx的官方模块都遵循上述的配置值指令的合并规则，但是有一些第三方模块很可能没有遵循这套规则，这个时候如果它相应的说明文档也不是非常详细的话，就需要我们通过源码来判断，当它们的值指令出现冲突的时候，究竟以哪一个为准
+
+
+
+如何通过源码判断：抓住一下四个点
+
+- 指令在哪个快下生效？
+
+  - 部分指令在Server快下生效
+  - 大部分指令在location块下生效
+
+- 指令允许出现在哪个块下？
+
+- 在server块内生效，从http向server合并指令
+
+  - 当这个指令是在server块内生效的话，它会定义一个方法
+
+  ``````C
+  char *(*merge_srv_conf)(ngx_conf_t *cf, void *prev, void *conf);
+  // 当这个指令即出现在http块下，也出现在server块下的时候，那么从http向server合并的时候，会提供一个函数是merge_srv_conf
+  
+  // 如果是在location中生效，就是merge_loc_conf
+  char *(*merge_loc_conf)(ngx_conf_t *cf, void *prev, void *conf);
+  ``````
+
+  
+
+- 配置缓存在内存
+
+
+
+#### 源码分析 -- referer防盗链模块
+
+``````C
+// 任何一个模块都会有要给结构体叫ngx_module_t
+// 这个模块所有的配置指令都在ngx_command_t中
+ngx_module_t  ngx_http_referer_module = {
+    NGX_MODULE_V1,
+    &ngx_http_referer_module_ctx,          /* module context */
+    ngx_http_referer_commands,             /* module directives */
+    NGX_HTTP_MODULE,                       /* module type */
+    NULL,                                  /* init master */
+    NULL,                                  /* init module */
+    NULL,                                  /* init process */
+    NULL,                                  /* init thread */
+    NULL,                                  /* exit thread */
+    NULL,                                  /* exit process */
+    NULL,                                  /* exit master */
+    NGX_MODULE_V1_PADDING
+};
+
+// 这个模块所有的配置指令都在ngx_command_t这样一个数组中，这个数组中的每个元素就是一条指令，
+static ngx_command_t  ngx_http_referer_commands[] = { 
+
+    { ngx_string("valid_referers"),// 比如valid_referers,
+      NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_1MORE,// 它允许出现在哪些快下：SRV,LOC,它可以携带几个参数：1More
+      ngx_http_valid_referers,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+    
+    { ngx_string("referer_hash_max_size"),
+      NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_referer_conf_t, referer_hash_max_size),
+      NULL },
+        
+    { ngx_string("referer_hash_bucket_size"),
+      NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+      ngx_conf_set_num_slot,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      offsetof(ngx_http_referer_conf_t, referer_hash_bucket_size),
+      NULL },
+
+      ngx_null_command
+};
+
+// 所有的指令解析完后，需要做合并，合并要看ngx_http_module_t这样的一个函数
+// 这个函数定义了可能出现的8个回调方法，
+static ngx_http_module_t  ngx_http_referer_module_ctx = {
+    ngx_http_referer_add_variables,        /* preconfiguration */
+    NULL,                                  /* postconfiguration */
+
+    NULL,                                  /* create main configuration */
+    NULL,                                  /* init main configuration */
+
+    NULL,                                  /* create server configuration */
+    NULL,                                  /* merge server configuration */
+
+    ngx_http_referer_create_conf,          /* create location configuration */
+    // 以上所说的指令都是指在location下生效的，所以需要把http，server这些块下的指令向location这里合并，在方法中可以看到规则
+    ngx_http_referer_merge_conf            /* merge location configuration */
+};
+
+// 这个方法中的第二个参数parent，就是它的父指令，child就是当前的子指令，下方可以看到它们进行合并的方法
+ngx_http_referer_merge_conf(ngx_conf_t *cf, void *parent, void *child)
+{
+    ngx_http_referer_conf_t *prev = parent;
+    ngx_http_referer_conf_t *conf = child;
+
+    ngx_uint_t                 n;
+    ngx_hash_init_t            hash;
+    ngx_http_server_name_t    *sn;
+    ngx_http_core_srv_conf_t  *cscf;
+
+    if (conf->keys == NULL) {
+        conf->hash = prev->hash;
+
+#if (NGX_PCRE)
+        ngx_conf_merge_ptr_value(conf->regex, prev->regex, NULL);
+        ngx_conf_merge_ptr_value(conf->server_name_regex,
+                                 prev->server_name_regex, NULL);
+#endif
+        ngx_conf_merge_value(conf->no_referer, prev->no_referer, 0);
+        ngx_conf_merge_value(conf->blocked_referer, prev->blocked_referer, 0);
+        ngx_conf_merge_uint_value(conf->referer_hash_max_size,
+                                  prev->referer_hash_max_size, 2048);
+        ngx_conf_merge_uint_value(conf->referer_hash_bucket_size,
+                                  prev->referer_hash_bucket_size, 64);
+
+        return NGX_CONF_OK;
+    }
+
+    if (conf->server_names == 1) {
+        cscf = ngx_http_conf_get_module_srv_conf(cf, ngx_http_core_module);
+
+        sn = cscf->server_names.elts;
+        for (n = 0; n < cscf->server_names.nelts; n++) {
+
+#if (NGX_PCRE)
+            if (sn[n].regex) {
+
+                if (ngx_http_add_regex_server_name(cf, conf, sn[n].regex)
+                    != NGX_OK)
+                {
+                    return NGX_CONF_ERROR;
+                }
+
+                continue;
+            }
+#endif
+            .....
+        }
+``````
+
+
+
+## Listen指令
+
+``````nginx
+Syntax:	listen address[:port] [default_server] [ssl] [http2 | quic] [proxy_protocol] [setfib=number] [fastopen=number] [backlog=number] [rcvbuf=size] [sndbuf=size] [accept_filter=filter] [deferred] [bind] [ipv6only=on|off] [reuseport] [so_keepalive=on|off|[keepidle]:[keepintvl]:[keepcnt]];
+listen port [default_server] [ssl] [http2 | quic] [proxy_protocol] [setfib=number] [fastopen=number] [backlog=number] [rcvbuf=size] [sndbuf=size] [accept_filter=filter] [deferred] [bind] [ipv6only=on|off] [reuseport] [so_keepalive=on|off|[keepidle]:[keepintvl]:[keepcnt]];
+listen unix:path [default_server] [ssl] [http2 | quic] [proxy_protocol] [backlog=number] [rcvbuf=size] [sndbuf=size] [accept_filter=filter] [deferred] [bind] [so_keepalive=on|off|[keepidle]:[keepintvl]:[keepcnt]];
+Default:	
+listen *:80 | *:8000;
+Context:	server  # 只能出现在server的配置块下
+``````
+
+
+
+示例
+
+``````nginx
+listen unix:/var/run/nginx.sock; // 监听unix.socket地址
+listen 127.0.0.1:8000;
+listen 127.0.0.1;
+listen 8000;
+listen *:8000;
+listen localhost:8000 bind;
+listen [::]:8000 ipv6only=on;
+listen [::1];
+``````
+
+
+
+了解listen指令后，可以从这里开始，从连接建立起，到我们收到请求，怎样处理请求，完整的去介绍每一个http模块的用法
+
+
+
 ## 处理HTTP请求头部的流程
+
+
+
+http请求报文
+
+``````http
+HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
+``````
+
+
+
+在http模块开始处理用户请求之前，首先我们需要nginx的框架先对客户端建立好连接，然后接收用户发来的http的start-line，比如说方法，url等，然后再去接收到所有的header，根据这些header信息，我们才能决定选用哪些配置块，才能解决让http模块怎样处理请求，所以我们先来看下，nginx框架是怎样建立连接以及接收http请求的
+
+
+
 ### 接收请求事件模块
+
+
+
+在下面这样图中，分为3个层次来讲nginx从建立连接到接收请求的这个过程
+
 ![alt text](nginx_images/image-10.png)
 
 分三次层次讲述这个过程
 
 - 首先是操作系统内核，比如三次握手，用户发送一个`syn`包，内核会返回一个`syn+ack`表示确认，然后用户端再次发送`ack`的时候，内核收到这个`ack`包，会认为这次连接建立成功
-
-- 我们有很多worker进程，每个worker进程可能都监听了80/443端口，操作系统会根据它的负载均衡算法（后续会详讲）会选中CPU上的某个worker进程，这个worker进程会通过epoll中的epoll_wait()方法，会返回到刚刚建立好的连接的句柄，nginx在拿到这个建立好连接的句柄后（这其实是一个读事件），我们找到了这个句柄是我们监听的80/443端口，我们就会调用accept()这个方法，在调用accept()的时候，我需要分配连接内存池`connect_pool_size: 512`，（在nginx中分为连接内存池和请求内存池，这里是连接内存池），到这一步，nginx会为这个连接分配512字节的内存池
-
-- 分配完内存池，建立好连接后我们的所有http模块开始从事件模块的手中接入请求的处理过程了，http模块在启动的时候会定义一个方法，叫做`ngx_http_init_connection`设置回调方法，也就是会说当建立一个新连接的时候，这个方法就会被回调执行，这个时候需要把新建立的连接的读事件天啊及到epoll中，通过epoll_ctl这个函数，然后还要添加一个定时器，表示如果60秒内我还没有接收到请求，就超时，就是`client_header_timeout: 60s`.
-
-- 当客户端返回的是一个带有数据DATA的GET或者POST请求，事件模块的epoll_wait再次拿到这个请求，这个请求的回调方法就是ngx_http_wait_request_handler分配内存，这一步中需要把内核收到的data读到用户态中，我们要把数据读到用户态中就要分配内存，这一段内存我们从连接内存池中进行分配，分配1k大小的内存`client_header_buffer_size:1k`，这个大小可以更改
+- 我们有很多worker进程，每个worker进程可能都监听了80/443端口，操作系统会根据它的负载均衡算法（后续会详讲）会选中CPU上的某个worker进程，这个worker进程会通过epoll中的epoll_wait()方法，会返回到刚刚建立好的连接的句柄，nginx在拿到这个建立好连接的句柄后（这其实是一个读事件，因为读到了要给ack报文），我们找到了这个句柄是我们监听的80/443端口，我们就会调用accept()这个方法，在调用accept()的时候，我需要分配连接内存池`connect_pool_size: 512`，（在nginx中分为连接内存池和请求内存池，这里是连接内存池），到这一步，nginx会为这个连接分配512字节的内存池
+- 分配完内存池，建立好连接后我们的所有http模块开始从事件模块的手中接入请求的处理过程了，http模块在启动的时候会定义一个方法，叫做`ngx_http_init_connection`设置回调方法，也就是会说当accept()建立一个新连接的时候，这个方法就会被回调执行，这个时候需要把新建立的连接的读事件添加到epoll中，通过epoll_ctl这个函数，然后还要添加一个定时器，表示如果60秒内我还没有接收到请求，就超时，就是`client_header_timeout: 60s`。这个模块处理完之后，可能nginx的事件模块就切到其他的去处理了
+- 当客户端返回的是一个带有数据DATA的GET或者POST请求，事件模块的epoll_wait再次拿到这个请求，这个请求的回调方法就是ngx_http_wait_request_handler分配内存，这一步中需要把内核收到的data读到nginx的用户态中，要读到用户态中，就需要分配内存，这个内存需要分配多大？从哪里分？首先，我们从连接内存池中进行分配，这个连接内存池初始分配了512字节，这个时候我们需要从内存池中再分配1k，因为内存池是可以扩展的嘛，它只是初始分配了512字节，这个1k是可以改的，就是`client_header_buffer_size:1k`，这个大小的更改并不是越大越好，这里可以看到，哪怕用户只发送1字节的数据，nginx就要分配1k的内存出来，所以放的很大并不合适
 （这里无论用户发送多大的数据，nginx都会分配指定比如1k的内存出来，所以放的很大并不合适）
+
+
+
+
+
+当接收的请求（url或者header非常大）超过1k时
 
 ![alt text](nginx_images/image-11.png)
 
-这里处理请求和处理连接是不一样的，处理连接的话，可能我只需要把连接收到我的nginx内存中就ok，但处理请求可能需要进行大量的上下文分析，去分析http协议，分析每一个header，所以此时要分配一个请求内存池，请求内存池默认分配4k，因为请求的上下文通常涉及业务，因此分配的会大一点，4k通常是比较合适的数值
+刚刚分配完1k的内存空间以后，这个时候我已经收到了小于等于1k的请求内容
 
-分配完内存池后，nginx会使用状态机解析请求行，解析请求行的时候可能会发现有的url特别大，已经超过了刚刚分配的1k的内存，此时就要分配一个更大的内存`large_client_header_buffers:4 8k`（这里并不是直接分配32k，而是先分配1个8k，然后将1k的内容拷贝到这里，此时还剩7k，我们用剩余的7k内存再去接收httpurl，看url是不是解析完了，如果8k的url实在是太长了，8k还没有接收完，就会再分配第二个8k，最多分配32k）
+这里处理请求和处理连接是不一样的，处理连接的话，可能我只需要把连接收到我的nginx内存中就ok，但处理请求可能需要进行大量的上下文分析，去分析http协议，分析每一个header，所以此时要分配一个请求内存池，请求内存池默认分配4k（`request_pool_size:4k`），因为请求的上下文通常涉及业务，因此分配的会大一点，4k通常是比较合适的数值，如果分配的很小的话，可能就会需要请求内存池不断的扩充，当我们分配内存的次数变多的时候，性能肯定会下降的，所以connection_pool_size要不要改需要根据业务来的，我们可以根据实际业务情况来绝对是否需要修改内存池
 
-当我完整的解析完请求行，通过解析到\R\N，我就可以标识url（表示url就是nginx有很多变量，这些变量并不是复制一份，而仅仅是有一个指针指向我们接收到的请求行，也因此url变得如此强大），那么标识完url，nginx会继续解析http的各首部字段header
+分配完内存池后，nginx会使用状态机解析请求行（start_line），解析请求行的时候可能会发现有的url特别大，已经超过了刚刚分配的1k的内存，此时就要分配一个更大的内存`large_client_header_buffers:4 8k`（这里并不是直接分配32k，而是先分配1个8k，然后将1k的内容拷贝到这里，此时还剩7k，我们用剩余的7k内存再去接收httpurl，看url是不是解析完了，如果8k的url实在是太长了，8k还没有接收完，就会再分配第二个8k，最多分配32k）
+
+当我完整的解析完请求行，通过解析到\R\N，我就可以标识url（表示url就是nginx有很多变量，这些变量并不是复制一份，而仅仅是有一个指针指向我们接收到的请求行，也因此nginx性能才会如此强大），那么标识完url，nginx会继续解析http的各首部字段header
+
+http的header可能非常长，因为里面可能有cookie，还有很多的hosts等字段，heade是非常有可能超过1k的，因此我们还是需要分配大内存，而这个大内存和之前的哪个解析请求头是的大内存是共用的，如果url用掉了2个8K，那么在接收header时就只剩下2个8K，所以`large_client_header_buffers:4 8k`，是针对所有的，
 
 状态机解析header各字段，然后如果当前分配的内存不足以放header的各字段，就还会分配内存，这里接受请求行的内存和接收header各字段的共用一个内存，共用4*8k的内存
 
-接收完完整的header后，标识header，标识header的过程中，但是收到hosts的字段时会确定哪个server块来处理这个请求，当我标识完所有的header后，会移除超时定时器，`client_header_timeout: 60s`
+接收完完整的header后，标识header，标识header的过程中，但是收到hosts的字段时会确定哪个server块来处理这个请求，当我标识完所有的header后，会移除超时定时器，`client_header_timeout: 60s`，这里就可以看出，什么时候需要修改这个60s，也就是说当我们收完完整的header，到底可能最长两次接收之间，需要多长事件，也就是我们这个60s应该是怎样的。
 
-开始11个阶段的http请求处理，上述所有的过程都nginx的框架处理的，后续的内容才是nginx模块来处理
+当接收完所有header后，就会开始核心的过程：（**上述流程都是nginx的框架执行的**）
+
+**开始11个阶段的http请求处理**，上述所有的过程都nginx的框架处理的，后续的内容才是http模块来处理
+
+
+
+### Nginx处理http请求头部详解
+
+
+
+#### Listen_fd是什么？
+
+**发起端口监听时，内核会动态创建一个 `listen_fd`（监听套接字）**，并为该套接字分配必要的内核资源来管理连接。这是由以下步骤实现的：
+
+
+
+#### `listen_fd` 的创建过程
+
+**创建套接字：`socket()`**
+
+- 用户调用 `socket()` 系统调用，内核动态创建一个套接字并返回一个文件描述符（`listen_fd`）。
+- 这个文件描述符是一个整数标识符，用于在用户空间引用内核中的套接字。
+
+```C
+int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+```
+
+- 内核同时分配与该文件描述符关联的资源：
+  - 一个 `file` 结构（文件对象）。
+    - 这个file是全局文件打开表的一个条目
+  - 一个 `socket` 结构（套接字对象）。
+  - 一个协议控制块（如 TCP 的 `tcp_sock` 结构）。
+
+**绑定地址和端口：`bind()`**
+
+- 用户通过 `bind()` 将套接字绑定到一个特定的 IP 地址和端口。
+- 内核会在套接字中记录绑定的地址和端口信息。
+
+```C
+cCopy codestruct sockaddr_in addr;
+addr.sin_family = AF_INET;
+addr.sin_addr.s_addr = htonl(INADDR_ANY);
+addr.sin_port = htons(8080);
+bind(listen_fd, (struct sockaddr*)&addr, sizeof(addr));
+```
+
+**开启监听：`listen()`**
+
+- 用户调用 `listen()`，将套接字设置为监听状态。
+
+- 内核在 
+
+  ```
+  tcp_sock
+  ```
+
+   中初始化两个队列：
+
+  - **SYN 队列**：用于存储半连接。
+  - **accept 队列**：用于存储全连接。
+
+```C
+listen(listen_fd, 128);  // 128 是 backlog 参数，表示 accept 队列的最大长度
+```
+
+**监听套接字动态创建的资源：**
+
+- ```
+  listen_fd
+  ```
+
+   对应的 
+
+  ```
+  socket
+  ```
+
+   结构关联了：
+
+  - **地址和端口信息**。
+  - **队列状态（SYN 队列和 accept 队列）**。
+  - **连接处理函数（协议栈实现）**。
+
+
+
+
+
+#### `listen_fd`这个文件描述符由监听服务创建，以Nginx为例
+
+**Nginx 主进程（`master`）**
+
+- 主进程启动时调用 `socket()` 和 `listen()` 创建 `listen_fd`。
+- 它负责初始化监听套接字，但不直接处理连接。
+
+**Nginx 子进程（`worker`）**
+
+- 主进程将 `listen_fd` 继承或传递给子进程（`worker`）。
+- 子进程通过 `epoll_wait()` 监听 `listen_fd` 上的事件，当有新连接到达时，子进程调用 `accept()` 获取连接。
+
+
+
+
+
+#### **文件描述符表中的 `listen_fd`**
+
+- 每个进程的文件描述符表
+  - 文件描述符表是每个进程独有的结构，用于管理该进程打开的文件、套接字等资源。
+  - `listen_fd` 是该表中的一个条目，对应一个监听套接字。
+
+#### **具体流程**
+
+1. **创建 `listen_fd`**
+   - 服务器程序通过 `socket()` 创建监听套接字。
+   - 内核在该进程的文件描述符表中分配一个条目，指向内核的 `socket` 结构。
+2. **监听新连接**
+   - 服务器程序通过 `listen_fd` 调用 `listen()`，开启监听功能。
+   - 随后，程序通过 `epoll_wait()` 或类似机制监听 `listen_fd` 的事件。
+3. **获取新连接**
+   - 当有新连接到达时，内核通知服务器进程。
+   - 服务器进程调用 `accept()` 从 accept 队列中取出连接。
+
+
+
+#### **多进程共享 `listen_fd`**
+
+1. **多进程（如 Nginx 或 Apache）**
+   - 在多进程服务器中，`listen_fd` 可以被多个进程共享。
+   - 例如：
+     - Nginx 主进程创建 `listen_fd` 后，将其传递给多个 worker 进程。
+     - 所有 worker 进程通过 `epoll` 或 `kqueue` 监听同一个 `listen_fd` 上的事件。
+2. **共享机制**
+   - 共享 `listen_fd` 的进程会竞争新连接。
+   - 内核通过负载均衡策略（如 SO_REUSEPORT）决定哪个进程处理新连接。
+
+
+
+#### `tcp_sock` 是什么？它在哪里？
+
+- `tcp_sock`
+
+   是 Linux 内核中 TCP 协议的核心控制块，存储了与 TCP 连接相关的状态和资源。
+
+  - 它是套接字（`socket`）中专门为 TCP 连接设计的数据结构。
+  - 对于 `listen_fd`：
+    - `tcp_sock` 中会存储监听套接字的状态和队列信息（SYN 队列、accept 队列）。
+
+#### `tcp_sock` 结构中包含的重要字段：
+
+```
+cCopy codestruct tcp_sock {
+    struct request_sock_queue req;  // SYN 队列
+    struct listen_sock_queue accept; // accept 队列
+    ...
+};
+```
+
+#### 如何关联：
+
+- `file->f_inode` -> `inode->private_data` -> `tcp_sock`。
+
+------
+
+#### **整个链路的流程图**
+
+以下是 `listen_fd` 的数据结构链路：
+
+1. **用户态的 `listen_fd`**
+   - 表示文件描述符表中的索引。
+   - 指向内核中 `file` 结构。
+2. **内核中的 `file`**
+   - 位于全局文件打开表。
+   - 指向 `inode`，同时包含文件的特定操作信息。
+3. **内核中的 `inode`**
+   - 套接字的 `inode` 特殊，记录网络协议栈的入口。
+   - 指向 `tcp_sock`（通过 `inode->private_data`）。
+4. **内核中的 `tcp_sock`**
+   - 存储与监听套接字相关的核心信息，包括 SYN 队列和 accept 队列。
+
+------
+
+#### **具体代码例子**
+
+以下简化的伪代码展示了从 `listen_fd` 到 `tcp_sock` 的链路：
+
+```
+cCopy codeint listen_fd = socket(AF_INET, SOCK_STREAM, 0); // 创建监听套接字
+bind(listen_fd, ...);                            // 绑定地址和端口
+listen(listen_fd, 128);                          // 开启监听
+
+// 内核中对应的链路
+file = fd_table[listen_fd];                     // 进程文件描述符表
+inode = file->f_inode;                          // 全局文件打开表条目
+tcp_sock = inode->private_data;                 // 指向协议控制块
+```
+
+
+
+
+
+
+
+
+
+
+
+Http是非常多样化的，我们必须有一个流程，按照一条主线把它们串起来，这样也方便我们理解和记忆，下面我们开始介绍Nginx有哪些阶段，以及这些模块在这些阶段中，又是怎样处理请求的
+
+
+
+
+
+
+
+
 
 
 

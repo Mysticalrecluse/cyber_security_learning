@@ -87,7 +87,7 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
   Escape character is '^]'.
   GET / HTTP/1.1
   Host: www.feng.org
-
+  
   HTTP/1.1 200 OK
   Server: nginx/1.18.0 (Ubuntu)
   Date: Sun, 23 Jun 2024 04:06:22 GMT
@@ -97,7 +97,7 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
   Connection: keep-alive
   ETag: "66779dc8-1a"
   Accept-Ranges: bytes
-
+  
   i'm test-10.0.0.200-index
   ```
 
@@ -738,7 +738,6 @@ Server: openresty/1.13.6.2
 ```
 
 ### 响应上下文 Allow与Accept-Ranges
-
 
 
 
