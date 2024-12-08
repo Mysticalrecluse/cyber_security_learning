@@ -1,0 +1,167 @@
+<mxfile host="Electron" modified="2024-12-08T07:20:29.483Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/23.0.2 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="3agafm7x9b4G-zKwXMjJ" version="23.0.2" type="device">
+  <diagram name="第 1 页" id="S_PhzvY_rkiAZ63yRA8J">
+    <mxGraphModel dx="4923" dy="2815" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="z7APVgdZAIvJb30If5ek-81" value="" style="group;align=left;" vertex="1" connectable="0" parent="1">
+          <mxGeometry x="-1860" y="-210" width="2910" height="1955" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-67" value="&amp;nbsp;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=none;dashed=1;strokeWidth=5;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="350" y="115" width="2559" height="1840" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-1" value="&lt;b&gt;Nginx启动&lt;br&gt;&lt;/b&gt;发起端口监听&amp;nbsp;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="1860" width="160" height="75" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-2" value="&lt;b&gt;Listen_fd（监听文件描述符）&lt;/b&gt;&lt;br&gt;int listen_fd = socket(AF_INET, SOCK_STREAM, 0);" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="1540" y="240" width="310" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;curved=1;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-1" target="z7APVgdZAIvJb30If5ek-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-7" value="Listen_fd --&amp;gt; file --&amp;gt; f_inode&amp;nbsp; --&amp;gt; tcp_sock" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="1120" y="235" width="350" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-9" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-2" target="z7APVgdZAIvJb30If5ek-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-10" value="&lt;div&gt;struct tcp_sock {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct request_sock_queue req;&amp;nbsp; // SYN 队列&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct listen_sock_queue accept; // accept 队列&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; ...&lt;/div&gt;&lt;div&gt;};&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;spacingLeft=14;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="950" y="400" width="290" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-11" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-7" target="z7APVgdZAIvJb30If5ek-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-12" value="从listen_fd到tcp_sock的链路&lt;br&gt;&lt;div&gt;int listen_fd = socket(AF_INET, SOCK_STREAM, 0);&amp;nbsp; // 创建监听套接字&lt;/div&gt;&lt;div&gt;bind(listen_fd, ...);&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 绑定地址和端口&lt;/div&gt;&lt;div&gt;listen(listen_fd, 128);&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // 开启监听&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;// 内核中对应的链路&lt;/div&gt;&lt;div&gt;file = fd_table[listen_fd];&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 进程文件描述符表&lt;/div&gt;&lt;div&gt;inode = file-&amp;gt;f_inode;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 全局文件打开表条目&lt;/div&gt;&lt;div style=&quot;&quot;&gt;&lt;span style=&quot;background-color: initial;&quot;&gt;tcp_sock = inode-&amp;gt;private_data;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 指向协议控制块&lt;/span&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#d80073;strokeColor=#A50040;align=left;spacingLeft=15;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="630" y="160" width="430" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-14" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.998;entryY=0.451;entryDx=0;entryDy=0;entryPerimeter=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-7" target="z7APVgdZAIvJb30If5ek-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-17" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-16" target="z7APVgdZAIvJb30If5ek-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-16" value="客户端" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry y="400" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-18" value="&lt;font style=&quot;font-size: 15px;&quot;&gt;TCP三次握手&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontFamily=Helvetica;fontColor=default;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="670" y="390" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-21" value="&lt;div style=&quot;orphans: 4;&quot;&gt;epoll_fd&lt;/div&gt;&lt;div style=&quot;orphans: 4;&quot;&gt;&lt;span style=&quot;font-weight: normal;&quot;&gt;int epoll_fd = epoll_create1(0);&lt;/span&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;align=center;" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="2030" y="320" width="206" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-22" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-1" target="z7APVgdZAIvJb30If5ek-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-23" value="&lt;div&gt;&lt;b&gt;文件描述符表 (fd = 4) -&amp;gt; 全局文件打开表 (file) -&amp;gt; inode (epoll inode) -&amp;gt; eventpoll (rbtree, waiting list)&lt;/b&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="1940" y="430" width="530" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-24" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-21" target="z7APVgdZAIvJb30If5ek-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-25" value="&lt;div&gt;struct eventpoll {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; spinlock_t lock;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 保护整个 eventpoll 结构的自旋锁&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct list_head rdllist;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // **等待链表**（就绪的事件列表）&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct rb_root_cached rbr;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// **红黑树**（所有监控的文件描述符的存储结构）&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct epitem *ovflist;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // 溢出链表（epoll_wait 产生的事件溢出到这里）&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; wait_queue_head_t wq;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // 进程等待队列&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; int visited;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 标记是否有任务访问&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct file *file;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 关联的 epoll_fd 的文件对象&lt;/div&gt;&lt;div&gt;};&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#d80073;strokeColor=#A50040;align=left;spacingLeft=16;" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="2290" y="555" width="450" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-36" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-23" target="z7APVgdZAIvJb30If5ek-25">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-27" value="在内核创建一个epitem结构，他表示listem_fd" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="1410" y="415" width="250" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-28" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.475;entryY=0.01;entryDx=0;entryDy=0;entryPerimeter=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-2" target="z7APVgdZAIvJb30If5ek-27">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-31" value="&lt;font style=&quot;font-size: 17px;&quot;&gt;&lt;b&gt;&lt;span style=&quot;background-color: rgb(194, 19, 19);&quot;&gt;&lt;font color=&quot;#ffffff&quot;&gt;epoll_ctl()&lt;/font&gt;&lt;/span&gt;将listen_fd注册到epoll&lt;/b&gt;&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontFamily=Helvetica;fontColor=default;" vertex="1" connectable="0" parent="z7APVgdZAIvJb30If5ek-28">
+          <mxGeometry x="-0.1887" y="-4" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-32" value="&lt;div&gt;struct epitem {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct rb_node rbn;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 红黑树中的节点&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct list_head rdllink;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 等待链表的链接&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct eventpoll *ep;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// eventpoll 结构的指针&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct file *file;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; // 被监听的文件对象 (listen_fd 或 client_fd)&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; struct epoll_event event;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp;// 监听的事件（EPOLLIN、EPOLLOUT 等）&lt;/div&gt;&lt;div&gt;};&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#d80073;strokeColor=#A50040;align=left;spacingLeft=15;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="1280" y="585" width="420" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-52" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-27" target="z7APVgdZAIvJb30If5ek-32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-37" value="&lt;p style=&quot;line-height: 160%;&quot;&gt;&lt;b&gt;rbtree(红黑树)&lt;/b&gt;&lt;br&gt;用于存储和管理&lt;strong&gt;监听的文件描述符 (fd)&lt;/strong&gt;，将监听的&lt;strong&gt;文件描述符 fd 注册到 epoll&lt;/strong&gt; 中。&lt;/p&gt;&lt;p style=&quot;line-height: 160%;&quot;&gt;&lt;b&gt;listen_fd;&amp;nbsp; &amp;nbsp;client_fd&lt;/b&gt;&lt;/p&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="1810" y="825" width="440" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-41" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-25" target="z7APVgdZAIvJb30If5ek-37">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-53" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-32" target="z7APVgdZAIvJb30If5ek-37">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-38" value="&lt;strong&gt;rdllist（等待链表）&lt;br&gt;&lt;/strong&gt;存储&lt;strong&gt;就绪的事件&lt;/strong&gt;，当某个 fd 上有数据可读时，&lt;strong&gt;fd 被从 rbtree 移动到 rdllist&lt;/strong&gt; 中，等待 epoll_wait 处理。" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="2365" y="965" width="300" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-55" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-25" target="z7APVgdZAIvJb30If5ek-38">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-50" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-37" target="z7APVgdZAIvJb30If5ek-38">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-51" value="&lt;font style=&quot;font-size: 15px;&quot;&gt;&lt;br&gt;事件触发，监听的fd在&lt;strong&gt;内核态中&lt;/strong&gt;发生&lt;strong&gt;可读、可写、错误等事件&lt;br&gt;&lt;/strong&gt;内核将&lt;strong&gt;epitem 的引用“挂到” rdllist 中&lt;/strong&gt;&lt;br&gt;&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontFamily=Helvetica;fontColor=default;fontStyle=1" vertex="1" connectable="0" parent="z7APVgdZAIvJb30If5ek-50">
+          <mxGeometry x="-0.3817" y="-3" relative="1" as="geometry">
+            <mxPoint x="153" y="-3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-86" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-56" target="z7APVgdZAIvJb30If5ek-84">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-56" value="events数组" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="2430" y="1275" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-69" value="&lt;font style=&quot;font-size: 28px;&quot;&gt;内核空间&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontFamily=Helvetica;fontColor=default;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="530" y="795" width="320" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-70" value="&lt;font style=&quot;font-size: 28px;&quot;&gt;用户空间&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontFamily=Helvetica;fontColor=default;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="530" y="1335" width="320" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-75" value="&lt;font style=&quot;font-size: 12px;&quot;&gt;epoll_wait()只监听就绪链表上的epitem上的fd&lt;/font&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;fontFamily=Helvetica;fontColor=default;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="2550" y="1035" width="256" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-78" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=none;startArrow=classic;startFill=1;endFill=0;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-77" target="z7APVgdZAIvJb30If5ek-56">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-79" value="&lt;li style=&quot;font-size: 13px;&quot;&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;Nginx 获取到&lt;strong style=&quot;&quot;&gt;就绪的 client_fd&lt;/strong&gt;，并使用 &lt;font style=&quot;background-color: rgb(194, 19, 19);&quot; color=&quot;#ffffff&quot;&gt;&lt;b&gt;recv() &lt;/b&gt;从&lt;/font&gt; client_fd 中读取数据。&lt;/font&gt;&lt;/li&gt;&lt;li style=&quot;font-size: 13px;&quot;&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;Nginx 处理完事件后，&lt;strong&gt;epitem 从 rdllist 中删除&lt;/strong&gt;。&lt;/font&gt;&lt;/li&gt;&lt;li style=&quot;font-size: 13px;&quot;&gt;&lt;font style=&quot;font-size: 13px;&quot;&gt;&lt;strong style=&quot;&quot;&gt;epitem 仍然存在于 rbtree 中&lt;/strong&gt;，继续监听 client_fd 上的 EPOLLIN/EPOLLOUT 事件。&lt;/font&gt;&lt;/li&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontFamily=Helvetica;fontColor=default;" vertex="1" connectable="0" parent="z7APVgdZAIvJb30If5ek-78">
+          <mxGeometry x="0.3154" y="46" relative="1" as="geometry">
+            <mxPoint x="-118" y="143" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-92" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-77" target="z7APVgdZAIvJb30If5ek-87">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-77" value="Nginx处理事件" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="2510" y="1590" width="234" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-57" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-38" target="z7APVgdZAIvJb30If5ek-56">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-60" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;监听到事件后，将其从rbtree迁移到rdllist&lt;br&gt;由&lt;span style=&quot;background-color: rgb(194, 19, 19);&quot;&gt;&lt;font color=&quot;#ffffff&quot;&gt;epoll_wait()&lt;/font&gt;&lt;/span&gt;将epitem从链表取出给用户空间&lt;br&gt;&lt;br&gt;&lt;strong&gt;取出 epitem&quot; 并不是将 epitem 从 rdllist 中删除，&lt;br&gt;而是将它的引用放入 events 数组中&lt;/strong&gt;。更具体地说，epoll_wait() &lt;strong&gt;不会拷贝整个 epitem 结构，&lt;br&gt;而是仅将指向 epitem 的指针传递到 events 数组中&lt;/strong&gt;。&lt;br&gt;&lt;/font&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontFamily=Helvetica;fontColor=default;fontStyle=1" vertex="1" connectable="0" parent="z7APVgdZAIvJb30If5ek-57">
+          <mxGeometry x="0.1052" y="-3" relative="1" as="geometry">
+            <mxPoint x="10" y="-7" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-82" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-56" target="z7APVgdZAIvJb30If5ek-37">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-83" value="Nginx 通过 &lt;strong&gt;accept() 处理新连接&lt;/strong&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;strong&gt;&lt;font style=&quot;background-color: rgb(194, 19, 19); font-size: 13px;&quot; color=&quot;#ffffff&quot;&gt;accept() &lt;/font&gt;从 accept 队列中取出一个新的客户端连接&lt;/strong&gt;，并返回一个新的 &lt;strong&gt;client_fd&lt;/strong&gt;。&lt;br&gt;Nginx 使用 &lt;font color=&quot;#ffffff&quot; style=&quot;font-size: 13px; background-color: rgb(194, 19, 19);&quot;&gt;&lt;strong&gt;epoll_ctl()&lt;/strong&gt; &lt;/font&gt;将 &lt;strong&gt;client_fd 注册到 epoll&lt;/strong&gt; 中，以便监听 client_fd 上的 EPOLLIN 事件&lt;span style=&quot;font-size: 14px; font-weight: 700;&quot;&gt;&lt;br&gt;&lt;/span&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontFamily=Helvetica;fontColor=default;" vertex="1" connectable="0" parent="z7APVgdZAIvJb30If5ek-82">
+          <mxGeometry x="0.5091" y="-35" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-64" value="" style="rounded=0;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#a20025;strokeColor=#6F0000;" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="380" y="1225" width="2460" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-84" value="&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Nginx 遍历 &lt;strong&gt;events 数组&lt;/strong&gt;，检测到 &lt;strong&gt;listen_fd&lt;/strong&gt; 上的可读事件。&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;for (int i = 0; i &amp;lt; nfds; i++) {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; if (events[i].data.fd == listen_fd) {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; int client_fd = accept(listen_fd, NULL, NULL);&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; &amp;nbsp; epoll_ctl(epfd, EPOLL_CTL_ADD, client_fd, EPOLLIN);&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; }&lt;/div&gt;&lt;div&gt;}&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fontColor=#ffffff;fillColor=#d80073;strokeColor=#A50040;align=left;spacingLeft=12;" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="1810" y="1264" width="333" height="145" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-93" style="edgeStyle=orthogonalEdgeStyle;shape=connector;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;labelBackgroundColor=default;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;endArrow=classic;" edge="1" parent="z7APVgdZAIvJb30If5ek-81" source="z7APVgdZAIvJb30If5ek-87" target="z7APVgdZAIvJb30If5ek-56">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="z7APVgdZAIvJb30If5ek-87" value="处理过程中产生新事件" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="z7APVgdZAIvJb30If5ek-81">
+          <mxGeometry x="2170" y="1470" width="144" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
