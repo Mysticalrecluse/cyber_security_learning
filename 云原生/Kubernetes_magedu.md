@@ -1974,7 +1974,7 @@ spec:
 
 - 目标端口 (targetport: 80):
   - 这是 service 选择器匹配到的 pod 上的端口。service 将请求转发到这个端口上的 pod。也就是说，当请求到达 service 的 80 端口时，它将转发到 pod 的 80 端口。
-nodeport (nodeport: 32000):
+  nodeport (nodeport: 32000):
 
 这是在每个节点上暴露的端口，用于将外部流量路由到 service。外部客户端可以通过节点的 ip 地址和 32000 端口来访问 service，kubernetes 将这个流量转发到 service 的 80 端口，然后再转发到 pod 的 80 端口。
 
@@ -4886,7 +4886,7 @@ kubectl create ingress ingress-myapp --rule=myapp.feng.org/v1=myapp1:80 --rule=m
 #### 单域名多url支持子url
 ```shell
 kubectl create ingress demo-ingress2 --rule='myapp.feng.org/v1(/|$)(.*)=myapp1:80' --rule='myapp.feng.org/v2(/|$)(.*)=myapp2:80' --class=nginx --annotation nginx.ingress.kubernetes.io/rewrite-target='/$2'
-``` 
+```
 
 #### 多域名多url支持子url
 ```shell
@@ -5549,6 +5549,7 @@ current-context: user@cluster
 - contexts：将每个user同可认证的cluster建立关联关系的上下文列表
 - current-context: 当前默认使用的context
   
+
 客户端程序kubectl加载的kubeconfig文件的途径及从高到低优先级次序
 - `--kubeconfig`选项，只支持一个文件
 - kubeconfig环境变量：其值是包含有kubeconfig文件的列表，支持多个文件，用冒号隔离

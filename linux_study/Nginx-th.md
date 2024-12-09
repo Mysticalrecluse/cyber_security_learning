@@ -3778,29 +3778,33 @@ Http是非常多样化的，我们必须有一个流程，按照一条主线把�
 
 
 
-
+当我们在Nginx中确认哪个域名处理nginx请求的时候，或者用location中匹配哪个URL的时候，或者我们重写一个url的时候，往往我们都需要使用正则表达式，因为正则表达式可以让我们匹配的功能更加强大
 
 
 
 
 
 ### server_name
-`server_name`可以保证我们在处理11个阶段的http模块处理之前，先决定哪个server块指定被使用
+`server_name`可以保证我们在处理11个阶段的http模块处理之前，先决定哪个server块指令被使用
 
 server_name支持三种表示方法
 #### 指令后可以跟多个域名，第一个是主域名
+``````http
 Syntax  server_name_in_redirect on | off(默认off)
 
 Default server_name_in_redirect off;
 
 Context http, server, location
+``````
+
+
 
 主域名用法
 ```shell
 # 主域名本质上就是返回响应的域名，如果不指明主域名，则默认与请求的uri相同
 server {
     server_name private.feng.tech second.feng.tech;
-    server_name_in_redirect off;
+    server_name_in_redirect off; 
     
     return 302 /redirect;
 }
@@ -3857,8 +3861,8 @@ server {
 
 #### 其他
 - `.feng.tech`可以匹配`feng.tech` `*.feng.tech`
-- _匹配所有
-- ""匹配没有传递Host头部
+- `_`匹配所有
+- `""`匹配没有传递Host头部
 
 #### Server匹配顺序
 1. 精确匹配
@@ -3869,6 +3873,12 @@ server {
    1. 第1个
    2. listen指定default
 
+
+
+除http过滤模块和只提供变量的nginx模块之外，所有的http模块必须从nginx定义好的11个阶段进行请求的处理，所以每个http模块，何时生效，它有没有机会生效，都要看一个请求究竟处理到哪个阶段。
+
+
+
 ## 详解HTTP请求的11个阶段
 - 阶段1：POST_READ: realip模块处理
   - 刚读完http头部，没有做任何再加工之前，想获得一些原始的值，再该阶段实现
@@ -3877,25 +3887,35 @@ server {
   - 主要做location的匹配
 - 阶段4：REWRITE：rewrite模块处理
 - 阶段5：POST_REWRITE
-  - 阶段5之后是access相关的三个权限，确定访问权限的
+  - 阶段5之后是access相关的三个模块，确定访问权限的
+  - access模块核心解决的是能不能访问；
 - 阶段6：PREACCESS
   - limit_conn
   - limit_req
 - 阶段7：ACCESS
-  - auth_basic
-  - access
-  - auth_request
+  - auth_basic（根据用户名，密码）
+  - access（用户访问的ip）
+  - auth_request（根据第三方服务给我们返回是否去访问）
 - 阶段8：POST_ACCESS
+  - 当前学习的模块没有涉及到这部分的
+
 - 阶段9：PRECONTENT
   - try_files
 - 阶段10：CONTENT
   - index
   - autoindex
   - concat
+  - 反向代理
 - 阶段11：LOG
   - access_Log
 
 所有请求必须是一个阶段一个阶段依次向下进行
+
+当Nginx接收完用户请求的header的时候，就会按照这11个阶段的顺序依次的调用每个阶段中的http模块处理这个请求，当然，每个阶段中可能会有多个http模块，他们之间的处理顺序也很重要，后续会了解到，每个阶段中的http模块中的顺序是怎样对请求产生影响的
+
+
+
+当一个http请求进入Nginx这11个阶段的时候，由于每个阶段都可能有0个或多个http模块，如果某个模块不再把请求向下传递，那么后面的模块是得不到执行的，那么同一个阶段中的多个模块，也并不一定每个模块都有机会执行到，可能会有前面的模块把请求传递给下一个阶段中的模块去处理，下面看下这些http模块中的顺序和处理流程究竟是怎样的
 
 ### 11个阶段的顺序处理
 ![alt text](nginx_images/image-12.png)
@@ -3911,13 +3931,18 @@ char *ngx_module_name [] = {
     ...
 }
 ```
-### POSTREAD阶段
-用于获取客户端地址的realip
 
-#### 如何拿到真实的用户ip地址
+
+### POSTREAD阶段
+
+Postread这个阶段的一个模块：realip模块，它可以帮助我们发现用户的真实IP地址，这为我们后续的一些模块实现例如：限速，限流等功能提供了可能性
+
+
+
+#### 问题：                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      如何拿到真实的用户ip地址
 - TPC连接四元组(src ip, src port, dst ip, dst port)
-- HTTP头部X-Forwarded-For用于传递IP
-- HTTP头部X-Real-IP用于传递用户IP
+- HTTP头部**X-Forwarded-For**用于传递IP
+- HTTP头部**X-Real-IP**用于传递用户IP
 - 网络中存在许多反向代理
 
 ####  realip模块
@@ -3936,7 +3961,20 @@ char *ngx_module_name [] = {
   - realip_remote_port
   
 
-拿到真实用户IP后如何使用?
+#### 拿到真实用户IP后如何使用?
+
+realip模块要求我们必须基于变量来使用，根据我们在realip中配置的指令，realip模块会把从x-forwarded-for或x-real-ip这个头部里的值给他覆盖binary_remote_addr和remote_addr这两个变量的值
+
+
+
+这两个变量原先是指向直接和nginx产生连接的客户端的地址，但是经过了realip模块之后，我们会把这个变量的值改成x-forwarded-for等等里面的头部的值，这样我们后续的模块做连接的限制或者限速才有意义
+
+
+
+所以这时候我们就可以理解，为什么说limit_conn模块，它的顺序一定要在preaccess阶段，它不能在postread阶段，它的道理就是这个。realip模块默认不会编译进nginx，我们必须通过./config后面加上--with-http_realip_module来启用功能，所以我们通常应该下载nginx源代码，才能做这样的事情，它的功能是去修改客户端地址，它还会新生成两个变量，因为它修改了原来的`remote_addr`和`remote_port`变量，所以，他提供了两个变量去氛维护原来的变量，就如果我们还想用原先的`remote_addrde`的话，应该加上realip_remote_addr,此时就可以拿到TCP连接中的`src ip`
+
+
+
 基于变量
 如：binary_remote_addr、remote_addr这样的变量，其值就是为真实的IP！这样做连接限制（limit_conn模块）才有意义
 
@@ -3955,11 +3993,11 @@ real_ip_recursive on | off
 示例
 ```shell
 server {
-    server_name realip.taohui.tech;
+    server_name realip.mystical.tech;
 
     error_log logs/myerror.log debug;
-    set_real_ip_from 116.62.160.193;
-    # real_ip_header X-Real-IP;
+    set_real_ip_from 116.62.160.193;   # 信任本机是src ip的
+    # real_ip_header X-Real-IP;， 默认用这个X-Real-IP
     real_ip_recursive off;
     # real_ip_recursive on;
     real_ip_header    X-Forwarded-For;
@@ -3968,10 +4006,22 @@ server {
         return 200 "Client real ip: $remote_addr\n"
     }
 }
+
+curl -H 'X-Forwarded-For: 1.1.1.1,116.62.160.193' realip mystical.tech
+>> Client real ip:116.62.160.193
+
+
+# 开启还回地址real_ip_recursive on;
+>> Client real ip:1.1.1.1
 ```
 
 ### Rewrite阶段
 #### return指令
+
+
+
+
+
 语法
 ```shell
 return code [text];
@@ -4209,7 +4259,36 @@ if ($invalid_referer) {
 }
 ```
 
+
+
+### find_config阶段：找到处理请求的location
+
+当我们在server块下的rewrite指令执行完毕之后，我们开始根据用户请求中的URL去Location后面相对应的URL前缀，或者正则表达式进行匹配，这一步匹配之后，我们就确定了有哪一个location对这个请求进行处理
+
+``````nginx
+Syntax: location [=|~|~*|^~]uri{...}
+        location @name {...} # 表示是面向内部跳转的
+Default: _
+Context: server, location
+
+# merge_slashes可以去合并URL中的/，当merge_slashes打开的时候，比如两个//可以合并成1个/，通常只有在url中直接使用了base64编码等等的情况下才需要关闭，通常都是打开的
+Syntax: merge_slashes on | off;
+Default: merge_slashes on;
+Context: http, server
+``````
+
+
+
+#### location匹配顺序
+
+
+
+![image-20241209154641081](C:\Users\31403\AppData\Roaming\Typora\typora-user-images\image-20241209154641081.png)
+
+
+
 ### 变量的运行原理
+
 ![alt text](nginx_images\image-14.png)
 
 每一个变量通常分为提供变量的模块和使用变量的模块，图的左边就是提供变量的模块，右边是使用变量的模块
@@ -4401,6 +4480,8 @@ Context: http
 Syntax: server address [parameters];
 Default: ——
 Context: upstream
+
+# upstream指令只能出现在http这个上下文中，他会定义一个名字，这个名字会交由后面的反向代理模块去使用，而它的大括号中的内容，就是我们去配置server，相关的内容，指定我这个name是一个应用服务集群，这些应用服务集群中，包含很多个server，每个server就是一台服务器，每台服务器中，我们可以跟一些parameters，去控制负载均衡的行为
 ```
 
 - 功能
@@ -4408,7 +4489,7 @@ Context: upstream
 
 - 通用参数
   - backup：指定当前server为备份服务，仅当非备份server不可用时，请求会转发到该server
-  - down：表示某台服务已经下线，不在服务
+  - down：表示某台服务已经下线，不在服务，相当于一个注释，方便我们管理维护
 
 
 
@@ -4416,6 +4497,24 @@ Context: upstream
 功能：在加权轮询的方式访问server指令指定的上游服务器。集成在nginx的upstream框架中
 
 该算法是所有算法的基础，比如hash算法，或者一致性hash算法，在某种情况下，都会退化成加权round-robin算法
+
+
+
+#### 什么是round-robin?
+
+就是它依次轮询挨个进行的方式，我们就叫做round-robin
+
+
+
+#### 什么叫加权
+
+有的服务器我们用的是4核8G，有的服务器我们可能用了8核16G，那么8核16G这样的服务器，它能够处理的请求数，或者QPS就会更强一点，那么我们通过一个权重，来标识这台服务不同于其他服务，权重更大，那么我们的round-robin算法就应该按照我们的权重值将更多的请求发给这样的服务
+
+
+
+它是默认集成在Nginx的upstream框架中的，我们没有办法添加或者移除这个办法
+
+
 
 指令：
 - weight
@@ -4428,6 +4527,16 @@ Context: upstream
   - 单位为秒，默认值为10秒，具有2个功能：
   - 指定一段时间内，最大的失败次数max_fails
   - 到达max_fails后，该server不能访问的时间
+
+``````
+max_fails参数和fail_timeout这两个参数是相互配合使用的
+
+fail_timeout参数的单位是秒，它有两层用法，
+第一层用法：比如：在timeout，10s内，当这台server的失败次数超过max_fails指定的次数后，会在第二层含义
+第二层含义：会在timeout,这么长时间内这台server不会被负载均衡算法再次选择到
+``````
+
+
 
 
 #### 对上游服务使用keepalive长连接
@@ -4491,10 +4600,18 @@ server {
 ```
 
 ### 负载均衡算法：ip_hash与hash模块
+
+round-robin它无法保证某一类请求只能由某一台服务器去处理，他只能做水平扩展，如果需要做基于Z轴的扩展，就可以选择基于hash算法来保证某一个请求只会由某一台服务去处理
+
+
+
 #### 基于客户端ip地址的Hash算法实现负载均衡：upstream_ip_hash模块
+
+ip_hash其实就是使用**$remote_addr**变量的值作为关键字，然后使用hash算法将其映射到特定的上游服务器中
+
 功能：以客户端的ip地址作为hash算法的关键字，映射到特定的上游服务器中
 - 对ipv4地址使用前3个字节作为关键字，对ipv6则使用完整地址
-- 可以基于realip模块修改用于执行算法的IP地址
+- 因为使用了$remote_addr作为关键字做hash运算，因此可以基于realip模块修改用于执行算法的IP地址
 
 - 模块：ngx_http_upstream_ip_hash_module，通过--without-http_upstream_ip_hash_module禁用模块
 
@@ -4579,7 +4696,7 @@ curl -H 'X-Forwarded-For: 100.200.20.200' iphash.feng.tech?username=bbbb
 
 该算法弊病：使用hash算法可以确保某一类请求只会路由到某一台上游服务中，无论这台上游服务后续是否正常在线，当一台上游服务下线了，机器损坏了，我们不能直接从upstream中把这台sever从配置中移除，因为移除之后，会导致它的hash算法发生变化，他就会同时影响原本路由到其他server的请求也发生变化，从而造成严重后果
 
-一致性hash算法可以缓解这个问题
+一致性hash算法可以缓解这个问题 
 
 
 ### 一致性hash算法
@@ -4620,7 +4737,13 @@ Default: ——
 Context: upstream
 ```
 
+
+
+之前所有的都是在内存中的配置，包括服务server的状态信息，那么我们为了能够让它跨worker进程生效，所以我们必须使用共享内存
+
 #### 使用共享内存使负载均衡策略对所有worker进程生效:`upstream_zone`模块
+
+- upstream_zone这个模块是默认编译在内存中的
 
 - 功能：分配处共享内存，将其他upstream模块定义的负载均衡策略数据、运行时每个上游服务的状态数据存放在共享内存上，以对所有nginx worker进程生效
 
@@ -4647,4 +4770,17 @@ ngx_module_t *ngx_modules[] = {
 这个数组决定了http模块11个阶段的执行顺序，包括过滤模块间的顺序，对于upstream模块也同样有效
 它的顺序是从上到下的，我们启动的时候，会优先看hash、ip_hash、least_conn、random、keepalive、zone，这个模块间的顺序也是非常有用的，比如说我们先试用了rr算法，再使用least_conn算法，least_conn才能退化为rr算法，如果我们还使用了keepalive，而keepalive会保存下hash算法以后，会把它的路由算法放下来，因为它的路由算法是如果我缓存了，我就直接使用我缓存的，zone放在最后一个，就是不管你们前面定义了多少东西，到我了，我就开始分配一块共享内存，把你们之前所分配的信息全部用共享内存替代原先的内存存储，我就解决了多个worker进程间共享配置，共享负载均衡算法的能力
 
-### upstream模块提供的变量
+
+
+### upstream模块提供的变量（不含cache）
+
+nginx框架中为上述的upstream模块提供了相应的变量，upstream框架提供的变量中，含有缓存的部分，将在后面讲到缓存的时候讲，先看下不含有缓存的upstream变量有哪些
+
+``````
+upstream_addr            # 上游服务器的IP地址，格式为可读的字符串，比如127.0.0.1:8012
+upstram_connection_time  # 与上游服务器建立连接消耗的时间，单位为秒，精确到毫秒
+upstream_header_time     # 接收上游服务器回响应头部所消耗的时间，单位为秒，精确到毫秒
+upstream_response_time   # 接收完整的上游响应所消耗的时间，单位为秒，精确到毫秒
+upstream_http_名称        # 从上游服务器返回的响应头部的值
+``````
+
