@@ -17385,13 +17385,193 @@ server.xml文件解析
 3. 连接器接收数据后，交给引擎处理
 4. 将访问的资源解析到虚拟主机Host
 5. 通过Host的name进行匹配
-6. 匹配后，通过context获取请求，并通过mapping table找到对应的servlet
-   - servlet（server applet）:是以servlet编码方式写的一个tomcat的服务器端 
-   - servlet是在web.xml 里定义的
-7. 由servlet去封装request和response
-8. 封装好后将结果返回引擎，再从引擎返回到连接区，在返回给客户端
+    1. 匹配后，通过context获取请求，并通过mapping table找到-=-------匹配【·								v  对应的servlet
+    2. servlet（server applet）:是以servlet编码方式写的一个tomcat的服务器端 
+    3. servlet是在web.xml 里定义的
+
+6. 由servlet去封装request和response
+7. 封装好后将结果返回引擎，再从引擎返回到连接区，在返回给客户端
+
+​	
+
+### **各组件的作用及关系**
+
+#### **1. Server**
+
+- **顶层组件**：`<Server>` 是 Tomcat 配置文件的顶层组件，用来定义整个 Tomcat 服务器实例的配置。
+
+- 作用
+
+  ：
+
+  - 代表整个服务器的运行实例。
+  - 包含一个或多个 `<Service>`。
+  - 负责监听服务器生命周期（启动和关闭）事件。
+  - 通过 `port` 属性配置一个端口（通常是 `8005`），用于监听关闭命令。
+
+- 关键属性
+
+  ：
+
+  - `port`：监听关闭命令的端口号。
+  - `shutdown`：接收关闭命令的字符串。
+
+```
+xmlCopy code<Server port="8005" shutdown="SHUTDOWN">
+    ...
+</Server>
+```
+
+#### **2. Service**
+
+- **中间组件**：`<Service>` 是 Server 的子组件，一个 Server 可以包含一个或多个 Service。
+
+- 作用
+
+  ：
+
+  - 表示一个具体的服务实例。
+  - 负责将 `Connector` 和 `Engine` 组合在一起工作。
+  - 允许在同一个服务器中运行多个服务（比如一个服务处理 HTTP，另一个处理 HTTPS）。
+
+- 关键属性
+
+  ：
+
+  - `name`：Service 的名称。
+
+```
+xmlCopy code<Service name="Catalina">
+    ...
+</Service>
+```
+
+#### **3. Engine**
+
+- **核心组件**：`<Engine>` 是 Service 的子组件，一个 Service 必须包含一个 Engine。
+
+- 作用
+
+  ：
+
+  - 表示整个服务的核心引擎，负责将来自 Connector 的请求分发到正确的 Web 应用（Context）。
+  - 每个 Engine 必须配置一个默认的 `Host`，以便处理请求时无法匹配具体虚拟主机的情况。
+
+- 关键属性
+
+  ：
+
+  - `name`：Engine 的名称。
+  - `defaultHost`：默认虚拟主机的名称，用于处理无法匹配到其他 Host 的请求。
+
+```
+xmlCopy code<Engine name="Catalina" defaultHost="localhost">
+    ...
+</Engine>
+```
+
+#### **4. Connector**
+
+- **通信组件**：`<Connector>` 是 Service 的子组件，用于定义服务的通信方式。
+
+- 作用
+
+  ：
+
+  - 负责监听特定的协议端口（如 HTTP、HTTPS、AJP 等），将收到的请求传递给 Engine。
+  - 一个 Service 可以包含多个 Connector，以支持不同协议或端口。
+
+- 关键属性
+
+  ：
+
+  - `port`：监听的端口号。
+  - `protocol`：通信协议（如 HTTP/1.1、AJP/1.3）。
+  - `URIEncoding`：编码方式（如 UTF-8）。
+
+```
+xml
 
 
+Copy code
+<Connector port="8080" protocol="HTTP/1.1" connectionTimeout="20000" redirectPort="8443" />
+```
+
+------
+
+
+
+#### **组件之间的关系**
+
+1. **`Server → Service`**
+   - 一个 Server 可以包含多个 Service，每个 Service 是一个独立的服务实例。
+2. **`Service → Engine`**
+   - 每个 Service 必须包含一个 Engine，Engine 是整个服务的核心。
+3. **`Service → Connector`**
+   - 每个 Service 可以包含多个 Connector，负责监听不同协议或端口的请求。
+4. **`Engine → Host → Context`**
+   - Engine 负责请求分发，它包含一个或多个虚拟主机（Host）。
+   - 每个 Host 代表一个虚拟主机（比如不同的域名）。
+   - 每个 Host 包含多个 Web 应用（Context），每个 Context 对应一个部署的应用。
+
+------
+
+
+
+#### **工作流程**
+
+1. **启动阶段**：
+   - `Server` 启动后，初始化所有 `Service`。
+   - 每个 `Service` 初始化对应的 `Engine` 和 `Connector`。
+2. **请求处理阶段**：
+   - `Connector` 监听特定端口，接收来自客户端的请求。
+   - `Connector` 将请求交给 `Engine`。
+   - `Engine` 根据请求的域名（Host Header）选择对应的 `Host`。
+   - `Host` 根据请求的 URI，将请求分发到对应的 `Context`（Web 应用）。
+   - `Context` 将请求交给具体的 Servlet 或资源处理。
+
+
+
+#### **示例配置**
+
+```xml
+xmlCopy code<Server port="8005" shutdown="SHUTDOWN">
+    <!-- 定义一个服务 -->
+    <Service name="Catalina">
+
+        <!-- 定义一个 HTTP 协议的连接器 -->
+        <Connector port="8080" protocol="HTTP/1.1" connectionTimeout="20000" redirectPort="8443" />
+
+        <!-- 定义一个 AJP 协议的连接器 -->
+        <Connector port="8009" protocol="AJP/1.3" redirectPort="8443" />
+
+        <!-- 定义服务的核心引擎 -->
+        <Engine name="Catalina" defaultHost="localhost">
+
+            <!-- 定义一个虚拟主机 -->
+            <Host name="localhost" appBase="webapps" unpackWARs="true" autoDeploy="true">
+
+                <!-- 定义一个 Web 应用 -->
+                <Context path="" docBase="ROOT" />
+                <Context path="/app1" docBase="app1" />
+            </Host>
+
+        </Engine>
+    </Service>
+</Server>
+```
+
+------
+
+
+
+#### **总结**
+
+- **Server** 是顶层容器，负责管理多个 Service 的运行。
+- **Service** 将 Connector 和 Engine 绑定在一起，管理整个服务的通信和请求分发。
+- **Engine** 是 Service 的核心组件，负责请求的分发。
+- **Connector** 负责网络通信，将请求转发给 Engine。
+- 各组件紧密协作，构成了 Tomcat 的请求处理体系。
 
 ### 日志配置
 
@@ -17554,7 +17734,7 @@ cat web.xml
 <welcome-file-list>
     <welcome-file>index.txt</welcome-file>
     <welcome-file>index.html</welcome-file>
-    <welcome-file>index.htm</welcome-file>
+    <welcome-file>index.htm</wesslcome-file>
     <welcome-file>index.jsp</welcome-file>
 </welcome-file-list>
 ```
@@ -17847,7 +18027,7 @@ server {
         <Transport className="org.apache.catalina.tribes.transport.nio.PooledParallelSender"/>
     </Sender>
     <Interceptor className="org.apache.catalina.tribes.group.interceptors.TcpFailureDetector"/>
-    <Interceptor className="org.apache.catalina.tribes.group.interceptors.MessageDispatchIntercep tor"/>
+    <Interceptor className="org.apache.catalina.tribes.group.interceptors.MessageDispatchInterceptor"/>
     </Channel>
     <Valve className="org.apache.catalina.ha.tcp.ReplicationValve"  filter=""/>
     <Valve className="org.apache.catalina.ha.session.JvmRouteBinderValve"/>
@@ -18058,7 +18238,7 @@ get test                    # 30S 后数据消失
 END
 ```
 
-### 基于MSM实现session共享
+
 
 #### MSM介绍和安装
 
@@ -18324,13 +18504,28 @@ systemctl restart tomcat:
 删除或设置 redirectPort="0"
 ```
 
-线程池数据（连接数）
+**application**
+
+**查看资源请求情况详情**
+![alt text](images\image109.png)
+
+**通过request插看**
+![alt text](images\image108.png)
+
+**Session**
+![alt text](images\image110.png)
+
+
+**线程池数据（连接数）**
 - 根据下列指标即可看出线程池是否够用，是否需要增加线程池的线程数量
 ![alt text](images/image94.png)
 
 ![alt text](images/image95.png)
 
-内存数据
+
+**内存数据**
+
+![alt text](images\image111.png)
 
 ![alt text](images/image96.png)
 
@@ -18350,21 +18545,19 @@ systemctl restart tomcat:
 重点关注类似点击率（每隔多少时间有多少请求数）和吞吐量
 
 #### probe重点关注数据总结
-- 请求数，分析是按个站点的请求内容比较多，如果出问题的话是哪个类引起的，这些都可以从下图看出
+- 请求数，分析是按个站点的请求内容比较多，如果出问题的话是哪个类引起的，这些都可以从下图看出，虽然运维看的不是特别明确但是开发是看的懂的，哪个类在消耗，开发自身应该很清楚
 - ![alt text](images/image98.png)
-
 - 通过线程池数据分析线程数，看线程够不够用，如果线程用满了就即使去增大，防止出现排队，出现排队超时
 - ![alt text](images/image94.png)
-
 - 观察内存中内存分布的情况（青年态，老年态）
   - （可以在catalina.sh的文件中指定内存的大小），后期根据实际情况去调整内存的分布,防止内存溢出和产生频发回收机制（比如年轻态过小，就会频繁出发回收，而频繁的GC会消耗系统资源）
   ![alt text](images/image99.png)
-
   - 通过看系统资源的情况分析，比如由于内存过小，导致频繁出发GC，导致CPU使用率增高
-  - 又或者发生频繁的读取文件，频繁导致磁盘IO
+  - JMP CPU UTILIZATION过高，就会导致CPU负载变高
+  - FILE DESCRIPTIONS变高，又或者发生频繁的读取文件，频繁导致磁盘IO变高
   ![alt text](images/image100.png)
-
 - 观察（http）连接器里的点击率和吞吐量
+![alt text](images\image112.png)
 
 ### JVM调优
 JVM当前有三家公司在开发分别是
@@ -18372,9 +18565,310 @@ JVM当前有三家公司在开发分别是
 - BEA
 - IBM
 #### JVM工作原理
-程序运行过程
-- Class Loader 加载类到JVM内存中
-- 
+```java
+public class MyMath { 
+    public static final int INIT_DATA = 666; 
+    public static User user = new User();  
+
+    public int compute() { // 一个方法对应一块栈帧内存区域
+        int a = 1;
+        int b = 2;
+        int c = (a + b) * 10;
+        return c;
+    }
+
+    public static void main(String[] args) {
+        MyMath math = new MyMath(); 
+        int result = math.compute(); 
+        System.out.println("计算结果为: " + result); // 输出结果
+    }
+}
+
+class User {
+    private String name;
+
+    public User() {
+        this.name = "Default User";
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+![alt text](images\image116.png)
+
+**java程序编译执行流程**
+- 第一步：通过**javac**指令将Math.java变成字节码文件，在通过**java**命令去运行
+- 第二步：执行java命令后，字节码文件加载到**类装载子系统**，通过类装载子系统将字节码加载到JVM的第二块组成部分（内存区域或运行时数据区）
+- 第三步：通过JVM第三个组成部分：**字节码执行引擎**来执行内存区域里的代码
+
+我们学的堆，栈，元空间等概念都仅仅指的是内存区域组成部分的一小块内容
+我们的JVM调优，主要调的就是内存区域
+
+
+
+**jVM内存区域详解**
+- 堆（Heap）
+  - 通常new的实例都在堆中
+
+- 栈（Java Virtual Machine Stacks）
+  - 也叫线程栈
+  - 当我们的main方法开始运行，就会启用一个线程运行，而在线程运行过程中，局部变量需要有内存去存放，而这些局部变量都是放在线程栈
+  - 只要有一个线程开始运行，JVM就会给这个线程分配一个**专属的**栈内存区域，用来放局部变量
+
+  - **栈帧**
+    - 当我们的线程开始运行，JVM就会给这个线程分配一块自己专属的线程栈
+    - 而局部变量的作用范围通常只在方法内部有效，比如上述代码的中变量a，b，c，只在方法compute执行的过程中有效，
+    - 而math只在main方法执行的过程中生效，方法一结束，这个局部变量肯定就没有了
+      - 实现过程：
+      - 只要我们的线程开始执行方法，马上会给这个方法在我们的线程栈内存区域分配一个块方法对应的内存区域，用来存放方法内部的局部变量
+      - 当调用compute方法的时候，也会给这个方法分配一块自己内部的内存区域，我们把方法对应的这个内存区域就叫**栈帧**
+
+  - **数据结构的栈和这个栈空间的关系是什么**
+    - 栈的特点是FILO(First IN Last Out)
+    - 我们的线程栈这块内存区放栈帧的这个数据结构，就是用的数据结构里的栈
+    - 根据上述代码，我们的程序在运行过程中，他的内存分配如下  
+      - 先是线程开始运行，分配一大块内存区域（线程栈）
+      - 然后开始执行main方法，然后分配一块main方法的栈帧内存区域，然后执行compute方法，compute方法又会被分配一块栈帧内存区域
+      - compute方法一旦运行完，它对应的栈帧局部内存空间全部都会被释放掉，也就是所谓的出栈
+      - 然后在回到mian方法继续执行，main方法执行完，一样的也会把main方法对应的栈帧内存空间销毁掉，说白了就是出栈
+    - 这也就是为什么要用栈这种数据结构来存储我们的方法，因为他跟我们程序的嵌套调用的先后顺序完全一致。
+
+```java
+// 通过javap -c MyMath > MyMath.txt，得到java字节码的反汇编
+// 对上述代码生成的字节码进行反汇编
+// 可以通过对照Orcle上面的JVM指令码手册，进行阅读
+Compiled from "MyMath.java"
+public class MyMath {
+  public static final int INIT_DATA;
+
+  public static User user;
+
+  public MyMath();
+    Code:
+       0: aload_0
+       1: invokespecial #1                  // Method java/lang/Object."<init>":()V
+       4: return
+
+  public int compute();
+    Code:
+       0: iconst_1                         // iconst_1 将int类型常量1压入操作数栈，操作数栈内部也是栈结构来存储数据
+       1: istore_1                         // 将int类型的值存入局部变量1，这里也就是将操作栈中的常量1出栈，然后给局部变量a开辟一个内存空间，然后将常量1存入局部变量a的内存空间中
+       2: iconst_2                         // iconst_2 将int类型常量2压入操作数栈
+       3: istore_2
+       4: iload_1                          // iload 从局部变量中装载int类型值1
+       5: iload_2
+       6: iadd                             // iadd 从操作数栈中，弹出两个值，做加法，得到的结果，重新压回操作数栈
+       7: bipush        10                 // bipush 将一个8位带符号整数(10)压入栈
+       9: imul
+      10: istore_3
+      11: iload_3
+      12: ireturn
+
+  public static void main(java.lang.String[]);
+    Code:
+       0: new           #2                  // class MyMath
+       3: dup
+       4: invokespecial #3                  // Method "<init>":()V
+       7: astore_1
+       8: aload_1
+
+```
+  - **局部变量表与操作数栈**
+    - 在我们的栈帧中，有一个表结构来存放我们的局部变量，也就是**局部变量表**
+    - 整个栈帧中除了有**局部变量表**，**操作数栈**，**动态链接**，**方法出口**
+    - **局部变量表**就是存放局部变量的数据存储结构
+    - **操作数栈**临时存放局部变量值的地方
+    - **程序计数器**每个线程从程序计数器的内存空间中，取一部分作为自己的程序计数器内存空间，内部存放的数据是记录我们的代码执行到什么位置（方法区的内存地址）
+      - 程序计数器的意义: 为什么JVM的程序设计人员要设计它：当线程时间片用完，产生线程间切换的时候，该程序计数器记录线程运行的位置，在后续切换回来的时候使用
+      - Math.class在java运行的时候，要将其加载到方法区（也就是元空间），加载到元空间后，由字节码执行引擎执行
+      - 程序计数器上记录了代码执行的位置，而这个程序计数器的值由字节码执行引擎处理
+    - **动态链接**：涉及C++底层源码，java程序是由C++写的，
+      - 大概意思：我们的函数名，方法名，看做一个符号，比如compute就是一个符号，动态链接实质上就是程序在运行过程中，根据这个符号找到这个方法所在的方法区内的内存地址，根据这些内存地址作为入口，找到这个方法的代码进行执行
+      - 所以动态链接放的就是我们的方法对应的在方法区内的解析之后的入口的内存地址，根据这个内存地址可以找到compute方法的具体代码
+    - **方法出入口**：记录compute代码执行完后，返回到main方法的哪个位置
+    - 每个栈帧都有上述的这四个部分，即：局部变量表，操作数栈，动态链接，方法出入口
+    - **main方法内的局部变量表**：有些不同的地方：就是Math.math接受的值是一个对象( new Math() ),而这个对象是被分配在堆里的，而我们的局部变量比如：a=1是被分配在局部变量表中
+    - 那么局部变量表中的变量和堆中的math对象有什么区别：也就是局部变量表中的数值是存放的常量，而对象则是存放的堆中存放该对象数据的地址，即指针
+    - **方法区（元空间）**：方法区内放常量，静态变量，类元信息，
+      - **常量**：`public static final int initData = 666;`
+      - **静态变量**：`public static User user = new User();`，而这个变量的值是一个变量，因此也是一个指针指向堆内的user对象，这也就是方法区和堆之中的关系
+      - **本地方法栈**：本地方法就是native方法，底层是C++写的，这部分native方法就是从本地方法栈分配的内存空间
+        - 和线程栈比较类似，线程栈是java语言实现的方法，它的内存空间是从栈空间分配的
+        - 对于本地方法（native方法），底层是C++/C语言实现的，而这些方法的内存空间从本地方法中分配
+
+
+**堆**
+- 对象new出来时放在Eden区，当我们不断new对象，将Eden区撑满，会触发minor GC，minor GC本质上是字节码执行引擎开启的一个线程，专门用来做垃圾对象回收，
+- **GC底层垃圾回收的过程**：
+  - **可达性分析算法**
+    - 将"GC Roots"对象作为起点，从这些节点开始向下搜索引用的对象，找到的对象都标记为非垃圾对象，其余未标记的对象都是垃圾对象，
+      - 比如：可以以math变量作为GC ROOT,看math变量有没有成员变量，如果有引用成员变量，继续向下找，直到找到最后一个对象，它没有任何引用的成员变量，整个链上的所有变量对打一个标记，记为非垃圾，而所有的非垃圾会复制到survivor上去，所有没有GC ROOT指向的对象，也就是垃圾对象，直接销毁掉
+      - 一个对象在经历过GC后，他的分代年龄会加1，假设程序一直在运行，下一次，Eden区又放满了，会再次出发minor GC，minor GC实质上回收的是整个年轻代，它不仅会回收Eden区，还会回收Survivor区的对象，如果第二次回收，survivor区域中还有对象存活，它会被复制到另一块survivor区域，即s1区，如果eden区还有对象存活，也会复制到s1区，剩下的edne去和s0区里的所有对象直接清空，效率非常高
+      - 对象的组成：对象中除了实例数据（比如：成员变量外），还有对象头（Object Header），包含对象的一些附属信息，比如：锁状态，数组长度（只有数组对象才有），分代年龄（用4bit存储）
+      - 每经过一次minor GC，分代年龄都会加1，当分代年龄变为15后，直接移到老年代（这里的15不是绝对的，不同的垃圾回收器的值不同）
+      - 在web应用中，向数据库连接池，对象缓存池，静态变量这些最终都会移到老年代
+    - GC Roots根节点：线程栈的本地变量，静态变量，本地方法栈的变量等等
+
+**总结：三种对象从青年代移动到老年代的原因**
+- 对象的年龄超过阈值（默认15，具体看JVM实现）
+  - 当对象在 Survivor 区的年龄超过了阈值，JVM 会将对象移动到老年代
+  - 过程解释
+    - 在年轻代中，内存划分为 Eden、Survivor from (S0) 和 Survivor to (S1) 三部分。
+    - 新创建的对象首先分配在 Eden 区
+    - 当 Eden 区内存满时，Minor GC 触发
+    - 存活的对象将被移入 Survivor S0 区。
+    - 在接下来的 GC 中，存活的对象会从 S0 → S1，它们的“年龄”会增加 1。
+    - 当对象的年龄达到某个阈值 (默认为15)，JVM 就会将该对象移入老年代。
+  - **年龄阈值**
+    - JVM 中的对象年龄由 MaxTenuringThreshold 决定，默认值是15。
+    - 也就是说，如果一个对象的年龄达到 15（在 S0/S1 之间存活了 15 次 GC），这个对象就会被移到老年代
+  - **修改阈值**
+  ```bash
+  -XX:MaxTenuringThreshold=10
+  # 将对象的“最大生存代数”调整为 10。也就是说，当对象在 Survivor 区经历了 10 次 GC 后，它就会被移入老年代。
+  ```
+
+- 对象的年龄超过阈值
+  - 大对象（通常是大数组或大字符串）会直接分配到老年代，而不会经历年轻代的过程。
+  - **为什么要直接进入老年代？**
+    - 如果一个大对象（比如一个大数组或大字符串）被分配到 Eden 区，可能会很快填满 Eden 区，频繁触发 GC。这种频繁的 GC 会导致性能问题。为了解决这个问题，JVM 提供了一种机制，大对象直接进入老年代。
+  - **如何定义大对象的大小？**
+    - JVM 使用 `PretenureSizeThreshold` 参数来决定大对象的最小大小。
+    - 只要对象的大小大于 PretenureSizeThreshold，它就会被直接分配到老年代。
+  - **如何设置大对象的阈值？**
+  ```bash
+  # 表示大于 1MB 的对象将直接分配到老年代。
+  -XX:PretenureSizeThreshold=1M
+  ```
+
+- 特殊情况：Survivor 区满了的情况
+  - 如果 Survivor 区满了，存活的对象也会被直接送入老年代。
+  - **为什么会发生？**
+    - 在 GC 过程中，如果 Survivor 区中的空间不足以存放所有 Eden 和 Survivor 中存活的对象，那么一部分对象会直接被分配到老年代。
+    - 这有点像应急转移的机制。
+  - 这种情况在高并发场景中常见，比如网络高并发请求，瞬时大量对象创建导致 Survivor 区不够用。
+
+
+**堆满时，老年代如何分配？**
+- 当老年代也满了时，JVM 将触发 Full GC。
+- Full GC 触发后，如果无法回收老年代中的对象，JVM 会抛出：
+```bash
+java.lang.OutOfMemoryError: Java heap space
+```
+
+### JVM调优工具
+
+#### 使用jvisualvm监控内存
+jvisualvm一款图形化的内存监控工具，在jdk-8u361之前的版本中是内置的组件，但在之后的JDK版本中已经取消了该组件，要单独下载并配置
+
+```bash
+# 安装依赖
+apt install libxrender1 libxrender1 libxtst6 libxi6 fontconfig -y
+
+wget https://github.com/oracle/visualvm/releases/download/2.1.8/visualvm_218.zip
+
+unzip visualvm_218.zip
+
+# 在windows中开启Xmanager - Passive
+export DISPLAY=10.0.0.1:0.0
+
+# 执行，在windows中能看到GUI界面，在GUI中点击Tools菜单，Plugins，然后安装VisualGC插件
+```
+
+**测试程序**
+```java
+// HeapOom.java
+import java.util.ArrayList;
+import java.util.List;
+public class HeapOom {
+    public static void main(String[] args) {
+        List<byte[]> list = new ArrayList<byte[]>();
+        int i = 0;
+        boolean flag = true;
+        while(flag) {
+            try {
+                i++;
+                list.add(new byte[1024 * 1024]); // 每次增加一个1M大小的数组对象
+                Thread.sleep(1000);
+            } catch (Throwable e ) {
+                e.printStackTrace();
+                flag = false;
+                System.out.println("count="+i); // 记录运行次数
+            }
+        }
+    }
+}
+```
+![alt text](images\image118.png)
+![alt text](images\image117.png)
+
+老年代放满后，会触发**Full GC**，它会回收整个堆的内存空间，但是由于上述代码的对象一直在被列表引用，FUll GC无法回收，因此会触发OOM
+```bash
+java.lang.OutOfMemoryError: Java heap space
+```
+
+#### 阿里巴巴内部JVM调优工具Arthas详解
+
+启动Demo
+```bash
+curl -o https://arthas.aliyun.com/arthas-boot.jar
+java -jar arthas-demo.jar
+```
+
+**Arthas使用场景**
+得益于Arthas强大且丰富的功能，让Arthas能做的事情超乎想象。下面仅仅例举几项常见的使用情况，更多的使用场景可以在熟悉了Arthas之后自行探索
+- 是否有一个全局视角来查看系统的运行状况？
+- 为什么CPU又升高了，到底是哪里占用了CPU？
+- 运行的多线程有死锁吗？有阻塞吗？
+- 程序运行耗时很长，是哪里耗时比较长呢？如何监测呢？
+- 这个类从哪个jar包加载的？为什么会报各种类相关的Exception？
+- 我改的代码为什么没有执行到？难道是我没commit?分支搞错了？
+- 遇到问题无法在线上debug，难道只能通过加日志再重新发布吗？
+- 有什么办法可以监控到JVM的实时运行状态？
+
+
+![alt text](images\image119.png)
+
+**执行dashboard**
+```bash
+# 把当前的监控进程里面的所有的线程执行的情况，全部打出来，包括内存的分配情况
+dashboard
+```
+![alt text](images\image120.png)
+
+**thread <线程号>**
+```bash
+# 定位这个线程占用CPU执行的具体的代码
+thread 18
+```
+
+**更多的用法**：查看Arthas官网的更多详细高阶用法
+
+#### JVM虚拟机调优的目的
+尽可能的减少GC，不论是FULL GC还是MINOR GC，减少GC，特别是FULL GC的目的是尽量减少STW（Stop The World）
+SWT一旦发生，在客户端的影响就是，用户会发现卡顿
+
+**JVM的开发人员为什么要设计SWT机制**
+
+使用反证法，假设JVM在做GC的过程中，不STW，没有STW机制，后台线程在做GC的过程中，同时用户线程也继续在执行，会发生什么效果
+- 如果用户线程不暂停，程序一直在执行，则对象的状态会一直变，可能GC在或变量检查时，还不是垃圾对象，但是GC可能还没检测完，而程序线程运行外，导致之前的部分非垃圾对象变为垃圾对象，此时怎么办？GC重新遍历检测吗？
+- 所以为了防止这个情况发生，就需要SWT机制，在GC触发时，暂停线程运行，直到GC结束
+- 不同的垃圾收集器的SWT会有区别
+
+
+#### 通过案例讲解JVM优化  
+
+**亿级流量电商场景**
+![alt text](images\image121.png)
+
+
+
 
 #### 堆和栈的区别
 
@@ -18855,6 +19349,12 @@ test                 # 行项目的单元测试
 package              # 将项目打包成war包或jar包
 install              # 将项目打包并安装到本地Maven仓库，以便其他项目使用
 clean install        # 先清理，再编译安装
+
+# 常用命令
+mvn clean install package                              # 清理，打包，并安装
+mvn clean install package -Dmaven.test.skip=true       # 清理，打包，并安装，跳过单元测试部分
+mvn -T 4 clean install package -Dmaven.test.skip=true  # 4线程编译
+mvn -f mall-gateway clean package dockerfile:build     # 构建docker镜像，要在pom.xml中配置 
 ```
 
 实验示例
@@ -18993,7 +19493,7 @@ ln -sv /usr/local/nexus/bin/nexus /usr/bin/
 cat lib/systemd/system/nexus.service
 [Unit]
 Description=nexus service
-After=network.target
+After=network.target1
 
 [Service]
 Type=forking

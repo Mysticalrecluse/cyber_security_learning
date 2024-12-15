@@ -4,7 +4,7 @@
 - 即实现了分布式服务管理
 
 ## Zookeeper的功能
-- 实现了服务的命名服务
+- 实现了服务的**命名服务**
     - 即给每个服务取个名称进行存放，并对其进行对应的解析，解析成对应的地址，实现服务发现，服务注册
 
 - Zookeeper内部可以看作是一个树状存储数据库
@@ -34,9 +34,9 @@ apt -y install zookeeper
 ### 二进制安装
 ```shell
 # 安装java环境
-apt install -y openjdk-8-jdk
+apt install -y openjdk-11-jdk
 # 下载zookeeper
-wget https://mirrors.tuna.tsinghua.edu.cn/apache/zookeeper/current/apache-zookeeper-3.9.2-bin.tar.gz
+wget https://mirrors.tuna.tsinghua.edu.cn/apache/zookeeper/current/apache-zookeeper-3.9.3-bin.tar.gz
 
 # 解压并放入指定目录
 tar xf apache-zookeeper-3.9.2-bin.tar.gz -C /usr/local/
@@ -106,7 +106,7 @@ clientPort=2181
 #autopurge.snapRetainCount=3
 # Purge task interval in hours
 # Set to "0" to disable auto purge feature
-#autopurge.purgeInterval=1
+#autopurge.purgeInterval=1    # 自动数据清理
 
 ## Metrics Providers
 #
@@ -131,6 +131,8 @@ zkServer.sh start-foreground
   - Zab(Zookeeper Atomic Broadcast原子广播)：强一致性协议
 - 集群中节点数越多，写性能越差，读性能越好
 
+
+![alt text](images\image14.png)
 
 #### 集群角色
 - 领导者(Leader)
