@@ -2000,4 +2000,868 @@ kubectl 命令可分为三类命令：
 
 
 
+#### 名称空间说明
+
+![alt text](images\image30.png)
+
+
+
+Kubernetes 的资源工作的有效范围分成两种级别:
+
+- **集群级别**: 针对整个Kubernetes集群内都有效
+  - 
+- **名称空间级别**: 只针对指定名称空间内有效,而不属于任务名称空间
+
+
+
+##### **名称空间的作用**
+
+- 名称空间 Namespace 用于将集群分隔为多个隔离的逻辑分区以配置给不同的用户、租户、环境或者项目使用。
+- 名称空间限定了资源对象工作在指定的名称范围内的作用域
+- **注意: 名称空间本身是 Kubernetes 集群级别的资源**
+
+
+
+##### **名称空间的使用场景**
+
+- **环境管理**：需要在同一Kubernetes集群上隔离研发、预发和生产等一类的环境时，可以通过名称空间进行
+- **隔离**：多个项目团队的不同产品线需要部署于同一Kubernetes集群时，可以使用名称空间进行隔离
+- **资源控制**：名称空间可用作资源配额的承载单位，从而限制其内部所有应用可以使用的CPU/Memory/PV各自 的资源总和
+  - 需要在产品线或团队等隔离目标上分配各自总体可用的系统资源时，可通过名称空间实现
+- **权限控制**：基于RBAC鉴权体系，能够在名称空间级别进行权限配置
+- **提高集群性能**：进行资源搜索时，名称空间有利于Kubernetes API缩小查找范围，从而对减少搜索延迟和提升性能 有一定的帮助
+
+
+
+
+
+##### **名称空间分类**（**两类**）
+
+- **系统级名称空间**
+  - 由Kubernetes集群默认创建，主要用来隔离系统级的资源对象 所有的系统级名称空间均不能进行删除操作（即使删除也会自动重建） **除default外，其它三个系统级名称空间**不应该用作业务应用的部署目标
+  - **default**：为任何名称空间级别的资源提供的默认的名称空间
+  - **kuhe-system**：Kubernetes集群自身组件及其它系统级组件使用的名称空间，Kubernetes自身的 关键组件均部署在该名称空间中
+  - **kube-public**：公众开放的名称空间，所有用户（包括Anonymous）都可以读取内部的资源,通常为空
+  - **kube-node-lease**：节点租约资源所用的名称空间
+    - 分布式系统通常使用“租约(Leqse)”机制来锁定共享资源并协调集群成员之间的活动 Kubernetes上的租约概念由API群组coordination.k8s.io群组下的Lease资源所承载，以支撑系统 级别的功能需求，例如节点心跳( node heartbeats)和组件级的领导选举等 Kubernetes集群的每个管理组件在该名称空间下都有一个与同名的Iease资源对象 
+    - `~# kubectl -n kube-node-lease get lease`
+
+
+
+- **自定义名称空间**
+  - 由用户按需创建
+  - 比如: 根据项目和场景, 分别创建对应不同的名称空间
+
+
+
+
+
+#### 查看名称空间及资源对象
+
+```bash
+[root@master1 ~]#kubectl get ns
+NAME              STATUS   AGE
+default           Active   65m
+kube-flannel      Active   63m
+kube-node-lease   Active   65m
+kube-public       Active   65m
+kube-system  
+Active   65m
+
+
+[root@master1 ~]#kubectl get ns default -o yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  creationTimestamp: "2024-12-16T05:34:09Z"
+  labels:
+    kubernetes.io/metadata.name: default
+  name: default
+  resourceVersion: "42"
+  uid: b650835c-84e8-464a-84af-4955cb56285e
+spec:
+  finalizers:
+  - kubernetes
+status:
+  phase: Active
+  
+  
+# 查看指定信息
+[root@master1 ~]#kubectl get ns default -o jsonpath={.metadata.name}
+default
+
+[root@master1 ~]#kubectl get ns default -o jsonpath={.apiVersion}
+v1
+
+# 查看默认名称下的资源
+[root@master1 ~]# kubectl get all
+NAME                         READY   STATUS    RESTARTS   AGE
+pod/myapp-7b94444f8d-9xld5   1/1     Running   0          61m
+pod/myapp-7b94444f8d-dhkdj   1/1     Running   0          61m
+pod/myapp-7b94444f8d-ssp7z   1/1     Running   0          61m
+
+NAME                 TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+service/kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP   69m
+
+NAME                    READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/myapp   3/3     3            3           61m
+
+NAME                               DESIRED   CURRENT   READY   AGE
+replicaset.apps/myapp-7b94444f8d   3         3         3       61m
+
+# 查看指定名称空间的资源
+[root@master1 ~]# kubectl get all -n kube-system 
+NAME                                  READY   STATUS    RESTARTS   AGE
+pod/coredns-cb4864fb5-5rbqf           1/1     Running   0          70m
+pod/coredns-cb4864fb5-mzd84           1/1     Running   0          70m
+pod/etcd-master1                      1/1     Running   0          70m
+pod/kube-apiserver-master1            1/1     Running   0          70m
+pod/kube-controller-manager-master1   1/1     Running   0          70m
+pod/kube-proxy-h2kx8                  1/1     Running   0          68m
+pod/kube-proxy-kklfd                  1/1     Running   0          68m
+pod/kube-proxy-kmzqq                  1/1     Running   0          70m
+pod/kube-proxy-vlvhj                  1/1     Running   0          69m
+pod/kube-scheduler-master1            1/1     Running   0          70m
+
+NAME               TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
+service/kube-dns   ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   70m
+
+NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+daemonset.apps/kube-proxy   4         4         4       4            4           kubernetes.io/os=linux   70m
+
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/coredns   2/2     2            2           70m
+
+NAME                                DESIRED   CURRENT   READY   AGE
+replicaset.apps/coredns-cb4864fb5   2         2         2       70m
+
+
+```
+
+
+
+#### 创建Namespace资源
+
+
+
+##### **指令式命令创建**
+
+使用指令式命令 `kubectl create` 可以直接创建名称空间，只需指定名称空间名称
+
+```bash
+[root@master1 ~]# kubectl create ns ns-mystical
+namespace/ns-mystical created
+
+[root@master1 ~]# kubectl get ns ns-mystical 
+NAME          STATUS   AGE
+ns-mystical   Active   8s
+```
+
+**注意**：实际生产中不建议使用指令式命令和配置，直接使用声明式就可以。
+
+
+
+##### **指令式配置创建**
+
+`kubectl create -f </path/to/namespace-obj.yaml `实现创建
+
+此方式生产不建议使用,执行此命令需要指定的namespace不存在
+
+```bash
+[root@master1 ~]#vim namespace-test1.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: namespace-test1
+
+# 创建
+[root@master1 ~]#kubectl create -f namespace-test1.yaml 
+namespace/namespace-test1 created
+
+# 查看
+[root@master1 ~]#kubectl get ns namespace-test1 
+NAME              STATUS   AGE
+namespace-test1   Active   8s
+```
+
+
+
+##### 声明式配置创建
+
+Namespace 是 Kubernetes API 的标准资源类型之一，其配置主要有 kind、apiVolume、metadata 和 spec 等一级字段组成。使用 kubectl create/apply -f /path/to/namespace-obj.yaml 命令就可以 创建名称空间资源
+
+```bash
+[root@master1 ~]#vim namespace-test2.yaml 
+
+[root@master1 ~]#cat namespace-test2.yaml 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: namespace-test2
+  
+[root@master1 ~]#kubectl apply -f namespace-test2.yaml 
+namespace/namespace-test2 created
+
+[root@master1 ~]#kubectl get namespaces namespace-test2 
+NAME              STATUS   AGE
+namespace-test2   Active   16s
+
+# 使用命令生成声明式yaml文件
+[root@master1 ~]# kubectl create ns stage --dry-run=client -o yaml > stage-ns.yaml
+[root@master1 ~]# cat stage-ns.yaml 
+apiVersion: v1
+kind: Namespace
+metadata:
+  creationTimestamp: null
+  name: stage
+spec: {}
+status: {}
+```
+
+
+
+#### 删除Namespace资源
+
+注意: **删除 Namespace 会级联删除此名称空间的所有资源**,非常危险
+
+```bash
+[root@master1 ~]#kubectl delete namespaces namespace-test1 
+namespace "namespace-test1" deleted
+
+[root@master1 ~]#kubectl delete -f namespace-test2.yaml 
+namespace "namespace-test2" deleted
+
+# 在指定名称空间下创建资源
+[root@master1 ~]#kubectl apply -f myapp.yaml -n ns-mystical 
+deployment.apps/myapp created
+
+# 查看指定名称空间(ns-mystical)下的指定资源(pod)
+[root@master1 ~]#kubectl get pod -n ns-mystical 
+NAME                     READY   STATUS    RESTARTS   AGE
+myapp-7b94444f8d-6ms2c   1/1     Running   0          23s
+myapp-7b94444f8d-c9g6n   1/1     Running   0          23s
+myapp-7b94444f8d-l5bgb   1/1     Running   0          23s
+
+# 删除指定名称空间
+[root@master1 ~]#kubectl delete namespaces ns-mystical 
+namespace "ns-mystical" deleted
+
+# 所有此名称空间下的资源都被删除
+[root@master1 ~]#kubectl get -n ns-mystical all
+No resources found in ns-mystical namespace.
+```
+
+
+
+
+
+#### 删除指定名称空间的资源 
+
+使用 kubectl 管理资源时，如果提供了名称空间选项，就表示此管理操作仅针对指定名称空间进行，而 删除 Namespace 资源则会级联删除其包含的所有其他资源对象
+
+| 命令格式                        | 功能                                   |
+| ------------------------------- | -------------------------------------- |
+| kubectl delete TYPE RESOURCE -n | 删除指定名称空间内的指定资源           |
+| kubectl delete TYPE --all -n    | 删除指定名称空间内的指定类型的所有资源 |
+| kubectl delete all -n           | 删除指定名称空间内的所有资源           |
+| kubectl delete all --all        | 删除所有名称空间中的所有资源           |
+
+
+
 ### Pod资源
+
+
+
+#### Pod资源基础
+
+Pod 是 Kubernetes API 中最常见最核心资源类型
+
+**Pod 是一个或多个容器的集合**，因而也可称为容器集，但却是Kubernetes调度、部署和运行应用的原子单元
+
+- 同一Pod内的所有容器都将运行于由Scheduler选定的同一个worker节点上
+- 在同一个pod内的容器共享的**存储资源**、**网络协议栈**及容器的**运行控制策略**等
+- 每个Pod中的容器依赖于一个特殊名为**pause容器**事先创建出可被各应用容器共享的**基础环境**，包括 Network、IPC和UTS名称空间共享给Pod中各个容器，PID名称空间也可以共享，但需要用户显式定 义,**Mount和User是不共享的**,每个容器有独立的Mount,User的名称空间
+
+
+![alt text](images/image31.png)
+
+
+
+Pod的组成形式有两种
+
+- **单容器Pod**：除Pause容器外,仅含有一个容器
+- **多容器Pod**：除Pause容器外，含有多个具有“超亲密”关系的容器，一般由主容器和辅助容器（比 如：**sidecar容器**）构成
+
+
+
+**Pod资源分类**
+
+- **自主式 Pod**
+  - 由用户直接定义并提交给API Server创建的Pods
+- **由Workload Controller管控的 Pod**
+  - 比如: 由Deployment控制器管理的Pod
+- **静态 Pod**
+  - 由kubelet加载配置信息后，自动在对应的节点上创建的Pod
+  - 用于实现Master节点上的系统组件API Server 、Controller-Manager 、Scheduler 和Etcd功能的 Pod
+  - 相关配置存放在控制节点的 **`/etc/kubernetes/manifests`** 目录下
+
+
+
+**总结：**
+
+- Pod中最少有2个容器
+- Pod = **Pause容器** + 业务容器
+
+
+
+Pod的管理链
+
+``````ABAP
+# 自定义pod创建流程
+kuebctl --> apiserver --> kubelet --> docker runc --> pod容器
+
+# 在/etc/kubernetes/manifests目录下的yaml文件，不需要apiserver管理，会直接读取yaml文本执行创建pod
+
+# 静态pod创建流程
+/etc/kubernetes/mainfests目录下yaml文件 ---> kubelet --> docker runc --> ETCD | ApiServer Pod ...
+``````
+
+
+
+```bash
+[root@master1 manifests]#ll /etc/kubernetes/manifests/
+总计 24
+drwxrwxr-x 2 root root 4096 12月 16 13:33 ./
+drwxrwxr-x 4 root root 4096 12月 16 13:33 ../
+-rw------- 1 root root 2408 12月 16 13:33 etcd.yaml
+-rw------- 1 root root 4046 12月 16 13:33 kube-apiserver.yaml
+-rw------- 1 root root 3567 12月 16 13:33 kube-controller-manager.yaml
+-rw-r--r-- 1 root root    0 12月 10 20:09 .kubelet-keep
+-rw------- 1 root root 1487 12月 16 13:33 kube-scheduler.yaml
+```
+
+
+
+
+
+#### 自主式Pod
+
+
+
+##### 指令式命令创建Pod
+
+通过kubectl 命令行工具指定选项创建 Pod，适合**临时性**工作
+
+基本语法
+
+```bash
+kubectl run NAME --image=image [--port=port] [--replicas=replicas] 
+
+kubectl run NAME --image=image [--env="key=value"] [--port=port] [--dryrun=server|client] [--overrides=inline-json] [--command] -- [COMMAND] [args...] [options]
+
+#参数详解
+--image='' #指定容器要运行的镜像
+--port='' #设定容器暴露的端口
+--dry-run=true #以模拟的方式来进行执行命令
+--env=[] #执行的时候，向对象中传入一些变量
+--labels='' #设定pod对象的标签
+--limits='cpu=200m,memory=512Mi' #设定容器启动后的资源配置
+--replicas=n #设定pod的副本数量,新版不再支持
+--command=false     #设为true，将 -- 后面的字符串做为命令代替容器默认的启动命令，而非做为默
+认启动命令的参数
+-it            #打开交互终端
+--rm           #即出即删除容器
+--restart=Never #不会重启
+```
+
+
+
+示例
+
+```bash
+#初始化一个Pod对象，包含一个nginx容器
+[root@master1 manifests]#kubectl run myapp-pod --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/myapp:v1.0
+pod/myapp-pod created
+
+#创建Busybox的Pod,默认busybox没有前台进程,需要指定前台程序才能持继运行
+[root@master1 manifests]#kubectl run busbox --image busybox:1.30 -- sleep 3600
+pod/busbox created
+
+[root@master1 manifests]#kubectl get pod
+NAME                     READY   STATUS    RESTARTS   AGE
+busbox                   1/1     Running   0          17s
+
+# 进入容器
+[root@master1 manifests]#kubectl exec -it busbox -- sh
+/ # 
+
+# 运行pod时定义一个变量
+[root@master1 manifests]#kubectl run busybox --image busybox:1.30 --env="NAME=mystical" -- sleep 3600
+pod/busybox created
+
+[root@master1 manifests]#kubectl get pod
+NAME                     READY   STATUS    RESTARTS   AGE
+busybox                  1/1     Running   0          8s
+myapp-7b94444f8d-9xld5   1/1     Running   0          133m
+myapp-7b94444f8d-dhkdj   1/1     Running   0          133m
+myapp-7b94444f8d-ssp7z   1/1     Running   0          133m
+myapp-pod                1/1     Running   0          8m28s
+
+[root@master1 manifests]#kubectl exec -it busybox -- sh
+/ # echo $NAME
+mystical
+```
+
+
+
+#### pod资源清单说明
+
+
+
+##### yaml格式的Pod清单文件-极简版
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp2
+  namespace: m58-namespace
+spec:
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/myapp:v1.0
+    name: myapp2
+```
+
+
+
+##### yaml格式的Pod清单文件实例-完整版
+
+```yaml
+# yaml格式的Pod定义文件完整内容
+apiVersion: v1
+kind: Pod
+metadata:
+  name: string
+  namespace: string
+  labels:
+    name: string
+  annotations:
+    name: string
+spec:
+  initContainers:
+  - name: string
+    image: string
+    imagePullPolicy: Always  # Options: Always, Never, IfNotPresent
+    command: 
+      - string
+    args: 
+      - string
+  containers:
+  - name: string
+    image: string
+    imagePullPolicy: Always  # Options: Always, Never, IfNotPresent
+    command: 
+      - string
+    args: 
+      - string
+    workingDir: string
+    volumeMounts:
+    - name: string
+      mountPath: string
+      readOnly: true  # Options: true, false
+    ports:
+    - name: string
+      containerPort: 80  # Replace with the correct port
+      hostPort: 80  # Replace with the correct port
+      protocol: TCP  # Options: TCP, UDP, SCTP
+    env:
+    - name: string
+      value: string
+    resources:
+      limits:
+        cpu: "500m"  # Replace with actual limit
+        memory: "128Mi"  # Replace with actual limit
+      requests:
+        cpu: "250m"  # Replace with actual request
+        memory: "64Mi"  # Replace with actual request
+    startupProbe:
+      httpGet:
+        path: /healthz
+        port: 80  # Replace with actual port
+    livenessProbe:
+      exec:
+        command: 
+          - string
+      httpGet:
+        path: /healthz
+        port: 80  # Replace with actual port
+        host: localhost  # Replace with actual host
+        scheme: HTTP  # Options: HTTP, HTTPS
+        httpHeaders:
+        - name: string
+          value: string
+      tcpSocket:
+        port: 80  # Replace with actual port
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+      periodSeconds: 10
+      successThreshold: 1
+      failureThreshold: 3
+    securityContext:
+      privileged: false  # Options: true, false
+  restartPolicy: Always  # Options: Always, Never, OnFailure
+  nodeSelector: 
+    disktype: ssd  # Example node selector
+  nodeName: string  # Replace with actual node name
+  imagePullSecrets:
+  - name: my-secret  # Replace with actual secret name
+  hostNetwork: false  # Options: true, false
+  volumes: 
+  - name: empty-volume
+    emptyDir: {}
+  - name: host-path-volume
+    hostPath:
+      path: /data/volume  # Replace with actual path
+  - name: secret-volume
+    secret:
+      secretName: string  # Replace with actual secret name
+      items:     
+      - key: string
+        path: string
+  - name: configmap-volume
+    configMap:
+      name: string  # Replace with actual ConfigMap name
+      items:
+      - key: string
+        path: string
+```
+
+
+
+##### 更新Pod资源
+
+```bash
+# 方法1
+# 导出配置
+# kubectl get pods pod-test1 -o yaml pod-test1-update.yaml
+
+# 编译导出的配置清单
+[root@master1 ~]# vim myapp-pod-update.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: "2024-12-16T07:47:09Z"
+  labels:
+    run: myapp-pod
+  name: myapp-pod
+  namespace: default
+  resourceVersion: "13553"
+  uid: 6e9fe649-9761-4d71-a7f9-9e8423e105b4
+spec:
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/myapp:1.0  # 改为myapp:2.0
+    imagePullPolicy: IfNotPresent
+...
+
+# 更新
+kubectl replace -f myapp-pod-update.yaml # replace不建议使用，没有幂等性，建议apply
+
+# 验证是否修改
+[root@master1 ~]# kubectl describe -f myapp-pod-update.yaml
+...
+Events:
+  Type    Reason     Age                  From               Message
+  ----    ------     ----                 ----               -------
+  Normal  Scheduled  48m                  default-scheduler  Successfully assigned default/myapp-pod to node1
+  Normal  Pulled     48m                  kubelet            Container image "registry.cn-beijing.aliyuncs.com/wangxiaochun/myapp:v1.0" already present on machine
+  Normal  Pulling    5m23s                kubelet            Pulling image "registry.cn-beijing.aliyuncs.com/wangxiaochun/myapp:v2.0"
+  Normal  Pulled     5m12s                kubelet            Successfully pulled image "registry.cn-beijing.aliyuncs.com/wangxiaochun/myapp:v2.0" in 10.467s (10.468s including waiting). Image size: 23012239 bytes.
+  Normal  Killing    60s (x2 over 5m23s)  kubelet            Container myapp-pod definition changed, will be restarted
+  Normal  Pulling    60s                  kubelet            Pulling image "registry.cn-beijing.aliyuncs.com/wangxiaochun/myapp:v3.0"
+  Normal  Created    43s (x3 over 48m)    kubelet            Created container myapp-pod
+  Normal  Pulled     43s                  kubelet            Successfully pulled image "registry.cn-beijing.aliyuncs.com/wangxiaochun/myapp:v3.0" in 16.971s (16.971s including waiting). Image size: 23012239 bytes.
+  Normal  Started    42s (x3 over 48m)    kubelet            Started container myapp-pod
+
+```
+
+
+
+##### 声明式对象管理方式
+
+**创建 Pod 资源对象**
+
+```bash
+[root@master1 yaml]#kubectl apply -f pod-test1.yaml 
+pod/pod-test1 created
+
+[root@master1 yaml]#kubectl get -f pod-test1.yaml -o wide
+NAME       READY   STATUS   RESTARTS   AGE   IP           NODE               
+NOMINATED NODE   READINESS GATES
+pod-test1   1/1     Running   0         5m8s   172.16.3.13   node1.wang.org   
+<none>           <none>
+
+[root@master1 ~]#curl 172.16.3.13 -I
+HTTP/1.1 200 OK
+Server: nginx/1.21.5
+Date: Tue, 01 Mar 2022 04:32:32 GMT
+Content-Type: text/html
+Content-Length: 615
+Last-Modified: Tue, 28 Dec 2021 15:28:38 GMT
+Connection: keep-alive
+ETag: "61cb2d26-267"
+Accept-Ranges: bytes
+```
+
+
+
+**更新应用版本**
+
+```bash
+# 更新对象的操作，可以直接在原有的资源清单文件上修改后再执行kubectl apply
+# 生产环境下，建议使用，具有幂等性
+[root@master1 yaml]#vim pod-test1.yaml
+[root@master1 yaml]#cat pod-test1.yaml
+apiVersion: v1
+kind: Pod      
+metadata:       
+ name: pod-test1 
+ labels:      
+   app: test1  
+   version: v1.0
+spec:         
+ containers:  
+  - name: nginx-web01
+   image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0 #修改此行
+   
+#应用更新
+[root@master1 yaml]#kubectl apply -f pod-test1.yaml 
+pod/pod-test1 configured
+```
+
+
+
+#### Pod查看状态
+
+可以通过以下命令查看Pod 状态
+
+```bash
+kubectl get pod <pod_name> [(-o|--output=)json|yaml|jsonpath] [-n namespace]
+kubectl describe pod <pod_name> [-n namespace]
+```
+
+
+
+范例
+
+``````bash
+#查看当前名称空间的所有pod
+[root@master1 ~]# kubectl get pod
+
+#查看所有空间的所有pod
+[root@master1 ~]# kubectl get pod -A
+
+#查看指定pod当前状态信息
+[root@master1 yaml]# kubectl get -f pod-test1.yaml 
+[root@master1 ~]# kubectl get pod pod-test1 
+[root@master1 ~]# kubectl get po pod-test1 #支持缩写po
+NAME       READY   STATUS   RESTARTS   AGE
+pod-test1   1/1     Running   0         67s
+
+#持续查看pod状态
+# kubectl get pods pod-test1 -w
+
+#查看扩展信息
+[root@master1 ~]#kubectl get pod pod-test1 -o wide
+NAME       READY   STATUS   RESTARTS   AGE   IP           NODE               
+NOMINATED NODE   READINESS GATES
+pod-test1   1/1     Running   0         88s   172.16.3.12   node1.wang.org   
+<none>           <none>
+
+#通过 -o yaml 的方式来进行查看yaml格式的详细信息
+[root@master1 ~]#kubectl get pod pod-test -o yaml
+apiVersion: v1
+kind: Pod
+metadata:
+ annotations:
+   kubectl.kubernetes.io/last-applied-configuration: |
+......
+
+#查看pod上面的label
+[root@master1 ~]#kubectl get pod pod-test1 --show-labels
+NAME       READY   STATUS   RESTARTS       AGE   LABELS
+pod-test1   1/1     Running   7 (7h4m ago)   14d   app=test1,version=v2.0
+``````
+
+
+
+#### 查看Pod中指定容器应用的日志
+
+```bash
+kubectl logs [-f] (POD | TYPE/NAME) [-c CONTAINER] [options]
+# 选项
+
+-p 前一个已退出的容器的日志
+--all-containers=true 所有容器
+--tail=N 最后N个日志
+
+# 示例
+[root@master1 ~]#kubectl logs myapp-pod 
+10.244.0.0 - - [16/Dec/2024:16:34:39 +0800] "GET / HTTP/1.1" 200 31 "-" "curl/7.81.0"
+
+# 进入容器内执行操作
+[root@master1 ~]#kubectl exec myapp-pod -- ps aux
+PID   USER     TIME  COMMAND
+    1 root      0:00 nginx: master process nginx -g daemon off;
+    7 nginx     0:00 nginx: worker process
+    8 root      0:00 ps aux
+```
+
+
+
+####  进入Pod 执行命令
+
+```bash
+kubectl exec (POD | TYPE/NAME) [-c CONTAINER] [flags] -- COMMAND [args...] [options]
+```
+
+范例
+
+```bash
+# 交互式执行
+[root@master1 ~]#kubectl exec -it myapp-pod -- sh
+/ # ps aux
+PID   USER     TIME  COMMAND
+    1 root      0:00 nginx: master process nginx -g daemon off;
+    7 nginx     0:00 nginx: worker process
+   14 root      0:00 sh
+   20 root      0:00 ps aux
+```
+
+
+
+#### 删除 Pod
+
+删除资源对象推荐使用指令式管理命令 `kubectl delete`
+
+```bash
+kubectl delete pod <pod_name> ... [--force --grace-period=0]
+```
+
+
+
+范例
+
+```bash
+#优雅删除
+[root@master1 ~]#kubectl delete pod pod-test1
+
+#立即删除
+[root@master1 ~]#kubectl delete pod pod-test1 --force --grace-period=0
+warning: Immediate deletion does not wait for confirmation that the running 
+resource has been terminated. The resource may continue to run on the cluster 
+indefinitely.
+pod "pod-test1" force deleted
+
+#删除多个资源
+[root@master1 yaml]#kubectl delete -f pod-test1.yaml -f /data/kubernetes/yaml/pod-test2.yaml
+
+#删除所有pod
+[root@master1 ~]#kubectl get po|cut -d" " -f1 | tail -n +2 |xargs kubectl delete pod
+
+#快速删除所有pod
+[root@master1 ~]#kubectl get pod|awk 'NR!=1{print $1}'|xargs -i kubectl delete pod {} --force --grace-period=0
+```
+
+
+
+#### 创建定制的Pod
+
+kubernets 支持多种定制 Pod 的实现方法
+
+- 对于不同应用的Pod,重新定制对应的镜像
+- 启动容器时指定env环境变量
+- 启动容器的指定command和args
+- 将配置信息基于卷资源对象，再将其加载到容器，比如：configMap和secret等
+
+
+
+#####  利用环境变量实现容器传参
+
+在容器上嵌套使用env字段
+
+- 每个环境变量需要通过`pod.spec.containers.env.name`给出指定的名称
+- 传递的值则定义在`pod.spec.containers.env.value`字段上
+
+
+
+示例：实现LAMP的应用wordpress
+
+```bash
+# mysql
+[root@master1 lamp]# vim pod-mysql.yaml
+[root@master1 lamp]# cat pod-mysql.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mydb
+  namespace: default
+spec:
+  containers:
+  - name: mysql
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:8.0.29-oracle
+    env:
+    - name: MYSQL_ROOT_PASSWORD
+      value: "654321"
+    - name: MYSQL_DATABASE
+      value: wordpress
+    - name: MYSQL_USER
+      value: wpuser
+    - name: MYSQL_PASSWORD
+      value: "123456
+   
+# 查看MySQL对应Pod的IP
+[root@master1 lamp]#kubectl apply -f pod-mysql.yaml
+pod/mydb created
+
+[root@master1 lamp]#kubectl get pods mydb -o wide
+NAME   READY   STATUS    RESTARTS   AGE     IP           NODE    NOMINATED NODE   READINESS GATES
+mydb   1/1     Running   0          2m44s   10.244.2.6   node2   <none>           <none>
+
+
+# wordpress
+[root@master1 lamp]#vim pod-wordpress.yaml
+[root@master1 lamp]#cat pod-wordpress.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: wordpress
+  namespace: default
+spec:
+  hostNetwork: true
+  containers:
+  - name: wordpress
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/wordpress:php8.2-apache
+    env:
+    - name: WORDPRESS_DB_HOST
+      value: 10.244.2.6
+    - name: WORDPRESS_DB_NAME
+      value: wordpress
+    - name: WORDPRESS_DB_USER
+      value: wpuser
+    - name: WORDPRESS_DB_PASSWORD
+      value: "123456"
+
+[root@master1 lamp]#kubectl get pod -o wide
+NAME                     READY   STATUS    RESTARTS      AGE     IP           NODE    NOMINATED NODE   READINESS GATES
+myapp-7b94444f8d-9xld5   1/1     Running   0             4h16m   10.244.1.2   node1   <none>           <none>
+myapp-7b94444f8d-dhkdj   1/1     Running   0             4h16m   10.244.2.2   node2   <none>           <none>
+myapp-7b94444f8d-ssp7z   1/1     Running   0             4h16m   10.244.3.4   node3   <none>           <none>
+myapp-pod                1/1     Running   2 (84m ago)   131m    10.244.1.5   node1   <none>           <none>
+mydb                     1/1     Running   0             48m     10.244.2.6   node2   <none>           <none>
+wordpress                1/1     Running   0             5m22s   10.0.0.202   node1   <none>           <none>
+```
+
+![alt text](images\image32.png)
+
+
+

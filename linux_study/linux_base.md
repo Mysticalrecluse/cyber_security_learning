@@ -17166,9 +17166,7 @@ logging.properties       # tomcat的日志配置，定义日志级别，格式�
 server.xml               # 主配置文件，用于配置整个Tomcat服务器的全局设置，包括连接器，虚拟主机，引擎等，定义了Tomcat基本结构和行为
 tomcat-users.xml         # 用户配置文件，用于配置Tomcat的用户，角色和其对应的权限
 tomcat-users.xsd         # 上述文件中的标签取值约束
-web.xml               f   NM./.'
-L;'
-\
+web.xml              
 ```
 
 #### /usr/local/tomcat/conf/web.xml
@@ -17535,7 +17533,7 @@ Copy code
 #### **示例配置**
 
 ```xml
-xmlCopy code<Server port="8005" shutdown="SHUTDOWN">
+<Server port="8005" shutdown="SHUTDOWN">
     <!-- 定义一个服务 -->
     <Service name="Catalina">
 
@@ -18618,7 +18616,7 @@ class User {
 
 - 栈（Java Virtual Machine Stacks）
   - 也叫线程栈
-  - 当我们的main方法开始运行，就会启用一个线程运行，而在线程运行过程中，局部变量需要有内存去存放，而这些局部变量都是放在线程栈
+  - 当我们的**main方法**开始运行，就会启用一个线程运行，而在线程运行过程中，局部变量需要有内存去存放，而这些局部变量都是放在线程栈
   - 只要有一个线程开始运行，JVM就会给这个线程分配一个**专属的**栈内存区域，用来放局部变量
 
   - **栈帧**
