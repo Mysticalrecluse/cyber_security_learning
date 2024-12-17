@@ -2785,7 +2785,7 @@ kubernets 支持多种定制 Pod 的实现方法
 
 
 
-#####  利用环境变量实现容器传参
+#####  利用环境变量`env`实现容器传参
 
 在容器上嵌套使用env字段
 
@@ -2862,6 +2862,169 @@ wordpress                1/1     Running   0             5m22s   10.0.0.202   no
 ```
 
 ![alt text](images\image32.png)
+
+
+
+##### 利用`command`和`args`字段传递容器的启动命令和参数
+
+Pod配置中，spec.containers[].command字段能够在容器上指定替代镜像默认运行的应用程序，且可 同时使用spec.containers[].args字段进行参数传递，它们将覆盖镜像中的默认定义的参数。
+
+- 若仅定义了command字段时，其值将覆盖镜像中定义的程序及参数。
+- 若仅是定义了args字段，该字段值将作为参数传递给镜像中默认指定运行的应用程序
+- **注意: args中使用环境变量,需要使用格式: $(环境变量名)**
+
+
+
+**添加运行命令和参数**
+
+```bash
+[root@master1 yaml]#cat pod-with-cmd-and-args.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-cmd-and-args
+spec:
+  containers:
+  - name: pod-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+    command: ['/bin/sh','-c']
+    args: ['python3 /usr/local/bin/demo.py -p 8080']
+    
+[root@master1 yaml]#kubectl get pod -o wide
+NAME                     READY   STATUS    RESTARTS      AGE   IP           NODE    NOMINATED NODE   READINESS GATES
+myapp-7b94444f8d-66d4h   1/1     Running   1 (12m ago)   29h   10.244.4.4   node2   <none>           <none>
+myapp-7b94444f8d-nctmp   1/1     Running   1 (12m ago)   29h   10.244.3.5   node1   <none>           <none>
+myapp-7b94444f8d-tnj2j   1/1     Running   1 (12m ago)   29h   10.244.5.3   node3   <none>           <none>
+pod-with-cmd-and-args    1/1     Running   1 (12m ago)   60m   10.244.3.4   node1   <none>           <none>
+
+[root@master1 yaml]#curl 10.244.3.4:8080
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: pod-with-cmd-and-args, ServerIP: 10.244.3.4!
+```
+
+
+
+**添加运行命令，参数和环境变量**
+
+```bash
+[root@master1 yaml]#cat pod-with-cmd-and-args.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-cmd-and-args
+spec:
+  containers:
+  - name: pod-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+    command: ['/bin/sh','-c']
+    args: ['python3 /usr/local/bin/demo.py -p $port']
+    env:
+    - name: port
+      value: "8888"
+      
+[root@master1 yaml]#kubectl get pod -o wide
+NAME                     READY   STATUS    RESTARTS      AGE   IP           NODE    NOMINATED NODE   READINESS GATES
+myapp-7b94444f8d-66d4h   1/1     Running   1 (29m ago)   29h   10.244.4.4   node2   <none>           <none>
+myapp-7b94444f8d-nctmp   1/1     Running   1 (29m ago)   29h   10.244.3.5   node1   <none>           <none>
+myapp-7b94444f8d-tnj2j   1/1     Running   1 (29m ago)   29h   10.244.5.3   node3   <none>           <none>
+pod-with-cmd-and-args    1/1     Running   0             59s   10.244.5.4   node3   <none>           <none>
+      
+[root@master1 yaml]#curl 10.244.5.4:8888
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: pod-with-cmd-and-args, ServerIP: 10.244.5.4!
+```
+
+ 
+
+##### 使用宿主机网络实现容器的外部访问
+
+默认容器使用私有的独立网段，无法从集群外直接访问，可以通过下面两种方式实现外部访问
+
+- 让容器直接使用宿主机的网络地址，即容器使用host的网路模型
+- 让容器通过宿主机的端口映射实现，即DNAT
+
+注意：都要避免端口冲突
+
+
+
+```bash
+[root@master1 yaml]#cat pod-hostnetwork.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-hostnetwork-demo
+spec:
+  hostNetwork: true
+  containers:
+  - name: demo-env
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    env:
+    - name: PORT
+      value: "9999"
+      
+[root@master1 yaml]#kubectl apply -f pod-hostnetwork.yaml 
+pod/pod-hostnetwork-demo created
+
+[root@master1 yaml]#kubectl get pod -o wide
+NAME                     READY   STATUS    RESTARTS      AGE     IP           NODE    NOMINATED NODE   READINESS GATES
+myapp-7b94444f8d-66d4h   1/1     Running   1 (35m ago)   29h     10.244.4.4   node2   <none>           <none>
+myapp-7b94444f8d-nctmp   1/1     Running   1 (35m ago)   29h     10.244.3.5   node1   <none>           <none>
+myapp-7b94444f8d-tnj2j   1/1     Running   1 (35m ago)   29h     10.244.5.3   node3   <none>           <none>
+pod-hostnetwork-demo     1/1     Running   0             21s     10.0.0.105   node2   <none>           <none>
+pod-with-cmd-and-args    1/1     Running   0             7m33s   10.244.5.4   node3   <none>           <none>
+
+[root@master1 yaml]#curl 10.0.0.105:9999
+kubernetes pod-test v0.1!! ClientIP: 10.0.0.101, ServerName: node2, ServerIP: 10.0.0.105!
+```
+
+
+
+使用容器所在宿主机指定的端口
+
+```bash
+# 使用端口映射
+[root@master1 yaml]#cat pod-hostport.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-hostport-demo
+spec:
+  containers:
+  - name: demo-env
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    env:
+    - name: PORT
+      value: "9999"
+    ports:                           # 使用宿主机指定端口
+    - name: http                     # 不支持大写字母
+      containerPort: 9999            # 使用上面变量相同的端口
+      hostPort: 8888
+
+
+# 本质上就是通过宿主机的DNAT策略实现
+[root@master1 yaml]#ssh 10.0.0.104 iptables -vnL -t nat |grep DNAT|grep 8888
+    1    60 DNAT       tcp  --  *      *       0.0.0.0/0            0.0.0.0/0            tcp dpt:8888 to:10.244.3.6:9999
+
+[root@master1 yaml]#iptables --version
+iptables v1.8.7 (nf_tables)
+
+# 这里的 (nf_tables) 表示 iptables 是在 nftables 框架中实现的
+# iptables 实际上是一个对 nftables 的封装
+```
+
+
+
+
+
+#### 临时容器
+
+#####  了解临时容器
+
+Pod 是 Kubernetes 应用程序的基本构建块。 由于 Pod 是一次性且可替换的，因此一旦 Pod 创建，就 无法将容器加入到 Pod 中。 取而代之的是，通常使用 Deployment 以受控的方式来删除并替换 Pod。
+
+有时有必要检查现有 Pod 的状态。例如，对于难以复现的故障进行排查。 在这些场景中，可以在现有  Pod 中运行临时容器来检查其状态并运行任意命令。
+
+Kubernetes v1.16推出临时容器, Kubernetes v1.25稳定可用, 就是在原有的Pod 上，添加一个**临时的 Container，这个Container可以包含我们排查问题所有的工具**, 比如: ip、ss、ps、pstree、top、kill、 top、jstat、jmap等
 
 
 
