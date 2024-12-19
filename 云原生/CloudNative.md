@@ -944,7 +944,7 @@ K8S_RELEASE_VERSION=1.30.2 && kubeadm init --control-plane-endpoint kubeapi.wang
 **完整命令**
 
 ``````bash
-K8S_RELEASE_VERSION=1.30.2 && kubeadm init --control-plane-endpoint kubeapi.wang.org --kubernetes-version=v${K8S_RELEASE_VERSION} --pod-network-cidr 10.244.0.0/16 --service-cidr 10.96.0.0/12 --image-repository registry.aliyuncs.com/google_containers --token-ttl=0 --upload-certs --cri-socket=unix:///run/cri-dockerd.sock
+K8S_RELEASE_VERSION=1.30.2 && kubeadm init --control-plane-endpoint master1.mystical.org --kubernetes-version=v${K8S_RELEASE_VERSION} --pod-network-cidr 10.244.0.0/16 --service-cidr 10.96.0.0/12 --image-repository registry.aliyuncs.com/google_containers --token-ttl=0 --upload-certs --cri-socket=unix:///run/cri-dockerd.sock
 ``````
 
 
@@ -3025,6 +3025,2201 @@ Pod 是 Kubernetes 应用程序的基本构建块。 由于 Pod 是一次性且�
 有时有必要检查现有 Pod 的状态。例如，对于难以复现的故障进行排查。 在这些场景中，可以在现有  Pod 中运行临时容器来检查其状态并运行任意命令。
 
 Kubernetes v1.16推出临时容器, Kubernetes v1.25稳定可用, 就是在原有的Pod 上，添加一个**临时的 Container，这个Container可以包含我们排查问题所有的工具**, 比如: ip、ss、ps、pstree、top、kill、 top、jstat、jmap等
+
+
+
+
+
+
+
+### Pod工作机制
+
+
+
+#### Pod基本原理
+
+![image-20241217182330834](D:\git_repository\cyber_security_learning\markdown_img\image-20241217182330834.png)
+
+##### Pause容器
+
+**什么是 pause 容器？**
+
+- **pause 容器** 是每个 Pod 中的一个“基础”或“辅助”容器，作为 **“Pod的基础环境”**。
+- **pause 容器的核心目的是**：
+  1. 作为 Pod 中所有其他容器的“**根命名空间**”（包括网络、PID、IPC、用户命名空间等）。
+  2. 提供一个**管理所有容器的父容器**。
+  3. 充当**网络栈的宿主**，即将 Pod 的 IP 地址分配到 pause 容器。
+  4. **防止孤儿进程**：pause 容器负责回收 Pod 中子进程（即僵尸进程），防止孤儿进程残留。
+  5. **统一管理生命周期**：当 Pod 被销毁时，**所有与 pause 容器共享命名空间的容器**也会被销毁。
+
+
+
+🟢 **pause 容器的主要作用**
+
+| **作用**          | **描述**                                                     |
+| ----------------- | ------------------------------------------------------------ |
+| **网络命名空间**  | Pod 中的网络栈是 pause 容器的网络栈，所有其他容器与它共享 IP 地址、端口和网络命名空间。 |
+| **PID 命名空间**  | Pod 内的所有容器与 pause 容器共享一个 PID 命名空间，Pod 内的进程能“看到”彼此的进程列表。 |
+| **IPC 命名空间**  | 容器之间的进程通信（如信号、信号量）是通过 IPC 实现的，Pod 中的 IPC 命名空间由 pause 容器提供。 |
+| **Volume 卷管理** | 如果 Pod 中有挂载卷，卷的路径通常先挂载到 pause 容器的文件系统中，其他容器共享这个路径。 |
+| **僵尸进程回收**  | 如果 Pod 内的某个容器内的子进程退出，这个僵尸进程不会直接被宿主机的 init 进程 (PID 1) 回收，而是由 pause 容器回收。 |
+| **父进程作用**    | pause 容器的 PID 始终是 Pod 中的第一个进程 (PID=1)，所有其他进程（即业务容器的进程）都是 pause 容器的“子进程”。 |
+
+
+
+
+
+🟢 **实际的机制（深入剖析）**
+
+- 1️⃣ 当 kubelet 启动一个 Pod 时：
+  - **pause 容器首先启动**，这是 Pod 的第一个容器。
+  - 启动 pause 容器的原因是：它会创建**PID 命名空间、网络命名空间、IPC 命名空间和 UTS 命名空间**。
+  - pause 容器的 PID 在 Pod 命名空间中是 **1**，即**PID=1**。
+- 2️⃣ 当其他业务容器启动时：
+  - 业务容器不会从 pause 容器 fork() 出来，而是**containerd 或 dockerd** 启动的。
+  - 业务容器和 pause 容器**共享 pause 容器的命名空间**（网络、IPC、PID、Volume 等），这就是“共享”命名空间的含义。
+  - **从 PID 视角看**，所有业务容器中的进程都属于 pause 容器的子进程。
+
+
+
+🟢 **为什么需要 pause 容器？**
+
+- **统一命名空间**：
+  - Pod 中的多个业务容器共享**网络命名空间**，这使得它们共享一个 IP 地址（Pod IP）。
+  - 通过 pause 容器的 PID 1，所有业务容器可以共享同一个 PID 命名空间。
+- **负责回收子进程**：
+  - **回收僵尸进程**：如果业务容器内部的进程 (PID) 终止，会成为僵尸进程，系统的 init 进程通常负责回收僵尸进程。
+  - 在 Pod 中，**pause 容器就是 Pod 中的 "init 进程"**，负责回收业务容器中的僵尸进程。
+- **网络栈的基础**：
+  - 通过 pause 容器的网络命名空间，Pod 中的每个业务容器共享一个 IP 地址和端口空间。
+
+
+
+**🟢pod通信机制**
+
+- Pod内多容器通信：容器件通信（容器模型）借助于pause容器实现
+- 单节点内多Pod通信：主机间容器通信（host模型），利用kube-proxy实现
+- 多节点内多Pod通信：跨主机网络解决方案（overlay模型），利用网络插件flannel，calico等实现
+
+
+
+##### 静态Pod和动态Pod
+
+基于控制的特性Pod 主要有两类：**静态pod**和**动态pod**
+
+- 动态Pod
+
+  - 之前创建管理的pod都是动态pod，也是应用最广泛的pod
+  - 动态Pod 直接被集群中的API Server 进行管理
+
+- 静态pod
+
+  - 由特定节点上的kubelet进程来管理,对于**API Server 只能查看，而不能管理**。
+
+  - 在本质上与动态pod没有区别，只是在于静态pod只能在特定的节点上运行
+
+  - kubelet 默认会加载**/etc/kubernetes/manifests/*.yaml** 从而生成的静态Pod
+
+  - 静态pod实现方式主要有两种：**配置文件**或者**http方式**。
+
+    - 配置文件
+
+      所谓的配置文件的方式，其实就是在特定的目录下存放我们定制好的资源对象文件，然后节点上的 kubelet服务周期性的检查该目录下的所有内容，对静态pod进行增删改查。其配置方式主要有两 步 
+
+      1 定制kubelet服务定期检查配置目录 
+
+      2 增删定制资源文件 
+
+    - http方式
+
+      1 准备http方式提供资源文件的web站点 
+
+      2 工作节点的kubelet配置–manifest-url=<资源文件的url下载地址>
+
+  ```bash
+  # 查找静态文件配置路径的过程
+  [root@master1 net.d]#systemctl status kubelet.service 
+  ● kubelet.service - kubelet: The Kubernetes Node Agent
+       Loaded: loaded (/lib/systemd/system/kubelet.service; enabled; vendor preset: enabled)
+      Drop-In: /usr/lib/systemd/system/kubelet.service.d
+               └─10-kubeadm.conf
+       Active: active (running) since Tue 2024-12-17 14:20:02 CST; 6h ago
+         Docs: https://kubernetes.io/docs/
+     Main PID: 815 (kubelet)
+        Tasks: 13 (limit: 2196)
+       Memory: 68.4M
+          CPU: 3min 13ms
+       CGroup: /system.slice/kubelet.service
+               └─815 /usr/bin/kubelet --bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig
+               
+  # 基于上述的loaded (/lib/systemd/system/kubelet.service; enabled; vendor preset: enabled)
+  [root@master1 net.d]#cat /lib/systemd/system/kubelet.service.d/10-kubeadm.conf 
+  # Note: This dropin only works with kubeadm and kubelet v1.11+
+  [Service]
+  Environment="KUBELET_KUBECONFIG_ARGS=--bootstrap-kubeconfig=/etc/kubernetes/bootstrap-kubelet.conf --kubeconfig=/etc/kubernetes/kubelet.conf"
+  Environment="KUBELET_CONFIG_ARGS=--config=/var/lib/kubelet/config.yaml"
+  # This is a file that "kubeadm init" and "kubeadm join" generates at runtime, populating the KUBELET_KUBEADM_ARGS variable dynamically
+  EnvironmentFile=-/var/lib/kubelet/kubeadm-flags.env
+  # This is a file that the user can use for overrides of the kubelet args as a last resort. Preferably, the user should use
+  # the .NodeRegistration.KubeletExtraArgs object in the configuration files instead. KUBELET_EXTRA_ARGS should be sourced from this file.
+  EnvironmentFile=-/etc/default/kubelet
+  ExecStart=
+  ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS
+  
+  # 找到Environment="KUBELET_CONFIG_ARGS=--config=/var/lib/kubelet/config.yaml"这样，说明kubelet的配置参数主要是在/var/lib/kubelet/config.yaml文件中定义
+  
+  [root@master1 net.d]#cat /var/lib/kubelet/config.yaml|grep static
+  staticPodPath: /etc/kubernetes/manifests
+  
+  # 这个就是静态pod的专用目录
+  
+  ```
+
+
+
+#### Pod管理机制
+
+![image-20241217210820679](D:\git_repository\cyber_security_learning\markdown_img\image-20241217210820679.png)
+
+
+
+#### Pod创建流程
+
+客户端使用kubectl创建pod，需要先通知API Server，而kubectl能通知API Server是因为配置中，记录了API Server的地址
+
+```bash
+[root@master1 .kube]#grep server ~/.kube/config 
+    server: https://master1.mystical.org:6443
+    
+# host中记录了master1.mystical.org对应的ip
+[root@master1 .kube]#cat /etc/hosts
+127.0.0.1 localhost
+127.0.1.1 ubuntu2204
+
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters
+
+10.0.0.201 master1 master1.mystical.org
+10.0.0.202 node1 node1.mystical.org
+10.0.0.203 node2 node2.mystical.org
+10.0.0.204 node3 node3.mystical.org
+
+```
+
+##### 🌐 **1. 入口：kubectl 命令的发起**
+
+**命令示例**：
+
+```bash
+kubectl run nginx --image=nginx --replicas=1
+```
+
+**操作过程**
+
+1. kubectl 发起请求：
+
+   - kubectl 将请求打包为一个 **HTTP REST 请求**，并发送到 **Kubernetes API Server**。
+   - 通过 `kubectl` 命令，API Server 接收到**POST请求**，其中包含了 **Pod的定义信息**（YAML/JSON 格式的PodManifest）。
+
+   
+
+##### 📡 **2. API Server 处理请求**
+
+**API Server的作用**：
+
+1. 验证请求：
+
+   - 进行身份验证（Authentication）和权限验证（Authorization）。
+   - 例如，检查请求的用户是否具有创建Pod的权限。
+
+   
+
+2. 请求合法性校验：
+
+   - 通过 **Admission Controllers** 进行一系列的规则检查（比如资源配额、Pod调度限制等）。
+   - Admission Controller 可以拒绝不符合规范的Pod。
+
+   
+
+3. 对象序列化和持久化：
+
+   - 检查请求的YAML/JSON定义是否符合 **Pod Schema**。
+   - 如果检查通过，将其存储到 **etcd** 中。
+   - 通过 `apiserver` 的 **etcd client** 将Pod信息序列化为二进制数据，并存储到etcd的**存储路径** `/registry/pods/{namespace}/{pod-name}` 中。
+
+   
+
+##### 📦 **3. etcd 存储 Pod 定义**
+
+**etcd的作用**：
+
+1. 数据存储：
+   - etcd 存储的是**完整的Pod的定义**，如镜像、CPU/内存配额、环境变量等。
+   - etcd 是一个分布式的键值存储，所有的K8s资源（Pod、Service、ConfigMap）都以路径的形式存储。
+2. 数据变更触发通知：
+   - etcd 作为一个**发布/订阅系统**，一旦新的Pod定义被存储，所有监听该路径的控制器（如**Controller-Manager** 和 **Scheduler**）都会被**Watch事件**触发。
+
+
+
+##### ⚙️ **4. Scheduler 调度 Pod**
+
+**Scheduler的作用**：
+
+1. **监听Pod的变更**：
+   - Scheduler 监听 `/registry/pods/` 目录的变更。
+   - 监听到一个**未绑定Node的Pod**，即 `.spec.nodeName == null`，则启动调度。
+2. **调度决策**：
+   - Scheduler 会从所有**可用的Node中选择一个最优的Node**来运行这个Pod。
+   - Scheduler会考虑以下因素：
+     - **资源约束**：Node的CPU、内存是否足够。
+     - **亲和性/反亲和性**：Pod的亲和性和反亲和性规则。
+     - **污点和容忍度**：节点上是否有污点。
+     - **节点健康状态**：节点是否Ready。
+3. **写回调度结果**：
+   - Scheduler 将调度的结果（`spec.nodeName: node01`）回写到 etcd，通知API Server。
+
+
+
+##### 🔄 **5. Kubelet 监控 Pod 变更**
+
+**Kubelet的作用**：
+
+1. **监听 API Server 的事件**：
+   - Kubelet 监听 `/registry/pods/{namespace}/{pod-name}` 目录的变更。
+   - 一旦有变更，Kubelet会发现自己需要在本节点上**拉取一个新的Pod**。
+2. **创建Pod沙箱（Pause容器）**：
+   - Kubelet 使用 **container runtime (Docker/Containerd/CRI-O)** 创建一个**pause容器**。
+   - pause 容器的作用：
+     - **网络命名空间**：其他容器会和pause容器共享网络命名空间。
+     - **PID命名空间**：共享进程命名空间。
+     - **数据卷管理**：挂载Pod定义的卷到pause容器上，其他容器共享。
+3. **创建Pod中的业务容器**：
+   - **container runtime** 拉取镜像（如 nginx:latest），并在 pause 容器的**网络和PID命名空间中运行业务容器**。
+   - 这个过程分为以下几个阶段：
+     - **拉取镜像**：从**镜像仓库**中拉取镜像（docker hub、Harbor等）。
+     - **解压镜像**：解压 tar 文件，加载容器文件系统。
+     - **启动容器**：调用 `runc` 启动容器，和 pause 容器共享命名空间。
+
+
+
+##### 📊 **6. 容器状态同步回 API Server**
+
+**Kubelet的反馈机制**：
+
+1. **Kubelet 汇报Pod状态**：
+   - Pod 启动完成后，Kubelet 会将Pod的状态同步回API Server。
+   - API Server将这些状态写入 etcd，状态路径是 `/registry/pods/{namespace}/{pod-name}`。
+   - 用户可以通过 `kubectl get pods` 查看Pod的状态。
+2. **容器健康检查和Liveness Probe**：
+   - Kubelet 定期检查Pod的健康状态。
+   - 如果容器的Liveness Probe失败，Kubelet会**重启容器**。
+
+
+
+##### 流程图（可视化理解）
+
+```scss
+       kubectl run 
+           │
+           ▼
+   ┌─────────────────┐
+   │  API Server     │
+   └─────────────────┘
+           │  (身份验证、请求验证)
+           ▼
+   ┌─────────────────┐
+   │  etcd 存储      │
+   └─────────────────┘
+           │
+   (通知)  │   ┌─────────────────┐
+           └─▶│ Scheduler 调度  │
+               └─────────────────┘
+                      │
+               选择最佳节点
+                      │
+               ┌───────────┐
+               │ etcd 存储 │
+               └───────────┘
+                      │
+               (监听通知)
+   ┌─────────────────┐
+   │    Kubelet      │
+   └─────────────────┘
+      (在节点上启动Pod)
+
+```
+
+
+
+##### 🚀 **面试回答示例**
+
+> **面试官问**：Kubernetes Pod 是如何创建的？ **回答思路**：
+
+1. **kubectl run** 将YAML/JSON请求发到 **API Server**。
+2. **API Server** 验证请求，将Pod定义写入 **etcd**。
+3. **Scheduler** 监听到**etcd变更**，调度Pod到**最佳Node**。
+4. **Kubelet** 监听到Pod定义，启动**Pause容器和业务容器**。
+5. **Kubelet** 反馈Pod状态，用户可通过 `kubectl get pods` 查看状态。
+
+
+
+##### 注意事项
+
+1. **etcd 监听 API Server**：
+   当用户通过 `kubectl` 创建、更新或删除 Pod 资源时，这些更改会存储到 **etcd**。
+2. **API Server 监听 etcd**：
+   **API Server 监听 etcd 中的变化**，并将变化通知 Kubelet 和 Controller Manager。
+3. **Kubelet 监听 API Server**：
+   Kubelet 通过 Watch API 从 API Server 获取其所在 Node 上的 Pod 列表，并在本地启动或终止相应的 Pod。
+
+> 📝 **Kubelet 只能通过 API Server 来与 etcd 间接通信**。
+> 这是为了确保所有数据的操作都由 API Server 统一控制和验证。
+
+
+
+
+
+##### Pod创建流程自述（面试必背）
+
+
+
+- 当使用 `kubectl apply -f pod.yaml` 时，kubectl 会将 YAML 文件中的**Kubernetes 资源对象**（Pod）转换为**JSON 格式的请求体**，并通过 **HTTP POST** 发送到 API Server
+  - **kubectl 作为客户端**，会将 YAML 文件转换为**RESTful API 请求**，API Server 充当**服务端**。
+  - 使用的是 **HTTP/2**，并且需要身份认证和权限控制（RBAC）。
+  - API Server 会**先将 Pod 资源保存在内存中（Watch Cache）**，并异步写入 etcd。
+
+
+
+- API Server通过gRPC与etcd通信，将Pod的数据持久化到etcd，**此时Pod的状态是Pending**，因为此时Pod还未被调度到某个节点
+
+
+
+- Scheduler 通过 **watch 机制监听 API Server 中的 Pending Pods**。并通过预选过滤，优选打分，选择出最适合的节点，并将Pod通过POST请求binding到这个目标节点上
+
+
+
+- API Server 将 Pod 的状态从 `Pending` 变为 `Scheduled`。并使用**PUT 请求** 更新 Pod 的状态，并同步到 etcd。同时**API Server 通过 Watch 机制将 Pod 变更事件推送给 Kubelet**。
+
+
+
+- Kubelet 收到 API Server 发送的 Pod 数据后，Kubelet 使用**CRI（Container Runtime Interface）调用 containerd**。containerd 调用**runc**，创建 Pod 的 Linux 容器。Pod 进入**Running**状态。
+
+
+
+
+
+
+
+#### Pod的生命周期
+
+
+
+![image-20241218091558622](D:\git_repository\cyber_security_learning\markdown_img\image-20241218091558622.png)
+
+
+
+- 创建指令送到apiserver
+- 通知Schedule调度此请求到合适的节点
+- **init容器**
+  - 初始化容器（一次性容器，初始化结束，该容器就退出了），独立于主容器之外，即和主容器是隔离的
+  - Pod可以拥有任意数量的init容器，init顺序执行，最后一个执行完成后，才启动主容器
+  - init容器不支持探针检测功能
+    - 它主要是为了主容器准备运行环境的功能，比如：给主容器准备配置文件，向主容器的存储写入数据，然后将存储卷挂载到主容器上，下载相关资源，监测主容器依赖服务等
+- **启动后钩子PostStart（Post Start Hook）**: 与主容器同时启动
+- 状态监测
+- **Startup probe：启动探针**：启动探针用来探测这个服务是否起来的，如果探针检查失败，会认为该容器不健康，因此会重新启动容器，如果健康，就会进入下一步
+  - 启动探针只检测容器是否启动，容器启动后，后续不再检查
+- **Liveiness probe（存活探针）**：判断当前Pod是否处于存活状态，是Readiness存活的前提，对应READY状态的m/n的n值
+- **Readiness Probe（就绪探针**）：判断当前Pod的主应用容器是否可以正常对外提供服务，只有Liveiness为存活，Readiness
+  - Liveness probe和Readiness Probe持续容器终身，只要容器在启动，会不断地探测，如果容器出故障，可以进行一些操作
+  - 三个探针就是用来检测容器健康性的
+
+
+
+- Service关联Pod
+- 接收用户请求
+
+
+
+
+
+#### 关闭Pod流程
+
+
+
+![image-20241218092215630](D:\git_repository\cyber_security_learning\markdown_img\image-20241218092215630.png)
+
+
+
+
+
+Kubernetes 中的 **Pod 关闭流程**（Pod Termination）是一个**多阶段的有序过程**，其目的是在**优雅关闭（Graceful Termination）\**和\**强制删除（Force Deletion）\**之间取得平衡。这个流程涉及\**负载均衡器（Service 代理）、preStop 钩子、API Server、Kubelet、etcd、containerd 和 runc** 等多个组件的协作。
+
+
+
+整个流程可分为**5 个主要阶段**：
+
+
+
+##### 阶段 1：请求删除 Pod
+
+**发起删除请求**：
+
+- 通过 `kubectl delete pod <pod-name>`，kubectl 向 API Server 发起一个**DELETE 请求**。
+
+- 这时，API Server 会**立即**将 Pod 的**状态标记为 Terminating**。
+
+- API 请求示例：
+
+  ```http
+  DELETE /api/v1/namespaces/default/pods/nginx-pod
+  ```
+
+**体面终止期（graceful termination period）设置**：
+
+- 当执行 `kubectl delete` 时，可以通过 `--grace-period=<seconds>` 指定**体面终止限期**。
+
+- 如果未指定，默认为 30 秒。
+
+- etcd 存储的状态：
+
+  ```ABAP
+  /registry/pods/default/nginx-pod
+  {
+    "status": {
+      "phase": "Terminating"
+    }
+  }
+  ```
+
+**通知 Controller 和 Service**：
+
+- API Server 通过**watch 机制**通知 **Controller Manager** 和 **Service 代理（例如 kube-proxy）**。
+- **Service 代理（例如 kube-proxy）**会将 Pod 从 **Endpoints** 中删除，从而不再将流量路由到该 Pod
+
+
+
+
+
+##### 阶段 2：通知 Kubelet
+
+**Watch 机制通知 Kubelet**：
+
+- API Server 向 Node 上的 Kubelet 发送一个**Pod 变更事件**，标识该 Pod 处于 **Terminating** 状态。
+
+- watch URL：
+
+  ```http
+  GET /api/v1/nodes/<node-name>/pods?watch=true
+  ```
+
+**Kubelet 处理 Pod 变更**：
+
+- Kubelet 在收到变更事件后，**检查 Pod 的体面终止限期（graceful termination period）**。
+- Kubelet 确保 Pod 在**宽限期内停止运行**。
+- **注意**：在此期间，Pod 可能仍在运行，直到 **preStop 钩子**和**容器被停止**
+
+
+
+##### **阶段 3：执行 preStop 钩子和终止容器**
+
+**执行 preStop 钩子**：
+
+- 如果在 Pod 的 YAML 中定义了**preStop 钩子**，Kubelet 会**同步执行 preStop 钩子**。
+
+- preStop 是**阻塞操作**，即在 preStop 钩子运行完成前，Pod 不会进入终止阶段。
+
+- **！！preStop钩子和SIGTERM同步执行**
+
+- 示例 Pod 定义：
+
+  ```yaml
+  lifecycle:
+    preStop:
+      exec:
+        command: ["/bin/sh", "-c", "echo 'Goodbye, world!' > /tmp/goodbye.txt"]
+  ```
+
+**停止容器**：
+
+- preStop 钩子执行完毕后，Kubelet 调用 **containerd** 和 **runc** 停止 Pod 中的容器。
+
+- 通过调用 CRI gRPC，Kubelet 执行以下步骤：
+
+  1. **停止信号**：发送**SIGTERM** 信号给 Pod 中的所有容器。
+  2. **等待体面终止限期**：等待宽限期（默认 30 秒）内的终止。
+  3. 执行 preStop 钩子
+  4. **强制终止**：如果超时，Kubelet 会向容器发送**SIGKILL**，强制终止容器。
+
+- 流程摘要：
+
+  ```rust
+  Kubelet --> containerd --> runc --> SIGTERM (宽限期)
+  Kubelet --> containerd --> runc --> SIGKILL (强制杀死)
+  ```
+
+
+
+##### **阶段 4：移除 Pod Endpoints（从负载均衡中删除）**
+
+**更新 Service Endpoints**：
+
+- prestop钩子和Kubelet向Pod发送SIGTERM以及通过**Endpoints Controller**和**kube-proxy**将 Pod 从 Service 的 Endpoints 中移除。这三个操作同步执行
+
+- 在体面终止限期的**开始时**，API Server 就会通过**Endpoints Controller**和**kube-proxy**将 Pod 从 Service 的 Endpoints 中移除。
+- **原因**：即使 Pod 仍在运行，但为了防止发送到即将被终止的 Pod 的流量，提前将其从流量路径中删除。
+
+**Service 负载均衡更新**：
+
+- kube-proxy 监听 Endpoints 变更（**watch /api/v1/endpoints**）。
+- kube-proxy 在 iptables 中**删除相关的规则**，以防止新流量发送到该 Pod。
+
+
+
+##### 阶段 5：从 etcd 中删除 Pod
+
+**Kubelet 向 API Server 发送删除请求**：
+
+- 如果 Kubelet 发现 Pod 进程已完全终止（所有容器都已关闭），Kubelet 向 API Server 发送 **DELETE 请求**。
+
+- API 请求示例：
+
+  ```http
+  DELETE /api/v1/namespaces/default/pods/nginx-pod
+  ```
+
+**API Server 通知 etcd 删除 Pod**：
+
+- API Server 通过 gRPC 调用 etcd 删除与 Pod 相关的
+
+  存储路径：
+
+  ```http
+  DELETE /registry/pods/default/nginx-pod
+  ```
+
+**从 etcd 中移除 Pod 对象**：
+
+- Pod 对象从 etcd 中被物理删除，所有与之相关的**watch 监听器（Kubelet, Controller, Scheduler）**都会立即收到事件。
+
+
+
+##### 总结
+
+
+
+**Pod 关闭流程的状态变化**
+
+| **阶段**   | **状态**      | **描述**                                    |
+| ---------- | ------------- | ------------------------------------------- |
+| **阶段 1** | `Running`     | Pod 处于正常运行状态                        |
+| **阶段 2** | `Terminating` | `kubectl delete` 触发了删除事件             |
+| **阶段 3** | `Terminating` | 体面终止限期内，preStop 钩子和 SIGTERM 执行 |
+| **阶段 4** | `Terminating` | Pod 从 Service 的 Endpoints 中被删除        |
+| **阶段 5** | **已删除**    | 体面终止限期结束，Pod 彻底被清除            |
+
+
+
+**强制删除（Force Deletion）流程**
+
+**当指定 `--grace-period=0` 时，流程的关键变化如下：**
+
+| **组件**              | **行为变化**         | **解释**                                   |
+| --------------------- | -------------------- | ------------------------------------------ |
+| **体面终止**          | **跳过**             | 不执行宽限期，直接发出**SIGKILL**          |
+| **preStop 钩子**      | **跳过**             | 不会执行 preStop 脚本                      |
+| **Service Endpoints** | **立即删除**         | Pod 会立刻被从 Endpoints 中删除            |
+| **Pod 终止状态**      | 立即终止             | API Server 将 Pod 立即标记为 `Terminating` |
+| **Kubelet 删除**      | **立即发出 SIGKILL** | Kubelet 直接调用 SIGKILL                   |
+| **Pod 删除**          | **立即删除**         | Kubelet 直接调用 API Server 删除           |
+
+
+
+
+
+**关键总结**
+
+1. **优雅终止**：
+   - **宽限期**：体面终止限期内，Pod 从 Service 中被移除，接收 SIGTERM，并执行 preStop 钩子。
+   - **状态变更**：Running → Terminating → 删除。
+   - **删除过程**：当宽限期超时后，Pod 被 SIGKILL 终止，Kubelet 向 API Server 发送删除请求。
+2. **强制删除**：
+   - **直接跳过宽限期**，不执行 preStop 钩子，立即发送 SIGKILL。
+   - **从负载均衡中删除**：立即将 Pod 从 Endpoints 中删除。
+
+
+
+
+
+#### 设置终止宽限期
+
+```bash
+spec.terminationGracePeriod，默认为30s,此值为优雅终止宽限期
+
+#删除命令：kubectl delete pod mypod --grace-period=5
+#强制删除：kubectl delete pod mypod --grace-period=0 --force
+```
+
+
+
+范例
+
+```bash
+[root@master1 ~]#kubectl explain pod.spec.terminationGracePeriodSeconds
+KIND:     Pod
+VERSION: v1
+FIELD:   terminationGracePeriodSeconds <integer>
+DESCRIPTION:
+     Optional duration in seconds the pod needs to terminate gracefully. May be
+     decreased in delete request. Value must be non-negative integer. The value
+     zero indicates stop immediately via the kill signal (no opportunity to shut
+     down). If this value is nil, the default grace period will be used instead.
+     The grace period is the duration in seconds after the processes running in
+     the pod are sent a termination signal and the time when the processes are
+     forcibly halted with a kill signal. Set this value longer than the expected
+     cleanup time for your process. Defaults to 30 seconds.
+```
+
+
+
+示例
+
+```yaml
+spec:
+ terminationGracePeriodSeconds: 3600  # Pod 级别设置，等价于--grace-period=3600
+ containers:
+  - name: test
+   image: ...
+   ports:
+    - name: liveness-port
+     containerPort: 8080
+     hostPort: 8080
+   livenessProbe:
+     httpGet:
+       path: /healthz
+         port: liveness-port
+       failureThreshold: 1
+       periodSeconds: 60
+        # 重载 Pod 级别的 terminationGracePeriodSeconds
+       terminationGracePeriodSeconds: 60
+       
+# 解析上述两个terminationGracePeriodSeconds的含义与区别
+# 第一个terminationGracePeriodSeconds：决定了Kubelet 在发送 SIGKILL 信号前的等待时间。 -- Pod级别
+# 第二个terminationGracePeriodSeconds：在容器重启时生效。触发下列事件时，Kubelet会重启某个特定容器 -- 容器级别
+# Liveness 探针失败。
+# Kubelet 发现容器状态异常（例如 OOM、CrashLoopBackOff 等）。
+# 容器的自我崩溃（containerd 发现容器进程退出）。
+
+# 行为和信号流程：
+
+# Kubelet 发现Liveness 探针失败或容器需要重启。
+# Kubelet 向特定的容器发送 SIGTERM 信号。
+# Kubelet 等待 terminationGracePeriodSeconds 秒，默认是 30 秒。
+# 如果在宽限期内容器未退出，Kubelet 向容器发送 SIGKILL 信号。
+# Kubelet 通过 CRI gRPC 请求 containerd 来删除和重启这个容器。
+```
+
+
+
+##### 特别说明
+
+```ABAP
+当 Kubernetes 删除一个 Pod 时，Kubelet 向容器发送 SIGTERM 信号的同时，执行 preStop 钩子。这两个动作是同时触发的。宽限期（grace period）从这两个操作开始时计时，这意味着 preStop 必须在宽限期内完成，否则 Kubelet 会在宽限期结束时直接向容器发送 SIGKILL，不论 preStop 是否完成。
+
+preStop 触发的具体时间点
+触发点
+preStop 在Kubelet 发送 SIGTERM 的同时触发。
+这两个操作（发送 SIGTERM 和 执行 preStop 钩子）是并行的，不依赖彼此。
+
+如果 preStop 未能在宽限期内完成，Kubelet 仍会在宽限期结束后发送 SIGKILL，这会立即终止容器
+如果 preStop 本身的逻辑依赖于较长时间的任务（如数据迁移、持久化操作），你需要确保 preStop 钩子在宽限期内完成。
+```
+
+
+
+
+
+#### 两种钩子PostStart和PreStop
+
+
+
+根据上面Pod的启动流程，当容器中的进程启动前或者容器中的进程终止之前都会有一些额外的动作执 行，这是由kubelet所设置的，在这里，我们称之为 **pod hook。**
+
+
+
+对于Pod的流程启动，主要有两种钩子：
+
+- **postStart**：**容器创建完成后立即运行**，不保证一定会于容器中ENTRYPOINT之前运行,而Init  Container可以实现
+- **preStop**：**容器终止操作之前立即运行**，在其完成前会阻塞删除容器的操作调用
+
+
+
+##### Poststart钩子
+
+```yaml
+# cat pod-poststart.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-poststart
+spec:
+  containers:
+    - name: busybox
+      image: busybox:1.32.0
+      lifecycle:
+        postStart:
+          exec:
+            command: ["/bin/sh","-c","echo lifecycle poststart at $(date) > /tmp/poststart.log"]
+      command: ['sh', '-c', 'echo The app is running at $(date) ! && sleep 3600']
+      
+# 查看pod执行      
+#[root@master1 yaml]#kubectl logs pod-poststart
+#The app is running at Wed Dec 18 03:34:41 UTC 2024 !
+
+#[root@master1 yaml]#kubectl exec pod-poststart -- cat /tmp/poststart.log
+#lifecycle poststart at Wed Dec 18 03:34:41 UTC 2024
+```
+
+```ABAP
+基于上述现象，容器启动和PostStart钩子函数执行，几乎是同时的
+```
+
+
+
+##### Prestop钩子
+
+**功能**：实现pod对象移除之前，需要做一些清理工作，比如:释放资源，解锁等
+
+示例
+
+```yaml
+#由于默认情况下，删除的动作和日志我们都没有办法看到，那么我们这里采用一种间接的方法，在删除动作之前，给本地目录创建第一个文件，输入一些内容
+# cat pod-prestop.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-prestop
+spec:
+  volumes:
+  - name: vol-prestop
+    hostPath:
+      path: /tmp
+  containers:
+  - name: prestop-pod-container
+    image: busybox:1.32.0
+    volumeMounts:
+    - name: vol-prestop
+      mountPath: /tmp
+    command: ['sh', '-c', 'echo The app is running at $(date) ! && sleep 3600']
+    lifecycle:
+      postStart:
+        exec:
+          command: ['/bin/sh', '-c', 'echo lifecycle poststart at $(date) > /tmp/poststart.log']
+      preStop:
+        exec:
+          command: ['/bin/sh', '-c', 'echo lifecycle prestop at $(date) > /tmp/prestop.log']
+```
+
+
+
+#### Pod状态
+
+
+
+##### Pod phase阶段（相位）
+
+![image-20241218141357779](D:\git_repository\cyber_security_learning\markdown_img\image-20241218141357779.png)
+
+| Value     | Description                                                  |
+| --------- | ------------------------------------------------------------ |
+| Pending   | Pod 已被 Kubernetes 集群接受，但一个或多个容器尚未设置并准备好运行。 这 包括 Pod 等待调度所花费的时间以及通过网络下载容器镜像所花费的时间。 |
+| Running   | Pod 已经绑定到一个节点，并且所有的容器都已经创建。 至少有一个容器仍在运 行，或者正在启动或重新启动。 |
+| Succeeded | Pod 中的所有容器都已成功终止，并且不会重新启动。             |
+| Failed    | Pod 中的所有容器都已终止，并且至少有一个容器因故障而终止。 也就是说，容 器要么以非零状态退出，要么被系统终止。 |
+| Unknown   | 由于某种原因，无法获取 Pod 的状态。 此阶段通常是由于与 Pod 应运行的节点通 信时出现错误而发生的。 |
+
+
+
+
+
+##### Pod 的启动流程状态
+
+| 流程状态        | 描述                              |
+| --------------- | --------------------------------- |
+| PodScheduled    | Pod被调度到某一个节点             |
+| Ready           | 准备就绪，Pod可以处理请求         |
+| Initialized     | Pod中所有初始init容器启动完毕     |
+| Unschedulable   | 由于资源等限制，导致pod无法被调度 |
+| ContainersReady | Pod中所有的容器都启动完毕了       |
+
+
+
+
+
+##### Pod重启策略（面试题）
+
+
+
+**注意：同一个 Pod 内所有容器只能使用统一的重启策略**
+
+
+
+| 重启策略  | 描述                                                         |
+| --------- | ------------------------------------------------------------ |
+| Always    | 无论退出码exit code是否为0，都要重启，即只要退出就重启，并且重启次数并没有限制，此为默认值 |
+| OnFailure | 容器终止运行退出码exit code不为0时才重启,重启次数并没有限制  |
+| Never     | 无论何种退出码exit code,Pod都不重启。主要针对Job和CronJob    |
+
+
+
+示例：
+
+```bash
+[root@master1 tmp]#kubectl get pod myapp-pod -o yaml|grep restartPolicy
+  restartPolicy: Always
+```
+
+
+
+#####  Pod 镜像拉取状态（面试题）
+
+| 拉取策略     | 描述                                                         |
+| ------------ | ------------------------------------------------------------ |
+| Always       | 总是拉取新镜像，注意：如果**镜像的Tag为latest**，拉取策略为always或 ifNotPresent 都会重新拉取镜像 |
+| IfNotPresent | 此为默认值，如果本地不存在的话，再拉取新镜像，例外情况:如果镜像的Tag为 latest，仍会重新拉取镜像 |
+| Never        | 只使用本地的镜像，从不获取新镜像                             |
+
+
+
+```bash
+[root@master1 tmp]#kubectl get pod myapp-pod -o yaml|grep imagePullPolicy
+    imagePullPolicy: IfNotPresent   # 默认值
+```
+
+
+
+
+
+##### Pod状态汇总
+
+| 状态                       | 描述                                                         |
+| -------------------------- | ------------------------------------------------------------ |
+| Pending                    | APIserver已经创建该pod对象，但是kubelet启动容器之前，都处于Pending状态 |
+| Running                    | Pod内所有的容器已创建，且**至少有一个容器处于运行状态**，正 在启动或重启状态 |
+| Waiting                    | Pod 等待启动中                                               |
+| Terminating                | Pod 正在删除，若超过终止宽限期仍无法删除，可以强制删除 kubectl delete pod  -n --grace-period=0 --force |
+| Succeeded                  | 所有容器均成功执行退出，且不会再重启                         |
+| Ready                      | Pod 已经准备好,可以提供服务                                  |
+| Failed                     | Pod内所有容器都已退出，其中至少有一个容器退出失败            |
+| CrashLookBackOff           | 曾经启动Pod成功，但是后来异常情况下，重启次数过多导致异常<br />**终止Pod退避算法**：第1次0秒立刻重启，第二次10秒后重启，第三次 20秒后重启, ... 第6次160秒后重启，第7次300秒后重启，如仍然 重启失败，则为 CrashLookBackOff状态 |
+| Error                      | 因为集群配置、安全限制、资源等原因导致Pod 启动过程中发生 了错误 |
+| Evicted                    | 集群节点系统**内存或硬盘资源不足**导致Pod出现异常            |
+| Completed                  | 表示Pod已经执行完成,比如: **一次性的Job或周期性的CronJob**中 的Pod执行完成后,会显示此状态 |
+| Unschedulable              | Pod 不能调度到节点,一般可能是因为没有合适的节点主机          |
+| PodScheduled               | Pod 正在被调度过程,但此状态的时间很短                        |
+| Initialized                | Pod中所有初始init容器启动完毕                                |
+| ImagePullBackOff           | Pod对应的镜像拉取失败                                        |
+| InvalidImageName           | 镜像名称无效导致镜像无法下载                                 |
+| ImageInspectError          | 镜像检查错误，通常因为镜像不完整                             |
+| ErrlmageNeverPull          | 拉取镜像因策略禁止错误，**镜像仓库权限拒绝或私有导致**       |
+| RegistryUnavailable        | 镜像仓库服务不可用，比如:网络原因或仓库服务器宕机            |
+| ErrImagePull               | 镜像拉取错误，可能是因为超时或拉取被强行终止                 |
+| NetworkPluginNotReady      | 网络插件异常,会导致新建容器出错,但旧的容器不受影响           |
+| NodeLost                   | Pod所在节点无法联系                                          |
+| CreateContainerConfigError | 创建容器配置错误                                             |
+| CreateContainerError       | 创建容器错误                                                 |
+| RunContainerError          | 运行容器错误，比如:容器中没有PID为1的前台进程等原因          |
+| ContainersNotInitialized   | 容器没有初始化完成                                           |
+| ContainersNotReady         | 容器没有准备好                                               |
+| ContainerCreating          | 容器正在创建过程中                                           |
+| PodInitializing            | 容器正在初始化中                                             |
+| DockerDaemonNotReady       | 节点的Docker服务异常                                         |
+|                            |                                                              |
+
+
+
+#### Pod 的健康状态监测
+
+
+
+##### Pod的状态监控
+
+实际上，我们需要一种可以及时的获取容器的各种运行状态数据，所以对于容器任务编排的环境下，他们都应该考虑到一种场景：主动的将容器运行的相关数据暴露出来 -- **数据暴露接口**。比如：包含大量 metric指标数据的API接口。
+
+
+
+对于kubernetes内部的pod环境来说，常见的这些API接口有：
+
+![image-20241218150953385](D:\git_repository\cyber_security_learning\markdown_img\image-20241218150953385.png)
+
+
+
+```bash
+process health #状态健康检测接口
+readiness #容器可读状态的接口
+liveness #容器存活状态的接口
+metrics #监控指标接口
+tracing #全链路监控的埋点(探针)接口
+logs #容器日志接口
+```
+
+
+
+
+
+##### Pod 的健康性监控
+
+Pod 通过**探针**要制实现Pod 健康性监控,当一旦检测出Pod故障时，会**重置Pod**或**将Pod从service后端 endpoint删除**，从而实现服务的高可用
+
+
+
+**探针类型**
+
+针对运行中的容器， kubelet 可以选择是否执行以下三种探针，以及如何针对探测结果作出反应
+
+
+
+![image-20241218151223781](D:\git_repository\cyber_security_learning\markdown_img\image-20241218151223781.png)
+
+**过程详解**
+
+
+
+- 初始刚启动容器的时候，有个初始化时间（**InitialDelaySeconds for Startup Probe**该时间可以自己定义），然后在执行**Startup Probe** Execution
+  - 这种可能使用的场景：java程序启动较慢，容器启动时间可能比较长，所以需要容器启动一段时间后，再使用**Startup Probe**进行探测，否则可能容器还未启动成功，Startup Probe就开始探测，会探测失败
+  - 而Startup Probe**探测失败**的结果是容器会**立即重启**
+  - **Startup Probe只探测一次，探测成功后，后续不会再探测**
+
+- 容器启动成功后，后续会有两个探针Livness Probe和Readiness Probe，在两个探针之前，分别有两个等待时间，即
+  - Livness Probe ----- initialDelaySeconds for Liveness Probe
+  - Readiness Probe ----- initialDelaySeconds for Readiness Probe
+- 如果Liveness Probe检测失败，会重启容器
+- 如果Readiness Probe探测失败，不会重启容器，而是将容器从调度列表中移除
+  - 用户通常是通过service来访问后端的Pod，如果Readiness Probe检测失败，会将其从Service的列表中移除，但是Pod不会重启
+- 如果Liveness Probe检测成功后，会有一个等待的时间，即PeriodSeconds，然后会继续探测，也就是说后续会周期性探测，每过PeriodSeconds时间，会探测一次
+- 如果Readiness Probe检测成功，也会有一个等待的事件，即PeriodSeconds，然后会继续探测
+
+
+
+##### 配置探针
+
+probe有很多配置字段，可以使用这些字段精确地控制启动，存活和就绪检测的行为
+
+- `initialDelaySeconds`：容器启动后要等到多少秒后，才启动**启动**，**存活**，**就绪**探针，默认是0秒，最小值是0.
+- `periodSeconds`：执行探测的时间间隔（单位是秒）。默认是10秒，最小值是1。
+- `timeoutSeconds`：探测超时后，等待多少秒。默认值是1秒，最小值是1
+- `successThreshold`：探针在失败后，被视为成功的最小连续成功数。默认值是1.存活和启动探测的这个值必须是1，最小值是1
+- `failureThreshold`：当探测失败时，Kubernetes的重试次数。对存活探针而言。放弃就意味着重新启动容器
+  - 对就绪探针而言，放弃意味着POd会被打上未就绪的标签。默认是3，最小值是1
+
+
+
+
+
+![image-20241218151415616](D:\git_repository\cyber_security_learning\markdown_img\image-20241218151415616.png)
+
+``````yaml
+spec:
+  containers:
+  - name: string
+    image: string
+    livenessProbe:
+      exec <Object>                    # 命令式探针
+      httpGet <Object>                 # http GET类型的探针
+      tcpSocket <Object>               # tcp Socket类型的探针
+      initialDelaySeconds <integer>    # 发起初次探测请求前的延迟时长，默认为0，生产根据服务起哦多功能时长来设置，比如60s
+      periodSeconds <integer>          # 每次探针请求间隔，即探测的周期，默认10s，如果Pod众多，可适当设长，比如60s
+      timeoutSeconds <integer>         # 探测的超时时长，默认是1s
+      successThreshold <integer>       # 连续成功几次才表示状态正常，默认值是1次，注意：liveness和startup只能是1
+      failureThreshold <integer>       # 连续失败几次才表示状态异常，默认值是3次，即从成功变为失败的检查次数
+``````
+
+
+
+##### 实现探针的三种方式
+
+对于Pod中多容器的场景，只有所有容器就绪，才认为Pod就绪
+
+kubelet 定期执行LivenessProbe和ReadinessProbe探针来诊断Pod的健康状况，Pod探针的实现方式 有很多，常见的有如下三种：
+
+| 监测的实现方式 | 解析                                                         |
+| -------------- | ------------------------------------------------------------ |
+| Exec           | 直接执行指定的命令，**根据**命令结果的**状态码$?判断是否成功**，成功则返回表示探测成功 |
+| TCPSocket      | 根据相应TCP套接字连接建立状态判断,如果**端口能正常打开**，即成功 |
+| HTTPGet        | 根据指定Http/Https服务URL的响应码结果判断，当**2xx, 3xx的响应码表示成功** |
+| gRPC           | 使用 gRPC 执行一个远程过程调用。 目标应该实现 gRPC健康检查。 如果**响应的状态是 "SERVING"**，则认为诊断成功。 gRPC 探针是一个 Alpha 特性，只有在你启用 了 "GRPCContainerProbe" 特性门控时才能使用 |
+
+![image-20241219155655923](D:\git_repository\cyber_security_learning\markdown_img\image-20241219155655923.png)
+
+##### Exec方式案例
+
+exec 其实就是尝试通过在容器内部来执行一个命令，看看能不能执行成功，如果成功，那么说明该对象 是正常的，否则就是失败的。
+
+范例
+
+```yaml
+# cat pod-startup-exec.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-startup-exec
+  namespace: default
+  labels:
+    app: pod-startup-exec
+spec:
+  containers:
+  - name: pod-startup-exec-container
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+    startupProbe:
+      exec:
+        command: ['/bin/sh', '-c', '["`$(curl -s 127.0.0.1/lives)" == "0k" ]']
+      initialDelaySeconds: 60
+      timeoutSeconds: 1
+      periodSeconds: 5
+      successThreshold: 1
+      failureThreshold: 1
+      
+# 启动POd
+kubectl apply -f pod-startup-exec.yaml
+
+# 查看
+[root@master1 yaml]#kubectl get pod 
+NAME               READY   STATUS    RESTARTS      AGE
+pod-startup-exec   0/1     Running   2 (12s ago)   3m28s
+
+# 解析READY 0/1
+# EADY = 当前“处于就绪(Ready)状态的容器数” / Pod 中的总容器数
+
+# 这个pod里的容器里的程序是故意第一次启动会有一个延迟，超过1s,，因为timeoutSeconds: 1，因此会检测失败，unhealthy，导致重启
+# 后续会循环重启
+
+# 解决方案：将超时时间改为10
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### pod资源限制
+
+kubernetes 可以支持在**容器级**及**namespace级**分别实现资源限制
+
+
+
+Kubernetes 已经对Pod做了相应的资源配额设置，这些资源主要体现在：CPU和内存、存储，因为存储 在k8s中有专门的资源对象（PV,PVC）来进行管控，所以当前的pod资源限制，主要指的计算资源，即**CPU和内存。**
+
+
+
+为了方便与k8s的其他单独的资源对象区分开来，一般将**CPU和内存**其称为**计算资源**。
+
+如果运行的Pod使用的资源超过宿主机的最大可用资源,会导致**OOM**和**Pod驱逐**到其它宿主机
+
+
+
+##### 可限制的资源单位
+
+常见在容器级别的CPU和内存的限制
+
+
+
+- **CPU**
+  - 特点：是一种可压缩资源，cpu资源是支持抢占的
+  - 单位：CPU的资源单位是CPU(Core)的数量,是一个绝对
+  - 大小：在Kubernetes中通常以千分之一的CPU(Core)为最小单位，用毫 m 表示,即**一个CPU核心表示为1000m**
+  - 经验：**一个资源占用不多的容器占用的CPU**通常在100~300m，即**0.1-0.3个CPU**
+  - 注意：mi 代表是1024进制的
+
+
+
+- **内存**
+  - 特点：是不可压缩资源，当pod资源扩展的时候，如果node上资源不够，那么就会发生资源抢占， 或者OOM问题
+  - 单位：内存的资源以字节数为单位，是一个绝对值
+  - 大小：内存配额对于绝大多数容器来说很重要，在Kubernetes中通常以Mi,Gi为单位来分配。通常 分配置1G,2G,最多16G或32G
+  - 注意：如果内存分配不足,可能会出现OOM现象（Java程序常见）
+
+
+
+- **注意**
+  - CPU属于可压缩（compressible）型资源，即资源额度可按需收缩
+  - 内存（当前）则是不可压缩型资源，对其执行收缩操作可能会导致某种程度的问题，例如进程崩溃 等。
+
+
+
+- **Extended Resources 扩展资源限制（常见：GPU资源）**
+  - 所有不属于kubernetes.io域的资源,为扩展资源,如:"**nvidia.com/gpu**"
+  - kubernetes 也支持针到扩展资源限制
+
+
+
+
+
+##### 配额限制参数
+
+Kubernetes中，对于每种资源的配额限定都需要两个参数：**Requests和Limits**
+
+![image-20241218152631838](D:\git_repository\cyber_security_learning\markdown_img\image-20241218152631838.png)
+
+
+
+
+
+- **资源需求Requests**
+  - 业务运行时资源预留的最小使用量，即所需资源的**最低下限**，**该参数的值必须满足，若不满足，业务无法运行**。
+  - 容器运行时可能用不到这些额度的资源，但用到时必须确保有相应数量的资源可用
+  - 资源需求的定义会影响调度器的决策,只会将Pod调度至满足所有容器总的资源需求的节点
+  - 当资源不足时，**实际使用的资源超出 Requests 的部分，可能会被回收**
+  - **不能超过对应的limits值**
+  - **不能超过物理节点可用分配的资源值**
+
+
+
+- **资源限制 Limits**
+  - 运行时资源允许使用最大可用量，即所需资源的最高上限，该参数的值不能被突破，超出该额度的资源使用请求通常会被拒绝
+  - **该限制需要大于等于requests的值**，但系统在其某项资源紧张时，会从容器那里回收其使用的超出 其requests值的那部分
+  - 针对内存而言,为防止上面回收情况的发生,一般**建议将内存的 Requests 和 Limits 设为相同**
+  - 资源限制**Limit**的定义**不影响调度器的决策**
+  - 不能低于对应的limits值
+  - 可以超过物理节点可用分配的资源值
+  - **提示:为保证性能,生产推荐Requests和Limits设置为相同的值**
+
+
+
+##### k8s资源查看
+
+要实现资源限制,需要先**安装metrics-server**
+
+```bash
+[root@master1 ~]# curl -LO https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+#默认文件需要修改才能工作,因为默认需要内部证书验证和镜像地址k8s.gcr.io所以修改
+# vim components.yaml
+spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=10250
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        - --kubelet-insecure-tls
+        #image: registry.cn-hangzhou.aliyuncs.com/google_containers/metricsserver:v0.7.1 # 可以添加国内源
+        image: registry.k8s.io/metrics-server/metrics-server:v0.7.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+        name: metrics-server
+        ports:
+        - containerPort: 10250
+          name: https
+          protocol: TCP
+          
+[root@master1 yaml]# kubectl apply -f components.yaml 
+serviceaccount/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+service/metrics-server created
+deployment.apps/metrics-server created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+
+
+root@master1 yaml]#kubectl get pod -n kube-system metrics-server-b79d5c976-hqrct 
+NAME                             READY   STATUS    RESTARTS   AGE
+metrics-server-b79d5c976-hqrct   1/1     Running   0          60s
+[root@master1 yaml]#kubectl top node
+NAME      CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
+master1   62m          3%     910Mi           49%       
+node1     30m          1%     669Mi           36%       
+node2     20m          1%     927Mi           50%       
+node3     27m          1%     715Mi           39% 
+```
+
+
+
+##### 资源限制实现
+
+范例：limits和requests值大小
+
+```yaml
+# [root@master1 yaml]# cat pod-limit-request.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-limit-request
+spec:
+  containers:
+  - name: pod-limit-request-container
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "500Mi"
+        cpu: "250m"
+      limits:
+        memory: "500Mi"
+        cpu: "250m"
+
+```
+
+
+
+##### 压力测试
+
+```yaml
+# cat pod-stress.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-stress
+spec:
+  containers:
+  - name: pod-stress
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/stress-ng
+    imagePullPolicy: IfNotPresent
+    command: ["/usr/bin/stress-ng", "-c 2", "--metrics-brief"]
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 200m
+      limits:
+        memory: 256Mi
+        cpu: 500m
+
+# 查看
+[root@master1 yaml]#kubectl exec pod-stress -- top
+Mem: 1853284K used, 120644K free, 4744K shrd, 55064K buff, 832920K cached
+CPU:  24% usr   0% sys   0% nic  74% idle   0% io   0% irq   0% sirq
+Load average: 0.35 0.30 0.17 3/513 14
+  PID  PPID USER     STAT   VSZ %VSZ CPU %CPU COMMAND
+    8     1 root     R     6904   0%   1  13% {stress-ng-cpu} /usr/bin/stress-ng
+    7     1 root     R     6904   0%   0  12% {stress-ng-cpu} /usr/bin/stress-ng
+    1     0 root     S     6264   0%   1   0% /usr/bin/stress-ng -c 2 --metrics-
+q   9     0 root     R     1520   0%   0   0% top
+```
+
+
+
+
+
+#### Pod安全
+
+##### 资源安全属性
+
+容器一般是基于6个命名空间实现资源的隔离，而一个 Pod 就是一个容器集合，包含多个容器
+
+这个命名空间是按照下面方式来使用的：
+
+- 内部的所有容器共享底层 pause容器的 UTS，Network 两个名称空间资源
+- 可选共享命名空间：IPC，PID
+- MNT和USER 两个命名空间默认没有共享,从而实现应用的隔离。
+
+
+
+##### 容器安全上下文
+
+pod在其生命周期中，涉及到多种场景(多容器的关联关系)，将这种相关的作用关系称为容器上下文，其 中有一些涉及到权限、限制等安全相关的内容，称其为安全上下文。
+
+安全上下文是一组用于决定容器是如何创建和运行的约束条件，它们代表着创建和运行容器时使用的运行时参数。
+
+它根据约束的作用范围主要包括三个级别：
+
+- Pod级别：针对pod范围内的所有容器
+- 容器级别：仅针对pod范围内的指定容器
+- PSP级别：PodSecurityPolicy，全局级别的Pod安全策略，涉及到准入控制相关知识
+
+
+
+Pod和容器的安全上下文设置主要包括以下几个方面
+
+- 容器进程运行身份及资源访问权限
+- Linux Capabilities
+- 自主访问控制DAC
+- seccomp：securecomputing mode，实现限制程序使用某些系统调用
+- AppArmor：Application Armor 与SELinux类似，可以限制程序的功能，比如程序可以读、写或运 行哪些文件，是否可以打开端口等
+- SELinux
+- Privilege Mode
+- Privilege Escalation 特权提升
+
+
+
+##### 安全上下文相关属性
+
+```bash
+#Pod级安全上下文
+~]#kubectl explain pod.spec.securityContext
+#容器级安全上下文
+~]#kubectl explain pod.spec.containers.securityContext
+apiVersion: v1
+kind: Pod
+metadata: {…}
+spec:
+ securityContext:                        # Pod级别的安全上下文，对内部所有容器均有效
+   runAsUser <integer>                   # 以指定的用户身份运行容器进程，默认由镜像中的USER指定
+   runAsGroup <integer>                  # 以指定的用户组运行容器进程，默认使用的组随容器运行时
+   supplementalGroups <[]integer>        # 为容器中1号进程的用户添加的附加组；
+   fsGroup <integer>                     # 为容器中的1号进程附加的一个专用组，其功能类似于sgid
+   runAsNonRoot <boolean>                # 是否以非root身份运行
+   seLinuxOptions <Object>               # SELinux的相关配置
+   sysctls <[]Object>                    # 应用到当前Pod上的名称或网络空间级别的sysctl参数设置列表
+   windowsOptions <Object>               # Windows容器专用的设置
+ containers:
+  - name: …
+   image: …
+   securityContext:                      # 容器级别的安全上下文，仅生效于当前容器
+     runAsUser <integer>                 # 以指定的用户身份运行容器进程
+     runAsGroup <integer>                # 以指定的用户组运行容器进程
+     runAsNonRoot <boolean>              # 是否以非root身份运行
+     allowPrivilegeEscalation <boolean>  # 是否允许特权升级
+     readOnlyRootFilesystem <boolean>    # 是否设置rootfs只读
+     capabilities <Object>               # 于当前容器上添加（add）或删除（drop）的操作内核某些资源的能力
+       add <[]string>                    # 添加由列表格式定义的各内核能力
+       drop <[]string>                   # 移除由列表格式定义的各内核能力
+     privileged <boolean>                # 是否运行为特权容器
+     procMount <string>                  # 设置容器的procMount类型，默认为DefaultProcMount；
+     readOnlyRootFilesystem <boolean>    # 是否将根文件系统设置为只读模式
+     seLinuxOptions <Object>             # SELinux的相关配置
+     windowsOptions <Object>             # windows容器专用的设置   
+     
+#注意：上面的属性仅是最常用的属性，而不是所有的属性
+```
+
+
+
+##### 资源策略
+
+**用户级别**
+
+默认Pod的容器进程是以root身份运行，可以通过下面属性指定其它用户
+
+但此root用户只具有对容器内的相关资源比如文件系统等有管理权限，对于宿主机的内核不具有管理权 限，即是个**“伪"root用户**
+
+相关的属性: 
+
+- runAsUser
+- runAsGroup
+
+
+
+范例：默认root身份运行Pod内的进程
+
+```yaml
+# cat pod-test.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-test
+spec:
+  containers:
+  - name: pod-test
+  image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+  
+# kubectl apply -f pod-test.yaml
+
+# 查看用户
+# kubectl exec pod-test -- id
+uid=0(root) gid=0(root) 
+groups=0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)
+
+# 注意：默认情况下一旦Pod创建好后，是不允许对用户归属权限进行任意修改的，所以需要修改的话，必须先关闭，再开启
+```
+
+
+
+范例：添加安全上下文属性实现**指定用户身份运行Pod内进程**
+
+```yaml
+# cat pod-securitycontext-runasuser.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-securitycontext-runasuser
+  namespace: default
+spec:
+  containers:
+  - name: pod-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+    env:
+    - name: PORT
+      value: "8080"
+    securityContext:
+      runasuser: 1001     # 指定运行身份
+      runAsGroup: 1001
+```
+
+
+
+##### 资源能力
+
+在 Linux 中，**root 用户（UID 0）** 默认拥有所有权限，但在容器化环境（如 Kubernetes）中，为了**安全性**，容器默认会剥夺部分 `root` 用户的特权，确保容器无法对宿主机造成威胁。
+
+```bash
+CAP_CHOWN                  #改变文件的所有者和所属组   
+CAP_MKNOD                  #mknod()，创建设备文件  
+CAP_NET_ADMIN              #网络管理权限
+CAP_SYS_TIME               #更改系统的时钟
+CAP_SYS_MODULE             #装载卸载内核模块
+CAP_NET_BIND_SERVER：      #允许普通用户绑定1024以内的特权端口
+CAP_SYS_ADMIN              #大部分的管理权限,基本相当于root权
+```
+
+
+
+范例：默认能力无法直接创建iptables规则
+
+```yaml
+# cat pod-securitycontext-capabailities.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-securitycontext-capabilities
+  namespace: default
+spec:
+  containers:
+  - name: pod-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+    command: ["/bin/sh", "-c"]
+    args: ["/sbin/iptables -t nat -A PREROUTING -p tcp --dport 8080 -j REDIRECT --to-port 80 && /usr/bin/python3 /usr/local/bin/demo.py"]
+
+# 注意：可以在容器内部通过command + args运行一个自定义的容器启动命令
+
+# 创建资源
+kubectl apply -f pod-securitycontext-capabilities.yaml
+
+# 检查效果
+kubectl get pod pod-securitycontext-capabilities
+NAME                               READY   STATUS   RESTARTS     AGE
+pod-securitycontext-capabilities   0/1     Error    2 (30s ago)   67s
+
+[root@master1 ~]#kubectl logs pod-securitycontext-capabilities 
+getsockopt failed strangely: Operation not permitted
+#结果提示：当容器在启动的时候，默认是以linux系统普通用户启动的，所以普通用户是没有权限更改系统级别的内容的，所以导致我们更改命令权限失败
+```
+
+
+
+范例：通过添加add指令添加特权
+
+```yaml
+# cat pod-securitycontext-capabilities.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-securitycontext-capabilities
+  namespace: default
+spec:
+  containers:
+  - name: pod-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+    command: ["/bin/sh", "-c"]
+    args: ["/sbin/iptables -t nat -A PREROUTING -p tcp --dport 8080 -j REDIRECT --to-port 80 && /usr/bin/python3 /usr/local/bin/demo.py"]
+    # 添加下面三行
+    securityContext:
+      capailities:
+        add: ['NET_ADMIN']
+        
+# 注意：add后面的权限能力使用单引号(''),也可以使用双引号("")
+```
+
+
+
+范例: 使用 drop 指令删除特权
+
+```yaml
+# cat pod-securitycontext-capabilities.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-securitycontext-capabilities
+  namespace: default
+spec:
+  containers:
+  - name: pod-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+    command: ["/bin/sh", "-c"]
+    args: ["/sbin/iptables -t nat -A PREROUTING -p tcp --dport 8080 -j REDIRECT --to-port 80 && /usr/bin/python3 /usr/local/bin/demo.py"]
+    securityContext:
+      capabilities:
+        add: ['NET_ADMIN']
+        drop: ['CHOWN'] # 添加此行
+        
+# 应用配置
+kubectl apply -f pod-securitycontext-capabilities.yaml
+
+# 验证结果
+#kubectl exec pod-securitycontext-capabilities   -- chown 1001:1001 /etc/hosts
+
+#kubectl exec pod-securitycontext-capabilities   -- ls -l /etc/hosts
+-rw-r--r--    1 root     root           228 Mar 17 07:22 /etc/hosts
+#结果显示：文件权限不能随意的更改了
+```
+
+
+
+##### 添加特权模式：Privileged 模式
+
+在某些场景下，如果需要容器具备**完全的 root 权限**，可以将容器运行在**特权模式**下：
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-pod
+spec:
+  containers:
+  - name: test-container
+    image: nginx
+    securityContext:
+      privileged: true  # 运行在特权模式
+```
+
+**注意**：
+
+- `privileged: true` 会授予容器 **所有 Linux 能力**，包括 `SYS_ADMIN`、`NET_ADMIN` 等。
+- 特权模式可能会引发**安全风险**，应谨慎使用。
+
+
+
+##### 内核参数
+
+**Kubernetes 内核参数管理机制**
+
+Kubernetes 通过 **`sysctl`** 来管理和修改内核参数。由于 `sysctl` 修改的是操作系统内核的全局配置，作用范围是整个 **Linux 命名空间**，因此：
+
+- **Pod 内的所有容器共享相同的内核命名空间**。
+- **无法针对单个容器** 修改独立的内核参数，因为同一 Pod 内的容器使用相同的 **Linux 内核命名空间**。
+
+
+
+**为什么只能在 Pod 级别修改？**
+
+**原因：命名空间的共享**
+
+在 Kubernetes 中，Pod 是由一组容器组成的，它们共享以下资源：
+
+- **内核命名空间（Kernel Namespace）**：sysctl 参数属于全局或命名空间级别。
+- **网络命名空间（Net Namespace）**：Pod 级别的网络栈。
+- **PID 命名空间**：Pod 内的所有进程共享 PID 空间。
+
+**影响**
+
+- 如果修改了一个 Pod 的内核参数，那么 Pod 内的所有容器都会受到影响。
+- Kubernetes 没有为单个容器提供独立的内核命名空间，因此无法针对单个容器进行内核参数的修改。
+
+
+
+
+
+**如何在 Pod 级别修改内核参数？**
+
+Kubernetes 提供了 **`sysctl` 支持** 来设置 Pod 级别的内核参数，可以通过 `securityContext` 中的 **`sysctls` 字段** 进行配置。
+
+**示例：Pod 级别修改内核参数**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sysctl-example
+spec:
+  securityContext:
+    sysctls:                # Pod 级别的 sysctl 配置
+    - name: net.core.somaxconn
+      value: "1024"
+    - name: net.ipv4.tcp_syncookies
+      value: "1"
+  containers:
+  - name: nginx
+    image: nginx
+```
+
+**解释**：
+
+- **`securityContext.sysctls`**：在 Pod 级别设置内核参数。
+- 修改的内核参数如 `net.core.somaxconn` 和 `net.ipv4.tcp_syncookies`，会作用于整个 Pod，而非单个容器。
+
+
+
+**支持的 sysctl 参数**
+
+Kubernetes 中的 sysctl 参数分为 **安全（safe）** 和 **不安全（unsafe）** 两类：
+
+1. **安全参数**（Safe Sysctls）：
+
+   - 这些参数作用范围限制在 Pod 的网络或 IPC 命名空间内。
+   - 示例参数：
+     - `net.ipv4.tcp_syncookies`
+     - `net.ipv4.ip_unprivileged_port_start`
+     - `net.core.somaxconn`
+     - `net.ipv4.ping_group_range`
+
+2. **不安全参数**（Unsafe Sysctls）：
+
+   - 这些参数可能影响整个节点，可能会引发安全风险。
+
+   - 需要在 kubelet 启动时添加参数启用：
+
+     ```bash
+     kubelet --allowed-unsafe-sysctls='kernel.*,net.*'
+     ```
+
+
+
+
+
+#### Pod服务质量QoS
+
+#### 服务质量分类
+
+QoS（服务质量等级）是作用在Pod上的一个配置
+
+当Kubernetes创建一个Pod时，它就会给这个Pod分配一个QoS等级
+
+
+
+QoS三个等级（图例）
+
+![image-20241219100140277](D:\git_repository\cyber_security_learning\markdown_img\image-20241219100140277.png)
+
+
+
+
+
+- 低优先级BestEffort：没有任何一个容器设置了requests或limits的属性。（最低优先级）
+- 中优先级Burstable：Pod至少有一个容器设置了cpu或内存的requests和limits，且不相同
+
+- 高优先级Guaranteed：Pod内的每个容器同时设置了CPU和内存的requests和limits  而且所有值 必须相等
+
+
+
+**当主机出现OOM时,先删除服务质量为BestEffort的Pod，然后在删除Burstable，Quaranteed最后被删除**
+
+
+
+
+
+#### Pod设计模式
+
+##### 容器设计模式
+
+基于容器的分布式系统中常用三类设计模式
+
+- **单容器模式**：单一容器形式运行的应用,此模式应用最为广泛,相当于一个人
+- **单节点多容器模式**：由强耦合的多个容器协同共生,容器之间关系密切,通常需要工作在同一个 worker主机上,相当于一个多成员的家庭,**Pod就是此模式的代表**
+- **多节点多容器模式**：基于特定部署单元（ Pod）实现分布式算法,通常容器间需要跨网络通信,相当 于多个家庭此模式依赖于应用自身的实现, 例如: MySQL主从复制集群分布在不同节点的Pod
+
+
+
+
+
+##### 单节点多容器模式
+
+
+
+**注意:此处的节点指一个pod,而非worker节点主机**
+
+一种跨容器的设计模式，目的是在**单个Pod之上**同时**运行多个共生关系的容器**，因而容器管理系统需要由将它们作为一个原子单位进行统一调度
+
+**Pod概念就是这个设计模式的实现之一**
+
+一个容器有多个容器,分为两类
+
+- 主容器: 完成主要核心业务
+- 辅助容器: 提供辅助功能,比如监控,内核优化,代理等
+
+
+
+**单节点多容器模式的常见实现**
+
+辅助容器跟据和主容器的关系,可以由下面几种模式
+
+- **Init Container 模式**
+  - Init Container模式只会出现在容器初始化阶段
+  - Init容器负责以不同于主容器的生命周期来完成那些必要的初始化任务，包括在文件系统上设置必 要的特殊权限、数据库模式设置或为主应用程序提供初始数据等，但这些初始化逻辑无法包含在应 用程序的镜像文件中，或者出于安全原因，应用程序镜像没有执行初始化活动的权限等等
+  - 一个Pod中可以同时定义多个Init容器
+  - Init容器需要串行运行，且在**所有Init容器均正常终止后，才能运行主容器**
+  - 注意: 此模式用`kubectl get pods` 显示一个Pod只有一个容器
+
+
+
+- **Sidecar 模式**
+  - Sidecar模式即边车(摩托车的挎斗)模式
+  - Pod中的应用由主应用程序（通常是基于HTTP协议的应用程序）以及一个Sidecar的辅助容器组成 Sidecar做为辅助容器用于为主容器提供辅助服务以增强主容器的功能，是主应用程序是必不可少 的一部分，但却未必非得运行为应用的一部分,比如：服务网格的Envoy代理, filebeat 日志收
+  - Sidecar容器可以对客户端和主容器之间的所有流量进行干预和监控 
+  - 常见应用场景: 为主容器提供代理服务
+
+
+
+- **Ambassador 模式**
+  - Ambassador模式即大使模式,功能类似一国的大使
+  - Pod中的应用由**主应用程序和一个Ambassador容器组成**
+  - Ambassador辅助容器代表主容器发送网络请求至特定的外部环境中，因此可以将其视作主容器应 用的“大使”
+
+
+
+- **Adapter 模式**
+  - Adapter模式即适配器模式
+  - Pod中的应用由主应用程序和一个Adapter容器组成，主要为从外部应用向主应用容器访问提供支 持，和Ambassador 模式方向相反
+  - Adapter容器为主应用程序提供一致的接口，实现模块重用，支持主容器应用程序的标准化和规范 化输出以便于从外部服务进行访问
+  - Adapter容器帮助主容器通信过程中的信息格式修正,将客户端的数据格式转换成主容器能够识别的 数据格式
+  - 常见应用场景: 外部prometheus服务通过Adapter 模式的Exporter容器抓取nginx容器的日志,中间 Exporter需要转换两者之间的格式   
+
+
+
+##### init模式案例
+
+```yaml
+# cat pod-init-container.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-init-container
+  namespace: default
+spec:
+  initContainers:
+  - name: iptables-init
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/admin-box:v0.1
+    imagePullPolicy: IfNotPresent
+    command: ['/bin/bash', '-c']
+    args: ['iptables -t nat -A -PREROUTING -p tcp --dport 8000 -j REDIRECT --to-port:80']
+    securityContext:
+      capabilities:
+        add:
+        - NET_ADMIN
+  containers:
+  - name: demo
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    ports:
+    - name: http
+      containerPort: 80
+```
+
+
+
+##### sidecar模式案例
+
+```yaml
+# cat pod-sidecar-test.yaml
+apiServer: v1
+kind: Pod
+metadata:
+  name: sidecar-test
+spec:
+  containers:
+  - name: proxy
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/envoy-alpine:v1.14.1
+    command: ['sh', '-c', 'sleep 5 && envoy -c /etc/envoy/envoy.yaml']
+    lifecycle:
+      postStart:
+        exec:
+          command: ["/bin/sh", "-c", "wget -O /etc/envoy/envoy.yaml http://www.wangxiaochun.com:8888/kubernetes/yaml/envoy.yaml"]
+  - name: pod-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    env:
+    - name: HOST
+      value: "127.0.0.1"
+    - name: PORT
+      value: "8000"
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 知识扩展
+
+
+
+## Watch机制
+
+
+
+**watch 本质上就是一个基于 HTTPS 的长连接请求**。在这个长连接中，**API Server 会向客户端主动推送资源变更事件**，但要注意的是，**客户端在发起 watch 请求后不会反复发送请求，后续的所有数据都是由 API Server 主动推送的**。
+
+
+
+### HTTP/2实现
+
+#### **1. 技术核心：HTTP/2 的特性**
+
+Kubernetes 的 watch 机制依赖于**HTTP/2 协议**的**多路复用和流式数据传输**。和传统的 HTTP/1.1 不同，**HTTP/2 提供了持久的双向数据流**，这是实现“**一次请求，多次响应**”的核心。
+
+
+
+##### **HTTP/2 的关键特性**
+
+| **特性**            | **描述**                                   | **在 watch 中的作用**                                  |
+| ------------------- | ------------------------------------------ | ------------------------------------------------------ |
+| **多路复用**        | 单个 TCP 连接中允许多个流的并行交付        | 允许 kubelet 和 apiserver 通过单连接传输多个请求和响应 |
+| **数据流 (Stream)** | 数据以流的形式发送，流 ID 用于标识数据段   | kube-apiserver 不断向 kubelet 发送流数据               |
+| **流式响应**        | 不必等待请求完成，可以多次传输分段响应数据 | 在 watch 中，每次 Pod 变化都会立刻推送到客户端         |
+| **长连接**          | 连接不关闭，维持客户端与服务端的长连接     | 客户端的 watch 请求一直保持连接，直到中断              |
+| **头部压缩**        | HTTP 头的 HPACK 压缩，减少网络流量消耗     | kube-apiserver 的请求和响应的头部变小，减少延迟        |
+
+
+
+##### **HTTP/2 是如何实现“请求-多次响应”的？**
+
+1. **多路复用**：
+   - 在 HTTP/2 中，客户端与服务端之间只建立一个 TCP 连接，但可以在该连接上同时处理多个 HTTP 请求。
+   - watch 请求（`GET /api/v1/pods?watch=true`）**只占用一个 HTTP 流**，即使有其他请求（例如 List Pods）也不会影响 watch 流。
+2. **数据流 (Stream)**：
+   - HTTP/2 使用“**数据流**”的概念。
+   - 当 kube-apiserver 监测到 Pod 变化时，**将变化的事件打包为一条消息**，推送到与客户端的流中。
+   - **客户端监听到事件后可以立刻接收并处理，而不需要关闭或重新请求。**
+3. **流式响应**：
+   - 在 HTTP/1.1 中，响应数据必须等待请求完成后，才能完整返回。
+   - 在 HTTP/2 中，服务端可以**一段一段地将数据发送回客户端**，这正是 Kubernetes 中 watch 机制的关键。
+   - **每次 Pod 状态变化时，API Server 会将事件推送到客户端，客户端立即收到变化数据。**
+
+
+
+#### **2. 在 Kubernetes 中的实现**
+
+##### **Watch 请求**
+
+``` 
+GET /api/v1/pods?watch=true&resourceVersion=123456 HTTP/2
+Host: kube-apiserver:6443
+```
+
+- **GET** 请求，路径是 `/api/v1/pods`，带有参数 `watch=true`。
+- `resourceVersion=123456`：这表示客户端希望**从版本 123456 之后的事件开始监听**。
+- 这是一个 HTTP/2 请求，它**不关闭连接**，相当于在 TCP 上创建一个**长连接**，并保持数据流。
+
+
+
+##### **响应数据**
+
+API Server 检测到 Pod 变化后，会不断地**流式传输**变更事件。
+
+```json
+jsonCopy code{
+  "type": "ADDED",
+  "object": {
+    "metadata": {
+      "name": "nginx-pod",
+      "namespace": "default",
+      "resourceVersion": "123457"
+    },
+    "status": {
+      "phase": "Running"
+    }
+  }
+}
+{
+  "type": "MODIFIED",
+  "object": {
+    "metadata": {
+      "name": "nginx-pod",
+      "namespace": "default",
+      "resourceVersion": "123458"
+    },
+    "status": {
+      "phase": "Terminating"
+    }
+  }
+}
+{
+  "type": "DELETED",
+  "object": {
+    "metadata": {
+      "name": "nginx-pod",
+      "namespace": "default",
+      "resourceVersion": "123459"
+    }
+  }
+}
+```
+
+- 这些事件是**分段返回的 JSON 消息**。
+- 每条事件都有一个**事件类型 (type)**，可以是 `ADDED`, `MODIFIED`, `DELETED`。
+- **流式数据传输**：每个事件都是独立的 JSON 块，kubelet 立刻能读取这些数据，而不需要等待所有数据返回。
+- **不关闭连接**：API Server **只会在连接断开时关闭流**，否则会持续发送数据。
+
+
+
+#### **3. 这与 WebSocket 的对比**
+
+| **特性**     | **HTTP/2**               | **WebSocket**              |
+| ------------ | ------------------------ | -------------------------- |
+| **连接类型** | HTTP/2 长连接，流式响应  | TCP 长连接，类似双工通信   |
+| **协议层**   | TCP + HTTP/2             | TCP + WebSocket (ws://)    |
+| **多路复用** | 支持                     | 不支持（一个请求一个通道） |
+| **并发性**   | 高并发，多请求一个 TCP   | 需要多个 TCP 连接          |
+| **数据传输** | 以**数据流**传输分段数据 | 以数据包/消息方式传输      |
+| **使用场景** | Kubernetes watch、API流  | 聊天室、游戏等双工通信     |
+| **网络效率** | 较高，资源利用率高       | 较高，适合双工通信         |
+
+
+
+#### **4. 关键的网络协议特性**
+
+| **网络协议/特性** | **HTTP/2** | **描述**                             |
+| ----------------- | ---------- | ------------------------------------ |
+| **TCP**           | 需要       | HTTP/2 是基于 TCP 传输的（TLS/SSL）  |
+| **TLS/SSL**       | 必须       | 传输时使用 TLS 加密，增强数据安全    |
+| **多路复用**      | 支持       | 单个 TCP 连接可传输多个 HTTP 请求    |
+| **流控制**        | 支持       | 控制每个流的流量，避免某个流占满带宽 |
+| **分段传输**      | 支持       | 不必等待所有数据，流式传输响应片段   |
+| **头部压缩**      | 支持       | 使用 HPACK 压缩头部，减少带宽        |
+
+
+
+#### **5. 关键问题解答**
+
+1. **“一次请求，多次响应” 是怎么实现的？**
+
+- 使用**HTTP/2 中的流式响应**。
+- 通过在 HTTP/2 中维持一个**长连接**，服务端 API Server 会不断地将事件推送给客户端。
+- 这些事件是一个个**分段的 JSON 数据块**，流式返回给客户端。
+- **客户端只需要发起一次请求**，API Server 会主动推送资源的变化数据。
+
+
+
+2. **watch 机制与传统的“轮询 (polling)” 有何不同？**
+
+- **传统轮询**：客户端定期发送请求，获取全量资源列表，开销大，延迟高。
+- **watch 机制**：客户端只发送一次请求，API Server 持续推送变更，实时性强，资源开销小。
+
+
+
+3. **如果连接断开了怎么办？**
+
+- 客户端会检测到断开，并自动重新发起 watch 请求。
+- 如何避免丢失数据？
+  - 客户端会使用最后的 `resourceVersion` 来恢复。
+  - 如果 `resourceVersion` 太旧，API Server 会返回**HTTP 410 Gone**，这时客户端会触发**List + Watch**操作来重新同步数据。
+
+
+
+#### **总结**
+
+- **一次请求、多次响应**的关键在于**HTTP/2 的长连接和流式传输**。
+- watch 使用的**HTTP/2 协议、流式响应、多路复用和长连接**技术，避免了客户端的重复请求，提升了性能。
+- **不需要客户端反复请求**，一条请求，API Server 持续推送。
+- **网络协议的支撑**：HTTP/2 流、长连接、TLS 加密和数据分段传输。
+
+
+
+
+
+### 各组件在HTTP/2的角色
+
+#### **1. 各组件在 HTTP/2 请求中的角色**
+
+| **组件对**                 | **客户端 (Client)** | **服务端 (Server)** | **协议**   | **是否使用长连接** | **长连接的作用**                           |
+| -------------------------- | ------------------- | ------------------- | ---------- | ------------------ | ------------------------------------------ |
+| **Scheduler - API Server** | **Scheduler**       | **API Server**      | **HTTP/2** | 是                 | Scheduler 向 API Server 申请调度的资源更新 |
+| **Kubelet - API Server**   | **Kubelet**         | **API Server**      | **HTTP/2** | 是                 | Kubelet 监听 Pod 变更 (watch)              |
+| **API Server - etcd**      | **API Server**      | **etcd**            | **gRPC**   | 是                 | API Server 查询/更新 etcd 数据             |
+
+------
+
+#### **2. 角色解析**
+
+##### **(1) Scheduler - API Server**
+
+- **客户端**：Scheduler 是客户端。
+
+- **服务端**：API Server 是服务端。
+
+- **通信方式**：Scheduler 通过**HTTP/2 长连接**请求 API Server。
+
+- **请求类型**：
+
+  - Scheduler 向 API Server 发送请求，筛选出未绑定的 Pod。
+
+  - 当 Scheduler 决定将 Pod 绑定到某个节点时，它会向 API Server 发送 **Bind API 请求**。
+
+  - 请求示例：
+
+    ```http
+    POST /api/v1/namespaces/default/pods/<pod-name>/binding HTTP/2
+    ```
+
+- **长连接作用**：
+
+  - 由于 Scheduler 不需要**watch**资源（不像 kubelet 监听 Pod 变更），所以 Scheduler 的长连接更多是为了**提高请求性能**，避免频繁建立和关闭 TCP 连接。
+  - 当有多个调度请求时，长连接的**多路复用**特性显著提高了效率。
+
+
+
+##### **(2) Kubelet - API Server**
+
+- **客户端**：Kubelet 是客户端。
+
+- **服务端**：API Server 是服务端。
+
+- **通信方式**：**HTTP/2 长连接**，**watch 机制**。
+
+- **请求类型**：
+
+  - kubelet 监听特定的资源（如 Pods）：
+
+    ```http
+    GET /api/v1/nodes/<node-name>/pods?watch=true&resourceVersion=<RV> HTTP/2
+    ```
+
+  - 通过 watch 机制，Kubelet 可以**实时监听 Pod 的变化**（新增、修改、删除）。
+
+  - watch 机制通过**流式响应**，API Server 在资源变更时，**主动推送变更事件**到 Kubelet。
+
+- **长连接作用**：
+
+  - Kubelet 只发送**一次请求**，API Server 保持长连接，推送资源变更事件。
+  - 如果 watch 连接断开，Kubelet 会使用最后的 `resourceVersion` 重新发起 watch 请求。
+
+
+
+##### **(3) API Server - etcd**
+
+- **客户端**：API Server 是客户端。
+
+- **服务端**：etcd 是服务端。
+
+- **通信方式**：**gRPC 长连接**（HTTP/2）。
+
+- **请求类型**：
+
+  - 读操作：
+
+    ```go
+    etcdClient.Get(ctx, "/registry/pods/default/nginx-pod")
+    ```
+
+  - 写操作：
+
+    ```go
+    etcdClient.Put(ctx, "/registry/pods/default/nginx-pod", "<pod-data>")
+    ```
+
+- **长连接作用**：
+
+  - gRPC 是基于 **HTTP/2** 的远程过程调用（RPC）框架。
+  - **API Server 不会在每次请求时重新创建 TCP 连接**，而是维持一个**持久的 HTTP/2 连接**，这显著减少了 etcd 和 API Server 之间的网络开销。
+  - **etcd 使用 MVCC（多版本并发控制）** 机制，每个变更都会生成一个**新的 revision**，API Server 使用这个 revision 来进行增量监听。
+
+
+
+#### **3. HTTPS 证书的使用**
+
+> **在 Kubernetes 中的 "三套证书" 是指：**
+
+1. **ETCD 组件通信证书**（API Server ↔ ETCD）
+2. **Kubernetes 组件之间的通信证书**（API Server、Scheduler、Kubelet、Controller Manager）
+3. **外部用户的通信证书**（kubectl、外部 API 请求）
+
+
+
+##### **(1) Scheduler - API Server**
+
+- **证书类型**：**Kubernetes 组件内部通信证书**
+- 证书说明：
+  - Scheduler 需要与 API Server 进行 HTTPS 认证。
+  - API Server 公开了**kube-apiserver.crt** 和 **kube-apiserver.key**。
+  - Scheduler 使用 **kube-controller-manager.crt** 和 **kube-controller-manager.key** 来与 API Server 通信。
+  - 这些证书存储在 **/etc/kubernetes/pki** 目录下。
+  - 组件之间的**客户端证书**和**服务器证书**均由 **Kubernetes CA 证书**签名。
+
+
+
+##### **(2) Kubelet - API Server**
+
+- **证书类型**：**Kubernetes 组件内部通信证书**
+- 证书说明：
+  - Kubelet 需要与 API Server 通信以获取 Pod 信息。
+  - Kubelet 证书：**kubelet.crt** 和 **kubelet.key**。
+  - Kubelet 使用 **client-certificate-data** 和 **client-key-data** 进行客户端身份验证。
+  - API Server 端的 **kube-apiserver.crt** 和 **kube-apiserver.key** 用于提供 HTTPS 连接的服务端证书。
+
+
+
+##### **(3) API Server - etcd**
+
+- **证书类型**：**ETCD 组件通信证书**
+
+- 证书说明
+
+  ：
+
+  - API Server 作为**客户端**，etcd 作为**服务端**。
+  - etcd 证书：**etcd-server.crt** 和 **etcd-server.key**。
+  - API Server 作为客户端发起请求时，使用 **etcd-client.crt** 和 **etcd-client.key** 进行双向认证。
+  - 这也是三套证书中**专门为 ETCD 组件通信生成的证书**。
+
+
+
+##### **总结三套证书的作用**
+
+| **证书类型**      | **通信场景**                    | **证书路径**               | **作用**                                  |
+| ----------------- | ------------------------------- | -------------------------- | ----------------------------------------- |
+| **ETCD 组件证书** | API Server ↔ etcd               | /etc/kubernetes/pki/etcd/  | etcd 和 API Server 之间的加密通信         |
+| **K8s 组件证书**  | kubelet、Scheduler ↔ API Server | /etc/kubernetes/pki/       | Kubelet、Scheduler、API Server 之间的通信 |
+| **用户 API 证书** | kubectl ↔ API Server            | /etc/kubernetes/admin.conf | 用户使用 kubectl 访问 API Server          |
+
+
+
+#### **4. 关键总结**
+
+1. **谁是客户端，谁是服务端？**
+   - **Scheduler ↔ API Server**: Scheduler 是客户端，API Server 是服务端。
+   - **Kubelet ↔ API Server**: Kubelet 是客户端，API Server 是服务端。
+   - **API Server ↔ etcd**: API Server 是客户端，etcd 是服务端。
+2. **长连接**
+   - **Scheduler 和 API Server 之间**：HTTP/2 长连接。
+   - **Kubelet 和 API Server 之间**：HTTP/2 长连接（watch 机制，推送变化事件）。
+   - **API Server 和 etcd 之间**：gRPC（基于 HTTP/2 的长连接）。
+3. **三套证书的使用**
+   - **ETCD 证书**：API Server ↔ etcd 通信。
+   - **Kubernetes 组件证书**：Scheduler、Kubelet、Controller Manager 与 API Server 之间的通信。
+   - **用户 API 证书**：外部用户（如 kubectl）与 API Server 之间的通信。
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -20097,7 +20097,7 @@ chmod a+x /etc/rc.d/rc.local
 
 # Ubuntu中没有该文件，要自行创建
 vim /etc/rc.local
-#!/nbin/bash
+#!/bin/bash
 
 iptables-restore > /root/iptables.rule
 
