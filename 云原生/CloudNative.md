@@ -182,6 +182,12 @@ https://www.cncf.io/
 
 
 
+# 微服务
+
+
+
+
+
 # Kubernetes
 
 
@@ -1247,6 +1253,7 @@ source ~/.bashrc
 - **资源对象**
 - **名称空间**
 - **Pod资源**
+- **Pod工作机制**
 
 
 
@@ -4059,7 +4066,7 @@ kubelet 定期执行LivenessProbe和ReadinessProbe探针来诊断Pod的健康状
 
 exec 其实就是尝试通过在容器内部来执行一个命令，看看能不能执行成功，如果成功，那么说明该对象 是正常的，否则就是失败的。
 
-范例
+范例：startup probe
 
 ```yaml
 # cat pod-startup-exec.yaml
@@ -4103,11 +4110,323 @@ pod-startup-exec   0/1     Running   2 (12s ago)   3m28s
 
 
 
+范例：livenessProbe
+
+```yaml
+# cat pod-liveness-exec-cmd.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-liveness-exec-cmd
+  namespace: default
+spec:
+  containers:
+  - name: pod-liveness-exec-cmd-container
+    image: busybox:1.32.0
+    imagePullPolicy: IfNotPresent
+    command: ["/bin/sh", "-c", "touch /tmp/healthy; sleep 3; rm -f /tmp/healthy; sleep 3600"]
+    livenessProbe:
+      exec:
+        command: ["test", "-e", "/tmp/healthy"]
+      initialDelaySeconds: 1
+      periodSeconds: 3
+      
+# 创建容器
+kubectl apply -f pod-liveness-exec-cmd.yaml
+
+# 实时监控，发现不断重启
+[root@master1 yaml]#kubectl get pod pod-liveness-exec-cmd -w
+NAME                    READY   STATUS    RESTARTS   AGE
+pod-liveness-exec-cmd   1/1     Running   0          22s
+pod-liveness-exec-cmd   1/1     Running   1 (1s ago)   55s
+pod-liveness-exec-cmd   1/1     Running   2 (5s ago)   101s
+pod-liveness-exec-cmd   1/1     Running   3 (1s ago)   2m19s
+pod-liveness-exec-cmd   1/1     Running   4 (1s ago)   3m1s
+pod-liveness-exec-cmd   1/1     Running   5 (0s ago)   3m42s
+pod-liveness-exec-cmd   0/1     CrashLoopBackOff   5 (1s ago)   4m25s
+pod-liveness-exec-cmd   1/1     Running            6 (85s ago)   5m49s
+pod-liveness-exec-cmd   0/1     CrashLoopBackOff   6 (1s ago)    6m31s
+pod-liveness-exec-cmd   1/1     Running            7 (2m50s ago)   9m20s
+pod-liveness-exec-cmd   0/1     CrashLoopBackOff   7 (1s ago)      10m
+pod-liveness-exec-cmd   1/1     Running            8 (5m5s ago)    15m
+pod-liveness-exec-cmd   1/1     Running            9 (1s ago)      15m
+pod-liveness-exec-cmd   0/1     CrashLoopBackOff   9 (1s ago)      16m
+```
 
 
 
+##### Tcpsocket方式案例
+
+使用此配置， kubelet 将尝试在指定端口上打开容器的套接字。如果可以建立连接，容器被认为是健康 的，如果不能就认为是失败的，实际上就是**检查端口**。
+
+对于 TCP 探测而言，kubelet 在节点上（不是在 Pod 里面）发起探测连接， 这意味着你不能在 host 参数上配置服务名称，因为 kubelet 不能解析服务名称。
 
 
+
+**liveness的Tcpsocket探针**
+
+```yaml
+# cat pod-liveness-tcpsocket.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-liveness-tcpsocket
+  namespace: default
+spec:
+  containers:
+  - name: pod-liveness-tcpsocket-container
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+    ports:
+    - name: http           # 给指定端口定义别名
+      containerPort: 80
+    securityContext:       # 添加特权，否则添加iptables规则会提示：getsockopt failed strangely: Operation not permitted
+      capabilities:
+        add:
+        - NET_ADMIN
+    livenessProbe:
+      tcpSocket:
+        port: http        # 引用上面端口的定义
+      periodSeconds: 5
+      initialDelaySeconds: 5
+      
+# 注意：由于此镜像应用对外暴露的端口是80端口，所以要探测80端口
+
+# 模拟探测失败，添加防火墙规则，禁止探测
+kubectl exec pod-liveness-tcpsocket -- iptables -A INPUT -p tcp --dport 80 -j REJECT
+
+# 查看状态异常
+kubectl describe pod pod-liveness-tcpsocket
+...
+Events:
+  Type     Reason     Age               From               Message
+  ----     ------     ----              ----               -------
+  Normal   Scheduled  98s               default-scheduler  Successfully assigned default/pod-liveness-tcpsocket to node1
+  Normal   Pulled     98s               kubelet            Container image "registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1" already present on machine
+  Normal   Created    98s               kubelet            Created container pod-liveness-tcpsocket-container
+  Normal   Started    97s               kubelet            Started container pod-liveness-tcpsocket-container
+  Warning  Unhealthy  3s (x3 over 13s)  kubelet            Liveness probe failed: dial tcp 10.244.1.15:80: connect: connection refused
+  Normal   Killing    3s                kubelet            Container pod-liveness-tcpsocket-container failed liveness probe, will be restarted
+  
+# 注意：livenessProbe探测失败，会重启容器，而重启容器并不是重新创建容器，因此内核相关功能无法重置，也就导致即便重启，防火墙规则仍然在，会导致探测失败，后续不断重启
+```
+
+
+
+**Readiness的Tcpsocket探针**
+
+```yaml
+# cat pod-readiness-tcpsocket.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-readiness-tcpsocket
+  labels: 
+    app: pod-readiness-tcpsocket
+spec:
+  containers:
+  - name: pod-readiness-tcpsocket-container
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    readinessProbe:
+      tcpSocket:
+        port: 80
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    livenessProbe:
+      tcpSocket:
+        port: 80
+      initialDelaySeconds: 15
+      periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-readiness-tcpsocket-svc
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: pod-readiness-tcpsocket     # 指定上面Pod相同的标签
+    
+# 查看Service的IP    
+[root@master1 yaml]# kubectl get svc
+NAME                          TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+kubernetes                    ClusterIP   10.96.0.1      <none>        443/TCP   25h
+pod-readiness-tcpsocket-svc   ClusterIP   10.104.62.95   <none>        80/TCP    8s
+
+# curl 10.104.62.95
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+    body {
+        width: 35em;
+        margin: 0 auto;
+        font-family: Tahoma, Verdana, Arial, sans-serif;
+    }
+</style>
+</head>
+...
+
+
+# 将readniessProbe上的探测端口改为8080，因为没有打开8080端口，因此readinessProbe必然失败
+# cat pod-readiness-tcpsocket.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-readiness-tcpsocket
+  labels: 
+    app: pod-readiness-tcpsocket
+spec:
+  containers:
+  - name: pod-readiness-tcpsocket-container
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    readinessProbe:
+      tcpSocket:
+        port: 8080                 # 改为8080
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    livenessProbe:
+      tcpSocket:
+        port: 80
+      initialDelaySeconds: 15
+      periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-readiness-tcpsocket-svc
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: pod-readiness-tcpsocket     # 指定上面Pod相同的标签
+    
+# 创建资源
+[root@master1 yaml]#kubectl apply -f pod-readiness-tcpsocket.yaml 
+pod/pod-readiness-tcpsocket created
+service/pod-readiness-tcpsocket-svc created
+
+# 查看状态
+[root@master1 yaml]#kubectl get pod
+NAME                      READY   STATUS    RESTARTS   AGE
+pod-readiness-tcpsocket   0/1     Running   0          4s
+pod-startup-exec          1/1     Running   0          3h26m
+
+[root@master1 yaml]#kubectl describe pod pod-readiness-tcpsocket 
+...
+Events:
+  Type     Reason     Age               From               Message
+  ----     ------     ----              ----               -------
+  Normal   Scheduled  25s               default-scheduler  Successfully assigned default/pod-readiness-tcpsocket to node1
+  Normal   Pulled     24s               kubelet            Container image "registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0" already present on machine
+  Normal   Created    24s               kubelet            Created container pod-readiness-tcpsocket-container
+  Normal   Started    24s               kubelet            Started container pod-readiness-tcpsocket-container
+  Warning  Unhealthy  4s (x2 over 14s)  kubelet            Readiness probe failed: dial tcp 10.244.1.17:8080: connect: connection refused
+
+# 可以看到Readiness Probe失败
+# 观察Service的ep
+[root@master1 yaml]#kubectl get ep
+NAME                          ENDPOINTS         AGE
+kubernetes                    10.0.0.201:6443   25h
+pod-readiness-tcpsocket-svc                     41s
+
+# 由于readniessProbe探测失败，因此将Pod从service的endponits列表移除
+```
+
+
+
+##### HttpGet方式案例
+
+HTTP 探测通过对容器内容开放的web服务，进行http方法的请求探测，如果**探测成功(状态码为2XX和 3XX)**，那么表示http服务是正常的，否则就是失败的。
+
+HTTP Probes 允许针**对 httpGet 配置额外的字段**：
+
+```yaml
+#示例:
+httpHeaders:
+  - name: user_agent
+    value: curl
+
+# 其他字段
+# host： 连接使用的主机名，默认是 Pod 的 IP。也可以在 HTTP 头中设置 “Host” 来代替。一般不配置此项
+# scheme ： 用于设置连接主机的方式（HTTP 还是 HTTPS）。默认是 "HTTP"。一般不配置此项
+# path： 访问 HTTP 服务的路径。默认值为 "/"。一般会配置此项
+# port： 访问容器的端口号或者端口名。如果数字必须在 1～65535 之间。一般会配置此项
+# httpHeaders：请求中自定义的 HTTP 头。HTTP 头字段允许重复。一般不配置此项
+```
+
+
+
+**Liveness的httpGet探针**
+
+```yaml
+# cat pod-liveness-http.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-liveness-http
+spec:
+  containers:
+  - name: pod-liveness-http-container
+    image: busybox:1.32.0
+    ports:
+    - name: http
+      containerPort: 80
+    livenessProbe:
+      httpGet:
+        port: http
+        path: /index.html
+      initialDelaySeconds: 1
+      periodSeconds: 3
+
+# 启用容器
+kubectl apply -f pod-liveness-http.yaml
+pod/pod-liveness-http created
+```
+
+
+
+ **Readiness 的 httpGet 探针**
+
+通过readiness的属性，尝试判断资源对象是否准备好了相关服务，来接受用户请求。 如果readiness检测失败,相关的service会将此pod从Endpoints中移除,但不会重启pod 
+
+```yaml
+# cat pod-readiness-http.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-readiness-http
+spec:
+  containers:
+  - name: pod-readiness-http-container
+    image: busybox:1.32.0
+    ports:
+    - name: http
+      containerPort: 80
+    readinessProbe:
+      httpGet:
+        port: http
+        path: /index.html
+      initialDelaySeconds: 1
+      periodSeconds: 3
+      
+# 创建容器
+kubectl apply -f pod-readiness-http.yaml
+
+#实时监控
+[root@master1 ~]#kubectl get pod -w
+NAME                 READY   STATUS             RESTARTS     AGE
+pod-readiness-http   0/1     CrashLoopBackOff   1 (26s ago)   43s
+pod-readiness-http   0/1     Completed          2 (32s ago)   49s
+```
 
 
 
@@ -4315,6 +4634,116 @@ Load average: 0.35 0.30 0.17 3/513 14
     7     1 root     R     6904   0%   0  12% {stress-ng-cpu} /usr/bin/stress-ng
     1     0 root     S     6264   0%   1   0% /usr/bin/stress-ng -c 2 --metrics-
 q   9     0 root     R     1520   0%   0   0% top
+```
+
+
+
+
+
+##### 基于Namespace级别的资源限制
+
+在 **Kubernetes 中基于 Namespace 级别的资源限制**，我们通常使用 **ResourceQuota** 和 **LimitRange** 来实现对命名空间中资源的使用限制。
+
+
+
+**资源限制的实现方式**
+
+| **方式**          | **对象**       | **限制类型**                   | **典型限制内容**                             |
+| ----------------- | -------------- | ------------------------------ | -------------------------------------------- |
+| **ResourceQuota** | **Namespace**  | **命名空间级别的资源总量限制** | 限制 Namespace 中 Pod、CPU、内存、存储的总量 |
+| **LimitRange**    | **Pod 和容器** | **单个 Pod/容器的资源限制**    | 限制每个 Pod/容器的 CPU 和内存的最小和最大值 |
+
+------
+
+
+
+**资源限制的工作机制**
+
+**1️⃣ ResourceQuota (限制 Namespace 资源总量)**
+
+- **作用范围**：
+  限制整个 Namespace 中的资源总量，包括 Pod 数量、CPU、内存和存储。
+- **常见的限制项目**：
+  - Pod 总数 (`pods`)
+  - 容器的总 CPU 请求 (`requests.cpu`) 和总限制 (`limits.cpu`)
+  - 容器的总内存请求 (`requests.memory`) 和总限制 (`limits.memory`)
+  - PersistentVolumeClaim (PVC) 的总存储使用量 (`requests.storage`)
+- **典型场景**：
+  限制一个项目团队在其 Namespace 中最多只能使用 10 个 Pod，CPU 总量不超过 10 核，内存总量不超过 32GiB。
+
+
+
+**2️⃣ LimitRange (限制单个 Pod 和容器的资源)**
+
+- **作用范围**：
+  限制 **每个 Pod 或每个容器** 的 CPU 和内存的最大、最小值。
+- **常见的限制项目**：
+  - 容器的最小 CPU 请求 (`min.cpu`) 和最大限制 (`max.cpu`)
+  - 容器的最小内存请求 (`min.memory`) 和最大限制 (`max.memory`)
+- **典型场景**：
+  每个 Pod 中的容器都必须请求最少 100m 的 CPU，但最多不能超过 2 核 CPU，最少 200Mi 的内存，最多不能超过 2GiB 的内存。
+
+
+
+**ResourceQuota示例（命名空间的资源总量限制）**
+
+限制 **整个命名空间中的 Pod 数量、CPU 和内存使用量**。
+
+```yaml
+# cat resource-quota.yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: namespace-quota
+  namespace: my-namespace
+spec:
+  hard:
+    pods: "10"                    # 限制命名空间中最多有 10 个 Pod
+    requests.cpu: "10"            # 所有 Pod 的 CPU 请求总和不能超过 10 核
+    requests.memory: "32Gi"       # 所有 Pod 的内存请求总和不能超过 32Gi
+    limits.cpu: "20"              # 所有 Pod 中 CPU 限制的总和不能超过 20 核
+    limits.memory: "64Gi"         # 所有 Pod 中内存限制的总和不能超过 64Gi
+    persistentvolumeclaims: "5"   # 限制 Namespace 中的 PVC 数量为 5 个
+    requests.storage: "100Gi"     # 限制所有 PVC 请求的存储总量为 100Gi
+
+```
+
+
+
+**LimitRange示例（Pod和容器的资源限制）**
+
+为 **单个 Pod 和容器** 限制其 CPU 和内存的最小值和最大值。
+
+```yaml
+cat limit-range.yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: container-limit-range
+  namespace: my-namespace
+spec:
+  limits:
+  - type: Pod                # 作用范围为POd
+    max:                     # max：指定 Pod 总的 CPU 和内存上限，CPU 不能超过 2 核，内存不能超过 4Gi。
+      cpu: "2"               # 每个 Pod 的最大 CPU 限制为 2 核
+      memory: "4Gi"          # 每个 Pod 的最大内存限制为 4 GiB
+    min:                     # min：指定 Pod 的最小资源请求，CPU 不低于 250m，内存不低于 128Mi。
+      cpu: "250m"            # 每个 Pod 的最小 CPU 请求为 250m
+      memory: "128Mi"        # 每个 Pod 的最小内存请求为 128Mi
+  - type: Container          # type: Container：作用范围为 Pod 内的每个容器
+    default:
+      cpu: "500m"            # 每个容器的默认 CPU 请求为 500m
+      memory: "512Mi"        # 每个容器的默认内存请求为 512Mi
+    defaultRequest:
+      cpu: "250m"            # 如果未指定请求，默认 CPU 请求为 250m
+      memory: "256Mi"        # 如果未指定请求，默认内存请求为 256Mi
+    max:
+      cpu: "1"               # 每个容器的最大 CPU 限制为 1 核
+      memory: "2Gi"          # 每个容器的最大内存限制为 2GiB
+    min:
+      cpu: "100m"            # 每个容器的最小 CPU 请求为 100m
+      memory: "128Mi"        # 每个容器的最小内存请求为 128Mi
+
 ```
 
 
@@ -4850,11 +5279,4640 @@ spec:
 
 
 
+## Kubernetes工作负载
+
+
+
+**本章内容**
+
+- **控制器原理**
+- **标签和标签选择器**
+- **Replica Set**
+- **Deployment**
+- **DaemonSet**
+- **Job**
+- **CronJob**
+
+
+
+### 控制器原理
+
+#### 资源对象
+
+![image-20241220154542565](D:\git_repository\cyber_security_learning\markdown_img\image-20241220154542565.png)
+
+
+
+对于Kubernetes 集群应用来说，所有的程序应用都是
+
+- 运行在 **Pod 资源**对象里面
+- 借助于**service资源**对象向外提供服务访问
+- 借助于各种**存储资源对象**实现数据的可持久化
+- 借助于各种**配置资源对象**实现配置属性、敏感信息的管理操作
+
+
+
+#### 应用编排
+
+在工作中为了完成大量的业务目标，首先会根据业务应用内部的关联关系，**把业务拆分成多个子任务**， 然后**对这些子任务进行顺序组合**，当子任务按照方案执行完毕后，就完成了业务目标。
+
+任务编排实现就是对多个子任务的执行顺序进行确定的过程。
+
+对于Kubernetes 来说:
+
+- 对于**紧密相关**的多个子任务，把它们放到**同一个pod内部**
+- 对于**非紧密关联**的多个任务，分别放到**不同的pod中**
+- 然后借助于**endpoint+service**的方式实现彼此之间的相互调用
+
+- 为了让这些纷乱繁杂的任务能够互相发现，通过集群的 **CoreDNS**组件实现服务注册发现功能。
+
+
+
+对于Kubernetes场景中的应用任务，主要存在部署、扩容、缩容、更新、回滚等常见编排操作。
+
+虽然基于pod的方式实现了应用任务的部署功能操作，但是对于自主式的pod来说，它并不能实现其他 的更多编排任务。
+
+因此在Kubernetes集群的核心功能之上，有一群非常重要的组件专用于对pod实现所谓的任务编排功 能，这些组件统统将其称为**控制器Controller**。
+
+
+
+**Kubernetes的声明式API**
+
+- 用户能够以声明式定义资源对象的目标状态，即spec字段
+- 由控制器代码（机器智能组件）负责确保实际状态，即**status字段与期望状态spec字段一致**
+- 控制器相当于“人工智能机器人”，负责确保各项具体任务得以落地，而控制器通常由API的提供者负 责开发编写
+- 用户需要做的是根据资源类型及其控制器提供的DSL（领域特定语言）进行声明式编程
+
+
+
+**Kubernetes的控制器类型**
+
+- Kubernetes内置控制器：
+  - Kubernetes默认就提供的实现基础型、核心型的控制器
+  - Controller Manager中内置提供了许多的控制器，例如Service Controller、DeploymentController等
+  - 以kube-controller-manager组件的程序方式运行实现
+- 第三方控制器
+  - 实现高级控制器，通常需要借助于基础型控制器完成其功能
+  - 例如Ingress插件ingress-nginx的Controller，网络插件Project Calico的Controller等
+  - 通常以Pod形式托管运行于Kubernetes之上，而且这些Pod再由内置的控制器所控制
+
+
+
+**控制器种类**
+
+- 节点控制器(Node Controller): 负责在节点出现故障时进行通知和响应
+- 任务控制器(Job controller): 监测代表一次性任务的 Job 对象，然后创建 Pods 来运行这些任务直至完成
+- 端点控制器(Endpoints Controller): 填充端点(Endpoints)对象(即加入 Service 与 Pod)
+- 服务帐户和令牌控制器(Service Account & Token Controllers): 为新的命名空间创建默认帐户和 API 访问令牌
+
+
+
+**Kubernetes Controller的控制回路机制**
+
+![image-20241220160056338](D:\git_repository\cyber_security_learning\markdown_img\image-20241220160056338.png)
+
+
+
+- Controller根据Spec，控制Systems生成当前实际Status
+- Controller借助于Sensor持续监视System的Spec和Status，在每一次控制回路中都会对二者进行 比较
+- 确保System的Status不断逼近或完全等同Spec
+
+
+
+#### Kubernetes Controller 流程
+
+![image-20241220160149849](D:\git_repository\cyber_security_learning\markdown_img\image-20241220160149849.png)
+
+- 用户向 APIserver中插入一个应用资源对象的请求
+- 这个请求包含的数据形态中定义了该资源对象的 "期望"状态
+- 数据经由 APIserver 保存到 ETCD 中
+- kube-controller-manager 中的各种控制器会监视 Apiserver上与自己相关的资源对象的变动 比如 Pod Controller只负责Pod资源的控制，Service Controller只负责Service资源的控制等。
+- 一旦API Server中的资源对象发生变动，对应的Controller执行相关的配置代码，到对应的node节 点上运行
+- 该资源对象会在当前节点上，按照用户的"期望"进行运行
+- 这些实体对象的运行状态称为 "实际状态"
+- 即控制器的作用就是确保 "期望状态" 与 "实际状态" 相一致
+- Controller将这些实际的资源对象状态，通过APIServer存储到ETCD的同一个数据条目的status的 字段中
+- 资源对象在运行过程中，Controller 会循环的方式向 APIServer 监控 spec 和 status 的值是否一致
+- 如果两个状态不一致，那么就指挥node节点的资源进行修改，保证两个状态一致
+- 状态一致后，通过APIServer同步更新当前资源对象在ETCD上的数据
+
+
+
+### 工作负载资源
+
+工作负载是在 Kubernetes 上运行的应用程序。
+
+为了减轻用户的使用负担，通常不需要用户直接管理每个 Pod 。 而是**使用负载资源来替用户管理 一组 Pod**。 这些负载资源通过对应的配置控制器来确保正确类型的、处于运行状态的 Pod 个数是正确 的，与用户所指定的状态相一致。
+
+以编排Pod化运行的应用为核心的控制器，通常被统称为工作负载型控制器，用于管理与之同名的工作负载型资源类型的资源对象
+
+
+
+**Kubernetes 提供若干种内置的工作负载资源：**
+
+- **无状态应用编排**: Deployment 和 ReplicaSet （替换原来的资源 ReplicationController）。 Deployment 很适合用来管理你的集群上的无状态应用， Deployment 中的所有 Pod 都是相互等价的，并且在需要的时候被替换。
+- **有状态应用编排**:StatefulSet 让你能够运行一个或者多个以某种方式跟踪应用状态的 Pod。 例如， 如果你的负载会将数据作持久存储，你可以运行一个 StatefulSet ，将每个 Pod 与某个 PersistentVolume 对应起来。你在 StatefulSet 中各个 Pod 内运行的代码可以将数据复制到 同一 StatefulSet 中的其它 Pod 中以提高整体的服务可靠性。
+- **系统级应用**:DaemonSet 定义提供节点本地支撑设施的 Pod 。这些 Pod 可能对于你的集群的运维 是 非常重要的，例如作为网络链接的辅助工具或者作为网络 插件 的一部分等等。每次你向集群中 添加一个新节点时，如果该节点与某 DaemonSet 的规约匹配，则控制平面会为该 DaemonSet 调度一个 Pod 到该新节点上运行。
+- **作业类应用:**Job 和 CronJob。 定义一些一直运行到结束并停止的任务。 Job 用来执行一次性任 务，而 CronJob 用来执行的根据时间规划反复运行的任务。
+
+
+
+| 控制器                | 解析                                                         |
+| --------------------- | ------------------------------------------------------------ |
+| ReplicationController | 最早期的Pod控制器，目前已被废弃                              |
+| RelicaSet             | 副本集，负责管理一个应用(Pod)的多个副本状态                  |
+| Deployment            | 它不直接管理Pod，而是借助于ReplicaSet来管理Pod；最常用的无状态应用控制器 |
+| DaemonSet             | 守护进程集，用于确保在每个节点仅运行某个应用的一个Pod副本。用于完成系统级任务 |
+| Job                   | 有终止期限的一次性作业式任务，而非一直处于运行状态的服务进程 |
+| CronJob               | 有终止期限的周期性作业式任务                                 |
+| StatefulSet           | 功能类似于Deployment，但StatefulSet专用于编排有状态应用      |
+
+注意：
+
+- 当前主要 apps/v1 版本下的控制器
+- 每个控制器对象也需要对应的controller来进行管理
+
+
+
+#### **控制器和Pod**
+
+- 控制器主要是通过管理pod来实现任务的编排效果
+- 控制器是通过**标签或者标签选择器**找到pod
+- 控制器对象仅负责确保API Server上有相应数量的符合标签选择器的Pod对象的定义
+- Pod 对象的Status如何与Spec保持一致，则要由相应节点上的kubelet负责保证
+
+![image-20241220162927417](D:\git_repository\cyber_security_learning\markdown_img\image-20241220162927417.png)
+
+
+
+#### 节点控制器和Worker节点
+
+![image-20241220163315449](D:\git_repository\cyber_security_learning\markdown_img\image-20241220163315449.png)
+
+- 节点控制器**每间隔5秒检查一次** Worker 节点的状态
+- 如果节点控制器没有收到来自Worker 节点的心跳，则将该Worker 节点被标记为**不可达**
+- 如果该Worker节点被标记为不可达后,节点控制器再**等待40秒后**仍无法得到此节点的心跳,将该节点 标记为**无法访问**
+- 如果该Worker 节点被标记为无法访问后,再**等待5分钟后,**还没有心跳, 节点控制器会**删除当前 Worker节点上面的所有pod,并在其它可用的Worker节点重建这些 pod**
 
 
 
 
 
+### **标签和标签选择器**
+
+#### 标签说明
+
+Kubernetes通过标签来管理对应或者相关联的各种资源对象，**Label**是kubernetes中的核心概念之一。
+
+Label 不是一个独立的API 资源类型,但Label对象可以关联到各种资源对象上
+
+通过对Label的管理从而达到对相同Label的资源进行分组管理、分配、调度、配置、部署等。
+
+标签Label 是可以附加在任何资源对象上的键值型元数据,即**Label本质上是一个key/value键值对**，其中 key与value由用户自己指定
+
+key键标识由键前缀和键名组成,格式为 **[key_prefix/]key_name**
+
+
+
+**`kubectl label`** 命令可管理对象的标签
+
+创建：Label通常在资源对象定义时确定，也可以在对象创建后动态添加或者删除
+
+一个资源对象可以定义多个Label，同一个Label 也可以关联多个资源对象上去
+
+
+
+**常用标签使用场景：**
+
+- 版本标签："release" : "stable"，"release" : "canary"，"release" : "beta"
+- 环境标签："environment" : "dev"，"environment" : "qa"，"environment" : "prod"
+- 应用标签："app" : "ui"，"app" : "as"，"app" : "pc"，"app" : "sc"
+- 架构层级标签："tier" : "frontend"，"tier" : "backend", "tier" : "cache"
+- 分区标签："partition" : "customerA"，"partition" : "customerB"
+- 品控级别标签："track" : "daily"，"track" : "weekly"
+
+
+
+#### 管理标签
+
+关于label的创建操作主要有两种：
+
+- 命令行方法
+- yaml文件方法
+
+
+
+#####  命令行方法
+
+**管理标签：**
+
+```bash
+# 添加标签
+kubectl label 资源类型 资源名称 label_name=label_value [label_name=label_value] ...
+
+# 修改标签
+kubectl label 资源类型 资源名称 label_name=label_value [label_name=label_value] ... --overwrite[=true]
+
+# 删除标签
+kubectl label 资源类型 资源名称 label_name- [label_name-] ...
+
+# 参数说明
+同时增加多个标签，只需要在后面多写几个就可以了，使用空格隔开
+默认情况下，已存在的标签是不能修改的，使用 --overwrite=true 表示强制覆盖
+label_name=label_value样式写成 label_name- 即表示删除label
+```
+
+
+
+**查看标签和指定标签的资源**
+
+```bash
+#查看所有标签
+kubectl get 资源类型 [资源名称] --show-labels
+
+#示例:
+kubectl get pods --show-labels
+
+#查看指定标签的资源
+kubectl get pods -l label_name[=label_value]
+
+# 参数：
+-l #指定标签条件，获取指定资源对象，=表示匹配，!= 表示不匹配, 如果后面的选择标签有多个的话，使用逗号隔开
+
+# 如果针对标签的值进行范围过滤的话，可以使用如下格式：
+-l 'label_name in (value1, value2, value3, ...)'      #包括其中一个label
+-l 'label_name notin (value1, value2, value3, ...)'   #不包括其中任何一个label
+kube
+#是否存在label的判断
+-l 'label_name'    #存在label
+-l '!label_name'   #不存在label,注意使用单引号.不支持双引号】
+```
+
+
+
+示例
+
+```bash
+# 添加标签
+[root@master1 yaml]#kubectl label pod pod-startup-exec type=test
+pod/pod-startup-exec labeled
+
+# 查看标签
+[root@master1 yaml]#kubectl get pod --show-labels 
+NAME               READY   STATUS    RESTARTS   AGE     LABELS
+pod-startup-exec   1/1     Running   0          5h51m   app=pod-startup-exec,type=test
+
+# 修改标签
+[root@master1 yaml]#kubectl label pod pod-startup-exec type=proc --overwrite
+pod/pod-startup-exec labeled
+
+# 查看标签
+[root@master1 yaml]#kubectl get pod --show-labels 
+NAME               READY   STATUS    RESTARTS   AGE     LABELS
+pod-startup-exec   1/1     Running   0          5h52m   app=pod-startup-exec,type=proc
+
+# 删除标签
+[root@master1 yaml]#kubectl label pod pod-startup-exec type-
+pod/pod-startup-exec unlabeled
+
+# 查看标签
+[root@master1 yaml]#kubectl get pod --show-labels 
+NAME               READY   STATUS    RESTARTS   AGE     LABELS
+pod-startup-exec   1/1     Running   0          5h53m   app=pod-startup-exec
+```
+
+
+
+##### yaml方法
+
+资源对象 Label 不是一个独立的API资源，需要依附在某些资源对象上才可以
+
+比如：依附在Pod，Service，Deployment 等对象上
+
+初始化Pod资源对象应用时候，在资源对象的元数据metadata属性下添加一条Labels配置：
+
+在特定的属性后面按照指定方式增加内容即可，格式如下：
+
+```YAML
+metadata:
+  labels:
+    key1: value1
+    key2: value2
+    ......
+    
+# 注意：labels复数
+```
+
+
+
+示例：
+
+```yaml
+# Label在之前的Pod的资源文件中定义,标签的内容是：app: nginx和 version: v1.20.0
+# cat pod-label-nginx.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-label-nginx
+  labels:
+    app: nginx
+    version: v1.20.0
+spec:
+  containers:
+  - name: pod-label-nginx-container
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    
+# 查看
+[root@master1 yaml]#kubectl get pod --show-labels 
+NAME              READY   STATUS    RESTARTS   AGE   LABELS
+pod-label-nginx   1/1     Running   0          10s   app=nginx,version=v1.20.0
+
+# 添加新label
+[root@master1 yaml]# kubectl label pod pod-label-nginx arch=frontend role=proxy
+pod/pod-label-nginx labeled
+
+[root@master1 yaml]# kubectl get pod --show-labels 
+NAME              READY   STATUS    RESTARTS   AGE    LABELS
+pod-label-nginx   1/1     Running   0          111s   app=nginx,arch=frontend,role=proxy,version=v1.20.0
+
+```
+
+
+
+#### 标签选择器
+
+Label附加到Kubernetes集群中的各种资源对象上，目的是对这些资源对象可以进行**后续的分组管理** 而分组管理的核心就是：**标签选择器Label Selector**。
+
+可以通过Label Selector查询和筛选某些特定Label的资源对象，进而可以对他们进行相应的操作管理
+
+
+
+**标签选择器的主要应用场景：**
+
+监控具体的Pod、负载均衡调度、定向调度，常用于 Pod、Node等资源对象
+
+**Label Selector**跟Label一样，不能单独定义，必须附加在一些资源对象的定义文件上。一般附加在RS， Deployment 和Service等资源定义文件中。
+
+Label Selector使用时候有两种常见的标签选择算符表达式：**等值**和**集合**
+
+
+
+##### 等值和不等值
+
+```bash
+# 等值
+name = nginx                                   # 匹配所有具有标签name = nginx的资源对象
+name == nginx                                  # 同上
+name                                           # 表示匹配存在name标签的资源对象
+
+# 不等值
+!name                                          # 表示匹配不存在name标签的资源对象
+name != nginx                                  # 匹配所有没有name标签或者标签name的值不等于nginx的资源对象
+
+# 示例：pod调度到指定标签的Node节点上
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cuda-test
+spec:
+  containers:
+  - name: cuda-test
+    image: "registry.k8s.io/cuda-vector-add:v0.1"
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+  nodeSelector:
+    acclerator: nvidia-tesla-p100
+    
+# 将所有的有app: myapp标签的pod管理在service下
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-loadbalancer-lbaas
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app: myapp
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+```
+
+
+
+##### 集合
+
+```bash
+# 示例
+env in (dev, test)                # 匹配所有具有标签 env = dev 或者 env = test的资源对象
+name notin (frontend, backent)    # 匹配所有不具有标签name=frontend或者name=backend或者没有name标签的资源对象
+```
+
+
+
+后续Kubernetes 的集合表达式又增加了两种新的写法：匹配标签、匹配表达式
+
+
+
+##### **匹配标签：matchLabels**
+
+```bash
+# 匹配标签
+matchLabels:
+  name: nginx
+  app: myapp
+  
+# 当 matchLabels 中有多个标签时，它们之间的关系是逻辑与（AND）关系
+
+#如下所示：
+matchLabels:
+ app: frontend
+ environment: production
+#那么只有那些标签中同时包含 app=frontend 和 environment=production 的资源才会被选中。
+```
+
+
+
+##### **匹配表达式 matchExpressions**
+
+```bash
+#匹配表达式：
+   matchExpressions:
+      - {key: name, operator: NotIn, values: [frontend]}
+#当 matchExpressions 中包含多个标签表达式时，它们之间的关系是逻辑与（AND）关系。
+
+#常见的operator操作属性值有：
+   In、NotIn、Exists、NotExists等
+   Exists和NotExist时，values必须为空，即 { key: environment, opetator: Exists,values:}
+#注意：这些表达式一般应用在RS、RC、Deployment等其它管理对象中。
+
+#示例
+matchExpressions:
+  - key: environment
+    operator: In
+    values:
+      - production
+      - staging
+  - key: app
+    operator: NotIn
+    values:
+      - test
+#那么只有那些标签满足以下两个条件的资源才会被选中：
+- 标签中 environment 的值是 production 或 staging
+- 标签中 app 的值不是 test
+```
+
+
+
+#### 标签选择器操作方式
+
+标签选择器两种方式
+
+- 命令
+- 文件
+
+
+
+##### 命令方式
+
+```bash
+kubectl get TYPE -l SELECTOR1[,SELECTOR2,...]
+kubectl get TYPE -l SELECTOR1 [-l SELECTOR2] ...
+
+# 示例：
+[root@master1 yaml]#kubectl get node -l ai
+NAME    STATUS   ROLES    AGE    VERSION
+node1   Ready    <none>   2d2h   v1.30.8
+```
+
+
+
+##### 配置文件
+
+```yaml
+# 基于等值，多个为与关系
+selector:
+  component: reids
+  
+# 基于集合
+selector:
+  matchLabels:
+    component: redis
+  matchExpressions:
+    - key: tier            # 等价 - { key: tier, operator: In, values: [cache] }
+      operator: In
+      values: [cache]
+    - key: environment     # 等价 - { key: environment, operator: NotIn, values: [dev] }
+      operator: NotIn
+      values: [dev]
+```
+
+
+
+
+
+### Replica Set
+
+####  Replica Set 工作机制
+
+Replica Set 是Pod 最常用的控制器
+
+Replica Set 其实是定义了一个期望的场景，RS有以下特点：
+
+负责编排无状态应用的基础控制器是ReplicaSet，定义编排一个无状态应用相应的资源类型主要的**三个关键属**性如下
+
+- **replicas**：Pod期待的副本数量
+- **selector**：筛选目标Pod的标签选择器,支持matchExpressions和matchLabels
+- **template**：如果Pod数量不满足预期值，自动创建Pod时候用到的模板(template)，清单文件格式 和自主式Pod一样
+
+意义：自动监控Pod运行的副本数目符合预期，保证Pod高可用的核心组件，常用于Pod的生命周期管理
+
+
+
+**工作机制**
+
+- 当通过"资源定义文件"定义好了一个RS资源对象，把它提交到Kubernetes集群
+- Master节点上的Controller Manager组件就得到通知
+- Controller Manager 根据 ReplicaSet Control Loop 管理 ReplicaSet Object
+- 由该对象向API Server请求管理Pod对象(标签选择器选定的）
+- 如果没有pod：以**Pod模板**向API Server请求创建Pod对象，由Scheduler调度并绑定至某节点，由相应节点kubelet负责运行
+- 定期巡检系统中当前存活的Pod，并确保Pod实例数量刚到满足RC的期望值。
+- 如果Pod数量大于RS定义的期望值，那么就杀死一些Pod
+- 如果Pod数量小于RS定义的期望值，那么就创建一些Pod
+- 所以通过RS资源对象，Kubernetes实现了业务应用集群的高可用性，大大减少了人工干预，提高了管理 的自动化。
+- 如果后续想要扩充Pod副本的数量，可以直接修改replicas的值即可
+- 当其中一个Node的Pod意外终止，根据RS的定义，Pod的期望值是2，所以会随机找一个Node结点重新 再创建一个新的Pod，来保证整个集群中始终存在两个Pod运行
+
+
+
+![image-20241221153308297](D:\git_repository\cyber_security_learning\markdown_img\image-20241221153308297.png)
+
+
+
+注意：
+
+- 删除RS并不会影响通过该RS资源对象创建好的Pod。
+- 如果要删除所有的Pod那么可以设置RS的replicas的值为0，然后更新该RS。
+- 另外kubectl提供了stop和delete命令来一次性删除RS和RS控制的Pod。
+- Pod提供的如果无状态服务，不会影响到客户的访问效果。
+
+
+
+RS可以实现应用的部署，扩缩容和卸载，但一般很少单独使用，它**主要是被Deployment这个更高层的资源对象所使用**，从而形成了一整套Pod的创建、删除、更新的编排机制。
+
+
+
+#### Replica Set 资源清单文件示例
+
+```yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: ...                                   # ReplicaSet名称，生成的Pod名称以此处的ReplicaSet名称为前缀+随机字符
+  namespace: ...
+spec:
+  minReadySeconds <integer>                   # Pod就绪后多少秒内，Pod任一容器无crash方可视为“就绪”
+  replicas <integer>                          # 期望的Pod副本数，默认为1
+  selector:                                   # 标签选择器，必须匹配template字段中Pod模版中的标签
+    matchExpressions <[]Object>
+    matchLabels <map[string]String>
+  template:                                   # pod模版对象
+    metadata:                                 # pod对象元数据
+      labels:                                 # 由模版创建出的Pod对象所拥有的标签，必须要能够匹配前面定义的标签选择器
+    spec:                                     # pod规范，格式同自主式Pod
+```
+
+
+
+#### 创建资源对象
+
+```yaml
+# cat controller-replicaset.yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: controller-replicaset-test
+spec:
+  minReadySeconds: 0
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rs-test
+      release: stable
+      version: v1.0
+  template:
+    metadata:
+      labels:
+        app: rs-test
+        release: stable
+        version: v1.0
+    spec:
+      containers:
+      - name: rs-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+        
+# 创建
+kubectl apply -f controller-replicaset.yaml
+
+# 查看
+[root@master1 controller]#kubectl get rs
+NAME                         DESIRED   CURRENT   READY   AGE
+controller-replicaset-test   3         3         3       50s
+
+[root@master1 controller]#kubectl get pod
+NAME                               READY   STATUS    RESTARTS   AGE
+controller-replicaset-test-27mmp   1/1     Running   0          57s
+controller-replicaset-test-2hf65   1/1     Running   0          57s
+controller-replicaset-test-jm29c   1/1     Running   0          57s
+pod-label-nginx                    1/1     Running   0          78m
+pod-label-nginx2                   1/1     Running   0          50m
+
+```
+
+
+
+#### 扩容和缩容
+
+```yaml
+# 扩容：调整Pod副本数量更多
+# 方法1：修改清单文件
+[root@master1 controller]#cat controller-replicaset.yaml 
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: controller-replicaset-test
+spec:
+  minReadySeconds: 0
+  replicas: 4                                    # 修改这里，将其改为4
+  selector:
+    matchLabels:
+      app: rs-test
+      release: stable
+      version: v1.0
+  template:
+    metadata:
+      labels:
+        app: rs-test
+        release: stable
+        version: v1.0
+    spec:
+      containers:
+      - name: rs-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+
+# 查看，数量变为4
+[root@master1 controller]#kubectl get po
+NAME                               READY   STATUS    RESTARTS   AGE
+controller-replicaset-test-27mmp   1/1     Running   0          17m
+controller-replicaset-test-2hf65   1/1     Running   0          17m
+controller-replicaset-test-85dbn   1/1     Running   0          2m11s
+controller-replicaset-test-jm29c   1/1     Running   0          17m
+
+
+# 命令式，使用命令将其缩减为3个
+[root@master1 controller]#kubectl scale --replicas=3 rs/controller-replicaset-test 
+replicaset.apps/controller-replicaset-test scaled
+
+# 查看
+[root@master1 controller]#kubectl get po
+NAME                               READY   STATUS    RESTARTS   AGE
+controller-replicaset-test-27mmp   1/1     Running   0          18m
+controller-replicaset-test-2hf65   1/1     Running   0          18m
+controller-replicaset-test-jm29c   1/1     Running   0          18m
+```
+
+
+
+更新Pod镜像版本
+
+```yaml
+# 升级镜像版本
+# 方法1：清单文件
+cat controller-replicaset.yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: controller-replicaset-test
+spec:
+  minReadySeconds: 0
+  replicas: 6           # 修改此行，原pod版本不变，新pod的版本发生变化，更新为v0.2
+  selector:
+    matchLabels:
+      app: rs-test
+      release: stable
+      version: v1.0
+  template:
+    metadata:
+      labels:
+        app: rs-test
+        release: stable
+        version: v1.0
+    spec:
+      containers:
+      - name: rs-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2  # 修改此行
+```
+
+
+
+#### Replica Set 版本发布
+
+##### 滚动发布
+
+```yaml
+# 准备service
+# cat svc-controller-replicaset.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-replicaset
+spec:
+  type: ClusterIP
+  selector:
+    app: rs-test
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+    
+# 准备旧版本的replicaset的清单文件
+# cat controller-replicaset-1.yaml
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: replicaset-test
+spec:
+  minReadySeconds: 0
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rs-test
+      release: stable
+      version: v0.1
+  template:
+    metadata:
+      labels:
+        app: rs-test
+        release: stable
+        version: v0.1
+    spec:
+      containers:
+      - name: rs-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+
+# 准备新版本的replicaset清单文件
+# cat controller-replicaset-2.yaml
+apiVersion: apps/v2
+kind: ReplicaSet
+metadata:
+  name: replicaset-test-2
+spec:
+  minReadySeconds: 0
+  replicas: 0                   # 注意此处为0
+  selector:
+    matchLabels:
+      app: rs-test
+      release: stable
+      version: v0.2
+  template:
+    metadata:
+      labels:
+        app: rs-test
+        release: stable
+        version: v0.2
+    spec:
+      containers:
+      - name: rs-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2
+
+# 启动资源
+kubectl apply -f svc-controller-replicaset.yaml
+kubectl apply -f controller-replicaset-1.yaml
+kubectl apply -f controller-replicaset-2.yaml
+
+# 对旧版的RS缩容，对新版本的RS扩容
+[root@master1 controller]# kubectl scale --replicas=2 rs/replicaset-test; kubectl scale --replicas=1 rs/replicaset-test-2
+replicaset.apps/replicaset-test scaled
+replicaset.apps/replicaset-test-2 scaled
+
+# 观察结果
+[root@master1 controller]#kubectl get pod --show-labels 
+NAME                      READY   STATUS    RESTARTS      AGE   LABELS
+pod-label-nginx           1/1     Running   1 (55m ago)   27h   app=nginx,version=v1.20.0
+pod-label-nginx2          1/1     Running   1 (57m ago)   27h   app=nginx,version=v1.20.0
+replicaset-test-2-ffh5j   1/1     Running   0             68s   app=rs-test,release=stable,version=v0.2
+replicaset-test-2pbdk     1/1     Running   0             11m   app=rs-test,release=stable,version=v0.1
+replicaset-test-v8967     1/1     Running   0             11m   app=rs-test,release=stable,version=v0.1
+
+
+# 再次对旧版的RS缩容,对新版本的RS扩容
+[root@master1 controller]#kubectl scale --replicas=1 rs/replicaset-test; kubectl scale --replicas=2 rs/replicaset-test-2
+replicaset.apps/replicaset-test scaled
+replicaset.apps/replicaset-test-2 scaled
+
+#最后一次对旧版的RS缩容为0,对新版本的RS扩容到3
+[root@master1 ~]#kubectl scale --replicas=0 rs/replicaset-test;kubectl scale -- replicas=3 rs/replicaset-test-2
+
+# 上述手动实现滚动升级
+```
+
+
+
+##### 蓝绿发布
+
+```yaml
+# cat controller-replicaset-blue-green.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-replicaset-blue-green
+spec:
+  type: ClusterIP
+  selector:
+    app: rs-test
+    ctr: rs-${DEPLOY}
+    version: ${VERSION}
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: rs-${DEPLOY}
+spec:
+  minReadySeconds: 3
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rs-test
+      ctr: rs-${DEPLOY}
+      version: ${VERSION}
+  template:
+    metadata:
+      labels:
+        app: rs-test
+        ctr: rs-${DEPLOY}
+        version: ${VERSION}
+    spec:
+      containers:
+      - name: pod-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:${VERSION}
+        
+        
+# 开启蓝色发布旧版本
+[root@master1 controller]#DEPLOY=blue VERSION=v0.1 envsubst < controller-replicaset-blue-green.yaml |kubectl apply -f -
+service/svc-replicaset-blue-green created
+replicaset.apps/rs-blue created
+
+
+# 开启测试pod访问Service
+[root@master1 controller]#kubectl run pod-$RANDOM --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/admin-box:v0.1 -it --rm --command -- /bin/bash
+If you don't see a command prompt, try pressing enter.
+root@pod-3326 /# 
+root@pod-3326 /# curl svc-replicaset-blue-green
+kubernetes pod-test v0.1!! ClientIP: 10.244.2.26, ServerName: rs-blue-qbmlm, ServerIP: 10.244.3.30!
+root@pod-3326 /# curl svc-replicaset-blue-green
+kubernetes pod-test v0.1!! ClientIP: 10.244.2.26, ServerName: rs-blue-6hkbt, ServerIP: 10.244.1.25!
+
+
+# 切换至绿色版本
+[root@master1 ~]#DEPLOY=green VERSION=v0.2 envsubst < ./yaml/controller/controller-replicaset-blue-green.yaml |kubectl apply -f -
+service/svc-replicaset-blue-green configured
+replicaset.apps/rs-green created
+
+# 此时在测试pod上进行测试
+root@pod-3326 /# curl svc-replicaset-blue-green
+kubernetes pod-test v0.2!! ClientIP: 10.244.2.26, ServerName: rs-green-m5psl, ServerIP: 10.244.3.31!
+root@pod-3326 /# curl svc-replicaset-blue-green
+kubernetes pod-test v0.2!! ClientIP: 10.244.2.26, ServerName: rs-green-hlmxv, ServerIP: 10.244.1.26!
+
+# 已成功切换至v0.2，此时当前k8s上有两套rs
+[root@master1 controller]#kubectl get rs
+NAME       DESIRED   CURRENT   READY   AGE
+rs-blue    2         2         2       5m20s
+rs-green   2         2         2       87s
+
+# 上述就是蓝绿发
+```
+
+
+
+### Deployment
+
+#### **Deployment工作机制**
+
+**Deployment 介绍**
+
+Deployment资源对象一般用于部署**无状态服务**,比如 java应用，Web等，这也是最常用的控制器
+
+可以管理多个副本的Pod, 实现无缝迁移、自动扩容缩容、自动灾难恢复、一键回滚等功能
+
+**Deployment相对于RC或RS的一个最大的升级是:支持滚动发布策略,其它功能几乎一样**
+
+Deployment资源对象在内部使用Replica Set来实现Pod的自动化编排
+
+
+
+**Deployment工作流程**
+
+- 创建Deployment资源对象，自动生成对应的Replicas Set并完成Pod的自动管理，而无需人为显示创建 Replicas Set
+- 检查Deployment对象状态，检查Pod自动管理效果
+- 扩展Deployment资源对象，以应对应用业务的高可用
+
+
+
+
+
+#### 资源对象 Deployment 和 Replica Set 关系
+
+**Deployment 本质上是依赖并调用 Replica Set 的完成来基本的编排功能，并额外提供了滚动更新，回滚的功能**
+
+- 先由Deployment 创建 Replica Set 资源对象并进行编排
+- 再由Replica Set 创建并对 Pod 的编排
+- Deployment是建立在ReplicaSet控制器上层的更高级的控制器
+- Deployment 位于ReplicaSet更上面一层，基于ReplieaSet，提供了滚动更新、回滚等更为强大的 应用编排功能
+- Deployment是 Replica Set 的编排工具，Deployment编排ReplicaSet，ReplicaSet编排Pod
+- Replica Set的名称由Deployment名称-Template的Hash值生成
+- **Deployment 并不直接管理 Pod**，必须间接的利用 Replica Set 来完成对Pod的编排
+- 通常应该直接通过定义Deployment资源来编排Pod应用，而ReplicaSet无须显式配置
+
+
+
+
+
+#### Deployment 的资源定义
+
+Deployment的定义与Replica Set的定义类似，除了API声明与Kind类型有所区别，其他基本上都一样。
+
+![image-20241222191629314](D:\git_repository\cyber_security_learning\markdown_img\image-20241222191629314.png)
+
+
+
+**注意：Deployment对滚动更新多了一些更新策略的功能**
+
+```yaml
+apiVersion: apps/v1                 # API群组及版本
+kind: Deployment                    # 资源类型特有标识
+metadata: 
+  name: <string>                    # 资源名称，在作用域中要唯一，生成Pod名称：Deployment + Pod模版Hash + 随机字符串
+  namespace: <string>               # 名称空间：Deployment隶属名称空间级别
+spec:
+  minReadySeconds: <integer>
+  replicas: <integer>
+  selector: <object>
+    matchLabels:
+      app: <string>
+  template: <object>
+  revisionHistoryLimit: <integer>    # 滚动更新历史记录数量，默认为10，如果为0表示不保留历史数据
+  strategy: <object>                 # 滚动更新策略
+    type: <string>                   # 滚动更新类型，可用值有Recreate（删除所有旧POd再创建新Pod）和RollingUpdate     
+    rollingUpdate: <Object>          # 滚动更新类型，专用于RollingUpdate类型，逐步更新，先创建新Pod再逐步删除旧Pod
+      maxSurge: <string>             # 更新期间可比期望的POd数量能够多出的最大数量或比例
+      maxUnavaiLabel: <String>       # 更新期间可比期望的Pod数量能够缺少的最大数量或比例
+  progressDeadlineSeconds: <integer> # 滚动更新故障超时时长，默认为600秒
+  paused: <boolean>                  # 是否暂停部署过程
+```
+
+
+
+
+
+#### Deployment实现
+
+
+
+**命令行创建对象**
+
+```bash
+kubectl create deployment NAME --image=image -- [COMMAND] [args...] [options]
+```
+
+
+
+**示例**
+
+```bash
+# 创建命令
+kubectl create deployment deployment-pod-test --image=wangxiaochun/pod-test:v0.1 --replicas=3
+
+# 查看效果
+[root@master1 controller]#kubectl get all
+NAME                                       READY   STATUS    RESTARTS       AGE
+pod/deployment-pod-test-587f5cfffb-btv2w   1/1     Running   0              36s
+pod/deployment-pod-test-587f5cfffb-cbkrn   1/1     Running   0              36s
+pod/deployment-pod-test-587f5cfffb-ctjvc   1/1     Running   0              36s
+......
+
+NAME                                  READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/deployment-pod-test   3/3     3            3           36s
+
+NAME                                             DESIRED   CURRENT   READY   AGE
+replicaset.apps/deployment-pod-test-587f5cfffb   3         3         3       36s
+
+# 注意:创建deployment会自动创建相应的RS和POD
+# RS的名称=deployment名称+template_hash值
+# Pod的名称=deployment名称+replcaset_id+pod_id
+
+
+# 使用命令查看资源对象格式
+[root@master1 controller]# kubectl create deployment myapp --image registry.cn- beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas 3 --dry-run=client -o yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: myapp
+  name: myapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+        name: pod-test
+        resources: {}
+status: {}
+```
+
+
+
+**资源定义文件创建对象**
+
+示例
+
+```yaml
+# cat controller-deployment-test.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-test
+spec:
+  replicas: 3
+  selector: 
+    matchLabels:
+      app: rs-test
+  template:
+    metadata:
+      labels:
+        app: rs-test
+    spec:
+      containers:
+      - name: pod-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+        
+# 启动资源清单
+[root@master1 controller]#kubectl apply -f controller-deployment-test.yaml 
+deployment.apps/deployment-test created
+
+# 查看
+[root@master1 controller]#kubectl get deploy
+NAME              READY   UP-TO-DATE   AVAILABLE   AGE
+deployment-test   3/3     3            3           53s
+
+# 自动生成rs
+[root@master1 controller]#kubectl get rs
+NAME                         DESIRED   CURRENT   READY   AGE
+deployment-test-65495d86f9   3         3         3       95s
+
+# 只要template模版内容变量，就会生成新的rs，因为hash值会变
+[root@master1 controller]#cat controller-deployment-test.yaml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-test
+spec:
+  replicas: 3
+  selector: 
+    matchLabels:
+      app: rs-test
+  template:
+    metadata:
+      labels:
+        app: rs-test
+    spec:
+      containers:
+      - name: pod-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2        # 这里改为v0.2
+      
+# 查看：可以看到2个rs      
+[root@master1 controller]#kubectl get rs
+NAME                         DESIRED   CURRENT   READY   AGE
+deployment-test-65495d86f9   0         0         0       10m
+deployment-test-79f667698b   3         3         3       18s
+```
+
+
+
+![image-20241222202019431](D:\git_repository\cyber_security_learning\markdown_img\image-20241222202019431.png)
+
+
+
+
+
+#### Deployment实现扩容缩容
+
+**基于Deployment调整Pod有两种方法**
+
+```bash
+# 基于资源对象调整
+kubectl scale  [--current-replicas=<当前副本数>] --replicas=<新副本数> deployment/deploy_name
+
+# 基于资源文件调整
+kubectl scale --replicas=<新副本数> -f deploy_name.yaml
+```
+
+
+
+示例
+
+```bash
+[root@master1 controller]#kubectl scale deployment deployment-test --replicas=5
+deployment.apps/deployment-test scaled
+
+[root@master1 controller]#kubectl get pod
+NAME                               READY   STATUS    RESTARTS       AGE
+deployment-test-65495d86f9-4sl7h   1/1     Running   0              2s
+deployment-test-65495d86f9-kk28x   1/1     Running   0              3m33s
+deployment-test-65495d86f9-qr2mr   1/1     Running   0              3m30s
+deployment-test-65495d86f9-rfspr   1/1     Running   0              2s
+deployment-test-65495d86f9-tl7sp   1/1     Running   0              3m32s
+pod-label-nginx                    1/1     Running   1 (167m ago)   29h
+pod-label-nginx2                   1/1     Running   1 (169m ago)   29h
+```
+
+
+
+#### Deployment动态更新回滚
+
+##### 命令介绍
+
+```bash
+# 更新命令1
+kubectl set SUBCOMMAND [options] 资源类型 资源名称
+SUBCOMMAND：子命令，常用的子命令就是image
+
+# 参数详解
+--record=true       # 更改时，会将信息增加到历史记录中
+
+#更新命令2：（用的很少）
+kubectl patch (-f FILENAME | TYPE NAME) -p PATCH [options]
+
+#参数详解：
+--patch='' #设定对象属性内容
+
+#回滚命令：
+kubectl rollout SUBCOMMAND [options] 资源类型 资源名称
+
+SUBCOMMAND 子命令：
+history         #显示 rollout 历史,默认只保留最近的10个版本
+pause           #标记resource为中止状态，配合resume可实现灰度发布，pause目前仅支持deployment,可配合kubectl set实现批量更新
+restart         #重启一个 resource
+resume          #继续一个停止的 resource
+status          #显示 rollout 的状态
+undo            #撤销上一次的 rollout
+--revision=n    #查看指定版本的详细信息
+--to-revision=0 #rollback至指定版本,默认为0,表示前一个版本
+```
+
+
+
+##### 案例：命令式更新和回滚
+
+```bash
+# 创建deployment
+[root@master1 controller]# kubectl create deployment nginx --image registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.18.0
+deployment.apps/nginx created
+
+
+# 修改版本两种格式
+#kubectl set image deployment/nginx nginx='registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0' --record=true
+
+# 查看历史kubectl rollout history
+[root@master1 controller]#kubectl rollout history deployment nginx
+deployment.apps/nginx 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         kubectl set image deployment/nginx nginx=registry.cnbeijing.aliyuncs.com/wangxiaochun/nginx:1.20.0 --record=true
+
+# 撤销/回退上次的更改：注意：只能回退一次
+kubectl rollout undo deployment nginx
+
+# 回退到指定版本
+kubectl rollout undo --to-revision=2 deployment nginx
+```
+
+
+
+##### 案例: 基于声明清单文件实现升级和降级
+
+```yaml
+# cat controller-deployment-test.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rs-test
+  template:
+    metadata:
+      labels:
+        app: rs-test
+    spec:
+      containers:
+      - name: pod-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2        # 直接改这里
+
+# 完成升级
+kubectl apply -f controller-deployment-test.yaml
+```
+
+
+
+##### 批量更新
+
+默认只更改一次就会触发重新生成新Pod可能会影响业务的稳定,可以将多次批量更新合并为只触发一次 重新创建Pod,从而保证业务的稳定
+
+```bash
+# 暂停更新
+kubectl rollout pause deployment pod-test
+
+# 第一次更改
+kubectl set image deployment pod-test pod-test=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2 --record
+
+# 第二次更改
+kubectl set resources deployment nginx --limits=cpu=200m,memory=128Mi --requests=cpu=100m,memory=64Mi
+
+
+# 恢复批量更新
+kubectl rollout resume deployment nginx
+```
+
+
+
+
+
+#### Deployment滚动更新策略
+
+Deployment 控制器支持两种更新策略
+
+- **重建式更新 recreate**
+  - 当使用Recreate策略时，Deployment会直接**删除全部的旧的Pod**，然后创建新的Pod。
+  - 这意味着在部署新版本时，整个应用会停止服务一段时间，直到所有旧的Pod都被删除并且新的 Pod被创建并运行起来。
+  - 这可能会导致一段时间内的服务中断，因为旧版本的Pod被直接替换掉了。
+  - **此方式可以防止端口冲突**
+
+- **滚动式更新 rolling updates** 
+  - 此为默认策略
+  - RollingUpdate策略允许在部署新版本时逐步更新Pod。
+  - 它会先创建新版本的Pod，然后逐步替换旧版本的Pod，直到所有Pod都已经更新为新版本。
+  - 这种方式可以确保应用一直处于可用状态，因为在整个更新过程中，至少有一部分Pod一直在运行。
+  - 逐批次更新Pod的方式，支持按百分比或具体的数量定义批次规模
+  - 触发条件:
+    - **podTemplate的hash码**变动，即仅podTemplate的配置变动才会导致hash码改变
+    - replicas和selector的变更不会导致podTemplate的hash变动
+
+
+
+**存在的问题**:必须以Pod为最小单位来调整规模比例，而无法实现流量路由比例的控制，比如: 共3个Pod 实现20%流量比例
+
+要实现流量路由比例的控制，就需要使用更高级的工具比如: Ingress 才能实现
+
+
+
+**属性解析**
+
+```bash
+kubectl explain deployment.spec.strategy
+
+type <string> #主要有两种类型："Recreate"、"RollingUpdate-默认"
+Recreate            #重建,先删除旧Pod,再创建新Pod,比如可以防止端口冲突
+
+kubectl explain deployment.spec.strategy.rollingUpdate
+rollingUpdate       <Object>
+ maxSurge   <string>#更新时允许超过期望值的最大Pod数量或百分比,默认为25%,如果为0,表示先减,再加，此时maxUnavaible不能为0
+ maxUnavailabel <string> #更新时允许最大多少个或百分比的Pod不可用,默认为25%,如果为0,表示先加后减，此时maxSurge不能为0
+#如果maxSurge为正整数, maxUnavailabel为0,表示先添加新版本的Pod,再删除旧版本的Pod，即先加再减
+#如果maxSurge为0, maxUnavaiLabel为正整数,表示先删除旧版本的Pod,再添加新版本的Pod，即先减再加
+#如果maxSurge为100%，maxUnavaiLabel为100%，实现蓝绿发布，注意：资源要足够
+```
+
+
+
+| 属性            | 解析                                                         |
+| --------------- | ------------------------------------------------------------ |
+| minReadySeconds | Kubernetes在等待设置的时间后才进行升级<br />如果没有设置该值，Kubernetes会假设该容器启动起来后就提供服务了<br />如果没有设置该值，在某些情况下可能会造成服务不正常运行 |
+| maxSurge        | 升级过程中Pod最多可比预期值多出的Pod数量，其值可以是0或正整数,或 者相对预期值的百分比<br />默认是25%<br />例如：maxSurage=1，replicas=5,则表示Kubernetes会先启动1一个新的 Pod后才删掉一个旧的POD，整个升级过程中最多会有5+1个Pod。 |
+| maxUnavailabel  | 升级过程中最多有多少个Pod处于无法提供服务的状态<br />默认是25%<br />当maxSurge不为0时，该值也不能为0<br />例如：maxUnavaible=1，则表示Kubernetes整个升级过程中最多会有1个 POD处于无法服务的状态。 |
+
+
+
+**资源清单文件基本样式**
+
+```yaml
+#基本属性样式：
+minReadySeconds: 5
+strategy:
+ type: RollingUpdate
+ rollingUpdate:
+   maxSurge: 1
+   maxUnavaiLabel: 1
+```
+
+
+
+
+
+##### 案例：定制滚动更新文件
+
+```yaml
+# cat controller-deployment-rollupdate.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-rolling-update
+spec:
+  replicas: 6
+  selector:
+    matchLabels:
+      app: pod-test
+  template:
+    metadata:
+      labels:
+        app: pod-test
+    spec:
+      containers:
+      - name: pod-rolling-update
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    minReadySeconds: 5
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 1
+# 属性解析
+minReadySeconds: 5 #表示在更新的时候，需要先等待5秒，而不是一旦发生变化就滚动更新
+maxSurge: 1 #定义了在更新期间允许超过期望数量的 Pod 实例,此处表示允许超过期望数量的一个额外的 Pod 实例。
+maxUnavaiLabel: 1 #定义了在更新期间允许不可用的最大 Pod 数量。此处表示在更新期间允许最多一个 Pod 不可用。
+```
+
+
+
+##### 案例：金丝雀发布
+
+```yaml
+# cat controller-deployment-rollupdate-canary.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-rolling-update-canary
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pod-test
+  template:
+    metadata:
+      labels:
+        app: pod-test
+    spec:
+      containers:
+      - name: pod-rolling-update-canary
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1         # 先加后减
+      maxUnavailable: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pod-test
+  name: pod-test
+spec:
+  ports:
+  - name: "80"
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: pod-test
+  type: ClusterIP
+ 
+ 
+# 启动资源清单
+[root@master1 controller]#kubectl apply -f controller-deployment-rollupdate-canary.yaml 
+deployment.apps/deployment-rolling-update-canary created
+service/pod-test created
+
+# 当前状态
+[root@master1 controller]#kubectl get pod
+NAME                                                READY   STATUS    RESTARTS        AGE
+deployment-rolling-update-canary-6794cd6c97-6ljcw   1/1     Running   0               45s
+deployment-rolling-update-canary-6794cd6c97-dmsgg   1/1     Running   0               45s
+deployment-rolling-update-canary-6794cd6c97-xmjnh   1/1     Running   0               45s
+
+# 升级版本
+[root@master1 controller]#sed -i 's/pod-test:v0.1/pod-test:v0.2/' controller-deployment-rollupdate-canary.yaml
+
+# 金丝雀发布
+[root@master1 controller]#kubectl apply -f controller-deployment-rollupdate-canary.yaml && kubectl rollout pause deployment deployment-rolling-update-canary
+deployment.apps/deployment-rolling-update-canary configured
+service/pod-test unchanged
+deployment.apps/deployment-rolling-update-canary paused
+[root@master1 controller]#kubectl get pod
+NAME                                                READY   STATUS    RESTARTS        AGE
+deployment-rolling-update-canary-65687cb7cb-b9ghp   1/1     Running   0               4s
+deployment-rolling-update-canary-6794cd6c97-6ljcw   1/1     Running   0               3m34s
+deployment-rolling-update-canary-6794cd6c97-dmsgg   1/1     Running   0               3m34s
+deployment-rolling-update-canary-6794cd6c97-xmjnh   1/1     Running   0               3m34s
+
+# 更新
+[root@master1 controller]#kubectl rollout status deployment deployment-rolling-update-canary 
+Waiting for deployment "deployment-rolling-update-canary" rollout to finish: 1 out of 3 new replicas have been updated...
+
+# 观察
+[root@master1 ~]#while true;do curl 10.103.158.212; sleep 1;done
+87cb7cb-b9ghp, ServerIP: 10.244.3.41!
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: deployment-rolling-update-canary-6794cd6c97-6ljcw, ServerIP: 10.244.3.40!
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: deployment-rolling-update-canary-6794cd6c97-6ljcw, ServerIP: 10.244.3.40!
+kubernetes pod-test v0.2!! ClientIP: 10.244.0.0, ServerName: deployment-rolling-update-canary-65687cb7cb-b9ghp, ServerIP: 10.244.3.41!
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: deployment-rolling-update-canary-6794cd6c97-dmsgg, ServerIP: 10.244.2.32!
+kubernetes pod-test v0.2!! ClientIP: 10.244.0.0, ServerName: deployment-rolling-update-canary-65687cb7cb-b9ghp, ServerIP: 10.244.3.41!
+kubernetes pod-test v0.2!! ClientIP: 10.244.0.0, ServerName: deployment-rolling-update-canary-65687cb7cb-b9ghp, ServerIP: 10.244.3.41!
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: deployment-rolling-update-canary-6794cd6c97-6ljcw, ServerIP: 10.244.3.40!
+
+
+# 确信没问题之后，继续完成一部分更新
+[root@master1 controller]#kubectl rollout resume deployment deployment-rolling-update-canary && kubectl rollout pause deployment deployment-rolling-update-canary
+deployment.apps/deployment-rolling-update-canary resumed
+deployment.apps/deployment-rolling-update-canary paused
+```
+
+
+
+##### 案例：**模拟蓝绿发布**
+
+```yaml
+# cat controller-deployment-rollupdate-bluegreen.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-rolling-update-bluegreen
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: pod-test
+  template:
+    metadata:
+      labels:
+        app: pod-test
+    spec:
+      containers:
+      - name: pod-rolling-update-bluegreen
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 100%
+      maxUnavailable: 100%
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: pod-test
+  name: pod-test
+spec:
+  ports:
+  - name: "80"
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: pod-test
+  type: ClusterIP
+  
+  
+# 启动资源清单
+[root@master1 controller]#kubectl apply -f controller-deployment-rollupdate-bluegreen.yaml 
+deployment.apps/deployment-rolling-update-bluegreen created
+service/pod-test unchanged
+
+# 查看
+[root@master1 controller]#kubectl get pod
+NAME                                                   READY   STATUS    RESTARTS        AGE
+deployment-rolling-update-bluegreen-854d466b88-d2fk4   1/1     Running   0               4s
+deployment-rolling-update-bluegreen-854d466b88-dmpfg   1/1     Running   0               4s
+deployment-rolling-update-bluegreen-854d466b88-nmkc4   1/1     Running   0               4s
+
+# 修改版本
+[root@master1 controller]#sed -i 's/pod-test:v0.1/pod-test:v0.2/' controller-deployment-rollupdate-bluegreen.yaml 
+
+# 启动并观察结果
+[root@master1 controller]#kubectl apply -f controller-deployment-rollupdate-bluegreen.yaml 
+deployment.apps/deployment-rolling-update-bluegreen configured
+service/pod-test unchanged
+
+# 全部删除，全部换成新版本
+[root@master1 controller]#kubectl get pod
+NAME                                                   READY   STATUS        RESTARTS        AGE
+deployment-rolling-update-bluegreen-5dcf45995c-6srwf   1/1     Running       0               6s
+deployment-rolling-update-bluegreen-5dcf45995c-bmcr7   1/1     Running       0               6s
+deployment-rolling-update-bluegreen-5dcf45995c-xr5ds   1/1     Running       0               6s
+deployment-rolling-update-bluegreen-854d466b88-d2fk4   1/1     Terminating   0               115s
+deployment-rolling-update-bluegreen-854d466b88-dmpfg   1/1     Terminating   0               115s
+deployment-rolling-update-bluegreen-854d466b88-nmkc4   1/1     Terminating   0               115
+
+# 回退
+[root@master1 controller]#kubectl rollout undo deployment deployment-rolling-update-bluegreen 
+deployment.apps/deployment-rolling-update-bluegreen rolled back
+
+# 查看状态
+[root@master1 controller]#kubectl get pod
+NAME                                                   READY   STATUS        RESTARTS        AGE
+deployment-rolling-update-bluegreen-5dcf45995c-6srwf   1/1     Terminating   0               70s
+deployment-rolling-update-bluegreen-5dcf45995c-bmcr7   1/1     Terminating   0               70s
+deployment-rolling-update-bluegreen-5dcf45995c-xr5ds   1/1     Terminating   0               70s
+deployment-rolling-update-bluegreen-854d466b88-b2nmw   1/1     Running       0               2s
+deployment-rolling-update-bluegreen-854d466b88-nvprx   1/1     Running       0               2s
+deployment-rolling-update-bluegreen-854d466b88-rq7nw   1/1     Running       0               2s
+```
+
+
+
+
+
+### DaemonSet
+
+
+
+![image-20241223092340014](D:\git_repository\cyber_security_learning\markdown_img\image-20241223092340014.png)
+
+
+
+有些情况下，**需要在所有节点都运行一个Pod**，因为Node数量会变化，所以指定Pod的副本数就不合适 了
+
+DaemonSet能够让所有（或者特定）的节点"精确的"运行同一个pod
+
+当节点加入到kubernetes集群中，Pod会被DaemonSet 控制器调度到该节点上运行
+
+当节点从Kubrenetes集群中被移除，被DaemonSet调度的pod也会被移除
+
+如果删除DaemonSet，所有跟这个DaemonSet相关的pods都会被删除
+
+在某种程度上，DaemonSet承担了RS的部分功能，它也能保证相关pods持续运行
+
+
+
+**DaemonSet 的一些典型用法**
+
+- 在每个节点上运行集群守护进程
+- 在每个节点上运行日志收集守护进程
+- 在每个节点上运行监控守护进程
+
+
+
+**常用于后台支撑服务**
+
+- Kubernetes集群的系统级应用: kube-proxy,flannel,calico
+- 集群存储守护进程，如：ceph，glusterd
+- 日志收集服务，如：fluentd，logstash
+- 监控服务，如：Prometheus，collectd
+- 暴露服务: 如: Ingress nginx
+
+
+
+DaemonSet属性解析
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: <string>
+  namespace: <string>
+spec:
+  minReadySeconds: <integer>
+  selector: <object>
+  template: <object>
+  revisionHistoryLimit: <integer>
+  updateStrategy: <object>          # 滚动更新策略
+    type: <string>                  # 滚动更新类型，OnDelete(删除时更新，手动触发)和RollingUpdate(默认值，滚动更新)
+    rollingUpdate: <object>
+      maxSurge
+      maxUnavailable: <string>
+```
+
+
+
+官方示例
+
+```yaml
+#https://kubernetes.io/zh-cn/docs/concepts/workloads/controllers/daemonset/
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluentd-elasticsearch
+  namespace: kube-system
+  labels:
+    k8s-app: fluentd-logging
+spec:
+  selector:
+    matchLabels:
+      name: fluentd-elasticsearch
+  template:
+    metadata:
+      labels:
+        name: fluentd-elasticsearch
+    spec:
+      tolerations:
+      # 这些容忍度设置是为了让该守护进程集在控制平面节点上运行
+      # 如果你不希望自己的控制平面节点运行Pod，可以删除它们
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: fluentd-elasticsearch
+        image: quay.io/fluentd_elasticsearch/fluentd:v2.5.2
+        resources:
+          limits:
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - name: varlog
+        hostPath:
+          path: /var/log
+```
+
+
+
+
+
+**查看当前所有名称空间内的DaemonSet**
+
+```bash
+kubectl get ds -A    # -A表示所有名称空间
+```
+
+
+
+##### DaemonSet案例
+
+```yaml
+# cat controller-daemonset-test.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: controller-daemonset-test
+spec:
+  selector:
+    matchLabels:
+      app: pod-test
+  template:
+    metadata:
+      labels:
+        app: pod-test
+    spec:
+      # hostNetwork: true #使用宿主机的网络和端口,可以通过宿主机直接访问Pod,性能好,但要防止端口冲突
+      #hostPID: true #直接使用宿主机的PID
+      containers:
+      - name: pod-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+
+
+# 查看，每个节点有一个
+[root@master1 controller]#kubectl get pod -o wide
+NAME                                                   READY   STATUS    RESTARTS      AGE   IP            NODE    NOMINATED NODE   READINESS GATES
+controller-daemonset-test-hb2w4                        1/1     Running   0             16s   10.244.2.41   node2   <none>           <none>
+controller-daemonset-test-q5zgl                        1/1     Running   0             16s   10.244.3.48   node3   <none>           <none>
+controller-daemonset-test-wz55z                        1/1     Running   0             16s   10.244.1.43   node1   <none>           <none>
+
+# daemonset对象也支持滚动更新
+kubectl set image daemonsets controller-daemonset-test pod-test='wangxiaochun/pod-test:v0.2' --record=true && kubectl rollout status daemonset controller-daemonset-test
+
+# 注意：daemonset对象不支持pause动作
+```
+
+
+
+##### 案例：: 在所有节点上部署监控软件prometheus采集指标数据
+
+```yaml
+# cat controller-daemonset-prometheus.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: daemonset-demo
+  namespace: default
+  labels:
+    app: prometheus
+    component: node-exporter
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+      component: node-exporter
+  template:
+    metadata:
+      name: prometheus-node-exporter
+      labels:
+        app: prometheus
+        component: node-exporter
+    spec:
+      #tolerations:
+      #- key: node-role.kubernetes.io/control-plane
+      #  operator: Exists
+      #  effect: NoSchedule
+      #- key: node-role.kubernetes.io/master
+      #  operator: Exists
+      #  effect: NoSchedule
+      containers:
+      - image: prom/node-exporter:v1.2.2
+        name: prometheus-node-exporter
+        ports:
+        - name: prom-node-exp
+          containerPort: 9100
+          #hostPort: 9100
+        livenessProbe:
+          tcpSocket:
+            port: prom-node-exp
+          initialDelaySeconds: 3
+        readinessProbe:
+          httpGet:
+            path: '/metrics'
+            port: prom-node-exp
+            scheme: HTTP
+          initialDelaySeconds: 5
+      hostNetwork: true
+      hostPID: true
+```
+
+![image-20241223104118377](D:\git_repository\cyber_security_learning\markdown_img\image-20241223104118377.png)
+
+
+
+**案例：仅在指定标签的每个主机上运行一个Pod**
+
+```bash
+# 在指定的节点上打便签
+[root@master1 yaml]#kubectl label node node1.wang.org node2.wang.org ds=true
+node/node1.wang.org labeled
+node/node2.wang.org labeled
+
+[root@master1 yaml]#cat controller-daemonset-label-test.yaml 
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: controller-daemonset-label-test
+spec:
+  selector:
+    matchLabels:
+      app: pod-test
+  template:
+    metadata:
+      labels:
+        app: pod-test
+    spec:
+      nodeSelector:      # 使用节点标签选择器
+        ds: "true"       #指定条件
+      containers:
+      - name: pod-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+```
+
+
+
+
+
+### Job
+
+
+
+#### Job工作机制
+
+在日常的工作中，经常会遇到临时执行一个任务，但是这个任务必须在某个时间点执行才可以
+
+前面的Deployment和DaemonSet主要负责编排始终**持续运行的守护进程类的应用**，并不适合此场景
+
+针对于这种场景，一般使用job的方式来完成任务。
+
+
+
+**Job负责编排运行有结束时间的“一次性”任务**
+
+- 控制器要确保Pod内的进程“正常（成功完成任务)”退出
+- **非正常退出的Pod可以根据需要重启，并在重试指定的次数后终止**
+- Job 可以是单次任务，也可以是在多个Pod分别各自运行一次，实现运行多次（次数通常固定)
+- Job 支持同时创建及并行运行多个Pod以加快任务处理速度，Job控制器支持用户自定义其并行度
+
+
+
+**关于job的执行主要有两种并行度的类型：**
+
+- **串行 job**：即所有的job任务都在上一个job执行完毕后，再开始执行
+- **并行 job**：如果存在多个 job，可以设定并行执行的 job 数量。
+
+
+
+Job资源同样需要标签选择器和Pod模板，但它不需要指定replicas，且需要给定**completions**，即需要完成的作业次数，默认为1次
+
+- Job资源会为其Pod对象自动添加“job-name=JOB_NAME”和“controller-uid=UID”标签，并使用标 签选择器完成对controller-uid标签的关联，因此，selector并非必选字段
+- Pod的命名格式：$(job-name)-$(index)-$(random-string)，其中的$(index)字段取值与 completions和completionMode有关
+
+
+
+**注意**：
+
+- Job 资源是标准的API资源类型
+- Job 资源所在群组为“batch/v1”
+- Job 资源中，Pod的RestartPolicy的取值只能为**Never**或**OnFailure**
+
+
+
+#### job属性解析
+
+```yaml
+apiVersion: batch/v1                   # API群组及版本
+kind: Job
+metadata:
+  name: <string>             
+  namespace: <string>                  # 名称空间：Job资源隶属名称空间级别
+spec:
+  selector: <object>                   # 标签选择器，必须匹配template字段中Pod模版中的标签
+  suspend: <boolean>                   # 是否挂起当前Job的执行，挂起作业会重置StartTime字段的值
+  template: <object>                   # Pod模版对象
+  completions: <integer>               # 期望的成功完成的作业次数，成功运行结束的Pod数量，默认1次
+  completionMode: <string>             # 追踪Pod完成模式，支持有序的Indexed和无序的NonIndexed（默认）两种
+  ttlSecondsAfterFinished: <integer>   # Completed终止状态作业的生存时长，超时将被删除
+  parallelism: <integer>               # 作业的最大并行度，默认为1
+  backoffLimit: <integer>              # 将作业标记为Failed之前的重试次数，默认为6
+  activeDeadlineSeconds: <integer>     # 作业启动后可处于活动状态的时长
+```
+
+
+
+**并行配置示例**
+
+```yaml
+#串行运行共5次任务
+spec
+  parallelism: 1
+  completion: 5
+ 
+#并行2个队列，总共运行6次任务
+spec
+  parallelism: 2
+  completion: 6
+```
+
+
+
+#### Job案例
+
+##### 示例：单个任务
+
+```yaml
+# cat controller-job-single.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-single
+spec:
+  template:
+    metadata:
+      name: job-single
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: job-single
+        image: busybox:1.30.0
+        command: ["/bin/sh", "-c", "for i in `seq 10 -1 1`; do echo $i; sleep 2; done"]
+# 属性解析：job重启策略只有两种，仅支持Never和OnFailure两种，不支持Always,否则的话就成死循环了
+
+# 查看
+[root@master1 loadBalancer]#kubectl logs job-single-t58q9 -f --timestamps=true
+2024-12-23T03:08:42.128553849Z 10
+2024-12-23T03:08:44.131895308Z 9
+2024-12-23T03:08:46.132162071Z 8
+2024-12-23T03:08:48.132344330Z 7
+2024-12-23T03:08:50.132757393Z 6
+2024-12-23T03:08:52.133286967Z 5
+2024-12-23T03:08:54.133431930Z 4
+2024-12-23T03:08:56.134113681Z 3
+2024-12-23T03:08:58.134510385Z 2
+2024-12-23T03:09:00.134875367Z 1
+
+# 结果显示：job任务执行完毕后，状态是Completed
+[root@master1 loadBalancer]#kubectl get pod
+NAME                                                   READY   STATUS      RESTARTS       AGE
+job-single-t58q9                                       0/1     Completed   0              13m
+
+```
+
+
+
+##### 示例：多个串行任务
+
+```yaml
+# cat controller-job-multi-serial.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-multi-serial
+spec:
+  completions: 5
+  parallelism: 1              # parallelism为1表示串行
+  # completionMode: Indexed
+  template:
+    spec:
+      containers:
+      - name: job-multi-serial
+        image: busybox:1.30.0
+        command: ["/bin/sh", "-c", "echo serial job; sleep 3"]
+      restartPolicy: OnFailure
+
+# 验证是否串行
+# job_list=$(kubectl get pod |sort -k5 | awk '!/^NAME/{print $1}')
+[root@master1 loadBalancer] # for i in $job_list ;do kubectl logs $i --timestamps;done
+2024-12-23T03:36:53.978861730Z serial job
+2024-12-23T03:37:19.492071239Z serial job
+2024-12-23T03:37:12.968879900Z serial job
+2024-12-23T03:37:06.853185566Z serial job
+2024-12-23T03:37:00.775452672Z serial job
+#结果显示：这些任务，确实是串行的方式来执行，由于涉及到任务本身是启动和删除，所以时间间隔要大于3s
+```
+
+
+
+##### 示例：并行任务
+
+```yaml
+# cat controller-job-multi-parallel.yaml 
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: job-multi-parallel
+spec:
+  completions: 6
+  parallelism: 2   # #completions/parallelism 如果不能整除,最后一次为剩余的符务数
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 3
+  activeDeadlineSeconds: 1200
+  template:
+    spec:
+      containers:
+      - name: job-multi-parallel
+        image: busybox:1.30.0
+        command: ["/bin/sh", "-c", "echo parallel job; sleep 3"]
+      restartPolicy: OnFailure
+      
+[root@master1 loadBalancer] # kubectl apply -f controller-job-multi-parallel.yaml 
+job.batch/job-multi-parallel created
+
+# 查看Pod
+[root@master1 loadBalancer] # kubectl get pod
+NAME                       READY   STATUS      RESTARTS   AGE
+job-multi-parallel-9mcfj   0/1     Completed   0          42s
+job-multi-parallel-cmgjq   0/1     Completed   0          54s
+job-multi-parallel-n9kc2   0/1     Completed   0          48s
+job-multi-parallel-t7hrz   0/1     Completed   0          54s
+job-multi-parallel-vzrrp   0/1     Completed   0          42s
+job-multi-parallel-z2bsl   0/1     Completed   0          48s
+
+# 验证结果
+[root@master1 loadBalancer] # job_list=$(kubectl get pod |sort -k5 | awk '!/^NAME/{print $1}')
+[root@master1 loadBalancer] # for i in $job_list ;do kubectl logs $i --timestamps;done
+2024-12-23T03:45:54.982398422Z parallel job
+2024-12-23T03:45:54.921097939Z parallel job
+2024-12-23T03:45:48.912076981Z parallel job
+2024-12-23T03:45:48.908837334Z parallel job
+2024-12-23T03:45:42.743753059Z parallel job
+2024-12-23T03:45:42.739638339Z parallel job
+#结果显示：这6条任务确实是两两并行执行的
+```
+
+
+
+### CronJob
+
+#### CronJob工作机制
+
+![image-20241223114903445](D:\git_repository\cyber_security_learning\markdown_img\image-20241223114903445.png)
+
+
+
+对于**周期性的定时任务**，kubernetes提供了 Cronjob控制器实现任务的编排
+
+CronJob 建立在Job的功能之上，是更高层级的控制器
+
+它以Job控制器完成单批次的任务编排，而后为这种Job作业提供需要运行的周期定义
+
+CronJob其实就是在Job的基础上加上了时间调度，可以在给定的时间点启动一个Pod 来运行任务，也可 以周期性地在给定时间点启动Pod运行任务。
+
+CronJob 被调用的时间是来自于controller-manager的时间,需要确保controller-manager准确
+
+另外CronJob执行时,需要拉取镜像也需要一定的时间,所以可能会导致真正执行的时间不准确 对于没有指定时区的 CronJob，kube-controller-manager 基于本地时区解释排期表（Schedule）
+
+**删除CronJob，同时会级联删除相关的Job和Pod**
+
+一个CronJob对象其实就对应中crontab文件中的一行，它根据配置的时间格式周期性地运行一个Job， 格式和crontab也是相同的
+
+注意：在CronJob中，通配符“?”和“*”的意义相同，它们都表示任何可用的有效值
+
+
+
+**Cron 时间表语法**
+
+```bash
+# ┌───────────── 分钟 (0 - 59)
+# │ ┌───────────── 小时 (0 - 23)
+# │ │ ┌───────────── 月的某天 (1 - 31)
+# │ │ │ ┌───────────── 月份 (1 - 12)
+# │ │ │ │ ┌───────────── 周的某天 (0 - 6)（周日到周一；在某些系统上，7 也是星期日）
+# │ │ │ │ │                         或者是 sun，mon，tue，web，thu，fri，sat
+# │ │ │ │ │
+# │ │ │ │ │
+# * * * * *
+```
+
+
+
+| 输入                   | 描述                         | 相当于    |
+| ---------------------- | ---------------------------- | --------- |
+| @yearly (or @annually) | 每年 1 月 1 日的午夜运行一次 | 0 0 1 1 * |
+| @monthly               | 每月第一天的午夜运行一次     | 0 0 1 * * |
+| @weekly                | 每周的周日午夜运行一次       | 0 0 * * 0 |
+| @daily (or @midnight)  | 每天午夜运行一次             | 0 0 * * * |
+| @hourly                | 每小时的开始一次             | 0 * * * * |
+
+
+
+#### CronJob属性解析
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: <string>
+  namespace: <string>
+spec:
+  jobTemplate: <object>
+    metadata: <object>
+    spec: <object>
+  schedule: <string>                   # 调度时间设定，必选字段，格式和Linux的cronjob相同
+  concurrencyPolicy: <string>          # 多个Cronjob是否运行并发策略，可用值有Allow,Forbid和Replace
+                                       # Allow 允许上一个CronJob没有完成，开始新的一个CronJob开始执行
+                                       # Forbid 禁止在上一个CronJob还没完成，就开始新的任务
+                                       # Replace 当上一个CronJob没有完成时，杀掉旧任务，用新的任务代替
+  failedJobsHistoryLimit: <integer>    # 失败作业的历史记录数，默认为1，建议设置此值稍大一些，方便查看原因
+  successfulDeadlineSeconds: <integer> # 成功作业的历史记录数，默认为3
+  startingDeadlineSeconds: <integer>   # 因错过时间点而未执行的作业的可超期时长，仍可继续执行
+  suspend: <boolean>                   # 是否挂起后续的作业，不影响当前的作业，默认为false
+  
+
+# 官方示例
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: hello
+spec:
+  schedule: "* * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: hello
+            image: busybox:1.28
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/sh
+            - -c
+            - date; echo Hello from the kubernetes cluster
+          restartPolicy: OnFailure
+```
+
+
+
+#### CronJob案例
+
+##### 示例：单周期任务
+
+```yaml
+# cat controller-cronjob-simple.yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cronjob
+spec:
+  schedule: "*/2 * * * *"   # 每2分钟执行1次
+  jobTemplate:
+    spec:
+      #parallelism: 2       # 两路并行
+      #completions: 2
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: cronjob
+            image: busybox:1.30.0
+            command: ["/bin/sh", "-c", "echo Cron Job"]
+            
+# 启动
+[root@master1 loadBalancer]#kubectl apply -f controller-cronjob-simple.yaml 
+cronjob.batch/cronjob created
+
+# 查看cronjob
+[root@master1 loadBalancer]#kubectl get cronjobs.batch 
+NAME      SCHEDULE      TIMEZONE   SUSPEND   ACTIVE   LAST SCHEDULE   AGE
+cronjob   */2 * * * *   <none>     False     0        <none>          13s
+
+# 可以观察到cronjob是周期性创建job
+[root@master1 loadBalancer]#kubectl get job
+NAME               STATUS     COMPLETIONS   DURATION   AGE
+cronjob-28915564   Complete   1/1           3s         2m14s
+cronjob-28915566   Complete   1/1           3s         14s
+
+[root@master1 loadBalancer]#kubectl get pod
+NAME                     READY   STATUS      RESTARTS   AGE
+cronjob-28915564-zx5vh   0/1     Completed   0          2m50s
+cronjob-28915566-trj2l   0/1     Completed   0          50s
+```
+
+
+
+
+
+## Kubernetes服务发现
+
+
+
+**本章内容**
+
+- **服务访问**
+- **服务发现**
+- **域名解析**
+- **无头服务**
+
+
+
+
+
+### 服务访问
+
+Kubernetes集群提供了这样的一个资源对象Service，它定义了一组Pod的逻辑集合和一个用于访问它们 的入口策略
+
+Service 可以**基于标签的方式**自动找到对应的pod应用，而无需关心pod的ip地址变化与否，从而实现了 类似负载均衡的效果
+
+Service 本质上就是一个**四层的反向代理**，集群内和外的客户端可以通过如下流程最终实现访问Pod应用
+
+```ABAP
+集群内部Client --> service网络 --> Pod网络 --> 容器应用
+集群外部Client --> 集群内节点网络 --> service网络 --> Pod网络 --> 容器应用
+
+Kubernetes网络
+Pod网络     ----  cni
+Service网络 ----  kubeproxy
+node网络    ----  宿主机网络
+```
+
+
+
+Service 资源在master端的Controller组件中，由 Service Controller 来进行统一管理。
+
+service是Kubernetes里最核心的API资源对象之一，它是由coredns或者kube-dns组件提供的功能。
+
+Service 是基于名称空间的资源
+
+
+
+Kubernetes 的 Service定义了一个服务的访问入口地址，前端的应用Pod通过Service访问其背后一组有 Pod副本组成的集群实例，Service通过**Label Selector**访问指定的后端Pod，RC保证Service的服务能力和服务质量处于预期状态。
+
+
+
+每个Pod都有一个专用的IP地址，加上Pod内部容器的Port端口，就组成了一个访问Pod专用的 EndPoint(Pod IP+Container Port)，从而实现了用户外部资源访问Pod内部应用的效果。
+
+这个EndPoint资源在master端的Controller组件中，由EndPoint Controller 来进行统一管理。
+
+当多个Pod组成了一个业务集群来提供外部服务，那么外部客户端怎么才能访问业务集群服务呢？
+
+![image-20241223144004352](D:\git_repository\cyber_security_learning\markdown_img\image-20241223144004352.png)
+
+根据Pod所处的Node场景，有两种情况：
+
+- 所有Pod副本都在同一Node节点上：对于这种情况，将Node物理节点专用的IP，作为负载均衡器 的VIP，即可实现负载均衡后端服务的效果。
+- 所有Pod副本不在同一Node节点上：Node节点的物理ip就没有办法作为负载均衡器的VIP了，这也 是更为常见的情况。
+
+
+
+Kubernetes发明了一种设计，给Service分配一个全局唯一的虚拟ip地址--**cluster IP**，它不存在任何网络 设备上，Service通过内部的**标签选择器**，指定相应该Service的Pod资源，当请求发给cluster IP，后端 的Pod资源收到请求后，就会响应请求。
+
+这种情况下，每个Service都有一个全局唯一通信地址，整个系统的内部服务间调用就变成了最基础的 TCP/IP网络通信问题。如果我们的集群内部的服务想要和外部的网络进行通信，可以有多种方法，比 如：
+
+- NodePort类型，通过在所有节点上增加一个对外的端口，用于接入集群外部请求
+- ingress类型，通过集群附加服务功能，将外部的域名流量转交到集群内部。
+
+
+
+**Service 核心功能**
+
+- 服务发现: 利用标签选择器，在同一个namespace中筛选符合的条件的Pod, 从面实现发现一组提供 了相同服务的Pod
+- 负载均衡: Service作为流量入口和负载均衡器，其入口为ClusterIP, 这组筛选出的Pod的IP地址，将 作为该Service的后端服务器
+- 名称解析: 利用Cluster DNS，为该组Pod所代表的服务提供一个名称, 在DNS中 对于每个Service， 自动生成一个A、PTR和SRV记录
+
+
+
+```ABAP
+[root@master1 loadBalancer]#kubectl get svc -A
+NAMESPACE     NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
+default       kubernetes   ClusterIP   10.96.0.1    <none>        443/TCP                  4d1h
+kube-system   kube-dns     ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   4d1h
+
+# 使用10.96.0.1来访问api-server
+# 使用10.96.0.10来访问dns，进行域名解析
+# 因为在k8s中，core-dns和api-server都是以容器方式存在，本身地址不固定，因此需要借助service进行访问
+```
+
+
+
+#### Endpoints
+
+当创建 Service资源的时候，最重要的就是为Service指定能够提供服务的标签选择器
+
+Service Controller就会根据标签选择器会自动创建一个同名的**Endpoint**资源对象，Kubernetes新版中还增加了**endpointslices**资源
+
+- Endpoint Controller使用Endpoint的标签选择器(继承自Service标签选择器)，筛选符合条件(包括 符合标签选择器条件和处于Ready 状态)的pod资源
+- Endpoint Controller 将符合要求的pod资源绑定到Endpoint上，并告知给Service资源谁可以正常提供服务
+- Service 会自动获取一个固定的 **cluster IP**向外提供由Endpoint提供的服务资源
+- Service 其实就是为动态的一组 pod 资源对象提供一个固定的访问入口。即 Service实现了后端Pod 应用服务的发现功能 
+
+
+
+
+
+![image-20241223151136366](D:\git_repository\cyber_security_learning\markdown_img\image-20241223151136366.png)
+
+
+
+- 每创建一个Service ,自动创建一个和之同名的API 资源类型 Endpoints
+- Endpoints负责维护由相关Service标签选择器匹配的Pod对象
+- Endpoints对象上保存Service匹配到的所有Pod的IP和Port信息,称之为端点
+- ETCD是K/V数据库, 而一个**Endpoints对象对应一个Key**,所有**后端Pod端点信息为其Value**
+- 当一个Endpoints对象对应后端每个Pod的每次变动，都需更新整个Endpoints对象，并将新的 Endpoints对象重新保存至API Server和ETCD
+- 此外还需要将该对象同步至每个节点的kube-proxy
+- 在ETCD中的对象默认最大为1.5MB,一个Endpoints对象至多可以存储5000个左右的端点信息,这意 味着平均每端点占300KB
+
+
+
+#### EndpointSlice
+
+新版Kubernetes为什么需要引用EndpointSlice呢?
+
+![image-20241223151352710](D:\git_repository\cyber_security_learning\markdown_img\image-20241223151352710.png)
+
+- 基于Endpoints机制，即便只有一个Pod的IP等信息发生变动，就需要向集群中的每个节点上的 kube-proxy发送整个endpoints对象
+- 比如: 一个由2000个节点组成的集群中，更新一个有5000个Pod IP占用1.5MB空间的Endpoints 对 象，就需要发送3GB的数据
+  - 若以滚动更新机制，一次只升级更新一个Pod的信息，这将导致更新这个Endpoints对象需要发送 15T的数据
+- EndpointSlice资源通过将Endpoints切分为多片来解决上述问题
+- 自Kubernetes v1.16引入EndpointSlice
+- 每个端点信息的变动，仅需要更新和发送一个**EndpontSlice对象**,而非整个Endpoints对象
+- 每个EndpointSlice默认存储100个端点信息，不会超过 etcd对单个对象的存储限制
+- 可在kube-controller-manager程序上使用 **--max-endpoints-per-slice** 选项进行配置
+- EndpointSlice并未取代Endpoints，二者同时存在
+
+
+
+```bash
+# 查看endpoint和endpointslices
+[root@master1 loadBalancer]#kubectl get endpointslices -A
+NAMESPACE     NAME             ADDRESSTYPE   PORTS        ENDPOINTS                 AGE
+default       kubernetes       IPv4          6443         10.0.0.201                4d2h
+kube-system   kube-dns-5zfkl   IPv4          9153,53,53   10.244.2.40,10.244.2.38   4d2h
+[root@master1 loadBalancer]#kubectl get ep -A
+NAMESPACE     NAME         ENDPOINTS                                                  AGE
+default       kubernetes   10.0.0.201:6443                                            4d2h
+kube-system   kube-dns     10.244.2.38:53,10.244.2.40:53,10.244.2.38:53 + 3 more...   4d2h
+```
+
+
+
+
+
+#### Service访问过程
+
+![image-20241223153657945](D:\git_repository\cyber_security_learning\markdown_img\image-20241223153657945.png)
+
+
+
+#### endpoints扩展思路
+
+```ABAP
+可以手动创建endpoints，并将集群外资源加入endpoints的队列中，实现集群内的pod访问集群外资源的效果
+```
+
+
+
+#### Service 工作模型
+
+一个Service对象最终体现为工作节点上的一些**iptables或ipvs规则**，这些规则是由kube-proxy进行实时生成和维护\
+
+
+
+**针对某一特定服务，如何将集群中的每个节点都变成其均衡器：**
+
+- 在每个节点上运行一个kube-proxy，由kube-proxy注册监视API Server的Service资源的创建、修 改和删除
+- 将Service的定义，转为本地负载均衡功能的落地实现
+
+
+
+**kube-proxy将请求代理至相应端点的实现方式有四种：**
+
+- userspace（在kubernetes  v1.2以后淘汰）
+- **iptables**： iptables工具，默认模式
+- **ipvs**
+- nftables: 从kubernetes-v1.29.0 之后版本支持,nft 工具
+- kernelspace: 仅Windows使用
+
+
+
+这些方法的目的是：kube-proxy如何确保service能在每个节点实现并正常工作
+
+注意: 一个集群只能选择使用一种Mode，即集群中所有节点要使用相同的方式
+
+
+
+#### Service和kube-proxy关联关系
+
+![image-20241223160711007](D:\git_repository\cyber_security_learning\markdown_img\image-20241223160711007.png)
+
+- Service作为一个独立的API资源对象，它会在API Service服务中定义出来的
+- 在创建任何存在标签选择器的Service时，都会被自动创建一个同名的Endpoints资源，Endpoints  对象会使用Label Selector自动发现后端端点，并各端点的IP配置为可用地址列表的元素
+- Service Controller 触发每个节点上的kube-proxy，由kube-proxy实时的转换为本地节点上面的 ipvs/iptables规则。
+- 默认情况下，内核中的ipvs或iptables规则，仅仅是负责本地节点用户空间pod客户端发出请求时 的拦截或者转发规则
+- 如果Pod客户端向Service发出请求,客户端向内核发出请求，根据ipvs或iptables规则，匹配目标 service
+- 如果service匹配，会返回当前service随对应的后端endpoint有哪些
+- iptables或ipvs会根据情况挑选一个合适的endpoint地址
+  - 如果endpoint是本机上的，则会转发给本机的endpoint
+  - 如果endpoint是其他主机上的，则转发给其他主机上的endpoint
+
+
+
+#### Service类型
+
+对于Kubernetes 可以实现内部服务的自由通信,也可以将平台内部的服务发布到外部环境
+
+Service主要有四种类型，实现不同的网络通信功能
+
+- ClusterIP
+- NodePort
+- LoadBalancer
+- ExternalName
+
+
+
+| 类型         | 解析                                                         |
+| ------------ | ------------------------------------------------------------ |
+| ClusterIP    | 此为Service的默认类型<br />为**集群内部的客户端访问**,包括节点和Pod等，**外部网络无法访问**<br />In client --> clusterIP: ServicePort (Service) --> PodIP: PodPort |
+| NodePort     | 本质上**在ClusterIP模式基础上,再多加了一层端口映射的封装**,相当于增强版的 ClusterIP<br />通过NodeIP:NodePort对外部网络提供服务，默认**随机端口范围30000~32767**, 可指定为固定端口<br />NodePort是一个随机的端口，以防止端口冲突,在**所有安装kube-proxy的节点 上都会打开此相同的端口**<br />可通过访问ClusterIP实现集群内部访问,也可以通过NodeIP:NortPort的方式实 现从集群外部至内部的访问<br />Ex Client --> NodeIP:NodePort (Service) --> PodIP:PodPort |
+| LoadBalancer | 基于NodePort基础之上**，使用集群外部的运营商负载均衡器方式实现对外提供** 服务,增强版的NodePort<br/>基于云运营商IaaS云创建一个Kubernetes云，云平台也支持LBaaS(Load Balance as a Service)产品服务<br/>Master借助cloud-manager向LBaaS的API请求动态创建软件LB,即支持和Kubernetes API Server 进行交互<br/>如果没有云服务,将无法获取EXTERNAL-IP,显示Pending状态,则降级为 NodePort类型<br/>Ex Client --> LB_IP:LB_PORT --> NodeIP:NodePort(Service)--> PodIP:PodPort |
+| ExternalName | 当Kubernetes集群需要访问集群外部服务时，需要通过externalName**将外部主机引入到集群内部**<br />外部主机名以 DNS方式解析为一个 CNAME记录给Kubernetes集群的其他主机来使用<br />**这种Service既没有ClusterIP，也没有NodePort.而且依赖于内部的CoreDNS功能**<br />In client -->Cluster ServiceName --> CName --> External Service Name |
+
+
+
+
+
+### ExternalIP
+
+如果有外部 IP 能够路由到一个或多个集群节点上，则 Kubernetes 可以通过 externalIPs 将Service  公开出去。
+
+当网络流量进入集群时，如果 externalIPs 作为目的 IP 地址和端口都与该 Service 匹配， Kubernetes  所配置的规则和路由会确保流量被路由到该 Service 的端点之一。
+
+Service可通过使用节点上配置的辅助IP地址接入集群外部客户端流量
+
+流量入口仅能是配置有该IP地址的节点，其它节点无效，因而此时在节点间无负载均衡的效果
+
+external IP所在的节点故障后，该流量入口失效，除非将该IP地址转移配置到其它节点
+
+定义 Service 时，你可以为任何服务类型externalIPs。
+
+由于 externalIPs 是绑定在某一个节点上,而此节点存在单点问题,可以通过Keepalived等方式实现高可用
+
+**高可用对外解决方案**
+
+```ABAP
+ExternalIP + VRRP Keepalived -----> Service -----> Pod
+```
+
+
+
+#### ExternalIP实现
+
+```yaml
+# 创建带externalIPs的service
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-service
+spec:
+  selector:
+    app.kubernetes.io/name: MyApp
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  externalIPs:
+    - 10.0.0.88   
+
+# 查看
+[root@master1 ExternalIP]#kubectl get svc
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP   4d4h
+my-service   ClusterIP   10.108.156.228   10.0.0.88     80/TCP    60s
+
+# 创建deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-test
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: rs-test
+  template:
+    metadata:
+      labels:
+        app: rs-test
+        app.kubernetes.io/name: MyApp
+    spec:
+      containers:
+      - name: pod-test
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+
+
+[root@master1 loadBalancer] #kubectl apply -f controller-deployment-test.yaml 
+deployment.apps/deployment-test created
+
+# 查看ep
+[root@master1 loadBalancer]#kubectl get ep
+NAME         ENDPOINTS                                      AGE
+kubernetes   10.0.0.201:6443                                4d4h
+my-service   10.244.1.88:80,10.244.2.44:80,10.244.3.99:80   11m
+
+# 在其中一个节点上添加ip
+ip a a 10.0.0.88 dev eth0:1
+
+# 验证效果
+[root@master1 ExternalIP]#curl 10.0.0.88
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: deployment-test-74b7f7d459-j4fx6, ServerIP: 10.244.2.44!
+```
+
+
+
+### Service管理
+
+
+
+#### 创建 Service 方式说明
+
+对于Service的创建有两种方法：
+
+- 命令行方法
+- YAML 文件方法
+
+
+
+##### 命令行的方式
+
+```bash
+# 创建命令1：（单独创建一个service服务）
+kubectl create service [flags] NAME [--tcp=port:targetPort] [--dry-run]
+
+# flags参数详解：
+clusterip   Create a ClusterIP service.将集群专用服务接口
+nodeport     创建一个 NodePort service.将集群内部服务以端口形式对外提供
+loadbalancer 创建一个 LoadBalancer service.主要针对公有云服务
+externalname Create an ExternalName service.将集群外部服务引入集群内部
+
+# 创建命令2：（针对一个已存在的deployment、pod、ReplicaSet等创建一个service）
+kubectl expose (-f FILENAME | TYPE NAME) [--port=port] [--protocol=TCP|UDP|SCTP] [--target-port=number-or-name] [--name=name] [--external-ip=external-ip-of-service] [--type=type] [options]
+
+# 参数详解
+--port=''            #设定service对外的端口信息
+--target-port=''     #设定容器的端口,默认和service的端口相同    
+--type=''            #设定类型，支持四种：ClusterIP(默认), NodePort, LoadBalancer,ExternalName    
+--cluster-ip=''      #设定对外的ClusterIP地址
+--name=''            #创建service对外的svc名称
+
+# 创建命令3：（创建自主式Pod时动创建Service）
+kubectl run <Pod_name> --image 镜像 --expose --port <容器端口>
+
+# 查看命令
+kubectl get svc
+
+# 删除service
+kubectl delete svc <svc_name> [ -n <namespace>[] [--all]
+```
+
+
+
+
+
+##### 文件方式
+
+语法解析
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ...
+  namespace: ...
+  labels:
+    key1: value1
+    key2: value2
+spec:
+  type: <string>                    # service类型，默认为ClusterIP
+  selector: <map[string]string>     # 指定用于过滤出service所代理的后端pod的标签，指支持等值类型的标签选择器
+  ports:                            # Service的端口对象列表
+  - name: <string>                  # 端口名称，需要保证唯一性
+    protocol: <string>              # 协议，目前仅支持TCP、UDP和SCTP，默认为TCP
+    port: <integer>                 # Service端口号
+    targetPort: <string>            # 后端Pod的端口号或名称，名称需由Pod中的规范定义
+    nodePort: <integer>             # 节点端口号，仅使用NodePort和LoadBalancerl类型，范围：30000-32768，建议系统分配
+  - name: <string>
+    ...
+  clusterIP: <string>               # 指定Service的集群IP，建议不指定而由系统分配
+  internalTrafficPolicy: <string>   # 内部流量策略处理方式，Local表示由当前节点处理，Cluster表示向集群范围调度，默认                                         Cluster
+  externalTrafficPolicy: <string>   # 外部流量策略处理方式，默认为Cluster，当为Local时，表示由当前节点处理，性能好，但无                                       负载均衡功能，且可以看到客户端真实IP，Cluster表示向集群范围调度，和Local相反，基于                                       性能原因，生产更建议Local，此方式只支持type是NodePort和LoadBalancer类型或者                                         ExternalIps
+  loadBalancerIP: <string>          # 外部负载均衡器使用的IP地址，仅适用于LoadBalancer，此字段未来可能删除
+  externalName: <string>            # 外部服务名称，该名称将作为Service的DNS CNAME值
+  externalIPs: <[]string>           # 群集中的节点将接受此服务的流量的IP地址列表。这些IP不由Kubernetes管理。用户负责确保                                       流量到达具有此 IP 的节点。常见的是不属于 Kubernetes 系统的外部负载均衡器，注意：                                       此IP和Type类型无关
+```
+
+
+
+#### ClusterIP Service实现
+
+#####  单端口应用
+
+```yaml
+# 如果基于资源配置文件创建资源，依赖于后端pod的标签，才可以关联后端的资源
+# 准备多个后端Pod对象
+[root@master1 loadBalancer] # kubectl create deployment myweb --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas=3
+deployment.apps/myweb created
+
+# 查看效果
+[root@master1 service] # kubectl get pod --show-labels 
+NAME                     READY   STATUS    RESTARTS   AGE     LABELS
+myweb-565cb68445-6c928   1/1     Running   0          5m49s   app=myweb,pod-template-hash=565cb68445
+myweb-565cb68445-fc6xg   1/1     Running   0          5m49s   app=myweb,pod-template-hash=565cb68445
+myweb-565cb68445-rsbs6   1/1     Running   0          5m49s   app=myweb,pod-template-hash=565cb68445
+
+
+# 创建service对象
+[root@master1 service] # vim service-clusterip-test.yaml
+apiVersion: v1
+kind: Service
+metadata: 
+  name: service-clusterip-test
+spec:
+  #type: ClusterIP            # 默认即为ClusterIP，此行可省略
+  #clusterIP: 192.168.64.100  #可以手动指定IP，但一般都是系统自动指定而无需添加此行
+  selector:
+    app: myweb                # 引用上面deployment的名称，同时也是Pod的Lable中的app值
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+
+[root@master1 service] # kubectl apply -f service-clusterip-test.yaml 
+service/service-clusterip-test created
+
+# 查看
+[root@master1 service] # kubectl get svc
+NAME                     TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+kubernetes               ClusterIP   10.96.0.1        <none>        443/TCP   4d7h
+my-service               ClusterIP   10.108.156.228   10.0.0.88     80/TCP    158m
+service-clusterip-test   ClusterIP   10.102.58.175    <none>        80/TCP    4s
+
+# 测试
+[root@master1 service]# curl 10.102.58.175
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: myweb-565cb68445-rsbs6, ServerIP: 10.244.1.89!
+
+```
+
+
+
+##### 多端口实现
+
+有很多服务都会同时开启多个端口，典型的比如：tomcat三个端口，接下来实现创建多端口的Service
+
+```yaml
+# 创建多端口Service
+[root@master1 service] # vim service-clusterip-multi-port.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-clusterip-multi-port
+spec:
+  selector:
+    app: myweb
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+  - name: https
+    protocol: TCP
+    port: 443
+#关键点：只能有一个ports属性，多了会覆盖,每一个子port必须有一个name属性,由于service是基于标签的方式来管理pod的，所以必须有标签选择器 
+```
+
+
+
+#### NodePort Service实现
+
+NodePort会在所有节点主机上，向外暴露一个指定或者随机的端口，供集群外部的应用能够访问
+
+注意：nodePort 属性范围为 30000-32767，且type 类型只支持 NodePort或LoadBalancer
+
+**注意: 此方式有安全风险，端口为非标端口,而且性能一般,生产一般较少使用**
+
+**生产中建议使用Ingress方式向外暴露集群内的服务**
+
+
+
+##### externaltrafficpolicy 的两种策略
+
+![image-20241223203921088](D:\git_repository\cyber_security_learning\markdown_img\image-20241223203921088.png)
+
+- **cluster模式**
+  - 此为默认模式
+  - 集群外的请求报文从某节点的NodePort进入，该节点的Service可以将请求流量调度到其他节点上的Pod，无需关心Pod在哪个节点上
+  - **Kube-proxy转发外部请求时会替换掉报文的源IP和目标IP,相当于FULLNAT**
+  - 返回时需要从原路返回,可能会产生跨节点的跃点转发流量
+  - 此模式负载均衡效果好，因为无论容器实例怎么分布在多个节点上，它都会转发过去。
+  - 但是由于多了一次转发，性能会损失
+  - 如果是NodePort类型,Pod无法获取外部客户端真实客户端IP
+
+![image-20241223204317595](D:\git_repository\cyber_security_learning\markdown_img\image-20241223204317595.png)
+
+
+
+- **local模式**
+  - 集群外的请求报文从某节点的NodePort进入,该节点的Service 只会将请求流量调度到当前节点上 的Pod
+  - **外部请求流量只发给本机的Pod, Kube-proxy转发时只会替换掉报文的目标IP,即只实现DNAT**
+  - 即：容器收到的报文，看到源IP地址还是用户的原有 IP  
+  - 此模式的负载均衡效果不是很好，因为一旦容器实例分布在多个节点上，它只转发给本机，不产生 跨节点的跃点转发流量。
+  - 但是少了一次转发，性能会相对好
+  - 由于本机不会跨节点转发报文，所以要想对所有节点上的容器实现负载均衡，就需要借助外部的 Loadbalancer来实现
+  - 因此使用Local 模式,一般会使用 LoadBalancer Service 类型结合 Loadbalancer 实现
+
+
+
+
+
+##### nodePort实现
+
+```yaml
+[root@master1 service] # vim service-nodeport.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-nodeport
+spec:
+  type: NodePort
+  #externalTrafficPolicy: Local # 默认值为Cluster,如果是Local只能被当前运行Pod的节点处理流量，并>且可以获取客户端真实IP
+  selector:
+    app: myweb
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+    nodePort: 30066   # 指定固定端口(30000-32767)，使用NodePort类型且不指定nodeport，会自动分配随机端口向外暴露
+
+[root@master1 service] # kubectl apply -f service-nodeport.yaml 
+service/service-nodeport created
+
+# 查看
+[root@master1 service] # kubectl get svc
+NAME                     TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+service-nodeport         NodePort    10.104.196.234   <none>        80:30066/TCP   33s
+
+# 默认externalTrafficPolicy: Cluster，所以使用访问集群中任意一个物理节点的地址都可以，但是Pod上看不到真实客户端地址
+[root@master1 service]#curl 10.0.0.202:30066
+kubernetes pod-test v0.1!! ClientIP: 10.244.1.0, ServerName: myweb-565cb68445-6c928, ServerIP: 10.244.2.46!
+[root@master1 service]#curl 10.0.0.202:30066
+kubernetes pod-test v0.1!! ClientIP: 10.244.1.1, ServerName: myweb-565cb68445-rsbs6, ServerIP: 10.244.1.90!
+[root@master1 service]#curl 10.0.0.202:30066
+kubernetes pod-test v0.1!! ClientIP: 10.244.1.0, ServerName: myweb-565cb68445-fc6xg, ServerIP: 10.244.3.101!
+[root@master1 
+
+# 指定externalTrafficPolicy: Local，Pod能看到客户端真实IP，同时每个节点只能调度该节点上的Pod
+[root@master1 service] #curl 10.0.0.202:30066
+kubernetes pod-test v0.1!! ClientIP: 10.0.0.201, ServerName: myweb-565cb68445-rsbs6, ServerIP: 10.244.1.90!
+[root@master1 service] #curl 10.0.0.202:30066
+kubernetes pod-test v0.1!! ClientIP: 10.0.0.201, ServerName: myweb-565cb68445-rsbs6, ServerIP: 10.244.1.90!
+[root@master1 service] #curl 10.0.0.202:30066
+kubernetes pod-test v0.1!! ClientIP: 10.0.0.201, ServerName: myweb-565cb68445-rsbs6, ServerIP: 10.244.1.90!
+[root@master1 service] #curl 10.0.0.203:30066
+kubernetes pod-test v0.1!! ClientIP: 10.0.0.201, ServerName: myweb-565cb68445-6c928, ServerIP: 10.244.2.46!
+[root@master1 service] #curl 10.0.0.203:30066
+kubernetes pod-test v0.1!! ClientIP: 10.0.0.201, ServerName: myweb-565cb68445-6c928, ServerIP: 10.244.2.46!
+[root@master1 service] #curl 10.0.0.203:30066
+kubernetes pod-test v0.1!! ClientIP: 10.0.0.201, ServerName: myweb-565cb68445-6c928, ServerIP: 10.244.2.46!
+
+# 将deploy缩容至1
+[root@master1 service] #kubectl scale deployment myweb --replicas=1
+deployment.apps/myweb scaled
+
+# 查看
+[root@master1 service]#kubectl get pod -o wide
+NAME                     READY   STATUS    RESTARTS      AGE   IP             NODE    NOMINATED NODE   READINESS GATES
+myweb-565cb68445-fc6xg   1/1     Running   1 (17m ago)   13h   10.244.3.101   node3   <none>           <none>
+
+# 访问node1上的端口
+[root@master1 service]#curl 10.0.0.202:30066
+阻塞...
+```
+
+
+
+#### LoadBalancer Service实现
+
+![image-20241224093229587](D:\git_repository\cyber_security_learning\markdown_img\image-20241224093229587.png)
+
+只有Kubernetes集群是部署在一个LBaaS平台上且指供有一个集群外部的LB才适合使用LoadBalancer 
+
+一般的公有云都提供了此功能,但可能会有费用产生
+
+如果在一个非公用云的普通的Kubernetes集群上，创建了一个LoadBalancer类型的Service，一般情况 默认环境中是没有LBaaS的，所以会导致由于找不到指定的服务，状态会一直处于 Pending 状态
+
+如果在私有云环境中使用 LoadBalancer Service，可以使用云原生的开源项目实现负载均衡器，比如 **OpenELB, MetalLB** 实现
+
+Loadbalancer 可以获取用户访问的Service对应的Pod在哪个节点上,因此支持externaltrafficpolicy为 Local模式的流量转发
+
+
+
+##### OpenElB实现LBaas服务
+
+
+
+OpenELB 是一个开源的云原生负载均衡器实现
+
+可以在基于裸金属服务器、边缘以及虚拟化的 Kubernetes 环境中使用 LoadBalancer 类型的 Service 对 外暴露服务。
+
+OpenELB 项目最初由国内青云的 KubeSphere 社区发起，目前已作为 CNCF 沙箱项目加入 CNCF 基金 会，由 OpenELB 开源社区维护与支持。
+
+官网: 
+
+```ABAP
+https://openelb.io/
+https://github.com/openelb/openelb
+```
+
+
+
+OpenELB 也拥有两种主要工作模式：**Layer2** 模式和 **BGP** 模式。OpenELB 的 BGP 模式目前暂不支持 IPv6。
+
+因为 OpenELB 是针对裸金属服务器设计的，因此如果是在云环境中部署，需要注意是否满足条件。
+
+核心功能
+
+- BGP模式和二层网络模式下的负载均衡
+- ECMP路由和负载均衡
+- IP地址池管理
+- 基于CRD来管理BGP配置
+
+**注意: 此应用可能不支持 Openstack 等云环境**
+
+
+
+##### OpenELB 实现
+
+部署和使用OpenELB
+
+```bash
+[root@master1 ~]#wget https://raw.githubusercontent.com/openelb/openelb/master/deploy/openelb.yaml
+
+# 启用
+[root@master1 openelb] #kubectl apply -f openelb.yaml 
+namespace/openelb-system created
+customresourcedefinition.apiextensions.k8s.io/bgpconfs.network.kubesphere.io created
+customresourcedefinition.apiextensions.k8s.io/bgppeers.network.kubesphere.io created
+customresourcedefinition.apiextensions.k8s.io/eips.network.kubesphere.io created
+serviceaccount/openelb-admission created
+serviceaccount/openelb-controller created
+serviceaccount/openelb-speaker created
+role.rbac.authorization.k8s.io/openelb-admission created
+clusterrole.rbac.authorization.k8s.io/openelb-admission created
+clusterrole.rbac.authorization.k8s.io/openelb-controller created
+clusterrole.rbac.authorization.k8s.io/openelb-speaker created
+rolebinding.rbac.authorization.k8s.io/openelb-admission created
+clusterrolebinding.rbac.authorization.k8s.io/openelb-admission created
+clusterrolebinding.rbac.authorization.k8s.io/openelb-controller created
+clusterrolebinding.rbac.authorization.k8s.io/openelb-speaker created
+secret/memberlist created
+service/openelb-controller created
+deployment.apps/openelb-controller created
+daemonset.apps/openelb-speaker created
+job.batch/openelb-admission-create created
+job.batch/openelb-admission-patch created
+validatingwebhookconfiguration.admissionregistration.k8s.io/openelb-admission created
+
+# 查看创建的CRD自定义资源类型
+[root@master1 openelb]#kubectl get crd
+NAME                             CREATED AT
+bgpconfs.network.kubesphere.io   2024-12-24T01:49:36Z
+bgppeers.network.kubesphere.io   2024-12-24T01:49:36Z
+eips.network.kubesphere.io       2024-12-24T01:49:36Z
+
+# 确认openelb-manager Pod已经处于Running状态，且容器已经Ready
+[root@master1 openelb]#kubectl get pods -n openelb-system 
+NAME                                  READY   STATUS      RESTARTS   AGE
+openelb-admission-create-r28c5        0/1     Completed   0          69s
+openelb-admission-patch-h8g6n         0/1     Completed   2          69s
+openelb-controller-7f8788f446-22j7d   1/1     Running     0          69s
+openelb-speaker-f462b                 1/1     Running     0          69s
+openelb-speaker-mzhpb                 1/1     Running     0          69s
+openelb-speaker-phzd8                 1/1     Running     0          69s
+openelb-speaker-tb2ms                 1/1     Running     0          69s
+
+#创建了一个Eip资源对象，它提供了一个地址池给LoadBalancer Service使用
+[root@master1 openelb] #vim service-loadbalancer-eip-pool.yaml
+apiVersion: network.kubesphere.io/v1alpha2
+kind: Eip
+metadata:
+  name: eip-pool
+  annotations:
+    eip.openelb.kubesphere.io/is-default-eip: "true" #指定当前EIP作为向LoadBalancer Server分片地>址时使用的默认的eip对象
+spec:
+  address: 10.0.0.10-10.0.0.50 #指定排除主机节点之外的地址范围，可以使用单个IP或者带有掩码长度的>网络地址
+  protocol: layer2 #指定OpenELB模式，支持bgp,layer2和vip三种，默认bgp
+  interface: eth0 #OpenELB侦听ARP或NDP请求时使用的网络接口名称，仅layer2模式下有效
+  disable: false
+  
+  
+# 创建资源
+[root@master1 openelb]#kubectl apply -f service-loadbalancer-eip-pool.yaml 
+eip.network.kubesphere.io/eip-pool created
+
+# 查看结果
+[root@master1 openelb]#kubectl get eip
+NAME       CIDR                  USAGE   TOTAL
+eip-pool   10.0.0.10-10.0.0.50           41
+
+# 创建Deployment和LoadBalancer类型的Service，测试地址池是否能给Service分配LoadBalancerIP
+[root@master1 openelb] #kubectl create deployment myapp --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas=3
+deployment.apps/myapp created
+
+[root@master1 openelb]#vim service-loadbalancer-lbaas.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-loadbalancer-lbaas
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app: myapp
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+
+# 应用
+[root@master1 openelb ]#kubectl apply -f service-loadbalancer-lbaas.yaml 
+service/service-loadbalancer-lbaas created
+
+# 查看service资源对象myapp是否自动获得了EXTERNAL IP，获取失败...
+[root@master1 openelb]#kubectl get svc service-loadbalancer-lbaas 
+NAME                         TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+service-loadbalancer-lbaas   LoadBalancer   10.97.215.163   <pending>     80:30214/TCP   8m41s
+```
+
+
+
+
+
+##### metalLB实现LBaaS服务
+
+
+
+![image-20241224101508876](D:\git_repository\cyber_security_learning\markdown_img\image-20241224101508876.png)
+
+
+
+官网
+
+```ABAP
+https://github.com/metallb/metallb
+https://metallb.universe.tf/
+```
+
+MetalLB 是由 Google 开源提供
+
+MetalLB 功能实现依赖于两种机制
+
+- Address Allocation 地址分配：基于用户配置的地址池，为用户创建的LoadBalancer分配IP地址, 并配置在节点上
+- External Announcement 对外公告：让集群外部的网络了解新分配的P地址，MetalLB使用ARP、 NDP或BGP实现
+
+
+
+MetallB 可配置为在二层模式或BGP模式下运行
+
+- 二层模式(ARP/NDP)
+  - LoadBalancer IP地址配置在某一个节点上，并使用ARP(IPv4)或NDP(IPv6)对外公告
+  - 拥有LoadBalancer IP 地址的节点将成为Service流量的惟一入口，并在节点故障时自动进行故障转 移
+  - 并未真正实现负载均衡，存在性能瓶颈，且故障转移存在秒级的延迟
+- BGP模式
+  - 集群中的所有节点与本地网络中的BGP Router建立BGP对等会话，通告LoadBalancer IP，从而告知Router如何进行流量路由
+  - 可以实现跨多个节点的真正意义上的负载均衡
+
+
+
+**注意: 此应用可能不支持 Openstack 等云环境**
+
+
+
+##### MetalLB 实现
+
+```bash
+# 部署MetalLB至Kubernetes集群
+METALLB_VERSION='v0.14.7'
+wget https://raw.githubusercontent.com/metallb/metallb/${METALLB_VERSION}/config/manifests/metallb-native.yaml
+
+# 应用
+[root@master1 metalLB]# kubectl apply -f metallb-native.yaml 
+namespace/metallb-system created
+customresourcedefinition.apiextensions.k8s.io/bfdprofiles.metallb.io created
+customresourcedefinition.apiextensions.k8s.io/bgpadvertisements.metallb.io created
+customresourcedefinition.apiextensions.k8s.io/bgppeers.metallb.io created
+customresourcedefinition.apiextensions.k8s.io/communities.metallb.io created
+customresourcedefinition.apiextensions.k8s.io/ipaddresspools.metallb.io created
+customresourcedefinition.apiextensions.k8s.io/l2advertisements.metallb.io created
+customresourcedefinition.apiextensions.k8s.io/servicel2statuses.metallb.io created
+serviceaccount/controller created
+serviceaccount/speaker created
+role.rbac.authorization.k8s.io/controller created
+role.rbac.authorization.k8s.io/pod-lister created
+clusterrole.rbac.authorization.k8s.io/metallb-system:controller created
+clusterrole.rbac.authorization.k8s.io/metallb-system:speaker created
+rolebinding.rbac.authorization.k8s.io/controller created
+rolebinding.rbac.authorization.k8s.io/pod-lister created
+clusterrolebinding.rbac.authorization.k8s.io/metallb-system:controller created
+clusterrolebinding.rbac.authorization.k8s.io/metallb-system:speaker created
+configmap/metallb-excludel2 created
+secret/metallb-webhook-cert created
+service/metallb-webhook-service created
+deployment.apps/controller created
+daemonset.apps/speaker created
+validatingwebhookconfiguration.admissionregistration.k8s.io/metallb-webhook-configuration created
+
+# 查看CRD资源类型
+[root@master1 metalLB]#kubectl get crd
+NAME                           CREATED AT
+bfdprofiles.metallb.io         2024-12-24T02:27:38Z
+bgpadvertisements.metallb.io   2024-12-24T02:27:38Z
+bgppeers.metallb.io            2024-12-24T02:27:38Z
+communities.metallb.io         2024-12-24T02:27:38Z
+ipaddresspools.metallb.io      2024-12-24T02:27:38Z
+l2advertisements.metallb.io    2024-12-24T02:27:38Z
+servicel2statuses.metallb.io   2024-12-24T02:27:38Z
+
+# 创建地址池
+# 注意: IPAddressPool 必须使用Kuberetes集群节点的IP地址段
+[root@master1 metalLB]#vim service-metallb-IPAddressPool.yaml
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: localip-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 10.0.0.10-10.0.0.50
+  autoAssign: true
+  avoidBuggyIPs: true
+  
+# 应用
+[root@master1 metalLB]#kubectl apply -f service-metallb-IPAddressPool.yaml
+ipaddresspool.metallb.io/localip-pool created
+
+# 创建二层公告机制
+[root@master1 metalLB]#vim service-metallb-L2Advertisement.yaml
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: localip-pool-l2a
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - localip-pool
+  interfaces:
+  - eth0 # 用于发送免费ARP公告
+
+[root@master1 metalLB]#kubectl apply -f service-metallb-L2Advertisement.yaml 
+l2advertisement.metallb.io/localip-pool-l2a created
+
+# 创建Service和Deployment，测试地址池是否能给Service分配LoadBalancer IP
+[root@master1 ~]#kubectl create deployment myapp --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas=3
+
+[root@master1 metalLB]# vim service-loadbalancer-lbaas.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-loadbalancer-lbaas
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app: myapp
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+    
+# 应用
+[root@master1 metalLB]#kubectl apply -f service-loadbalancer-lbaas.yaml 
+service/service-loadbalancer-lbaas created
+
+# 查看
+[root@master1 metalLB]#kubectl get svc service-loadbalancer-lbaas 
+NAME                         TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+service-loadbalancer-lbaas   LoadBalancer   10.111.219.193   10.0.0.10     80:32248/TCP   7s
+
+# 从外部访问测试
+[root@master1 metalLB]#curl 10.0.0.10
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: myapp-547df679bb-57pnm, ServerIP: 10.244.2.51!
+```
+
+
+
+##### 实际生产环境
+
+- 通常使用公有云提供的LBaaS，而不是这种开源的负载均衡器，MetalLB有Bug，在Local模式下，没有负载均衡效果
+- 更多的是使用ingress进行对外暴露
+
+
+
+
+
+
+
+#### ExternalName Service实现
+
+Service 不仅可以实现Kubernetes集群内Pod应用之间的相互访问以及从集群外部访问集群中的Pod
+
+还可以支持做为外部服务的代理实现集群中Pod访问集群外的服务
+
+```ABAP
+Pod --> Service_name --> External Name --> 外部DNS --> 外部服务IP
+```
+
+
+
+**Service代理Kubernetes外部应用的使用场景**
+
+- 在生产环境中Pod 希望使用某个固定的名称而非IP地址进行访问集群外部的服务
+- 使用Service指向另一个Namespace中或其它Kubernetes集群中的服务
+- 某个项目正在迁移至Kubernetes集群，但是一部分服务仍然在集群外部，此时可以使用service代理至k8s集群外部的服务
+
+
+
+**使用ExternalName Service实现代理外部服务（公网IP的服务）**
+
+```bash
+[root@master1 service]# vim service-externalname-web.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-externalname-web
+  namespace: default
+spec:
+  type: ExternalName
+  externalName: www.mysticalrecluse.com
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+    nodePort: 0
+  selector: {}
+
+# 应用
+[root@master1 service]#kubectl apply -f service-externalname-web.yaml 
+service/svc-externalname-web created
+
+# 查看
+#注意: service没有Cluster-IP,即为无头服务Headless Service
+[root@master1 service]#kubectl get svc
+NAME                   TYPE           CLUSTER-IP   EXTERNAL-IP               PORT(S)   AGE
+svc-externalname-web   ExternalName   <none>       www.mysticalrecluse.com   80/TCP    7s
+
+# 创建一个测试pod，解析域名
+[root@master1 service]# kubectl run pod-$RANDOM --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/admin-box:v0.1 -it --rm --command -- /bin/bash
+If you don't see a command prompt, try pressing enter.
+root@pod-18379 /# 
+root@pod-18379 /# host svc-externalname-web
+svc-externalname-web.default.svc.cluster.local is an alias for www.mysticalrecluse.com.
+root@pod-18379 /# ping -c1 svc-externalname-web
+PING svc-externalname-web (101.35.250.82): 56 data bytes
+64 bytes from 101.35.250.82: seq=0 ttl=127 time=30.567 ms
+```
+
+
+
+**使用自建的Endpoint实现基于ClusterIP类型的Service代理集群外部服务**
+
+- 手动创建一个Endpoints资源对象，直接把外部端点的IP地址，放入可用地址列表
+- 额外创建一个不带selector的同名的Service对象
+
+```bash
+# 在k8s集群外安装redis
+[root@master1 ~]#apt update && apt -y install redis
+[root@master1 ~]#vim /etc/redis/redis.conf
+bind 0.0.0.0
+[root@master1 ~]#systemctl restart redis
+
+[root@master1 service]# vim service-endpoints.yaml
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: service-redis  # 和下面的service必须同名
+  namespace: default
+subsets:
+  - addresses:
+    - ip: 10.0.0.131  # 外部服务的FQDN或IP
+    ports:
+    - name: reids
+      port: 6379
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-redis  # 和上面的endpoints必须同名
+  namespace: default
+spec:
+  type: ClusterIP
+  clusterIP: "None"
+  ports:
+  - name: redis
+    port: 6379
+    protocol: TCP
+    targetPort: 6379
+
+  
+# 应用
+[root@master1 service]#kubectl apply -f service-endpoints.yaml 
+endpoints/service-redis created
+service/service-redis created
+
+# 查看
+[root@master1 service]#kubectl get svc
+NAME                   TYPE           CLUSTER-IP   EXTERNAL-IP               PORT(S)    AGE
+kubernetes             ClusterIP      10.96.0.1    <none>                    443/TCP    26m
+service-redis          ClusterIP      None         <none>                    6379/TCP   38s
+
+[root@master1 service]#kubectl get ep service-redis 
+NAME            ENDPOINTS         AGE
+service-redis   10.0.0.131:6379   76s
+
+# 测试访问，使用service名做为域名，访问外部redis
+[root@master1 service]#kubectl run pod-$RANDOM --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/admin-box:v0.1 -it --rm --command -- /bin/bash
+If you don't see a command prompt, try pressing enter.
+root@pod-28779 /# nc service-redis 6379
+info
+```
+
+
+
+
+
+#### 会话粘滞
+
+kubernetes的Service默认是按照轮询机制进行转发至后端的多个pod
+
+如果用户请求有一定的会话要求，即希望同一个客户每次总是能访问同一个pod的时候，可以使用 service的**affinity机制**来实现
+
+它能将同一个客户端的请求始终转发至同一个后端Pod对象，它是由**kube-proxy的ipvs机制**来实现的。
+
+默认情况下，service所提供的会话粘性效果默认在**10800s(3小时)**后会重新调度,而且仅能基于客户端IP 进行识别，调度粒度较粗
+
+
+
+**属性解析**
+
+```yaml
+# 属性信息
+service.spec.sessionAffinity  # 定义粘性会话的类型，可为 None 和 ClientIP,默认值为None即不开启会话沾滞
+service.spec.sessionAffinityConfig.clinetIP.timeoutSeconds # 配置会话保持时长，默认10800s，范围1-86400
+
+# 配置格式
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+```
+
+
+
+**实现会话粘滞**
+
+```yaml
+# 创建deployment资源
+[root@master1 service] # kubectl create deployment myweb --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas=3
+deployment.apps/myweb created
+
+[root@master1 service] # kubectl get pod
+NAME                     READY   STATUS    RESTARTS   AGE
+myweb-565cb68445-2sqx9   1/1     Running   0          3s
+myweb-565cb68445-8z59d   1/1     Running   0          3s
+myweb-565cb68445-nts2b   1/1     Running   0          3s
+
+# 创建Service资源对象
+[root@master1 service] # vim service-session.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-session
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  selector:
+    app: myweb
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 1800 # 默认值为10800，即3小时
+
+# 应用
+[root@master1 service]  #kubectl apply -f service-session.yaml 
+service/service-session created
+
+# 同一个客户端，多次访问都是调度到同一个Pod上
+[root@master1 service] # curl 10.109.193.1
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: myweb-565cb68445-8z59d, ServerIP: 10.244.2.52!
+[root@master1 service] # curl 10.109.193.1
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: myweb-565cb68445-8z59d, ServerIP: 10.244.2.52!
+[root@master1 service] # curl 10.109.193.1
+kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: myweb-565cb68445-8z59d, ServerIP: 10.244.2.52!
+```
+
+
+
+#### ipvs模式
+
+![image-20241224143822632](D:\git_repository\cyber_security_learning\markdown_img\image-20241224143822632.png)
+
+
+
+ipvs会在每个节点上创建一个名为kube-ipvs0的虚拟接口，并将集群所有Service对象的ClusterIP和ExternalIP都配置在该接口； 所以每增加一个ClusterIP 或者ExternalIP，就相当于为 kube-ipvs0 关联 了一个地址罢了。
+
+kube-proxy为每个service生成一个虚拟服务器( IPVS Virtual Server)的定义。
+
+
+
+**基本流程：**
+
+- 当前节点接收到外部流量后，如果该数据包是交给当前节点上的clusterIP，则会直接将数据包交给 kube-ipvs0，而这个接口是内核虚拟出来的，而kube-proxy定义的VS直接关联到kube-ipvs0上。
+- 如果是本地节点pod发送的请求，基本上属于本地通信，效率是非常高的。
+- 默认情况下，这里的ipvs使用的是nat转发模型，而且支持更多的后端调度算法。仅仅在涉及到源地址转 换的场景中，会涉及到极少量的iptables规则(应该不会超过20条)
+- 对于Kubernetes来说，默认情况下，支持的规则是 iptables，可以通过多种方式对代理模式进行更改， 因为这些规则都是**基于kube-proxy**来定制的，所以，如果要更改代理模式的话，就需要调整kube-proxy 的属性。
+
+
+
+**注意：Kubernetes-v1.29版本后，不再使用iptables，而使用nftables framework，工具使用nft  list ruleset 查看**
+
+
+
+更改kube-proxy为IPVS模式方法说明
+
+```bash
+#方法1： 在集群创建的时候，修改kubeadm-init.yml 添加如下配置，此方法是生产中推荐
+kubeadm config print init-defaults > kubeadm-init.yaml
+
+# 在文件最后面添加一下几行
+---
+apiVersion: kubeproxy.config.Kubernetes.io/v1alpha1
+kind: KubeProxyConfiguration
+featureGates:
+  SupportIPVSProxyMode: true
+mode: ipvs
+
+# 在初始阶段可能修改的参数
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: 192.168.0.100
+  bindPort: 6443
+nodeRegistration:
+  criSocket: unix:///run/cri-dockerd.sock                  # 配置cri-dockerd插槽
+  name: master1
+  taints:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/control-plane
+
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+kubernetesVersion: "v1.30.2"
+controlPlaneEndpoint: "master1.mystical.org:6443"            # 修改控制平面域名
+networking:
+  podSubnet: "10.244.0.0/16"                                 # 修改集群网路配置，pod网络
+  serviceSubnet: "10.96.0.0/12"                              # service网络
+imageRepository: registry.aliyuncs.com/google_containers     # 修改镜像仓库（如使用国内镜像）
+apiServer:
+  extraArgs:
+    authorization-mode: Node,RBAC
+
+
+# 更改好配置文件后，执行命令初始化
+kubeadm init --config=kubeadm-init.yaml --token-ttl --upload-certs
+
+# 验证集群状态
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+# 看集群是否正常运行
+kubectl get nodes
+kubectl get pods -n kube-system
+
+
+# 方法2：在测试环境中，临时修改一下configmap中proxy的基本属性，此方式在测试环境中推荐使用
+[root@master1 ~] # kubectl edit cm  kube-proxy -n kube-system
+...
+mode: "ipvs"  #修改此行，默认为空”“表示iptables模式
+...
+
+# 更改后，需要稍等一会儿才能生效
+
+# 如果想立即生效，需要重启所有的kube-proxy pod对象
+[root@master1 ~]#kubectl get ds -n kube-system 
+NAME         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+kube-proxy   4         4         4       4            4           kubernetes.io/os=linux   5d1h
+
+[root@master1 ~]#kubectl get pod -n kube-system -l k8s-app=kube-proxy
+NAME               READY   STATUS    RESTARTS        AGE
+kube-proxy-7fc2q   1/1     Running   5 (5h50m ago)   5d1h
+kube-proxy-7slb9   1/1     Running   5 (5h49m ago)   5d1h
+kube-proxy-n66cg   1/1     Running   5 (5h49m ago)   5d1h
+kube-proxy-vkqh5   1/1     Running   5 (5h47m ago)   5d1h
+
+# 重启pod
+[root@master1 ~]#kubectl rollout restart daemonset -n kube-system kube-proxy 
+daemonset.apps/kube-proxy restarted
+
+# 重启方式2：删除原pod，使damonset自动重新创建
+kubectl delete pod -n kube-system -l k8s-app=kube-proxy
+
+# 安装ipvsadm查看效果
+[root@master1 ~]#apt update && apt -y install ipvsadm
+[root@master1 ~]#ipvsadm -Ln
+IP Virtual Server version 1.2.1 (size=4096)
+Prot LocalAddress:Port Scheduler Flags
+  -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
+TCP  172.17.0.1:30433 rr persistent 1800
+  -> 10.244.1.99:80               Masq    1      0          0         
+  -> 10.244.2.52:80               Masq    1      0          0         
+  -> 10.244.3.106:80              Masq    1      0          0         
+TCP  10.0.0.201:30433 rr persistent 1800
+  -> 10.244.1.99:80               Masq    1      0          0         
+  -> 10.244.2.52:80               Masq    1      0          0         
+  -> 10.244.3.106:80              Masq    1      0          0 
+  ......
+```
+
+
+
+### 综合案例：Wordpress
+
+```yaml
+[root@master1 controller] # vim wordpress-mysql.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+  namespace: demo
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app: wordpress
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/wordpress:php8.2-apache
+        name: wordpress
+        env:
+        - name: WORDPRESS_DB_HOST
+          value: mysql.demo.svc.cluster.local.
+        - name: WORDPRESS_DB_USER
+          value: wordpress
+        - name: WORDPRESS_DB_PASSWORD
+          value: "123456"
+        - name: WORDPRESS_DB_NAME
+          value: wordpress
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: demo
+spec:
+  ports:
+  - port: 3306
+    protocol: TCP
+    targetPort: 3306
+  selector:
+    app: mysql
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:8.0.29-oracle
+        name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123456"
+        - name: MYSQL_DATABASE
+          value: "wordpress"
+        - name: MYSQL_USER
+          value: wordpress
+        - name: MYSQL_PASSWORD
+          value: "123456"
+          
+# 查看svc
+[root@master1 controller]#kubectl get svc -n demo 
+NAME        TYPE           CLUSTER-IP    EXTERNAL-IP   PORT(S)        AGE
+mysql       ClusterIP      10.111.9.21   <none>        3306/TCP       23s
+wordpress   LoadBalancer   10.97.65.76   10.0.0.11     80:30371/TCP   23s
+
+# 浏览器访问
+http://10.0.0.11/
+```
+
+
+
+![image-20241224154414207](D:\git_repository\cyber_security_learning\markdown_img\image-20241224154414207.png)
+
+
+
+
+
+
+
+
+
+## Kubernetes域名解析
+
+### 服务发现机制
+
+在传统的系统部署中，服务运行在一个固定的已知的 IP 和端口上，如果一个服务需要调用另外一个服 务，可以通过地址直接调用
+
+在Kubernetes 集群中，基于clusterip地址来访问每service是很不方便的
+
+虽然通过配置DNS可以实现名称解析来访问，但是在Kubernetes集群中，服务实例的启动和销毁是很频 繁的，服务地址在动态的变化，所以传统的方式配置DNS解析记录就很不友好了。
+
+
+
+将请求发送到动态变化的服务实例上，可以通过以下两个步骤来实现：
+
+- **服务注册** — 创建服务实例后，主动将当前服务实例的信息，存储到一个集中式的服务管理中心。
+- **服务发现** — 当A服务需要找未知的B服务时，先去服务管理中心查找B服务地址，然后根据该地址找到B服务
+
+
+
+**Kubernetes主要有两种服务发现机制：**
+
+- 环境变量
+- DNS解析
+
+
+
+
+
+
+
+### 环境变量
+
+对于环境变量来说，它主要有两种实现方式
+
+- **Kubernetes Service环境变量**
+
+  - Kubernetes为每个Service资源生成包括以下形式的环境变量在内一系列环境变量
+  - 在同一名称空间中后续创建的Pod对象都会自动拥有这些变量
+  - 注意：此方式不支持Service的动态变化，即在创建Pod对象以后，Service的变化不会生成相关的 环境变量，生产此方式不太常见
+  - Service相关环境变量形式如下
+
+  ```bash
+  {SVCNAME}_SERVICE_HOST {SVCNAME}_PORT
+  
+  # 比如：default名称空间创建名为test的Service，default名称空间下的每个Pod内部会被自动注入 和service相关的变量
+  TEST_SERVICE_HOST=ClusterIP
+  TEST_PORT=tcp://ClusterIP:80
+  ```
+
+  ```yaml
+  # 注意：如果先创建Pod，然后关联到Service是不生效的
+  # 一定要先创建Service，在创建Service下的pod资源类型或者deploy等，才会看到环境变量
+  
+  
+  # 相关实验
+  创建service
+  [root@master1 controller]#kubectl create svc clusterip myweb --tcp=80:80
+  service/myweb created
+  
+  # 创建相关svc下的deployment
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    labels:
+      app: myweb                            # 必须是myweb,因为svc是myweb
+    name: myweb
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 3
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: myweb
+    template:
+      metadata:
+        labels:
+          app: myweb
+      spec:
+        containers:
+        - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+          imagePullPolicy: IfNotPresent
+          name: pod-test
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+  
+  # 应用
+  [root@master1 controller] # kubectl apply -f myweb-deploy-test1.yaml
+  deployment.apps/myweb created
+  
+  # 查看
+  [root@master1 controller] # kubectl get pod
+  NAME                     READY   STATUS        RESTARTS   AGE
+  myweb-565cb68445-btlj8   1/1     Running       0          12s
+  myweb-565cb68445-c8drb   1/1     Running       0          12s
+  myweb-565cb68445-lj7bq   1/1     Running       0          12s
+  
+  [root@master1 controller] # kubectl get svc
+  NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+  kubernetes   ClusterIP   10.96.0.1        <none>        443/TCP   4h59m
+  myweb        ClusterIP   10.104.153.124   <none>        80/TCP    13m
+  
+  
+  # 查看pod内的环境变量
+  [root@master1 controller] # kubectl exec myweb-565cb68445-btlj8 -it -- /bin/sh
+  [root@myweb-565cb68445-btlj8 /]# env
+  KUBERNETES_SERVICE_PORT=443
+  KUBERNETES_PORT=tcp://10.96.0.1:443
+  HOSTNAME=myweb-565cb68445-btlj8
+  MYWEB_SERVICE_HOST=10.104.153.124        # MYWEB_SERVICE_HOST
+  SHLVL=1
+  HOME=/root
+  PS1=[\u@\h \w]\$ 
+  MYWEB_SERVICE_PORT=80
+  MYWEB_PORT=tcp://10.104.153.124:80       # MYWEB_PORT
+  TERM=xterm
+  MYWEB_PORT_80_TCP_ADDR=10.104.153.124
+  KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+  MYWEB_SERVICE_PORT_80_80=80
+  PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  MYWEB_PORT_80_TCP_PORT=80
+  
+  ```
+
+
+
+### COREDNS
+
+#### CoreDNS介绍
+
+![image-20241224164000953](D:\git_repository\cyber_security_learning\markdown_img\image-20241224164000953.png)
+
+
+
+专用于kubernetes集群中的服务注册和发现的解决方案就是KubeDNS。
+
+kubeDNS自从Kubernetes诞生以来，其方案的具体实现方案前后经历了三代，分别是 SkyDNS、 KubeDNS、CoreDNS。
+
+Kubernetes-v1.3之前使用SkyDNS, 之后到Kubernetes-v1.13之前使用KubeDNS,当前默认使用 **CoreDNS**
+
+CoreDNS 是一个DNS服务器。Go实现，由于其灵活性，它可以在多种环境中使用。
+
+CoreDNS 是一个云原生计算基金会毕业的项目。CoreDNS通过 Kubernetes 插件与 Kubernetes 集 成，或者通过etcd插件与etcd 集成,实现服务发现
+
+**CoreDNS 官方网站**
+
+```ABAP
+https://coredns.io/
+https://github.com/coredns/coredns
+```
+
+
+
+
+
+#### CoreDNS解析流程
+
+CoreDNS 通过访问名为 kubernetes 的 Service,找到 API Server 进而连接到 ETCD, 从而实现 Kubernetess集群中的Service,Endpoint,Pod 等资源的查找
+
+![image-20241224164328154](D:\git_repository\cyber_security_learning\markdown_img\image-20241224164328154.png)
+
+
+
+- Client Pod **查询自身的/etc/resolv.conf** 指向的DNS服务器地址,此地址为kube-dns service的地址, 即将解析请求转发给名为 kube-dns的 service
+
+  ```bash
+  [root@master1 controller]#kubectl exec myweb-565cb68445-btlj8 -it -- /bin/sh
+  [root@myweb-565cb68445-btlj8 /]# cat /etc/resolv.conf 
+  nameserver 10.96.0.10      # COREDNS的svc地址
+  search default.svc.cluster.local svc.cluster.local cluster.local wang.org
+  options ndots:5
+  ```
+
+- kube-dns service会将请求转发到后端CoreDNS Pod,为了DNS的高可用,通常有两个CoreDNS Pod, 并位于kube-system名称空间
+
+  ```bash
+  [root@master1 controller]#kubectl get svc -n kube-system
+  NAME       TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
+  kube-dns   ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   5d3h
+  ```
+
+- Coredns Pod 根据Corefile的配置会连接到在default名称空间的名为kubernetes的service,而 kubernetes service对应的Endpoints为所有kube-apiserver:6443的地址
+
+  ```bash
+  [root@master1 controller]#kubectl get svc -n kube-system
+  NAME       TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)                  AGE
+  kube-dns   ClusterIP   10.96.0.10   <none>        53/UDP,53/TCP,9153/TCP   5d3h
+  
+  [root@master1 controller]#kubectl get ep
+  NAME         ENDPOINTS                                        AGE
+  kubernetes   10.0.0.201:6443                                  5h17m
+  ```
+
+- kubernetes service 监视service IP的变动，维护DNS解析记录,并将变化发送至ETCD实现DNS记录 的存储
+
+- CoreDNS查询到service name对应的IP后返回给客户端
+
+- 如果查询的是外部域名，**CoreDNS无法解析，就转发给指定的域名服务器**，**一般是节点 上/etc/resolv.conf中的服务器解析**
+
+  ```bash
+  # 要使其生效，需要在更改coredns所在节点上的dns后，更新corednsPod
+  [root@master1 controller]#kubectl rollout restart deployment -n kube-system coredns 
+  deployment.apps/coredns restarted
+  ```
+
+
+
+
+
+
+
+#### CoreDNS域名解析
+
+![image-20241224175717162](D:\git_repository\cyber_security_learning\markdown_img\image-20241224175717162.png)
+
+Cluster DNS（CoreDNS）是Kubernetes集群的必备附件，负责为Kubernetes提供名称解析和服务发现
+
+每个Service资源对象，在**CoreDNS上都会自动生成如下格式的名称，结合该名称会生成对应的一些不同 类型的DNS资源记录**
+
+```bash
+<service>.<ns>.svc.<zone>
+<service>： #当前Service对象的名称
+<ns>：      #当前Service对象所属的名称空间
+<zone>：    #当前Kubernetes集群使用的域名后缀，默认为“cluster.local”pass
+```
+
+范例：kubeadm安装方式时查看默认Zone名称
+
+```bash
+[root@master1 ~]#kubeadm config print init-defaults |grep dns
+dns: {}
+  dnsDomain: cluster.local
+```
+
+CoreDNS会持续监视API Server上的Service资源对象的变动，并实时反映到相关的DNS资源记录中
+
+Pod中各容器内部默认会在其 /etc/resolv.conf中，将nameserver指向CoreDNS相关的Service的 ClusterIP，默认为service网段的第10个IP，比如：10.96.0.10，其后面的Endpoint是coredns对应的 Pod的IP，此配置由kubelet创建Pod时根据指定的配置自动注入
+
+
+
+范例：集群上的一个随机选择的Pod中的容器查看DNS客户端配置
+
+```bash
+[root@master1 ~]#kubectl exec myweb-5d78b4dcbd-6rgv4 -- cat /etc/resolv.conf
+nameserver 10.96.0.10
+search default.svc.cluster.local svc.cluster.local cluster.local wang.org
+options ndots:5
+
+#上述search参数中指定的DNS各搜索域，是以次序指定的几个域名后缀，它们各自的如下所示。
+#<ns>.svc.<zone>：附带有特定名称空间的域名，例如default.svc.cluster.local
+#svc. <zone>：附带了Kubernetes标识Service专用子域svc的域名，例如svc.cluster.local；
+<zone>：集群本地域名，例如cluster.local。
+#ndots:5，表示如果手工查询时候给的域名包含的点“.”不超过5个，那么进行DNS查找时将使用非完全限定
+名称，即用search指定的域名补全
+即 <手工输入域名> 或者 <手工输入域名>.<search 部分给定的域名后缀>
+如果你查询的域名包含点数大于等于5，那么DNS查询，默认会使用绝对域名进行查询。
+即 <手工输入域名>
+```
+
+
+
+#### Service 资源对应的DNS资源记录
+
+基于DNS的服务发现，对于每个Service对象，都会具有以下3个类型的DNS资源记录**A/AAAA**，**PTR**和 **SRV**
+
+- 根据ClusterIP的地址类型，为IPv4生成固定格式的 A记录，为IPv6生成AAAA记录
+
+```bash
+<service>.<ns>.svc.<zone>. <ttl> IN A <cluster-ip>
+<service>.<ns>.svc.<zone>. <ttl> IN AAAA <cluster-ip>
+#示例：
+testapp.default.svc.cluster.local.
+#注意：cluster.local 是默认zone名称，在初始化Kubernetes集群中，自己通过dnsDomain属性定制的。
+```
+
+- 对于每个给定的A记录或AAAA记录都要生成PTR记录，格式如下所示
+
+```bash
+<d>.<c>.<b>.<a>.in-addr.arpa. <ttl> IN PTR <service>.<ns>.svc.<zone>.
+h4.h3.h2.h1.g4.g3.g2.g1.f4.f3.f2.f1.e4.e3.e2.e1.d4.d3.d2.d1.c4.c3.c2.c1.b4.b3.b2
+.b1.a4.a3.a2.a1.ip6.arpa <ttl> IN PTR <service>.<ns>.svc.<zone>.
+```
+
+- 为每个定义了名称的端口生成一个SRV记录，未命名的端口号则不具有该记录
+
+```bash
+_<port_name>._<proto>.<service>.<ns>.svc.<zone>. <ttl> IN SRV <weight> 
+<priority> <port-number> <service>.<ns>.svc.<zone>.
+```
+
+
+
+
+
+#### Pod的DNS解析策略和配置
+
+Kubernetes支持在单个Pod资源规范上自定义DNS解析策略和配置，并组合生效
+
+- **pod.spec.dnsPolicy**：解析策略
+  - **Default**：从运行在的节点/etc/resolv.conf继承DNS名称解析相关的配置
+  - **ClusterFirst**：**此为默认值**，优先使用集群内DNS服务上解析集群域内的名称，其他域名的解析则 交由从节点/etc/resolv.conf继承的名称服务器 即使用Default策略
+  - **ClusterFirstWithHostNet**：专用于在设置了hostNetwork（使用宿主机的网络）的Pod对象上并不会使用节点网络的DNS，仍然使用的ClusterFirst策略
+  - **None**：用于忽略Kubernetes集群的默认设定，而仅使用由dnsConfig自定义的配置
+- **pod.spec.dnsConfig**：名称解析机制
+  - **nameservers <[]string>**：DNS名称服务器列表，附加于由dnsPolicy生成的DNS名称服务器之后
+  - **searches <[]string>**：DNS名称解析时的搜索域，附加由于dnsPolicy生成的搜索域之后
+  - **options <[]Object>**：DNS解析选项列表，同dnsPolicy生成的解析选项合并成最终生效的定义
+
+
+
+范例：dnsPolicy 的 None 的解析策略
+
+```yaml
+# cat service-pod-with-dnspolicy.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: service-pod-with-dnspolicy
+  namespace: default
+spec:
+  containers:
+  - name: demo
+    image: wangxiaochun/pod-test:v0.1
+    imagePullPolicy: IfNotPresent
+  dnsPolicy: None
+  dnsConfig:
+    nameservers:
+    - 10.96.0.10
+    - 180.76.76.76
+    - 233.6.6.6
+    searches:
+    - svc.cluster.local
+    - cluster.local
+    - wang.org
+    options:
+    - name: ndots
+      value: "5"  #意味着如果域名中只有5个或更少的点，则系统会尝试在其末尾添加搜索域。
+```
+
+
+
+
+
+#### CoreDNS配置
+
+CoreDNS的配置都存储在名为**coredns的ConfigMap**对象中，该对象位于**kube-system**名称空间中
+
+服务器配置段(Server Blocks)，用于定义负责解析的权威区域，配置段放置于其后的花括号{}中
+
+服务器配置段也可以指定要监听的端口号,端口号之前需要使用一个冒号，默认为53
+
+
+
+**配置解析**
+
+```bash
+# coredns的配置是存放在 configmap中
+[root@master1 ~]#kubectl get cm -n kube-system
+NAME                                                   DATA   AGE
+coredns                                                1      5d20h
+
+#查看配置内容
+apiVersion: v1
+data:
+  Corefile: |
+    .:53 {                               # 包括跟区域的所有区域对应的监听端口进行解析
+        errors                           # 将错误信息进行输出
+        health {                         # LivenessProbe检测，http://localhost:8080/health实现
+           lameduck 5s
+        }
+        ready                            # readinessProbe检测，http://localhost:8181/ready coredns就绪返回200
+        kubernetes cluster.local in-addr.arpa ip6.arpa {  # 基于Kubernetes的service名称进行查询返回查询结果
+           pods insecure
+           fallthrough in-addr.arpa ip6.arpa    # 如果in-addr.arpa ip6.arpa区域解析失败，交由后续的插件进行解析
+           ttl 30
+        }
+        prometheus :9153                # 配置访问端口给Prometheus实现监控
+        forward . /etc/resolv.conf {    # forward 转发配置，如果集群内部无法解析，交由宿主机的文件解析，也可为IP地址
+           max_concurrent 1000          # 最大连接数，提高此值可以提高并发性
+        }
+        cache 30                        # 启用缓存，单位s
+        loop                            # 检测发现环路时重建corendns对应的Pod显示CrashLoopBackOff状态而停止查询，比如CoreDNS直接将请求发给上游服务器，后者再将请求转发回CoreDNS
+        reload                          # 检测Corefile是否变化，修改configmap会默认2M后自动加载
+        loadbalance                     # 基于随机算法实现DNS查询记录负载均衡
+    }
+
+...
+        # 对于企业内的dns解决方案，可以通过forward来实现，格式如下
+        forward <域名> <转发至外部DNS的地址> {  # 转发配置，如果集群内部无法解析，交由宿主机文件或外部DNS的IP解析
+            max_concurrent 最大连接配置
+            except 排除域名
+        }
+        # 示例：转发域名解析至集群外的DNS服务器,"."点表示所有域名
+        forward . 10.0.0.10 10.0.0.20 {
+            prefer_udp                   # 优先使用UDP
+        }
+        #注意：如果仅仅对某个域名进行转发的话，只需要将 <域名> 部分设置为指定的域名即可。
+        #生产中不推荐直接将 "." 的转发地址使用公网的dns地址，推荐在当前主机的/etc/resolv.conf中配置外网，实现间接效果
+        
+        # 添加特定主机的正向解析记录，类似于/etc/hosts文件功能
+        hosts {
+            192.168.10.100 www.example.com
+            10.0.0.101 gitlab.example.org nfs.example.org
+            10.0.0.102 jenkins.wang.org
+            10.0.0.100 harbor.wang.org
+            fallthrough
+        }
+```
+
+
+
+范例: 不使用默认的转发策略，使用自定义的转发策略
+
+```bash
+# 修改配置文件
+[root@master1 ~]#kubectl edit cm coredns -n kube-system 
+configmap/coredns edited
+
+# 修改之后重启CoreDNS
+[root@master1 ~]#kubectl rollout restart -n kube-system deployment coredns 
+deployment.apps/coredns restarted
+```
+
+
+
+### Headless Service
+
+#### 无头服务机制
+
+无头服务场景下，Kubernetes会将一个集群内部的所有Pod成员提供唯一的DNS域名来作为每个成员的 网络标识，集群内部成员之间使用域名通信，这个时候，就特别依赖service的selector属性配置了。
+
+
+
+**广义上Headless Service，它们又可以为分两种情形**
+
+- 有标签选择器，或者没有标签选择器,但有着与Service对象同名的Endpoint资源
+  - Service的DNS名称直接解析为后端各就绪状态的Pod的IP地址
+  - 调度功能也将由DNS完成
+  - 各Pod IP相关PTR记录将解析至Pod名称，假设Pod IP为a.b.c.d，则其Pod名称为a-b-c-d...SVC.
+  - 这种类型也就是狭义上的Headless Service
+  - 主要应用于有状态服务的**statefulSet**资源对象
+
+- 无标签选择器且也没有与Service对象同名的Endpoint资源
+  - 用于集群外部 ExternalName 类型的Service
+  - Service的DNS名称将会生成一条CNAME记录，对应值由Service对象上的spec.externalName字段指定
+
+```ABAP
+注意: headless service是一个四层调度，因为iptatbles/ipvs都是四层的
+```
+
+
+
+**主要的应用场景**
+
+- ServiceName --> (label Selector，Pod) --> 所有Pod的IP地址，此方式又称为狭义的Headless  Service，主要应用在 **StatefulSet**
+- ServiceName --> CName （**ExternalName**） --> ExternalService IP，此方式称为狭义的 External Service
+
+
+
+**无头服务管理的域名是如下的格式：**
+
+```bash
+$(service_name).$(Kubernetes_namespace).svc.cluster.local
+```
+
+
+
+**DNS 解析记录**
+
+```bash
+#A记录
+<a>-<b>-<c>-<d>.<service>.<ns>.svc.<zone> A PodIP
+
+#PodIP的PTR反解析记录  
+<d>.<c>.<b>.<a>.in-addr.arpa IN PTR <用横线分隔的PodIP>.<service>.<ns>.svc.<zone>
+
+#关键点：
+正向解析:svc_name的解析结果从常规Service的ClusterIP，转为解析成各个Pod的IP地址
+反向解析:从常规的clusterip解析为service name，转为从podip到hostname, <a>-<b>-<c>-<d>.
+<service>.<ns>.svc.<zone>
+<hostname>指的是a-b-c-d格式，而非Pod自己的主机名；
+```
+
+
+
+**案例：: Headless Service**
+
+```bash
+# 命令行方式
+[root@master1 ~]#kubectl create service clusterip service-headless-cmd --clusterip="None"
+
+# 创建文件
+[root@master1 headlessService]#vim service-headless.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-headless
+spec:
+  selector:
+    app: myweb
+  clusterIP: "None"  #无头服务
+  
+# 应用
+[root@master1 headlessService]#kubectl apply -f service-headless.yaml 
+service/service-headless created
+
+# 查看
+[root@master1 headlessService]#kubectl exec myweb-565cb68445-btlj8 -- host service-headless
+service-headless.default.svc.cluster.local has address 10.244.1.104
+service-headless.default.svc.cluster.local has address 10.244.2.56
+service-headless.default.svc.cluster.local has address 10.244.3.111
+```
+
+
+
+
+
+
+
+## Kubernetes数据存储
+
+
+
+
+
+**本章内容**
+
+- **存储机制**
+- **emptyDir**
+- **hostPath**
+- **网络共享存储**
+- **PV和PVC**
+- **StorageClass**
+- **CNS的存储方案OpenEBS**
+
+
+
+
+
+
+
+### 数据存储
+
+
+
+#### 存储机制
+
+Container 中的文件在磁盘上是临时存放的，这给 Container 中运行的较重要的应用程序带来一些问题。
+
+- 当容器崩溃时。 kubelet 可能会重新创建容器，可能会导致容器漂移至新的宿主机，容器会以干净的状态重建。导致数据丢失
+- 在同一 Pod 中运行多个容器需要共享数据
+
+
+
+Kubernetes 卷（Volume） 这一抽象概念能够解决这两个问题
+
+
+
+Kubernetes 集群中的容器数据存储
+
+![image-20241225142912632](D:\git_repository\cyber_security_learning\markdown_img\image-20241225142912632.png)
+
+
+
+
+
+**Kubernetes支持的存储类型**
+
+Kubernetes支持丰富的存储类型，可以分为树内和树外两种
+
+
+
+**树内 In-Tree 存储卷插件**
+
+| 类型         | 举例                                                         |
+| ------------ | ------------------------------------------------------------ |
+| 临时存储卷   | emptyDir                                                     |
+| 本地数据卷   | hostPath、local                                              |
+| 文件系统     | NFS、CephFS、GlusterFS、fastdfs、Cinder、gitRepo(DEPRECATED) |
+| 块设备       | iSCSI、FC、rdb(块设备)、vSphereVolume                        |
+| 存储平台     | Quobyte、PortworxVolume、StorageOS、ScaleIO                  |
+| 云存储数据卷 | Aliyun OSS、Amazon S3、AWS Elastic Block Store、Google gcePersistentDisk等 |
+| 特殊存储卷   | ConfigMap、Secret、DownwardAPI、Projectd、flocker            |
+
+
+
+**树外 Out-of_Tree 存储卷插件**
+
+经由**容器存储接口CSI**或**FlexVolume接口（已淘汰）**扩展出的外部的存储系统称为Out-of-Trec类的存储插件
+
+
+
+- **CSI 插件**
+
+  - Container Storage Interface 是当前Kubernetes社区推荐的插件实现方案
+  - CSI 不仅支持Kubernetes平台存储插件接口，而且也作为云原生生态中容器存储接口的标准,公用 云对其有更好的支持
+  - Kubernetes 支持 CSI 的接口方式实现更大范围的存储功能扩展,更为推荐使用
+
+  ```bash
+  https://github.com/container-storage-interface/spec/blob/master/spec.md
+  ```
+
+  
+
+CSI 主要包含两个部分：**CSI Controller Server** 与 **CSI Node Server**，分别对应**Controller Server Pod**和 **Node Server Pod**
+
+
+
+![image-20241225145234834](D:\git_repository\cyber_security_learning\markdown_img\image-20241225145234834.png)
+
+- **Controller Server**
+  - 也称为CSI Controller
+  - 在集群中只需要部署一个 Controller Server，以 deployment 或者 StatefulSet 的形式运行
+  - 主要负责与存储服务API通信完成后端存储的管理操作，比如 provision 和 attach 工作。
+
+
+
+- **Node Server**
+  - 也称为CSI Node 或 Node Plugin
+  - 保证每一个节点会有一个 Pod 部署出来，负责在节点级别完成存储卷管理，和 CSI Controller 一起 完成 volume 的 mount 操作。
+  - Node Server Pod 是个 DaemonSet，它会在每个节点上进行注册。
+  - Kubelet 会直接通过 Socket 的方式直接和 CSI Node Server 进行通信、调用 Attach/Detach/Mount/Unmount 等。
+
+
+
+![image-20241225145625234](D:\git_repository\cyber_security_learning\markdown_img\image-20241225145625234.png)
+
+
+
+
+
+**CSI 插件包括以下两部分**
+
+- **CSI-Plugin**:实现数据卷的挂载、卸载功能。
+- **CSI-Provisioner**: 制备器（Provisioner）实现数据卷的自动创建管理能力，即驱动程序，比如: 支 持云盘、NAS等存储卷创建能力
+
+
+
+**Kubernetes 存储架构**
+
+存储的组件主要有：attach/detach controller、pv controller、volume manager、volume plugins、 scheduler
+
+每个组件分工明确
+
+![image-20241225150025215](D:\git_repository\cyber_security_learning\markdown_img\image-20241225150025215.png)
+
+- **AD控制器**：负责存储设备的Attach/Detach操作
+  - Attach：将设备附加到目标节点
+  - Detach：将设备从目标节点上卸载
+- **Volume Manager**：存储卷管理器，负责完成卷的Mount/Umount操作，以及设备的格式化操作等
+- **PV Controller** ：负责PV/PVC的绑定、生命周期管理，以及存储卷的Provision/Delete操作
+- **volume plugins**：包含k8s原生的和各厂商的的存储插件，扩展各种存储类型的卷管理能力
+  - 原生的包括：emptydir、hostpath、csi等
+  - 各厂商的包括：aws-ebs、azure等
+- scheduler：实现Pod的调度，涉及到volume的调度。比如ebs、csi关于单node最大可attach磁盘 数量的predicate策略，scheduler的调度至哪个指定目标节点也会受到存储插件的影响
+
+
+
+
+
+### Pod的存储卷Volume
+
+Kubernetes 支持在Pod上创建不同类型的任意数量的卷来实现不同数据的存储
+
+
+
+**单节点存储**
+
+![image-20241225151327829](D:\git_repository\cyber_security_learning\markdown_img\image-20241225151327829.png)
+
+
+
+**多节点存储**
+
+![image-20241225151355422](D:\git_repository\cyber_security_learning\markdown_img\image-20241225151355422.png)
+
+
+
+存储卷本质上表现为 Pod中**所有容器共享访问的目录**
+
+而此目录的创建方式、使用的存储介质以及目录的初始内容是由Pod规范中声明的存储卷类型来源决定
+
+**kubelet内置支持多种存储卷插件**，**存储卷是由各种存储插件(存储驱动)来提供存储服务**
+
+存储卷插件(存储驱动)决定了支持的后端存储介质或存储服务，例如hostPath插件使用宿主机文件系 统，而nfs插件则对接指定的NFS存储服务等
+
+Pod在规范中需要指定其包含的卷以及这些卷在容器中的挂载路径
+
+**存储卷需要定义在指定的Pod之上**
+
+有些卷本身的生命周期与Pod相同，但其后端的存储及相关数据的生命周期通常要取决于存储介质
+
+
+
+存储卷可以分为：**临时卷和持久卷**
+
+- **临时卷类型**的生命周期与 Pod 相同， 当 Pod 不再存在时，Kubernetes 也会销毁临时卷
+- 持久卷可以比 Pod 的存活期长。当 Pod 不再存在时，Kubernetes 不会销毁持久卷。
+- 但对于给定 Pod 中任何类型的卷，在容器重启期间数据都不会丢失。
+
+
+
+#### Pod中卷的使用
+
+- 一个Pod可以添加任意个卷
+- 同一个Pod内每个容器可以在不同位置按需挂载Pod上的任意个卷，或者不挂载任何卷
+- 同一个Pod上的某个卷，也可以同时被该Pod内的多个容器同时挂载，以共享数据
+- 如果支持，多个Pod也可以通过卷接口访问同一个后端存储单元
+
+![image-20241225155834088](D:\git_repository\cyber_security_learning\markdown_img\image-20241225155834088.png)
+
+
+
+**存储卷的配置由两部分组成**
+
+- 通过.spec.volumes字段定义在Pod之上的存储卷列表，它经由特定的存储卷插件并结合特定的存储供给方的访问接口进行定义
+- 嵌套定义在容器的volumeMounts字段上的存储卷挂载列表，它只能挂载当前Pod对象中定义的存储卷
+
+
+
+**Pod 内部容器使用存储卷有两步：**
+
+- 在Pod上定义存储卷，并关联至目标存储服务上 **volumes**
+  - **定义卷**
+- 在需要用到存储卷的容器上，挂载其所属的Pod中pause的存储卷 **volumesMount**
+  - **引用卷**
+
+
+
+**容器引擎对共享式存储设备的支持类型：**
+
+- **单路读写** - 多个容器内可以通过同一个中间容器对同一个存储设备进行读写操作
+- **多路并行读写** - 多个容器内可以同时对同一个存储设备进行读写操作
+- **多路只读** - 多个容器内可以同时对同一个存储设备进行只读操作
+
+
+
+**Pod的卷资源对象属性**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: <string>
+  namespace: <string>
+spec:
+  volumes:                       # 定义卷
+  - name: <string>               # 存储卷名称标识，仅可使用DNS标签格式的字符，在当前Pod必须唯一
+    VOL_TYPE: <Object>           # 存储卷插件及具体的目标存储供给方的相关配置
+  containers:
+  - name: ...
+    image: ...
+    volumeMounts:                # 挂载卷
+    - name: <string>             # 要挂载的存储卷的名称，必须匹配存储卷列表中某项的定义
+      mountPath: <string>        # 容器文件系统上的挂载点路径
+      readOnly: <boolean>        # 是否挂载为只读模式，默认为"否"，即可读可写
+      subPath: <string>          # 挂载存储卷上的一个子目录至指定挂载点
+      subPathExpr: <string>      # 挂载有指定的模式匹配到的存储卷的文件或目录至挂载点
+```
+
+
+
+
+
+### emptyDir
+
+一个emptyDir volume在pod被调度到某个Node时候自动创建的，无需指定宿主机上对应的目录。 适用于在一个**Pod中不同容器间的临时数据的共享**
+
+
+
+**emptyDir 数据存放在宿主机的路径如下**
+
+```bash
+/var/lib/kubelet/pods/<pod_id>/volumes/kubernetes.io~empty-dir/<volume_name>/<FILE>
+
+#注意：此目录随着Pod删除，也会随之删除，不能实现持久化
+
+# 查看pod所在节点
+[root@master1 pods]#kubectl get pods -o wide
+NAME                     READY   STATUS    RESTARTS        AGE   IP             NODE    NOMINATED NODE   READINESS GATES
+myweb-565cb68445-btlj8   1/1     Running   1 (7h25m ago)   24h   10.244.2.56    node2   <none>           <none>
+myweb-565cb68445-c8drb   1/1     Running   1 (7h26m ago)   24h   10.244.1.104   node1   <none>           <none>
+myweb-565cb68445-lj7bq   1/1     Running   1 (7h25m ago)   24h   10.244.3.111   node3   <none>           <none>
+
+# 查看pod节点上emptyDir数据存放的路径
+[root@master1 pods]#ssh 10.0.0.203 ls /var/lib/kubelet/pods/
+242cc64b-4330-4c00-ba80-9228f2186367
+4a737c21-36e2-413d-a53f-ce65b9b4698e
+9fe61621-a076-4d35-add9-c329ca6b12db
+eed8a3fa-73e0-4a1e-b897-4235d77cae66
+
+# 查看对应的pod的uid
+[root@master1 pods]#kubectl get pod myweb-565cb68445-btlj8 -o yaml|grep -i uid
+    uid: 4db8879a-ee0d-48d3-8b7e-675581eb4fa2
+  uid: eed8a3fa-73e0-4a1e-b897-4235d77cae66      # -------- 匹配上面的路径uid
+```
+
+
+
+**emptyDir 特点如下：**
+
+- 此为**默认存储类型**
+- 此方式只能临时存放数据，不能实现数据持久化
+- 跟随Pod初始化而来，开始是空数据卷
+- Pod 被删除，emptyDir对应的宿主机目录也被删除，当然目录内的数据随之永久消除
+- emptyDir 数据卷介质种类跟当前主机的磁盘一样。
+- emptyDir 主机可以为同一个Pod内多个容器共享
+- emptyDir 容器数据的临时存储目录主要用于数据缓存和**同一个Pod内的多个容器共享使用**
+
+
+
+**emptyDir属性解析**
+
+```bash
+kubectl explain pod.spec.volumes.emptyDir
+    medium       # 指定媒介类型，主要有default和memory两种
+                 # 默认情况下，emptyDir卷支持节点上的任何介质，SSD、磁盘或网络存储，具体取决于自身所在Node的环境
+                 # 将字段设置为Memory，让K8S使用tmpfs，虽然tmpfs快，但是Pod重启时，数据会被清除，并且设置的大小会被计入                    # Container的内存限制当中
+    sizeLimit    # 当前存储卷的空闲限制，默认值为nil表示不限制
+    
+kubectl explain pod.spec.containers.volumeMounts
+    mountPath    # 挂载到容器中的路径,此目录会自动生成
+    name         # 指定挂载的volumes名称
+    readOnly     # 是否只读挂载
+    subPath      # 是否挂载子目录的路径,默认不挂载子目录
+```
+
+
+
+**配置示例**
+
+```yaml
+# volume配置格式
+volumes:
+- name: volume_name
+  emptyDir: {}
+  
+# volume使用格式
+containers:
+- volumeMounts:
+  - name: volume_name
+    mountPath: /path/to/container/  # 容器内路径
+
+
+# 示例1
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  containers:
+  - image: registry.k8s.io/test-webserver
+    name: test-container
+    volumeMounts:
+    - mountPath: /cache
+      name: cache-volume
+  volumes:
+  - name: cache-volume
+    emptyDir: {}
+    
+# 示例2：
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pd
+spec:
+  containers:
+  - image: registry.k8s.io/test-webserver
+    name: test-container
+    volumeMounts:
+    - mountPath: /cache
+      name: cache-volume
+  volumes:
+  - name: cache-volume
+    emptyDir:
+      medium: Memory
+      sizeLimit: 500Mi
+```
+
+
+
+范例：在一个Pod中定义多个容器通过emptyDir共享数据
+
+```yaml
+[root@master1 storage] # vim storage-emptydir-2.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: storage-emptydir
+spec:
+  volumes:
+  - name: nginx-data
+    emptyDir: {}
+  containers:
+  - name: storage-emptydir-nginx
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    volumeMounts:
+    - name: nginx-data
+      mountPath: /usr/share/nginx/html/
+  - name: storage-emptydir-busybox
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/busybox:1.32.0
+    volumeMounts:
+    - name: nginx-data
+      mountPath: /data/
+    command:
+    - "/bin/sh"
+    - "-c"
+    - "while true; do date > /data/index.html; sleep 1; done"
+
+# 应用
+[root@master1 storage]#kubectl apply -f storage-emptydir-2.yaml 
+pod/storage-emptydir created
+
+# 查看Pod
+[root@master1 storage] # kubectl get pod -o wide
+NAME                     READY   STATUS              RESTARTS      AGE   IP             NODE    NOMINATED NODE   READINESS GATES
+myweb-565cb68445-btlj8   1/1     Running             1 (11h ago)   27h   10.244.2.56    node2   <none>           <none>
+myweb-565cb68445-c8drb   1/1     Running             1 (11h ago)   27h   10.244.1.104   node1   <none>           <none>
+myweb-565cb68445-lj7bq   1/1     Running             1 (11h ago)   27h   10.244.3.111   node3   <none>           <none>
+storage-emptydir         0/2     ContainerCreating   0             9s    <none>         node2   <none>           <none>
+
+# 查看Pod的网络IP
+[root@master1 storage] # kubectl get pod -o wide
+NAME                     READY   STATUS    RESTARTS      AGE   IP             NODE    NOMINATED NODE   READINESS GATES
+myweb-565cb68445-btlj8   1/1     Running   1 (11h ago)   27h   10.244.2.56    node2   <none>           <none>
+myweb-565cb68445-c8drb   1/1     Running   1 (11h ago)   27h   10.244.1.104   node1   <none>           <none>
+myweb-565cb68445-lj7bq   1/1     Running   1 (11h ago)   27h   10.244.3.111   node3   <none>           <none>
+storage-emptydir         2/2     Running   0             14s   10.244.2.59    node2   <none>           <none>
+
+# 测试效果
+[root@master1 storage] #curl 10.244.2.59
+Wed Dec 25 12:05:05 UTC 2024
+[root@master1 storage] #curl 10.244.2.59
+Wed Dec 25 12:05:06 UTC 2024
+[root@master1 storage] #curl 10.244.2.59
+Wed Dec 25 12:05:07 UTC 2024
+[root@master1 storage] #curl 10.244.2.59
+Wed Dec 25 12:05:08 UTC 2024
+[root@master1 storage] #curl 10.244.2.59
+Wed Dec 25 12:05:08 UTC 2024
+```
+
+
+
+
+
+
+
+
+
+### hostPath
+
+hostPath 可以将**宿主机上的目录**挂载到 Pod 中作为数据的存储目录
+
+
+
+**hostPath 一般用在如下场景：**
+
+- 容器应用程序中某些文件需要永久保存
+
+- Pod删除，hostPath数据对应在宿主机文件不受影响,即hostPath的生命周期和Pod不同,而和节点相同
+- **宿主机和容器的目录都会自动创建**
+- 某些容器应用需要用到容器的自身的内部数据，可将宿主机的/var/lib/[docker|containerd]挂载到 Pod中
+
+
+
+**hostPath 使用注意事项：**
+
+- 不同宿主机的目录和文件内容不一定完全相同，所以Pod迁移前后的访问效果不一样
+- 不适合Deployment这种分布式的资源，更适合于DaemonSet
+- 宿主机的目录不属于独立的资源对象的资源，所以**对资源设置的资源配额限制对hostPath目录无效**
+
+
+
+**配置属性**
+
+```bash
+# 配置属性
+kubectl explain pod.spec.volumes.hostPath
+path                         # 指定哪个宿主机的目录或文件被共享给Pod使用
+type                         # 指定路径的类型，一共有7种，默认的类型是没有指定
+     空字符串                 # 默认配置，在关联hostPath存储卷之前不进行任何检查，如果宿主机没有对应的目录，会自动创建
+     DirectoryCreate         # 宿主机上不存在，创建此0755权限的空目录，属主属组均为kubelet
+     Directory               # 必须存在，挂载已存在目录
+     FileOrCreate            # 宿主机上不存在挂载文件，就创建0644权限的空文件，属主属组均为kubelet
+     File                    # 必须存在文件
+     Socket                  # 事先必须存在Socket文件路径
+     CharDevice              # 事先必须存在的字符设备文件路径
+     BlockDevice             # 事先必须存在的块设备文件路径
+     
+     
+# 配置格式：
+  volumes:
+  - name: volume_name
+    hostPath:
+      path: /path/to/host
+      
+# 示例：
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  spec:
+    containers:
+    - image: registry.k8s.io/test-webserver
+      name: test-container
+      volumeMounts:
+      - mountPath: /test-pod
+        name: test-volume
+    volumes:
+    - name: test-volume
+      hostPath:
+        path: /data           # 宿主机上目录位置
+        type: Directory       # 此字段为可选
+```
+
+
+
+范例：使用你主机的时区配置
+
+```yaml
+[root@master1 storage] # vim storage-hostpath-timezone.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-hostpath-timezone
+spec:
+  volumes:
+  - name: timezone
+    hostPath:
+      path: /etc/timezone        # 此文件是影响时区
+      type: File
+  - name: localtime              # 此文件挂载失败，不影响时区
+    hostPath:
+      path: /etc/localtime
+      type: File
+  containers:
+  - name: c01
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    command: ["sh", "-c", "sleep 3600"]
+  - name: c02
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    command: ["sh", "-c", "sleep 3600"]
+    volumeMounts:
+    - name: timezone
+      mountPath: /etc/timezone    # 容器此为文件是普通文件， 挂载节点目录成功
+    - name: localtime
+      mountPath: /etc/localtime   # 容器此为文件是软连接， 挂载节点目录失败
+
+# 应用
+[root@master1 storage] # kubectl apply -f storage-hostpath-timezone.yaml 
+pod/pod-hostpath-timezone created
+
+# 查看Pod
+[root@master1 storage]#kubectl get pod
+NAME                     READY   STATUS    RESTARTS      AGE
+pod-hostpath-timezone    2/2     Running   0             3s
+
+# 测试效果
+[root@master1 storage] # kubectl exec pod-hostpath-timezone -c c01 -- date
+Wed Dec 25 13:19:40 UTC 2024
+[root@master1 storage] # kubectl exec pod-hostpath-timezone -c c02 -- date
+Wed Dec 25 21:19:46 CST 2024
+
+[root@master1 storage] # kubectl exec pod-hostpath-timezone -c c01 -- cat /etc/timezone
+Etc/UTC
+[root@master1 storage] # kubectl exec pod-hostpath-timezone -c c02 -- cat /etc/timezone
+Asia/Shanghai
+```
+
+
+
+**范例：实现NFS服务**
+
+```yaml
+```
 
 
 
@@ -5215,6 +10273,186 @@ jsonCopy code{
 
 
 
+## Controller Manager详解
+
+控制器有很多种，但是里面的逻辑是一样的，都是thinkloop, 每一个Controller都是一个生产者，消费者模型，一边监控API Server的变化，API Server支持watchable,任何事件发生了变化，通过watch机制就会通知，controller manager中的生产者就会观测到这些变化，这些变化发生后，会有将其放入中心队列中，消费者从这里取数据，取出来之后去做配置，所以任何控制器都是生产者消费者模型
+
+- Controller Manager是集群大脑，是确保整个集群动起来的关键；
+- 作用是确保Kubernetes遵循声明式系统规范，确保系统的真实状态(Actual State)与用户定义的期望状态（Desired State）一致；
+- Controller Manager是多个控制器的组合，每个Controller事实上都是一个Controll loop，负责侦听其管控的对象，当对象发生变更时完成配置；
+- Controller配置失败通常会触发自动重试，整个集群会在控制器不断重试的机制下确保最终一致性（Eventual Consistency）
+
+
+
+### 控制器工作流程
+
+![image-20241220161159816](D:\git_repository\cyber_security_learning\markdown_img\image-20241220161159816.png)
+
+Informer and lister Overview
+
+- Informer: Informers are responsible for watching Kubernetes resources and reacting to changes(events).They efficiently monitor resouces state by subscribing to API events like `add`,`update`and`Delete`.These events are produced by the Kubernetes API Server whenever relevant objects changed
+
+- Lister: Listers provide cached access to resources. Instead of directly querying the API server, they interact with a local cache that is populated by informers. This makes controllers more efficient by reducing the number of API requests needed to get the current state of objects
+
+Event Handling with Informers
+
+- Event Registration: Informers register event handlers to listen for changes(like add, update,delete)to resources. Whenerver an event occurs (e.g.,a Pod is added or deleted), the informer triggers the corresponding handler
+
+- Key Extraction: The handler processes the event by extracting the key of the affected object, typically composed of its namespace and name. This key uniquely identifies the object in the cluster
+
+Queue and Rate-Limited Queue
+
+- Work Queues: when an event occurs, instead of processing it immediately, the object's key is placed into a rate-limited queue. the rate-limiting aspect helps prevent overwhelming the controllers with too many requests, especially if there are repeated failures. if a failure occurs, the item can be re-enqueued after a delay based on the rate-limiting policy
+
+- Rate Limiting: Rate limiting is crucial for handing failures gracefully. If processing an event fails (e.g., due to a temporary error or unavailability of resources),the object is re-enqueued after a backoff period, allowing the controller to retry the operation without overloading the system.
+
+Worker and Consumer Logic:
+
+- Workers: On the other side of the queue, worker goroutines continuously dequeue and process these events.Each worker pull a key from the queue and reconclies the state of the corresponding object by querying its details using the lister and then performing the required actions to converge the cluster's state towards the desired configuration.
+- Reconciliation Loop: The worker performs a reconciliation loop,which consists of checking the current state of the resource,comparing it to the desired state, and taking corrective action if there is a discrepancy.For instance, if a Pod should be running but isn't the controller will take steps to start it.
+
+Error Handling and Retry
+
+- If the processing of an event fails, the key is re-queued with a delay(rate limiting) so that the controller can retry later. This mechanism helps handle transient error without discarding events and ensures that all objects eventually converge to their desired state.
+
+Producer-Consumer Model
+
+- THis entire flow is a classic producer-consumer model:
+  - Producers: The informers produce events and enqueue the affected objects'keys.
+  - Consumers: Workers act as consumers, dequeueing keys, and processing them until the queue is empty.
+
+- 注意：
+  - Informer 监听的是当前状态的变化，通过处理 API Server 推送的事件，确保本地缓存中的数据始终与 Kubernetes 集群中的实际状态保持同步。
+  - Lister 提供的是对当前状态的访问，但这个状态是从 informer 的缓存中获取的。它是为了减少频繁的 API 请求，提升访问性能。
+
+
+
+### Informer的内部机制
+
+![image-20241220161252961](D:\git_repository\cyber_security_learning\markdown_img\image-20241220161252961.png)
+
+
+
+- kubernetes提供了一系列的项目，该项目叫code generator，（Kubernetes 提供了工具，如 code-generator，可以自动为你生成 Go 语言的客户端、informer、lister 和深度拷贝函数。这些工具能大大简化自定义控制器的开发。你只需专注于定义自定义资源的结构体，剩下的代码生成工作交由 code-generator 完成。）这个项目的作用就是你要定义任何Kubernetes对象，定义这些对象时，只需要去定义它的数据结构，这个数据结构一旦创建好，在API Server这边发布，你就可以通过api Server去访问这个数据
+
+- Informer首先会提供一个list&watch机制（informer在启动后会发起一个长连接到API server，通常来讲，会在第一时间list一下，比如一个pod list&watch，它会把当前所有的podlist下来，然后回创建watch连接，那么api server上有哪些pod的变化，就会告诉informer）
+  - API Server是一个标准的RESTfulAPI， 它提供了一个string，一个json格式的序列化数据，如果我们的程序要去消费这个序列化的数据，那么就要反序列化，（就是把这个字符串转换为一个个go对象，这里使用反射机制实现，反射机制回去解析api server中的key，每一个对象的定义，它都会有json_tag，通过json tag，我们就会知道，这个json的key,对应go语言中的哪个属性，通过这种反射机制，就把一个序列化的对象，转换为go的struct）
+  - 后续有一个Delta buff，一个环状内存结构（任何时候都可以一直往里写），如果我的buffer满了，就会自动覆盖最老的数据的
+  - 然后他会做一个通知，让informer来处理这些数据
+  - informer会把这些反序列化好的数据，放入thread Safe Store里面，这里有indexer，会有索引，我们在未来要去访问这些Kubernete对象的时候，就不需要去api server去访问了，我们只需要对local store访问，减少对api server的访问，然后同时这个对象的变化会通过event发给event handler，然后将对应的key提取出来放入queue中，由另一边的woker将其取走进行处理
+
+
+- 任何的控制器都应该使用shareinformer的freemoke，所有的对象只要用了shareinformer的freemoke，所有对象在客户端，比方你要写个控制器，在你控制器端，所有api server对象已经有一份本地的缓存了，由shareinformer保证本地缓存和apiserver中对象的版本一致性，所以当我们写控制器代码的时候，应该避免直接访问api server。读取任何对象都应该去local store去读取（Thread safe store），而不是直接去api server去读。一般来讲，只有更新一个对象的时候才会去apiserver中更新，要去调用api server. 
+
+- 注意上述的local store指的是代码里，内存里的store不是本地的那个cache目录，那个地方只是去拉取一下当前支持的api，它不会存储对象，真实的对象是存在控制器的local store的
+
+
+
+
+### 控制器的协同工作原理
+
+![image-20241220161329298](D:\git_repository\cyber_security_learning\markdown_img\image-20241220161329298.png)
+
+- 创建一个deployment的资源清单，使用kubectl在客户端创建后，发给API Server
+
+```shell
+kubectl apply -f myapp-deployment.yaml
+```
+
+- API Server对我进行认证（通过读本地配置文件，知道我是谁），然后鉴权，因为我用的是admin的身份去登录的，所以我是有创建deployment的权限的，然后我的deployment又是合法的，所以我得deployment对象被API Server接收，并存入etcd中
+- `kube-controller-manager`里面有一个deployment controller，顾名思义，它感兴趣的对象是deployment，它回去根据资源清单的属性，去创建一个replicaset的对象
+
+```shell
+# 查看deployment对象
+kubectl describe deployment myapp -n learn01
+Name:                   myapp
+Namespace:              learn01
+CreationTimestamp:      Tue, 01 Oct 2024 16:02:31 +0800
+Labels:                 app=myapp
+Annotations:            deployment.kubernetes.io/revision: 1
+Selector:               app=myapp
+Replicas:               3 desired | 3 updated | 3 total | 3 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  25% max unavailable, 25% max surge
+Pod Template:
+  Labels:  app=myapp
+  Containers:
+   pod-test2:
+    Image:         registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    Port:          <none>
+    Host Port:     <none>
+    Environment:   <none>
+    Mounts:        <none>
+  Volumes:         <none>
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  <none>
+NewReplicaSet:   myapp-7547f4df6 (3/3 replicas created)
+Events:
+  Type    Reason             Age    From                   Message
+  ----    ------             ----   ----                   -------
+  Normal  ScalingReplicaSet  6m31s  deployment-controller  Scaled up replica set myapp-7547f4df6 to 3
+```
+
+- `kube-controller-manager`里面又有ReplicaSet Controller，它也在监听API Server，然后它监听到需要创建3个pod，然后当前pod不存在，一次就需要它去创建这3个pod，然后这个pod的对象由replicaset发到API Server
+
+```shell
+[root@master201 iventory]#kubectl get replicaset -n learn01
+NAME              DESIRED   CURRENT   READY   AGE
+myapp-7547f4df6   3         3         3       7m37s
+[root@master201 iventory]#kubectl describe replicaset -n learn01
+Name:           myapp-7547f4df6
+Namespace:      learn01
+Selector:       app=myapp,pod-template-hash=7547f4df6
+Labels:         app=myapp
+                pod-template-hash=7547f4df6
+Annotations:    deployment.kubernetes.io/desired-replicas: 3
+                deployment.kubernetes.io/max-replicas: 4
+                deployment.kubernetes.io/revision: 1
+Controlled By:  Deployment/myapp
+Replicas:       3 current / 3 desired
+Pods Status:    3 Running / 0 Waiting / 0 Succeeded / 0 Failed
+Pod Template:
+  Labels:  app=myapp
+           pod-template-hash=7547f4df6
+  Containers:
+   pod-test2:
+    Image:         registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    Port:          <none>
+    Host Port:     <none>
+    Environment:   <none>
+    Mounts:        <none>
+  Volumes:         <none>
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Events:
+  Type    Reason            Age   From                   Message
+  ----    ------            ----  ----                   -------
+  Normal  SuccessfulCreate  8m5s  replicaset-controller  Created pod: myapp-7547f4df6-fr2hh
+  Normal  SuccessfulCreate  8m5s  replicaset-controller  Created pod: myapp-7547f4df6-nkgnd
+  Normal  SuccessfulCreate  8m5s  replicaset-controller  Created pod: myapp-7547f4df6-s74wv
+```
+
+- API Server将该POd对象固化下来，存入etcd
+- Pod对象被创建下来后，在初始状态下，pod内的nodename属性是没有被写值的
+
+```shell
+kubectl get pod myapp-7547f4df6-fr2hh -n learn01 -o yaml|grep -i nodename
+nodeName: node205.feng.org
+```
+
+- 这个时候由于nodename是空，此时调度器Scheduler就会去做调度，调度器在API Server上watch了没有调度过的(nodename为空)pod对象，以及当前节点的所有节点，然后根据调度策略，判断当前那个节点最适合这个pod，然后将这个节点和pod做绑定，并将结果写入API Server
+
+- 写回到API Server后，节点上的kubelet会关注当前API Server中，跟我的节点相关的pod有哪些，该节点发生了一个pod绑定后，会被kubelet发现，就会去本地查当前运行的pod有没有这个pod，如果没有，就会进入create pod的流程，起pod，如果pod没有外挂存储，就会使用runtime拉起pod，并调用网络插件为pod setup网络，如果需要外挂存储，就需要使用csi，为这个pod挂载磁盘
+
+
+- 如果我删除一个pod，此时依然会产生一个事件event，这个事件是pod delete事件，该事件被replicaset controller监听到，它的职责是里面的所有pod的数量也用户的期望的数量应该是一样的，我删除了一个，此时实际pod数量和期望数量不等，就会被replicaset监测到，此时为了确保一致，他就会去创建一个新的pod
 
 
 
@@ -5222,4 +10460,61 @@ jsonCopy code{
 
 
 
+## SRV记录详解
 
+SRV（**Service Locator Record**）是 DNS 中的一种记录类型，用于**指定某个服务的主机名（hostname）和端口号（port number）**，以便客户端可以通过它找到指定服务的实例。它的**主要作用是支持基于服务的发现**，特别是在分布式系统中非常有用。
+
+
+
+### SRV 记录的结构
+
+SRV 记录的结构由以下几个部分组成：
+
+```kotlin
+_service._protocol.name TTL class SRV priority weight port target
+```
+
+| **字段**    | **含义**                                                     |
+| ----------- | ------------------------------------------------------------ |
+| `_service`  | 服务名称，以 `_` 开头。例如，`_http` 表示 HTTP 服务。        |
+| `_protocol` | 使用的协议，例如 `_tcp` 表示 TCP 协议，`_udp` 表示 UDP 协议。 |
+| `name`      | 服务的域名，表示此服务所属的域。例如，`service-test.default.svc.cluster.local`。 |
+| `TTL`       | 记录的生存时间（Time To Live），以秒为单位，表示该记录在 DNS 缓存中的有效期。 |
+| `class`     | 通常为 `IN`，表示 Internet 类别的记录。                      |
+| `SRV`       | 表示该记录是 SRV 类型。                                      |
+| `priority`  | 优先级，数值越小优先级越高，客户端应优先使用优先级较高的目标服务器。 |
+| `weight`    | 权重，用于在同一优先级下的负载均衡。权重越高，该服务器被选中的概率越高。 |
+| `port`      | 服务运行的端口号。例如，HTTP 通常是 `80`，HTTPS 是 `443`。   |
+| `target`    | 服务对应的主机名（域名），指向提供此服务的主机（可以是 Service 的名称或 Pod 的 IP）。 |
+
+
+
+### **SRV 记录的示例**
+
+假设 Kubernetes 中有一个名为 `service-test` 的 **Service**，位于 `default` 命名空间，域名后缀为 `cluster.local`，其 IP 为 `10.97.72.1`，并提供 TCP 协议的 HTTP 服务，监听端口 `80`。对应的 SRV 记录如下：
+
+```kotlin
+_http._tcp.service-test.default.svc.cluster.local. 30 IN SRV 0 100 80 service-test.default.svc.cluster.local.
+```
+
+
+
+### SRV记录的作用和用途
+
+**服务发现：**
+
+- SRV 记录可以让客户端动态发现服务的主机名和端口，而无需硬编码。
+- 在 Kubernetes 中，Service 的 SRV 记录用于客户端通过 DNS 查询找到相应的服务实例。
+
+**负载均衡：**
+
+- SRV 记录支持通过 **priority** 和 **weight** 字段实现简单的负载均衡。
+- 同一优先级的服务实例按照权重分配流量，优先级较高的服务会被优先选择。
+
+**动态分布式系统：**
+
+- 在微服务架构或分布式系统中，服务的实例可能动态扩缩容。SRV 记录允许客户端根据 DNS 动态获取服务的最新信息。
+
+**灵活性：**
+
+- SRV 记录可以为服务定义多个实例，每个实例的优先级和权重可以灵活调整，从而实现更复杂的负载分配策略。
