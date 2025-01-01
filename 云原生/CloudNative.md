@@ -9912,9 +9912,3286 @@ Asia/Shanghai
 **范例：实现NFS服务**
 
 ```yaml
+[root@master1 storage ]# cat storage-nfs-server.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nfs-server
+  labels:
+    app: nfs-server
+spec:
+  type: ClusterIP
+  selector: 
+    app: nfs-server
+  ports:
+    - name: tcp-2049            # 未显示指定tartPort，默认和port一致
+      port: 2049
+      protocol: TCP
+    - name: udp-111
+      port: 111
+      protocol: UDP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-server
+  template:
+    metadata:
+      name: nfs-server
+      labels:
+        app: nfs-server
+    spec:
+      nodeSelector:
+        "kubernetes.io/os": linux
+        "server": nfs
+      containers:
+      - name: nfs-server
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nfs-server-alpine:12
+        env:
+        - name: SHARED_DIRECTORY
+          value: "/exports"
+        volumeMounts:
+        - mountPath: /exports
+          name: nfs-vol
+        securityContext:
+          privileged: true
+        ports:                       # 声明性说明，无直接功能，除非Service配置了targetPort匹配这些端口
+        - name: tcp-2049
+          containerPort: 2049
+          protocol: TCP
+        - name: udp-111
+          containerPort: 111
+          protocol: UDP
+      volumes:
+      - name: nfs-vol
+        hostPath:
+          path: /nfs-vol
+          type: DirectoryOrCreate
 ```
 
 
+
+### 网络共享存储
+
+和传统的方式一样, 通过 NFS 网络文件系统可以实现Kubernetes数据的网络存储共享
+
+使用NFS提供的共享目录存储数据时，需要在系统中部署一个NFS环境，通过volume的配置，实现pod 内的容器间共享NFS目录。
+
+
+
+**属性解析**
+
+```bash
+# 配置属性
+kubectl explain pod.spec.volumes.nfs
+server                                     #指定nfs服务器的地址
+path                                       #指定nfs服务器暴露的共享地址
+readOnly                                   #是否只能读，默认false
+
+#配置格式：
+ volumes:
+  - name: <卷名称>
+   nfs:
+     server: nfs_server_address           #指定NFS服务器地址
+     path: "共享目录"                      #指定NFS共享目录
+     readOnly: false                      #指定权限
+
+# 示例
+apiVersion: v1
+kind: Pod
+metadata:
+ name: test-pd
+spec:
+ containers:
+  - image: registry.k8s.io/test-webserver
+   name: test-container
+   volumeMounts:
+    - mountPath: /my-nfs-data
+     name: test-volume
+ volumes:
+  - name: test-volume
+   nfs:
+     server: my-nfs-server.example.com
+     path: /my-nfs-volume
+     readonly: true
+```
+
+
+
+范例：使用集群外的NFS存储
+
+```bash
+#NFS服务器软件安装,10.0.0.131
+[root@nfs ~]#apt update && apt install -y nfs-kernel-server 或者 nfs-server
+
+#配置共享目录
+[root@nfs ~]#mkdir /nfs-data
+[root@nfs ~]#echo '/nfs-data *(rw,all_squash,anonuid=0,anongid=0)' >> /etc/exports
+
+#重启服务
+[root@nfs ~]#exportfs -r
+[root@nfs ~]#exportfs -v
+
+# 在所有kubernetes的worker节点充当NFS客户端，都需要安装NFS客户端软件
+[root@node1 ~]#apt update && apt -y install nfs-common 或者 nfs-client
+[root@node2 ~]#apt update && apt -y install nfs-common 或者 nfs-client
+[root@node3 ~]#apt update && apt -y install nfs-common 或者 nfs-client
+
+#测试访问
+[root@node1 ~]#showmount -e 10.0.0.131
+Export list for 10.0.0.101:
+/nfs-data *
+
+#编写资源配置文件
+[root@master1 storage]#cat storage-nfs-1.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: storage
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-nfs
+  namespace: storage
+  labels:
+    app: nginx-nfs
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nginx-nfs
+  template:
+    metadata:
+      labels:
+        app: nginx-nfs
+    spec:
+      volumes:
+      - name: html
+        nfs:
+          server: nfs.mystical.org
+          path: /nfs-data/nginx
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+        name: nginx
+        volumeMounts:
+        - name: html
+          mountPath: /usr/share/nginx/html
+          
+# 注意：nfs中的域名解析，使用的式Node上的DNS，而不是COREDNS，所以需要在Node节点上将DNS指向私有DNS
+```
+
+
+
+### **PV和PVC**
+
+![image-20241228171426884](D:\git_repository\cyber_security_learning\markdown_img\image-20241228171426884.png)
+
+#### PV Persistent Volume 定义
+
+工作中的存储资源一般都是独立于Pod的，将之称为资源对象Persistent Volume(PV)，是由管理员设置的存储，它是kubernetes集群的一部分，PV 是 Volume 之类的卷插件，**但具有独立于使用 PV 的 Pod  的生命周期**
+
+
+
+**Persistent Volume 跟 Volume类似，区别就是：**
+
+- PV 是集群级别的资源，负责将存储空间引入到集群中，通常由管理员定义
+- PV 就是Kubernetes集群中的网络存储，不属于Namespace、Node、Pod等资源，但可以被它们访问
+- **PV 属于Kubernetes 整个集群,即可以被所有集群的Pod访问**
+- **PV是独立的网络存储资源对象，有自己的生命周期**
+- PV 支持很多种volume类型,PV对象可以有很多常见的类型：本地磁盘、NFS、分布式文件系统...
+
+
+
+**PV持久卷的类型**
+
+PV持久卷是用插件的形式来实现的。Kubernetes目前支持一下插件：
+
+- **cephfs** - CephFS volume
+- **csi** - 容器存储接口（CSI）
+- **fc** - Fibre Channel（FC）存储
+- **hostPath** - HostPath卷（仅供单节点测试使用，不适用于多节点集群；请尝试使用lcoal作为替代）
+- **iscsi** = iSCSI（SCSI over IP）存储
+- **local** - 节点上挂载的本地存储设备
+- **nfs** - 网络文件系统（NFS）存储
+- **rbd** - Rados块设备（RBD）卷
+
+
+
+#### PVC Persistent Volume Claim定义
+
+Persistent Volume Claim(PVC) 是一个网络存储服务的**请求**。
+
+**PVC 属于名称空间级别的资源**，只能被同一个名称空间的Pod引用
+
+由用户定义，用于在空闲的PV中申请使用符合过滤条件的PV之一，与选定的PV是“一对一”的关系
+
+用户在Pod上**通过pvc插件**请求绑定使用定义好的PVC资源
+
+Pod能够申请特定的CPU和MEM资源，但是Pod只能通过PVC到PV上请求一块独立大小的网络存储空 间，而PVC 可以动态的根据用户请求去申请PV资源，不仅仅涉及到存储空间，还有对应资源的访问模 式，对于真正使用存储的用户不需要关心底层的存储实现细节，只需要直接使用 PVC 即可。
+
+
+
+#### Pod、PV、PVC 关系
+
+![image-20241228172519330](D:\git_repository\cyber_security_learning\markdown_img\image-20241228172519330.png)
+
+
+
+**前提：**
+
+- 存储管理员配置各种类型的PV对象
+- Pod、PVC 必须在同一个命名空间
+
+
+
+**用户需要存储资源的时候：**
+
+- 用户根据资源需求创建PVC，由PVC自动匹配(权限、容量)合适的PV对象
+- PVC 允许用户按需指定期望的存储特性，并以之为条件，按特定的条件顺序进行PV的过滤 
+  - VolumeMode → LabelSelector → StorageClassName → AccessMode → Size 
+- 在Pod内部通过 PVC 将 PV 绑定到当前的空间，进行使用
+- 如果用户不再使用存储资源，解绑 PVC 和 Pod 即可
+
+
+
+**PV和PVC的生命周期**
+
+![image-20241229204228667](D:\git_repository\cyber_security_learning\markdown_img\image-20241229204228667.png)
+
+
+
+
+
+**PV和PVC的配置流程**
+
+![image-20241229204254515](D:\git_repository\cyber_security_learning\markdown_img\image-20241229204254515.png)
+
+
+
+- 用户创建了一个包含 PVC 的 Pod，该 PVC 要求使用动态存储卷
+- Scheduler 根据 Pod 配置、节点状态、PV 配置等信息，把 Pod 调度到一个合适的 Worker 节点上
+- PV 控制器 watch 到该 Pod 使用的 PVC 处于 Pending 状态，于是调用 Volume Plugin(in-tree)创 建存储卷，并创建 PV 对象(out-of-tree 由 External Provisioner 来处理)
+- AD 控制器发现 Pod 和 PVC 处于待挂接状态，于是调用 Volume Plugin 挂接存储设备到目标 Worker 节点上
+- 在 Worker 节点上，Kubelet 中的 Volume Manager 等待存储设备挂接完成，并通过 Volume  Plugin 将设备挂载到全局目录：**/var/lib/kubelet/pods/[pod_uid]/volumes/kubernetes.io~iscsi/[PVname] (以iscsi为例)**
+- Kubelet 通过 Docker 启动 Pod 的 Containers，用 bind mount 方式将已挂载到本地全局目录的卷 映射到容器中
+
+
+
+![image-20241229204525669](D:\git_repository\cyber_security_learning\markdown_img\image-20241229204525669.png)
+
+
+
+
+
+#### PV和PVC管理
+
+**PV的Provison 置备（创建）方法**
+
+- **静态**：集群管理员预先手动创建一些 PV。它们带有可供群集用户使用的实际存储的细节
+- **动态**：集群尝试根据用户请求动态地自动完成创建卷。此配置基于 StorageClasses：PVC 必须请 求存储类，并且管理员必须预先创建并配置该 StorageClasses才能进行动态创建。声明该类为空字 符串 ""， 可以有效地禁用其动态配置。
+
+
+
+##### PV属性
+
+```bash
+# PV作为存储资源，主要包括存储能力，访问模式，存储类型，回收策略等关键信息，注意：PV的名称不支持大写
+kubectl explain pv.spec
+    capacity                            # 定义pv使用多少资源，仅限于空间的设定
+    accessModes                         # 访问模式,支持单路读写，多路读写，多路只读，单Pod读写，可同时支持多种模式
+    volumeMode                          # 文件系统或块设备,默认文件系统
+    mountOptions                        # 挂载选项,比如:["ro", "soft"]    
+    persistentVolumeReclaimPolicy       # 资源回收策略，主要三种Retain、Delete、Recycle 
+    storageClassName                    # 存储类的名称,如果配置必须和PVC的storageClassName相同才能绑定
+    
+#注意:PersistentVolume 对象的名称必须是合法的 DNS 子域名
+
+# 示例
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv0003
+  labels:
+    release: "stable"    # 便签可以支持匹配过滤PVC
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Recycle
+  storageClassName: slow  # 必须和PVC相同
+  mountOptions:
+    - hard
+    - nfsvers=4.1
+  nfs:
+    path: /tmp
+    server: 172.17.0.2  
+```
+
+
+
+##### PVC属性
+
+```bash
+#PVC属性信息,与所有空间都能使用的PV不一样，PVC是属于名称空间级别的资源对象，即只有特定的资源才能使用
+kubectl explain pvc.spec
+    accessModes            # 访问模式  
+    resources              # 资源限制
+    volumeMode             # 后端存储卷的模式,文件系统或块,默认为文件系统
+    volumeName             # 指定绑定的卷(pv)的名称
+
+kubectl explain pod.spec.volumes.persistentVolumeClaim
+    claimName              # 定义pvc的名称,PersistentVolumeClaim 对象的名称必须是合法的 DNS 子域名
+    readOnly               # 设定pvc是否只读
+    storageClassName       # 存储类的名称,如果配置必须和PV的storageClassName相同才能绑定
+    selector                # 标签选择器实现选择绑定PV
+    
+# storageClassName类
+PVC可以通过为storageClassName属性设置StorageClass的名称来请求特定的存储类。只有所请求的类的PV的StorageClass值与PVC设置相同，才能绑定
+
+# selector选择算符
+PVC可以设置标签选择算符,来进一步过滤卷集合。只有标签与选择算符相匹配的卷能够绑定到PVC上。选择算符包含两个字段：
+
+matchLabels - 卷必须包含带有此值的标签
+ 
+matchExpressions - 通过设定键（key）、值列表和操作符（operator） 来构造的需求。合法的操作符
+有 In、NotIn、Exists 和 DoesNotExist。
+来自 matchLabels 和 matchExpressions 的所有需求都按逻辑与的方式组合在一起。 这些需求都必须被满足才被视为匹配。
+
+# 示例：
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: slow  # 必须和PV相同
+  selector：
+    matchLabels:
+      release: "stable"
+    matchExpressions:
+    - {key: environment, operator: In, values: [dev]}
+```
+
+
+
+
+
+##### 属性进阶
+
+**PV状态**
+
+PV 有生命周期,自然也有自己特定的状态
+
+注意：这个过程是单向过程，不能逆向
+
+![image-20241229210212463](D:\git_repository\cyber_security_learning\markdown_img\image-20241229210212463.png)
+
+| 状态       | 解析                                                  |
+| ---------- | ----------------------------------------------------- |
+| Availabled | 空闲状态，表示PV没有被其他PVC对象使用                 |
+| Bound      | 绑定状态，表示PV已经被其他PVC对象使用                 |
+| Released   | 未回收状态，表示PVC已经被删除了，但是资源还没有被回收 |
+| Faild      | 资源回收失败                                          |
+
+
+
+![image-20241229210316627](D:\git_repository\cyber_security_learning\markdown_img\image-20241229210316627.png)
+
+
+
+
+
+**AccessMode 访问模式**
+
+AccessModes 是用来对 PV 进行访问模式的设置，用于描述用户应用对存储资源的访问权限，访问权限包括
+
+| 类型                   | 解析                                                         |
+| ---------------------- | ------------------------------------------------------------ |
+| ReadWriteOnce（RWO）   | 单节点读写,卷可以被一个节点以读写方式挂载。 <br />ReadWriteOnce 访问模式仍然可以在同一节点上运行的多个 Pod <br />访问该卷即不支持并行(非并发)写入 |
+| ReadOnlyMany（ROX）    | 多节点只读                                                   |
+| ReadWriteMany（RWX）   | 多节点读写                                                   |
+| ReadWriteOncePod(RWOP) | 卷可以被单个 Pod 以读写方式挂载。 如果你想确保整个集群中只 有一个 Pod 可以读取或写入该 PVC， 请使用 ReadWriteOncePod 访问模式。单Pod读写,v1.22版以后才支 持,v1.29版stable可用 |
+
+
+
+注意：
+
+- 不同的后端存储支持不同的访问模式，所以要根据后端存储类型来设置访问模式。
+- 一些 PV 可能支持多种访问模式，但是在挂载的时候只能使用一种访问模式，多种访问模式是不会 生效的
+
+
+
+**PV资源回收策略**
+
+PV 三种资源回收策略
+
+当 Pod 结束 volume 后可以回收资源对象删除PVC，而绑定关系就不存在了，当绑定关系不存在后这个 PV需要怎么处理，而PersistentVolume 的回收策略告诉集群在存储卷声明释放后应如何处理该PV卷。 目前，volume 的处理策略有保留、回收或删除。
+
+当PVC被删除后, Kubernetes 会自动生成一个recycler-for-的Pod实现回收工作,但Retain策 略除外
+
+回收完成后,PV的状态变为Availabled,如果其它处于Pending状态的PVC和此PV条件匹配,则可以再次此 PV进行绑定
+
+| 类型    | 解析                                                         |
+| ------- | ------------------------------------------------------------ |
+| Retain  | 保留PV和存储空间数据，后续数据的删除需要人工干预，**一般推荐使用此项**，对于**手动创建的PV此为默认值** |
+| Delete  | 相关的存储实例PV和数据都一起删除。需要支持删除功能的存储才能实现，**动态存储 一般会默认采用此方式** |
+| Recycle | **当前此项已废弃**，保留PV，但清空存储空间的数据，仅支持NFS和hostPath |
+
+
+
+##### PV和PVC的使用流程
+
+实现方法
+
+- 准备存储
+- 基于存储创建PV
+- 根据需求创建PVC: PVC会根据capacity和accessModes及其它条件自动找到相匹配的PV进行绑定, 一个PVC对应一个PV
+- 创建Pod
+  - 在Pod中的 volumes 指定调用上面创建的 PVC 名称
+  - 在Pod中的容器中的volumeMounts指定PVC挂载容器内的目录路径
+
+
+
+
+
+##### 案例
+
+**PV和PVC使用**
+
+```yaml
+[root@master1 storage] # cat storage-mysql-pv-pvc.yaml 
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 20Gi
+  accessModes:
+  - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+spec:
+  storageClassName: manual
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: mysql
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:8.0.29-oracle
+        name: mysql
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123456"
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
+
+# 安装mysql客户端
+[root@master1 storage] #apt install -y mysql-client
+
+# 通过svc域名，解析出mysql的pod的IP
+[root@master1 storage]#nslookup mysql.default.svc.cluster.local 10.96.0.10
+Server:		10.96.0.10
+Address:	10.96.0.10#53
+
+Name:	mysql.default.svc.cluster.local
+Address: 10.244.2.73
+
+# 测试访问
+[root@master1 storage] # mysql -h10.244.2.73 -p123456 -uroot
+
+# 查看Mysql的Pod所在主机
+[root@master1 storage] # kubectl get pod -o wide
+NAME                     READY   STATUS    RESTARTS   AGE     IP            NODE    NOMINATED NODE   READINESS GATES
+mysql-7ffdfbdf6f-fsv6c   1/1     Running   0          7m34s   10.244.2.73   node2   <none>           <none>
+
+# 查看node2节点的/mnt/data，自动创建/mnt/data目录
+[root@node2 ~] # cd /mnt/data/
+[root@node2 data]#ls
+ auto.cnf        client-cert.pem      ib_logfile0     mysql.sock           sys
+ binlog.000001   client-key.pem       ib_logfile1     performance_schema   undo_001
+ binlog.000002  '#ib_16384_0.dblwr'   ibtmp1          private_key.pem      undo_002
+ binlog.index   '#ib_16384_1.dblwr'  '#innodb_temp'   public_key.pem
+ ca-key.pem      ib_buffer_pool       mysql           server-cert.pem
+ ca.pem          ibdata1              mysql.ibd       server-key.pem
+```
+
+
+
+范例：以NFS类型创建一个3G大小的存储资源对象PV
+
+```yaml
+# 准备NFS共享存储
+[root@master1 ~] #mkdir /nfs-data
+[root@master1 ~] #apt -y install nfs-server
+[root@master1 ~] #echo "/nfs-data *(rw,no_root_squash)" >> /etc/exports
+[root@master1 ~] #exportfs -r
+[root@master1 ~] #exportfs -v
+/nfs-data     <world>
+(rw,wdelay,no_root_squash,no_subtree_check,sec=sys,rw,secure,no_root_squash,no_a
+ll_squash)
+
+#在所有worker节点安装nfs软件
+[root@node1 ~] #apt -y install nfs-common
+
+# 准备PV，定制一个具体空间大小的存储对象
+[root@master1 ~] #cat storage-pv.yaml 
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-test
+spec:
+  capacity:
+    storage: 3Gi
+  accessModes:
+    - ReadWriteOnce
+    - ReadWriteMany
+    - ReadOnlyMany
+  nfs:
+    path: /nfs-data
+    server: nfs.mystical.org # 需要名称解析
+
+# 应用
+[root@master1 ~] #kubectl apply -f storage-pv.yaml
+persistentvolume/pv-test created
+
+# 查看
+[root@master1 ~] #kubectl get pv
+NAME     CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS     CLAIM   
+STORAGECLASS   REASON   AGE
+pv-test   3Gi       RWO,ROX,RWX   Retain           Available                   
+                7s
+# 结果显示：虽然我们在创建pv的时候没有指定回收策略，而其策略自动帮我们配置了Retain
+
+# 准备PVC，定义一个资源对象，请求空间1Gi
+[root@master1 ~] #cat storage-pvc.yaml 
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-test
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+#注意：请求的资源大小必须在 pv资源的范围内
+
+[root@master1 ~] #kubectl apply -f storage-pvc.yaml
+
+#结果显示：一旦启动pvc会自动去搜寻合适的可用的pv，然后绑定在一起
+#如果pvc找不到对应的pv资源，状态会一直处于pending
+
+# 准备Pod
+[root@master1 ~] #cat storage-nginx-pvc.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: Pod-nginx
+spec:
+  volumes:
+  - name: volume-nginx
+    persistentVolumeClaim:
+      claimName: pvc-test
+  containers:
+  - name: pvc-nginx-container
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    volumeMounts:
+    - name: volume-nginx
+      mountPath: "/usr/share/nginx/html"
+      
+#属性解析：
+#spec.volumes 是针对pod资源申请的存储资源来说的，这里使用的主要是pvc的方式。
+#spec.containers.volumeMounts 是针对pod资源对申请的存储资源的信息。将pvc挂载的容器目录 
+```
+
+
+
+**案例： PVC自动绑定相匹配的PV,PVC和 PV 是自动关联的，而且会匹配容量和权限**
+
+```yaml
+[root@master1 ~] # mkdir /nfs-data/data{1..3}
+[root@master1 ~] # cat /etc/exports
+/nfs-data *(rw,no_root_squash)
+
+# PV清单文件
+[root@master1 ~] # cat storage-multi-pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-nfs-1
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeclaimPolicy: Retain
+  nfs:
+    path: "/nfs-data/data1"
+    server: nfs.mystical.org
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-nfs-2
+spec:
+  capacity:
+    storage: 5Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadOnlyMany
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    path: "/nfs-data/data2"
+    server: nfs.mystical.org
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-nfs-3
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    path: "/nfs-data/data3"
+    server: nfs.mystical.org
+
+# 应用
+[root@master1 ~] # kubectl apply -f storage-multi-pv.yaml
+
+# kubectl get pv
+[root@master1 storage] # kubectl get pv
+NAME       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM   STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+pv-nfs-1   5Gi        RWX            Retain           Available                          <unset>                          3s
+pv-nfs-2   5Gi        ROX            Retain           Available                          <unset>                          2m13s
+pv-nfs-3   1Gi        RWO            Retain           Available                          <unset>                          2m13s
+
+
+# PVC清单文件
+[root@master1 ~] # cat storage-multi-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-demo-1
+  namespace: default
+spec:
+  accessModes: ["ReadWriteMany"]
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 3Gi
+    limits:
+      storage: 10Gi
+      
+# 应用
+[root@master1 storage] # kubectl apply -f storage-multi-pvc.yaml 
+persistentvolumeclaim/pvc-demo-1 created
+
+# 查看PVC
+[root@master1 storage] # kubectl get pvc
+NAME         STATUS   VOLUME     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+pvc-demo-1   Bound    pv-nfs-1   5Gi        RWX                           <unset>                 14s
+
+# 自动绑定PVC至容器和权限都匹配的PV
+[root@master1 storage]#kubectl get pv
+NAME       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS      CLAIM                STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+pv-nfs-1   5Gi        RWX            Retain           Bound       default/pvc-demo-1                  <unset>                          3m7s
+pv-nfs-2   5Gi        ROX            Retain           Available                                       <unset>                          5m17s
+pv-nfs-3   1Gi        RWO            Retain           Available                                       <unset>                          5m17s
+```
+
+
+
+##### 强制删除
+
+生产中，对于存储资源的释放，最好按照流程来，即先清空应用，然后在清空pvc，但是生产中，经常遇 到应用资源意外终止或者其他情况，导致我们的pvc资源没有使用，而且也没有清空
+
+有多种方式解决，最常用的一种方式就是，在所有的应用pod中增加一个prestop的钩子函数，从而让我们的应用资源合理的清空
+
+**而对于特殊的异常情况，我们还有另外一种策略，即强制清空,但是一般不推荐使用。**
+
+```yaml
+#对于这种无论何种方法都无法删除的时候，我们可以通过修改配置属性的方式，从记录中删除该信息
+[root@master1 ~]#kubectl patch pv pv-nfs-1 -p '{"metadata":{"finalizers":null}}'
+persistentvolume/pv-nfs-1 patched
+```
+
+
+
+##### subPath
+
+上面范例中的nginx首页存放在/nfs-data的一级目录中，但是生产中，一个NFS共享资源通常是给多个应 用来使用的，比如需要定制每个app的分配单独的子目录存放首页资源，但是如果我们采用PV实现定制 的方式，就需要多个PV,此方式有些太繁琐了 
+
+**可以通过subPath实现针对不同的应用对应子目录的挂载**
+
+volumeMounts.subPath 属性可用于指定所引用的卷内的子路径，而不是其根路径。
+
+下面例子展示了如何配置某包含 LAMP 堆栈（Linux Apache MySQL PHP）的 Pod 使用同一共享卷。 **此示例中的 subPath 配置不建议在生产环境中使用**。 PHP 应用的代码和相关数据映射到卷的 html 文 件夹，MySQL 数据库存储在卷的 mysql 文件夹中：
+
+```yaml
+[root@master1 storage] # cat storage-nginx-pvc-subdir.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx-1
+spec:
+  volume:
+  - name: nginx-volume
+    persistentVolumeClaim:
+      claimName: pvc-test
+  containers:
+  - name: nginx-pv
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    volumeMounts:
+    - name: nginx-volume
+      mountPath: "/usr/share/nginx/html"
+      subPath: web1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx-2
+spec:
+  volumes:
+  - name: nginx-volume
+    persistentVolumeClaim:
+      claimName: pvc-test
+  containers:
+  - name: nginx-flask
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    volumeMounts:
+    - name: nginx-volume
+      mountPath: "/usr/share/nginx/html"
+      subPath: web2
+```
+
+
+
+
+
+### StorageClass
+
+#### storageClass说明
+
+对于 PV 和 PVC 的使用整个过程是比较繁琐的，不仅需要自己定义PV和PVC还需要将其与Pod进行关 联，而且对于PV和PVC的适配我们也要做好前提规划，而生产环境中，这种繁琐的事情是有悖于我们使 用kubernetes的原则的，而且这种方式在很大程度上并不能满足我们的需求，而且不同的应用程序对于 存储性能的要求可能也不尽相同，比如读写速度、并发性能等，比如我们有一个应用需要对存储的并发 度要求比较高，而另外一个应用对读写速度又要求比较高，特别是对于 StatefulSet 类型的应用简单的来 使用静态的 PV 就很不合适了，这种情况下就需要用到**动态 PV**。
+
+
+
+Kubernetes 引入了一个**新的资源对象：StorageClass**，通过 StorageClass 的定义，管理员可以将存储资源定义为某种类型的资源，比如存储质量、快速存储、慢速存储等，为了满足不同用户的多种多样的 需求，用户根据 StorageClass 的描述就可以非常直观的知道各种存储资源的具体特性了，这样就可以根据应用的特性去申请合适的存储资源了。
+
+所以,StorageClass提供了一种资源使用的描述方式，使得管理员能够描述提供的存储的服务质量和等级，进而做出不同级别的存储服务和后端策略。
+
+StorageClass 用于定义不同的存储配置和属性，以供 PersistentVolume（PV）的动态创建和管理。它 为开发人员和管理员提供了一种在不同的存储提供商之间抽象出存储配置的方式。
+
+**在 Kubernetes 中，StorageClass 是集群级别的资源，而不是名称空间级别。**
+
+PVC和PV可以属于某个SC，也可以不属于任何SC,PVC只能够在同一个storageClass中过滤PV
+
+
+
+**能建立绑定关系的PVC和PV一定满足如下条件：**
+
+- 二者隶属于同个SC
+- 二者都不属于任何SC
+
+
+
+**StorageClass这个API对象可以自动创建PV的机制,即:Dynamic Provisioning**
+
+
+
+**StorageClass对象会定义下面两部分内容:**
+
+- PV的属性.比如,存储类型,Volume的大小等
+- 创建这种PV需要用到的存储插件
+
+提供以上两个信息,Kubernetes就能够根据用户提交的PVC,找到一个对应的StorageClass,之后 Kubernetes就会调用该StorageClass声明的存储插件,进而创建出需要的PV.
+
+
+
+要使用 StorageClass，就得**安装对应的自动配置程序**，比如存储后端使用的是 nfs，那么就需要使用到 一个 nfs-client 的自动配置程序，也称为 Provisioner，这个程序使用已经配置好的 nfs 服务器，来自动 创建持久卷 PV。
+
+
+
+#### storageClass API
+
+每个 StorageClass 都包含 **provisioner** 、 **parameters** 和 **reclaimPolicy** 字段， 这些字段会在 StorageClass 需要动态制备 PersistentVolume 时会使用到。
+
+StorageClass 对象的命名很重要，用户使用这个命名来请求生成一个特定的类。 当创建 StorageClass  对象时，管理员设置 StorageClass 对象的命名和其他参数。
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp2
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+mountOptions:
+- debug
+volumeBindingMode: Immediate | WaitForFirstConsumer（延迟绑定，只有Pod准备好才绑定）
+
+# 管理员可以为没有申请绑定到特定StorageClass的PVC指定一个默认的存储类
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: standard
+  selector:
+    matchLabels:
+      release: "stable"
+    matchExpressions:
+      - {key: environment, operator: In, values: [dev]}
+```
+
+
+
+#### 存储制备器
+
+每个 StorageClass 都有**一个制备器（Provisioner）**，用于提供存储驱动，用来决定使用哪个卷插件制备 PV。 **该字段必须指定**
+
+| 卷插件         | 内置制备器 |                           配置示例                           |
+| :------------- | :--------: | :----------------------------------------------------------: |
+| AzureFile      |     ✓      | [Azure File](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#azure-file) |
+| CephFS         |     -      |                              -                               |
+| FC             |     -      |                              -                               |
+| FlexVolume     |     -      |                              -                               |
+| iSCSI          |     -      |                              -                               |
+| Local          |     -      | [Local](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#local) |
+| NFS            |     -      | [NFS](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#nfs) |
+| PortworxVolume |     ✓      | [Portworx Volume](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#portworx-volume) |
+| RBD            |     ✓      | [Ceph RBD](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#ceph-rbd) |
+| VsphereVolume  |     ✓      | [vSphere](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#vsphere) |
+
+
+
+
+
+#### Local Volume
+
+
+
+#####  hostPath存在的问题
+
+过去我们经常会通过hostPath volume让Pod能够使用本地存储，将Node文件系统中的文件或者目录挂 载到容器内，但是hostPath volume的使用是很难受的，并不适合在生产环境中使用。
+
+- 由于集群内每个节点的差异化，要使用hostPath Volume，我们需要通过**NodeSelector**等方式进行精确调度，这种事情多了，你就会不耐烦了。
+
+- 注意DirectoryOrCreate和FileOrCreate两种类型的hostPath，当Node上没有对应的 File/Directory时，你需要保**证kubelet有在 Node上Create File/Directory的权限**。
+- 另外，如果Node上的文件或目录是由root创建的，挂载到容器内之后，你通常还要保证容器内进程有权限对该文件或者目录进行写入，比如你需要以root用户启动进程并运行于privileged容器， 或者你需要事先修改好Node上的文件权限配置。
+- **Scheduler并不会考虑hostPath volume的大小，hostPath也不能申明需要的storagesize**，这样调度时存储的考虑，就需要人为检查并保证。
+
+
+
+#####  Local PV 使用场景
+
+Local Persistent Volume 并不适用于所有应用。它的适用范围非常固定，比如：高优先级的系统应用， 需要在多个不同节点上存储数据，而且对 I/O 要求较高。Kubernetes 直接使用宿主机的本地磁盘目录 ，来持久化存储容器的数据。它的**读写性能相比于大多数远程存储来说，要好得多，尤其是 SSD 盘**。
+
+典型的应用包括：分布式数据存储比如 MongoDB，分布式文件系统比如 GlusterFS、Ceph 等，以及需 要在本地磁盘上进行大量数据缓存的分布式应用，其次使用 Local Persistent Volume 的应用必须具备 数据备份和恢复的能力，允许你把这些数据定时备份在其他位置。
+
+
+
+#####  Local PV 的实现
+
+LocalPV 的实现可以理解为我们前面使用的 hostpath 加上 nodeAffinity ，比如：在宿主机 NodeA 上 提前创建好目录 ，然后在定义 Pod 时添加 nodeAffinity=NodeA ，指定 Pod 在我们提前创建好目录的 主机上运行。但是**我们绝不应该把一个宿主机上的目录当作 PV 使用**，因为本地目录的磁盘随时都可能 被应用写满，甚至造成整个宿主机宕机。而且，不同的本地目录之间也缺乏哪怕最基础的 I/O 隔离机 制。所以，**一个 Local Persistent Volume 对应的存储介质，一定是一块额外挂载在宿主机的磁盘或者 块设备**（“额外” 的意思是，它不应该是宿主机根目录所使用的主硬盘）。这个原则，我们可以称为 “**一个 PV 一块盘**”。
+
+
+
+
+
+#####  Local PV 和常规 PV 的区别
+
+对于常规的 PV，Kubernetes 都是先调度 Pod 到某个节点上，然后再持久化 这台机器上的 Volume 目 录。而 Local PV，则需要运维人员提前准备好节点的磁盘。它们在不同节点上的挂载情况可以完全不 同，甚至有的节点可以没这种磁盘。所以调度器就必须能够知道所有节点与 Local Persistent Volume  对应的磁盘的关联关系，然后根据这个信息来调度 Pod。也就是在调度的时候考虑 Volume 分布。
+
+
+
+k8s v1.10+以上的版本中推出local pv方案。Local volume 允许用户通过标准 PVC 接口以简单且可移植 的方式访问 node 节点的本地存储。 PV 的定义中需要包含描述节点亲和性的信息，k8s 系统则使用该信 息将容器调度到正确的 node 节点。
+
+在 Kubernetes 中，HostPath 和 Local Volume 都可以用于将主机上的文件系统挂载到容器内部。虽然 它们有一些相似之处，但是它们之间也有一些重要的区别。
+
+HostPath卷类型会直接挂载主机的文件系统到Pod中，这个文件系统可以是一个文件或者是一个目录。 当Pod被调度到一个节点上时，该节点上的文件系统就会被挂载到Pod中。这使得可以很容易地在容器 内部访问主机上的文件，例如主机上的日志或配置文件。但是，使用 HostPath 卷类型可能会存在安全 风险，因为容器可以访问主机上的所有文件和目录，包括其他容器的文件。
+
+相比之下，Local Volume 卷类型只能将节点上的一个目录挂载到容器内部。当Pod被调度到一个节点上 时，Kubernetes 会为该节点创建一个唯一的目录，并将该目录挂载到 Pod 中。因为每个 Pod 只能访问 其本地的 Local Volume 目录，所以这种卷类型更加安全。但是，如果节点故障或被删除，Local  Volume 中的数据将会丢失。因此，使用 Local Volume 卷类型需要谨慎，需要确保有备份机制或持久化 存储。
+
+
+
+**local Volume 默认不支持动态配置，只能用作静态创建的持久卷国。但可以采有第三方方案实现动态配置**
+
+local 类型的PV是一种更高级的本地存储抽象，它可以**允许通过StorageClass来进行管理**。
+
+与 hostPath 卷相比， local 卷能够以持久和可移植的方式使用，而无需手动将 Pod 调度到节点。
+
+同样使用节点上的本地存储，但相比于 hostPath ， l**ocal Volume可以声明为动态供应，并且可以利 用节点标签（nodeAffinity）实现存储亲和性，确保Pod调度到包含所需数据的节点上**。而hostPath卷 在Pod重建后可能会调度至新的节点，而导致旧的数据无法使用
+
+
+
+然而， local 卷仍然取决于底层节点的可用性，并不适合所有应用程序。 如果节点变得不健康，那么 local 卷也将变得不可被 Pod 访问。使用它的 Pod 将不能运行。 使用 local 卷的应用程序必须能够 容忍这种可用性的降低，以及因底层磁盘的耐用性特征而带来的潜在的数据丢失风险
+
+
+
+##### 创建Local PV
+
+下面是一个使用 local 卷和 nodeAffinity 的持久卷示例：
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner #表示该存储类不使用任何 provisioner，即不支持动态分配持久卷。这意味着管理员需要手动创建并管理持久卷。
+volumeBindingMode: WaitForFirstConsumer #延迟绑定，只有Pod准备好才绑定PV至PVC，否则PVC处于Pending状态
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: example-pv
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  sotrageClassName: local-storage
+  local:
+    path: /mnt/disks/ssd1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - example-node
+```
+
+使用 local 卷时，你需要设置 PersistentVolume 对象的 nodeAffinity 字段。 Kubernetes 调度器 使用 PersistentVolume 的 nodeAffinity 信息来将使用 local 卷的 Pod 调度到正确的节点。
+
+使用 local 卷时，**建议创建一个 StorageClass 并将其 volumeBindingMode 设置为 WaitForFirstConsumer** 。要了解更多详细信息，请参考 local StorageClass 示例。 延迟卷绑定的操作 可以确保 Kubernetes 在为 PersistentVolumeClaim 作出绑定决策时，会评估 Pod 可能具有的其他节点 约束，例如：如节点资源需求、节点选择器、Pod 亲和性和 Pod 反亲和性。
+
+
+
+**使用Local卷流程**
+
+- 创建PV，使用 nodeAffinity 指定绑定的节点提供存储
+- 创建 PVC，绑定PV的存储条件
+- 创建Pod，引用前面的PVC和PV实现Local 存储
+
+
+
+##### 案例：基于StorageClass实现Local卷
+
+```yaml
+#事先准备目标节点准备目录，对于本地存储Kubernetes 本身并不会自动创建路径，这是因为Kubernetes 不能控制节点上的本地存储，因此无法自动创建路径。
+[root@node2 ~] # mkdir -p /data/www
+
+#如果没有准备目录，会出现下面提示错误
+[root@master1 yaml]#kubectl describe pod pod-sc-local-demo
+Events:
+ Type     Reason           Age               From               Message
+  ----     ------            ----              ----               -------
+ Warning FailedScheduling 2m2s             default-scheduler  0/4 nodes are 
+available: pod has unbound immediate PersistentVolumeClaims. preemption: 0/4 
+nodes are available: 4 No preemption victims found for incoming pod..
+ Normal   Scheduled         2m1s             default-scheduler Successfully 
+assigned default/pod-sc-local-demo to node2.wang.org
+ Warning FailedMount       56s (x8 over 2m) kubelet           
+MountVolume.NewMounter initialization failed for volume "example-pv" : path 
+"/data/www" does not exist
+
+#准备清单文件, #kubernetes内置了Local的置备器，所以下面StorageClass资源可以不创建
+[root@master1 yaml] # cat storage-sc-local-pv-pvc-pod.yaml
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: waitForFirstConsumer #延迟绑定，只有Pod启动后再绑定PV到Pod所在节点，否则PVC处于Pending状态
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-sc-local
+spec:
+  capacity:
+    storage: 100Gi
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: local-storage
+  local:
+    path: /data/www/
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: kubernetes.io/hostname
+          operator: In
+          values:
+          - node2.mystical.org
+          
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-sc-local
+spec:
+  storageClassName: local-storage
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 100Mi
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-sc-local-demo
+spec:
+  containers:
+  - name: pod-sc-local-demo
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    volumeMounts:
+    - name: pvc-sc-local
+      mountPath: "/usr/share/nginx/html"
+  restartPolicy: "Nerver"
+  volumes:
+  - name: pvc-sc-local
+    persistentVolumeClaim:
+      claimName: pvc-sc-local
+      
+#应用清单文件
+[root@master1 yaml] # kubectl apply -f storage-sc-local-pv-pvc-pod.yaml
+persistentvolume/pv-sc-local created
+persistentvolumeclaim/pvc-sc-local created
+pod/pod-sc-local-demo created
+
+# 这里Pod的节点调度取决于PV定义的节点位置，是由于PV上定义了node2节点，因此Pod必然调度到node2节点
+# 而hostPath是先确定Pod，然后在根据Pod调度到的节点来确定路径。
+# 而且PV可以限定大小，而PV无法限定
+```
+
+
+
+#### NFS StorageClass
+
+##### NFS的存储制备器方案
+
+NFS 的自动配置程序 Provisioner 可以通过不同的项目实现,比如：
+
+- **csi-driver-nfs**
+
+  ```http
+  https://github.com/kubernetes-csi/csi-driver-nfs
+  ```
+
+  
+
+- **nfs-client-provisioner**
+
+  - nfs-client-provisioner 是一个自动配置卷程序，它使用现有的和已配置的 NFS 服务器来支持通过 PVC动态配置 PV
+  - nfs-client-provisioner **目前已经不提供更新**，nfs-client-provisioner 的 Github 仓库当前已经迁移 到 NFS-Subdir-External-Provisioner的仓库
+
+  ```http
+  https://github.com/kubernetes-retired/external-storage/tree/master/nfs-client
+  https://github.com/kubernetes-sigs/sig-storage-lib-external-provisioner
+  ```
+
+
+
+- **NFS-Subdir-External-Provisioner（官方推荐）**
+
+  - 此组件是由Kubernetes SIGs 社区开发,也是Kubernetes官方推荐实现
+  - 是对 nfs-client-provisioner 组件的扩展
+
+  ```http
+  https://kubernetes.io/docs/concepts/storage/storage-classes/#nfs
+  ```
+
+  - NFS-Subdir-External-Provisioner 是一个自动配置卷程序，可以在 NFS 服务器上通过PVC动态创 建和配置 Kubernetes 持久卷
+  - PV命名规则如下
+
+  ```bash
+  自动创建的 PV 以${namespace}-${pvcName}-${pvName} 命名格式创建在 NFS 服务器上的共享数据目录中
+  当这个 PV 被回收后会以 archieved-${namespace}-${pvcName}-${pvName} 命名格式存在NFS 服务器中
+  ```
+
+
+
+- **NFS Ganesha server and external provisioner**
+
+  ```http
+  https://github.com/kubernetes-sigs/nfs-ganesha-server-and-external-provisioner
+  ```
+
+  - nfs-ganesha-server-and-external-provisioner 是 Kubernetes 1.14+ 的树外动态配置程序。 您可以使用它快速轻松地部署几乎可以在任何地方使用的共享存储。
+
+
+
+##### 案例: 基于 nfs-subdir-external-provisione 创建 NFS 共享存储的 storageclass
+
+部署相关文件
+
+```http
+https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner
+https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner/tree/master/deploy
+https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner?tab=readme-ov-file#manuall
+```
+
+
+
+创建NFS共享存储的storageclass步骤如下
+
+- 创建 NFS 共享
+- 创建 **Service Account** 并授予管控NFS provisioner在k8s集群中运行的权限
+- 部署 NFS-Subdir-External-Provisioner 对应的 **Deployment**
+- 创建 StorageClass 负责建立PVC并调用NFS provisioner进行预定的工作,并让PV与PVC建立联系
+- 创建 PVC 时自动调用SC创建PV
+
+
+
+**创建NFS服务**
+
+```bash
+[root@master1 ~] # apt update && apt -y install nfs-server
+[root@master1 ~] # systemctl status nfs-server.service 
+● nfs-server.service - NFS server and services
+     Loaded: loaded (/lib/systemd/system/nfs-server.service; enabled; vendor 
+preset: enabled)
+     Active: active (exited) since Thu 2021-09-29 09:28:41 CST; 5min ago
+   Main PID: 64029 (code=exited, status=0/SUCCESS)
+     Tasks: 0 (limit: 2236)
+     Memory: 0B
+     CGroup: /system.slice/nfs-server.service
+9月 29 09:28:40 master1.wang.org systemd[1]: Starting NFS server and services...
+9月 29 09:28:41 master1.wang.org systemd[1]: Finished NFS server and services.
+
+
+[root@master1 ~]#mkdir -pv /data/sc-nfs 
+[root@master1 ~]#chown 777 /data/sc-nfs
+[root@master1 ~]#vim /etc/exports
+#授权worker节点的网段可以挂载
+#/data/sc-nfs *(rw,no_root_squash,all_squash,anonuid=0,anongid=0) 
+/data/sc-nfs *(rw,no_root_squash)
+
+[root@master1 ~]#exportfs -r
+[root@master1 ~]#exportfs -v
+/data/sc-nfs <world>
+(sync,wdelay,hide,no_subtree_check,anonuid=0,anongid=0,sec=sys,rw,secure,no_root_squash,all_squash)
+
+#并在所有worker节点安装NFS客户端 
+[root@nodeX ~]#apt update && apt -y install nfs-common 或者 nfs-client
+```
+
+
+
+**创建ServiceAccount并授权**
+
+```yaml
+[root@master1 yaml] # cat rbac.yaml 
+# 创建独立的名称空间
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nfs-provisioner-demo
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfs-client-provisioner
+  # replace with namespace where provisioner is deployed 根据业务需要修改此处名称空间
+  namespace: nfs-provisioner-demo
+  
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nfs-client-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+    
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: run-nfs-client-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    # replace with namespace where provisioner is deployed
+    namespace: nfs-provisioner-demo
+roleRef:
+  kind: ClusterRole
+  name: nfs-client-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+  
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  # replace with namespace where provisioner is deployed
+  namespace: nfs-provisioner-demo
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+    
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  # replace with namespace where provisioner is deployed
+  namespace: nfs-provisioner-demo
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    # replace with namespace where provisioner is deployed
+    namespace: nfs-provisioner-demo
+roleRef:
+  kind: Role
+  name: leader-locking-nfs-client-provisioner
+  apiGroup: rbac.authorization.k8s.io
+
+
+# 应用
+[root@master1 yaml] # kubectl apply -f rbac.yaml
+serviceaccount/nfs-client-provisioner created
+clusterrole.rbac.authorization.k8s.io/nfs-client-provisioner-runner created
+clusterrolebinding.rbac.authorization.k8s.io/run-nfs-client-provisioner created
+role.rbac.authorization.k8s.io/leader-locking-nfs-client-provisioner created
+rolebinding.rbac.authorization.k8s.io/leader-locking-nfs-client-provisioner created
+
+# 查看系统用户
+[root@master1 yaml]#kubectl get sa
+NAME                     SECRETS   AGE
+default                  0         34d
+nfs-client-provisioner   0         9s
+```
+
+
+
+**部署 NFS-Subdir-External-Provisioner 对应的 Deployment**
+
+```yaml
+[root@master1 nsf-provisioner] #vim nfs-client-provisioner.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-client-provisioner
+  labels:
+    app: nfs-client-provisioner
+  namespace: nfs-provisioner-demo
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccountName: nfs-client-provisioner
+      containers:
+      - name: nfs-client-provisioner     
+        image: k8s.gcr.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2 #此镜像国内可能无法访问
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: nfs-client-root
+          mountPath: /persistentvolumes
+        env:
+        - name: PROVISIONER_NAME
+          value: k8s-sigs.io/nfs-subdir-external-provisioner # 名称确保与nfs-StorageClass.yaml文件中的provisioner名称保持一致
+        - name: NFS_SERVER
+          value: nfs.mystical.org
+        - name: NFS_PATH
+          value: /nfs-data/sc-nfs
+      volumes:
+      - name: nfs-client-root
+        nfs:
+          server: nfs.mystical.org
+          path: /nfs-data/sc-nfs
+          
+# 应用
+[root@master1 nsf-provisioner]#kubectl apply -f nfs-client-provisioner.yaml 
+deployment.apps/nfs-client-provisioner created
+
+# 查看
+[root@master1 nsf-provisioner]#kubectl get pod -n nfs-provisioner-demo 
+NAME                                      READY   STATUS    RESTARTS   AGE
+nfs-client-provisioner-74d7c6bf46-kkpmd   1/1     Running   0          4m9s
+```
+
+
+
+**创建NFS资源的storageClass**
+
+```yaml
+[root@master1 nsf-provisioner] # vim nfs-storageClass.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sc-nfs
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false" # 是否设置为默认的storageClass
+provisioner:kubrovisioner # or choose another name, must match deployment's env PROVISIONER_NAME
+parameters:
+  archiveOnDelete: "true" # 设置为false时删除PVC不会保留数据，"true"则保留数据，基于安全原因建议设为"true"
+
+
+# 应用
+[root@master1 nsf-provisioner] # kubectl apply -f nfs-storageClass.yaml 
+storageclass.storage.k8s.io/sc-nfs created
+
+# 查看
+[root@master1 nsf-provisioner]#kubectl get sc -n nfs-provisioner-demo 
+NAME     PROVISIONER                                   RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+sc-nfs   k8s-sigs.io/nfs-subdir-external-provisioner   Delete          Immediate           false                  15s
+```
+
+
+
+**创建PVC**
+
+```yaml
+[root@master1 nsf-provisioner] # vim pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-nfs-sc
+spec:
+  storageClassName: sc-nfs # 需要和前面创建的storageClass名称相同
+  accessModes: ["ReadWriteMany", "ReadOnlyMany"]
+  resources:
+    requests:
+      storage: 100Mi
+
+
+# 应用
+[root@master1 nsf-provisioner] # kubectl apply -f pvc.yaml 
+persistentvolumeclaim/pvc-nfs-sc created
+
+# 查看pvc
+[root@master1 nsf-provisioner] # kubectl get pvc
+NAME         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+pvc-nfs-sc   Bound    pvc-a77fd2d8-3f14-475c-8e81-b5c0b24c4358   100Mi      ROX,RWX        sc-nfs         <unset>                 9m46s
+
+# 自动生成pv
+[root@master1 nsf-provisioner]#kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+pvc-a77fd2d8-3f14-475c-8e81-b5c0b24c4358   100Mi      ROX,RWX        Delete           Bound    default/pvc-nfs-sc   sc-nfs         <unset>                          10m
+
+
+# 如果pv没有创建出来，可能的问题查看下rbac的权限，是否ServiceAccount给予的权限不够
+# 可以通过logs命令查看，根据输出的日志进行排错
+[root@master1 nsf-provisioner] # kubectl logs pod/nfs-client-provisioner-649b64df96-sb7sg -n nfs-provisioner-demo
+```
+
+
+
+**创建Pod**
+
+```yaml
+[root@master1 nsf-provisioner] # cat pod-test.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nfs-sc-test
+spec:
+  containers:
+  - name: pod-nfs-sc-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    volumeMounts:
+    - name: nfs-pvc
+      mountPath: "/usr/share/nginx/html/"
+  restartPolicy: "Never"
+  volumes:
+  - name: nfs-pvc
+    persistentVolumeClaim:
+      claimName: pvc-nfs-sc
+
+# 应用
+[root@master1 nsf-provisioner] # kubectl apply -f pod-test.yaml                          
+pod/pod-nfs-sc-test created
+
+# 查看
+[root@master1 nsf-provisioner] # kubectl get pod -o wide
+NAME              READY   STATUS    RESTARTS   AGE   IP             NODE    NOMINATED NODE   READINESS GATES
+pod-nfs-sc-test   1/1     Running   0          11s   10.244.1.125   node1   <none>           <none>
+
+# curlIP
+[root@master1 nsf-provisioner] # curl 10.244.1.125
+<html>
+<head><title>403 Forbidden</title></head>
+<body>
+<center><h1>403 Forbidden</h1></center>
+<hr><center>nginx/1.20.0</center>
+</body>
+</html>
+
+# 因为根目录下没有内容，因此返回403
+# 在nfs目录下，添加index.html文件
+[root@ubuntu2204 ~] # echo web1 > /nfs-data/sc-nfs/default-pvc-nfs-sc-pvc-a77fd2d8-3f14-475c-8e81-b5c0b24c4358/index.html
+
+# 等一段时间后（有短时间的延迟），再次查看，
+[root@master1 nsf-provisioner] # curl 10.244.1.125
+web1
+```
+
+
+
+
+
+
+
+## Kubernetes配置管理
+
+
+
+**文章内存**
+
+- **配置说明**
+- **ConfigMap**
+- **Secret**
+- **downwardAPI**
+- **Projected**
+
+
+
+
+
+### 配置说明
+
+kubernetes提供了对 Pod 容器应用可以实现集中式的配置管理功能的相关资源：
+
+- ConfigMap
+- Secret
+- downwardAPI
+- Projected 
+
+
+
+通过这些组件来实现向pod中的容器应用中注入配置信息的机制，从而避免了开发者参与
+
+注意：**对于运行中容器的配置改变，还需要通过应用程序重载相关配置才能生效**
+
+
+
+
+
+#### 配置组件简介
+
+**configMap**
+
+Configmap是Kubernetes集群中非常重要的一种配置管理资源对象。
+
+借助于ConfigMap API可以向pod中的容器中注入配置信息。
+
+ConfigMap不仅可以保存环境变量或命令行参数等属性，也可以用来保存整个配置文件或者JSON格式的 文件。
+
+各种配置属性和数据以 k/v或嵌套k/v 样式 存在到Configmap中
+
+注意：所有的配置信息都是**以明文的方式**来进行保存，实现资源配置的快速获取或者更新。
+
+
+
+**Secret**
+
+Kubernetes集群中，有一些配置属性信息是非常敏感的，所以这些信息在传递的过程中，是不希望其他人能够看到的
+
+Kubernetes提供了一种加密场景中的配置管理资源对象Secret。
+
+它在进行数据传输之前，会对数据进行编码，在数据获取的时候，会对数据进行解码。从而保证整个数 据传输过程的安全。
+
+**注意：这些数据通常采用Base64机制保存，所以安全性一般**
+
+
+
+**DownwardAPI**
+
+downwardAPI 为运行在pod中的应用容器提供了一种反向引用。让容器中的应用程序了解所处pod或 Node的一些基础外部属性信息。
+
+从严格意义上来说，downwardAPI不是存储卷，它自身就存在
+
+相较于configmap、secret等资源对象需要创建后才能使用，而downwardAPI引用的是Pod自身的运行环境信息，这些信息在Pod启动的时候就存在
+
+
+
+ **Projected**
+
+一个 projected Volumes 投射卷可以将若干现有的卷源映射到同一个目录之上。
+
+
+
+
+
+
+
+### ConfigMap
+
+
+
+#### ConfigMap说明
+
+Kubernetes提供了对pod中容器应用的集中配置管理组件：ConfigMap。
+
+通过ConfigMap来实现向pod中的容器中注入配置信息的机制。
+
+可以把configmap理解为Linux系统中的/etc目录，专门用来存储配置文件的目录
+
+Kubernetes借助于ConfigMap对象实现了将配置信息从容器镜像中解耦，从而增强了工作负载的可移樟 性、使其配置更易于更改和管理并避免了将配置数据硬编码到Pod配置清单中
+
+**ConfigMap不仅仅可以保存单个属性，也可以用来保存整个配置文件。**
+
+从Kubernetes v1.19版本开始，ConfigMap和Secret支持使用**immutable字段**创建不可变实例，实现不 可变基础设施效果
+
+
+
+##### 基本属性
+
+```bash
+# kubectl explain cm
+    binaryData              # 二进制数据
+    data                    # 文本数据，支持变量和文件
+    immutable <boolean>     # 设为true，不能被修改只能删除，默认为nil可以随时被修改
+    
+#注意：基于data的方式传递信息的话，会在pod的容器内部生成一个单独的数据文件    
+```
+
+
+
+##### 数据配置的格式
+
+```bash
+#单行配置数据格式
+属性名称key: 属性值value   #单行配置内容，一般保存变量，参数等
+文件名：单行内容            #配置文件如果只有一行，也使用此方式，key为文件名，value为文件内容
+
+
+#多行文件数据格式     
+文件名称1: |     #注意：| 是"多行键值"的标识符
+ 文件内容行1    #内容大小不能超过1M
+ 文件内容行2
+ ......
+文件名称2: |     #注意：| 是"多行键值"的标识符
+ 文件内容行1    #内容大小不能超过1M
+ 文件内容行2
+ ......
+```
+
+configmap资源类型的创建，与Kubernetes的其他很多资源对象的创建方式一样，主要涉及到两种方式：
+
+- **命令行工具**：配置中有大量简单的键值对时建议使用
+- **资源定义文件**：配置为大量文本内容时建议使用，此方式需要事先准备在资源清单元文件中加入配置文件内容
+
+
+
+
+
+通常为了避免配置更新后没有生效的问题，可以在更新 ConfigMap 之后，手动重创建相关的 Pod 或者 Deployment
+
+- 运维方式：可以通过 **重启** 或 **重建** 的方式 
+  - 使用 kubectl rollout restart 命令来重启 Deployment 
+  - 使用 kubectl delete pod 命令来删除 Pod，从而触发 Pod 的重启
+
+
+
+#### ConfigMap创建和更新
+
+##### 命令行创建方式
+
+```bash
+# 创建命令格式
+kubectl create configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run=server|client|none] [-n <namespace>] [options]
+
+# 参数详解：
+--from-literal=key1=value1          #以设置键值对的方式实现变量配置数据
+--from-env-file=/PATH/TO/FILE       #以环境变量专用文件的方式实现配置数据
+--from-file=[key=]/PATH/TO/FILE     #以配置文件的方式创建配置文件数据，如不指定key，FILE名称为key名
+--from-file=/PATH/TO/DIR            #以配置文件所在目录的方式创建配置文件数据
+
+--dry-run=client -o yaml            #测试运行并显示cm内容
+
+
+#查看configmap
+kubectl create configmap <cm_name> -n <namespace> [-o yaml] --dry-run=client
+kubectl get configmap <cm_name> -n <namespace>
+kubectl describe configmap <cm_name> -n <namespace>
+
+
+#删除configmap
+kubectl delete configmap <cm_name> [-n <namespace>]
+```
+
+
+
+##### **命令行创建方式案例**
+
+
+
+**范例：命令行创建基于key/value形式的变量配置**
+
+```bash
+# 在使用kubectl创建的时候，通过在命令行直接传递键值对创建
+[root@master1 ~]#kubectl create configmap cm-test1 --from-literal=key1='value1' --from-literal=key2='value2'
+
+# 查看
+[root@master1 nsf-provisioner]#kubectl get cm
+NAME               DATA   AGE
+cm-test1           2      7s
+kube-root-ca.crt   1      3d1h
+
+# 查看yaml清单
+[root@master1 nsf-provisioner]#kubectl get cm cm-test1 -o yaml
+apiVersion: v1
+data:
+  key1: value1
+  key2: value2
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2024-12-31T09:27:23Z"
+  name: cm-test1
+  namespace: default
+  resourceVersion: "165446"
+  uid: 8f831d4c-3b2d-4058-ae76-342c819f38a3
+
+# 查看describe
+[root@master1 nsf-provisioner]#kubectl describe cm cm-test1 
+Name:         cm-test1
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+key1:
+----
+value1
+key2:
+----
+value2
+
+BinaryData
+====
+
+Events:  <none>
+
+# 删除cm
+[root@master1 nsf-provisioner]#kubectl delete cm cm-test1 
+configmap "cm-test1" deleted
+```
+
+
+
+**范例: 命令行创建基于key/value形式的变量配置**
+
+```bash
+[root@master1 ~]# kubectl create configmap pod-test-config --from-literal=host="127.0.0.1" --from-literal=port="8888"
+configmap/pod-test-config created
+
+# 查看
+[root@master1 ~]# kubectl get cm
+NAME               DATA   AGE
+kube-root-ca.crt   1      3d22h
+pod-test-config    2      5s
+
+# 输出清单
+[root@master1 ~]# kubectl get cm pod-test-config -o yaml;
+apiVersion: v1
+data:
+  host: 127.0.0.1
+  port: "8888"
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2025-01-01T06:27:29Z"
+  name: pod-test-config
+  namespace: default
+  resourceVersion: "197278"
+  uid: 297b056b-8fa0-42e3-8394-93470a208147
+```
+
+
+
+**范例: 命令行创建基于环境变量文件的变量配置**
+
+```bash
+# 如果变量较多，使用上面方式一个个的设定环境变量太繁琐，可以全部添加到环境变量文件中然后基于它来创建CM
+# 定制环境变量文件
+[root@master1 conf.d]#cat env
+key1=value1
+key2=value2
+
+# 注意：env文件中所有的配置项以“属性名=属性值”格式定制
+
+# 将所有环境变量添加到configmap中
+[root@master1 conf.d]# kubectl create configmap cm-test2 --from-env-file=./env 
+configmap/cm-test2 created
+
+# 查看清单文件
+[root@master1 conf.d]# kubectl get cm cm-test2 -o yaml
+apiVersion: v1
+data:
+  key1: value1
+  key2: value2
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2025-01-01T06:32:42Z"
+  name: cm-test2
+  namespace: default
+  resourceVersion: "197783"
+  uid: e3a193ae-5093-4822-9c34-3b212fafc473
+
+# 删除cm
+[root@master1 conf.d]# kubectl delete cm pod-test-config 
+configmap "pod-test-config" deleted
+```
+
+
+
+**范例：命令行创建基于配置文件的文件形式CM**
+
+```bash
+# 直接将多个配置文件创建为一个ConfigMap
+[root@master1 ~]# ls conf.d/
+app1.conf app2.conf app3.conf
+
+[root@master1 ~]# cat conf.d/app1.conf
+[app1]
+config1
+
+[root@master1 ~]# cat conf.d/app2.conf
+[app2]
+config2
+
+#文件名自动成为key名
+[root@master1 conf.d]#kubectl create configmap cm-test3 --from-file=./app1.conf --from-file=./app2.conf 
+configmap/cm-test3 created
+
+# 查看
+[root@master1 conf.d]#kubectl get cm cm-test3 -o yaml
+apiVersion: v1
+data:
+  app1.conf: |
+    [app1]
+    config1
+  app2.conf: |
+    [app2]
+    config2
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2025-01-01T06:36:45Z"
+  name: cm-test3
+  namespace: default
+  resourceVersion: "198174"
+  uid: ee772063-dd7d-4ed5-acab-74423104695b
+  
+# 删除CM
+[root@master1 conf.d]#kubectl delete cm cm-test3 
+configmap "cm-test3" deleted
+```
+
+
+
+**范例: 命令行创建基于目录的CM**
+
+```bash
+[root@master1 conf.d]# ls
+app1.conf  app2.conf  app3.conf
+
+[root@master1 conf.d]#cat *
+[app1]
+config1
+[app2]
+config2
+[app3]
+config3
+
+#直接将一个目录下的所有配置文件创建为一个ConfigMap
+[root@master1 cm]#kubectl create cm cm-test4 --from-file=./conf.d/
+configmap/cm-test4 created
+
+#结果显示：多个文件之间，属性名是文件名，属性值是文件内容
+[root@master1 cm]#kubectl get cm cm-test4 -o yaml;
+apiVersion: v1
+data:
+  app1.conf: |
+    [app1]
+    config1
+  app2.conf: |
+    [app2]
+    config2
+  app3.conf: |
+    [app3]
+    config3
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2025-01-01T06:40:19Z"
+  name: cm-test4
+  namespace: default
+  resourceVersion: "198521"
+  uid: 4c83e7d6-b191-46a5-b0f4-a1c8b14f905a
+
+# 删除CM
+[root@master1 ~]#kubectl delete cm cm-test4
+```
+
+
+
+##### 资源清单文件创建方式
+
+**资源清单文件命令格式说明**
+
+```yaml
+# 清单文件格式
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm_name
+  namespace: default
+data:
+  key: value          # 配置信息如果只有一行，也使用此方式，使用卷挂载时，key即为文件名，value为文件内容
+  文件名： |
+    文件内容行1
+    文件内容行2
+    ......
+# 注意：CM的清单文件没有spec信息，而是data
+
+# 命令式：
+kubectl create -f /path/file
+# 声明式
+kubectl apply -f /path/file
+```
+
+注意：此方式需要事先将配置文件的内容全部写入清单文件，而且配置文件的格式需要调整才能匹配， 所以很不方便，推荐如下方式解决
+
+- 先在命令行执行时指定配置文件的方式创建 CM
+- 通过 kubectl get cm  -o yaml > cm.yaml 方式导出资源清单文件
+- 或者 kubectl create configmap NAME --dry-run=client -o yaml > cm.yaml 方式导出资源清单文件
+- 最后调整和修改上面生成的 yaml资源清单文件
+
+
+
+##### 资源清单文件创建方式案例
+
+```yaml
+# 资源定义文件
+[root@master1 cm] # vim storage-configmap-test.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-test
+data:
+  author: wangxiaochun
+  file.conf: |
+    [class]
+    linux
+    go
+    java
+    
+    
+# 创建资源对象
+[root@master1 cm] # kubectl apply -f storage-configmap-test.yaml 
+configmap/config-test created
+
+# 查看
+[root@master1 cm] # kubectl describe cm config-test 
+Name:         config-test
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+author:
+----
+wangxiaochun
+file.conf:
+----
+[class]
+linux
+go
+java
+
+
+BinaryData
+====
+
+Events:  <none>
+
+# 可以在线修改
+[root@master1 cm] # kubectl edit cm config-test
+
+# 删除
+[root@master1 cm]#kubectl delete cm config-test 
+configmap "config-test" deleted
+```
+
+
+
+**范例: 只读的configmap**
+
+```yaml
+[root@master1 cm] # vim storage-configmap-immutable-test.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-immutable-test
+data:
+  author: wangxiaochun
+  file.conf: |
+    [class]
+    linux
+    go
+    java
+immutable: true  # 只读
+
+# 应用
+[root@master1 cm]#kubectl apply -f storage-configmap-immutable-test.yaml 
+configmap/cm-immutable-test created
+
+# 查看
+[root@master1 cm]#kubectl get cm cm-immutable-test 
+NAME                DATA   AGE
+cm-immutable-test   2      31s
+
+# 在线修改configmap提示出错
+[root@master1 cm]#kubectl edit cm cm-immutable-test 
+error: configmaps "cm-immutable-test" is invalid
+
+# 可以删除
+[root@master1 cm]#kubectl delete cm cm-immutable-test 
+configmap "cm-immutable-test" deleted
+```
+
+
+
+##### 在线更新configmap
+
+注意：configmap虽然支持在线更新，但是configmap更新后可能不会对已有的Pod的应用生效，可能 还需要重建Pod才能生效
+
+```bash
+#创建 configmap
+[root@master1 ~]#kubectl create cm cm-nginx-conf --from-file=nginx.conf
+
+#修改configmap
+#方法1,旧版中如果配置内容如果不大,多行内容可以显示在一行,但此方式不方便修改,但如果过大,此方式只
+能显示大小,而非内容,所以不能修改,新版无此问题
+[root@master1 ~]#kubectl edit cm cm-nginx-conf
+
+
+#方法2
+[root@master1 ~]#kubectl get cm cm-nginx-conf -o yaml > cm-config-conf.yaml
+[root@master1 ~]#vim cm-config-conf.yaml
+[root@master1 ~]#kubectl apply -f cm-config-conf.yaml
+
+
+#方法3
+#修改配置
+[root@master1 ~]#vim nginx.conf
+[root@master1 ~]#kubectl create cm cm-nginx-conf --from-file=nginx.conf --dry-run=client -oyaml |kubectl apply -f -
+```
+
+
+
+#### ConfigMap使用
+
+**使用ConfigMap主要有两种方式：**
+
+- 通过环境变量的方式直接传递pod
+- 使用volume的方式挂载入到pod内的文件中
+
+
+
+**注意：**
+
+- ConfigMap必须在Pod之前创建
+- 与ConfigMap在同一个namespace内的pod才能使用ConfigMap**，即ConfigMap不能跨命名空间调用。**
+- ConfigMap通常存放的数据不要超过1M
+- CM 可以支持实时更新，在原来的pod里面直接看到效果
+
+
+
+#####  通过环境变量的方式直接传递 Pod
+
+引用ConfigMap对象上特定的key，以**valueFrom**赋值给Pod上指定的环境变量
+
+也可以在Pod上使用**envFrom**一次性导入ConfigMap对象上的所有的key-value,key(可以统一附加特定前 缀）即为环境变量,value自动成为相应的变量值
+
+环境变量是容器启动时注入的，容器启动后变量的值不会随CM更改而发生变化,即一次性加载 configmap,除非删除容器重建
+
+
+
+**方式1：env 对指定的变量一个一个赋值**
+
+```bash
+kubectl explain pod.spec.containers.env
+    name          # 手工定制环境变量时，设置环境变量的名称，必选字段
+    value         # 手工定制环境变量时，直接设置环境变量的属性值，不通过CM获取配置，可选字段
+    valueFrom     # #手工定制环境变量时，设置环境变量的属性来源，可以支持从CM,Secret,downwordAPI获取
+
+kubectl explain pod.spec.containers.env.valueFrom.configMapKeyRef
+    name          # 引用指定的configmap
+    key           # 引用指定的configmap中的具体哪个key
+    optional      # 如果设置为false，标识该项是必选项，如果设置为true标识这个key是可选的。默认false
+
+#此方式实现过程
+1）容器中自定义环境变量名
+2）根据CM的名称和Key名，找到对应的value
+3) 再将value赋值给容器的环境变量
+```
+
+
+
+**方式2：envFrom 使用CM的所有变量实现对变量的批量赋值，此方式生产更为推荐**
+
+```bash
+kubectl explain pod.spec.containers.envFrom
+    configMapRef     # ConfigMap对象中的所有Key
+    secretKeyRef     # Secret对象中的所有Key
+    prefix           # #为ConfigMap中的每个属性都添加前缀标识
+
+#此方实现过程
+1）容器中自定义环境变量名，并且和CM的key同名
+2）找到指定的CM中所有Key名，将值批量直接赋值给容器中相同名称的变量
+```
+
+
+
+##### 使用volume的方式挂载入到pod内的文件中
+
+在Pod上将 configMap对象引用为存储卷，而后整体由容器mount至某个目录下，key转为文件名， value即为相应的文件内容
+
+在Pod上定义configMap卷时，仅引用其中的部分key，而后由容器mount至目录下
+
+在容器上仅mount configMap卷上指定的key
+
+容器中挂载的Volume数据可以**根据时间戳机制和ConfigMap 同步更新**，即configmap变更后会自动加载，但更新时间是不确定的，
+
+所以一般建议当更新configmap的配置后，可以通过重新Pod使之生效，符合不可变基础设施的理念 
+
+推荐滚动升级pod的方式来让ConfigMap内容变化生效
+
+
+
+##### ConfigMap实战案例
+
+**范例：env 变量**
+
+```yaml
+# 资源清单文件
+[root@master1 cm] # vim storage-configmap-simple-env.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-nginx-config
+data:
+  port: "10086"  # 注意：只支持字符串，需要用引号引起来
+  user: "www"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-env-test
+spec:
+  containers:
+  - name: configmap-env-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    env:
+    - name: NGINX_HOST
+      value: "10.0.0.100"  #直接变量赋值
+    - name: NGINX_PORT
+      valueFrom:
+        configMapKeyRef:
+          name: cm-nginx-config
+          key: port
+          optional: true
+    - name: NGINX_USER
+      valueFrom:
+        configMapKeyRef:
+          name: cm-nginx-config
+          key: user
+          optional: false
+#配置解析：这里面我们可以使用两种方式在pod中传递变量
+
+# 资源创建
+[root@master1 cm] # kubectl apply -f storage-configmap-simple-env.yaml 
+configmap/cm-nginx-config created
+pod/configmap-env-test created
+
+# 查看
+[root@master1 cm] # kubectl get pod
+NAME                 READY   STATUS    RESTARTS   AGE
+configmap-env-test   1/1     Running   0          9s
+[root@master1 cm] # kubectl get cm
+NAME               DATA   AGE
+cm-nginx-config    2      32s
+
+# 验证变量
+[root@master1 cm] # kubectl exec configmap-env-test -- env
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=configmap-env-test
+NGINX_HOST=10.0.0.100 
+NGINX_PORT=10086   # ---------------------- ConfigMap传入变量
+NGINX_USER=www     # ---------------------- ConfigMap传入变量
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+KUBERNETES_SERVICE_HOST=10.96.0.1
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+KUBERNETES_PORT=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP=tcp://10.96.0.1:443
+NGINX_VERSION=1.20.0
+NJS_VERSION=0.5.3
+PKG_RELEASE=1~buster
+HOME=/root
+
+# 资源删除
+[root@master1 cm] # kubectl delete -f storage-configmap-simple-env.yaml 
+configmap "cm-nginx-config" deleted
+pod "configmap-env-test" deleted
+```
+
+
+
+**范例：env 变量**
+
+```yaml
+# 创建配置文件
+[root@master1 cm] # vim storage-configmap-valueFrom-env.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-pod-test
+  namespace: default
+data:
+  host: 0.0.0.0
+  port: "8888"
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-env-demo
+spec:
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+    name: pod-test
+    env:
+    - name: HOST
+      valueFrom:
+        configMapKeyRef:
+          name: cm-pod-test
+          key: host
+          optional: true  #true时,如果configmap中的key即使不存在,也不会导致容器无法初始
+
+    - name: PORT
+      valueFrom:
+        configMapKeyRef:
+          name: cm-pod-test
+          key: port
+          optional: false # false时，如果configmap中的key不存在，会导致容器无法初始化
+
+
+# 应用
+[root@master1 cm] # kubectl apply -f storage-configmap-valueFrom-env.yaml 
+configmap/cm-pod-test created
+pod/configmap-env-demo created
+
+# 查看
+[root@master1 cm] # kubectl exec configmap-env-demo -- env
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=configmap-env-demo
+HOST=0.0.0.0
+PORT=8888
+KUBERNETES_PORT_443_TCP=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+KUBERNETES_SERVICE_HOST=10.96.0.1
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+KUBERNETES_PORT=tcp://10.96.0.1:443
+DEPLOYENV=Production
+RELEASE=Stable
+PS1=[\u@\h \w]\$ 
+HOME=/root
+
+# 删除资源
+[root@master1 cm]#kubectl delete -f storage-configmap-valueFrom-env.yaml 
+configmap "cm-pod-test" deleted
+pod "configmap-env-demo" deleted
+```
+
+
+
+**范例：env 变量**
+
+```yaml
+# 清单文件
+[root@master1 cm] # vim storage-configmap-simple-envargs.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-command-arg
+data:
+  time: "3600"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-cm-command-arg
+spec:
+  containers:
+  - name: pod-cm-command-arg-container
+    image: busybox:1.32.0
+    command: ["/bin/sh", "-c", "sleep ${SPECIAL_TIME}"]
+    env:
+    - name: SPECIAL_TIME
+      valueFrom:
+        configMapKeyRef:
+          name: cm-command-arg
+          key: time
+    - name: NAME
+      value: "wangxiaochun"
+  restartPolicy: Never
+
+# 应用
+[root@master1 cm] # kubectl apply -f storage-configmap-simple-envargs.yaml 
+configmap/cm-command-arg created
+pod/pod-cm-command-arg created
+
+# 查看
+[root@master1 cm] # kubectl get pod
+NAME                 READY   STATUS    RESTARTS   AGE
+pod-cm-command-arg   1/1     Running   0          3s
+
+[root@master1 cm] # kubectl exec pod-cm-command-arg -- ps aux
+PID   USER     TIME  COMMAND
+    1 root      0:00 sleep 3600
+    8 root      0:00 ps aux
+
+# 删除
+[root@master1 cm]#kubectl delete -f storage-configmap-simple-envargs.yaml 
+configmap "cm-command-arg" deleted
+pod "pod-cm-command-arg" deleted
+```
+
+
+
+**范例：envFrom 批量导入所有变量**
+
+```yaml
+# 配置文件资源定义文件
+[root@master1 cm] # vim storage-configmap-simple-envfrom.yaml
+[root@master1 cm]#cat storage-configmap-simple-envfrom.yaml 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-nginx
+data:
+  NGINX_PORT: "10086"
+  NGINX_USER: "www"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-envfrom-test
+spec:
+  containers:
+  - name: configmap-envfrom-test
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    envFrom:
+    - configMapRef:
+        name: cm-nginx  # 所有变量从cm中读取
+        
+# 应用
+[root@master1 cm] # kubectl apply -f storage-configmap-simple-envfrom.yaml 
+configmap/cm-nginx unchanged
+pod/configmap-envfrom-test created
+
+# 查看
+[root@master1 cm] # kubectl get pod
+NAME                     READY   STATUS    RESTARTS   AGE
+configmap-envfrom-test   1/1     Running   0          2s
+
+[root@master1 cm] # kubectl exec configmap-envfrom-test -- env
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+HOSTNAME=configmap-envfrom-test
+NGINX_PORT=10086
+NGINX_USER=www
+KUBERNETES_PORT_443_TCP_ADDR=10.96.0.1
+KUBERNETES_SERVICE_HOST=10.96.0.1
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_SERVICE_PORT_HTTPS=443
+KUBERNETES_PORT=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP=tcp://10.96.0.1:443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+KUBERNETES_PORT_443_TCP_PORT=443
+NGINX_VERSION=1.20.0
+NJS_VERSION=0.5.3
+PKG_RELEASE=1~buster
+HOME=/root
+
+# 删除
+[root@master1 cm]#kubectl delete -f storage-configmap-simple-envfrom.yaml 
+configmap "cm-nginx" deleted
+pod "configmap-envfrom-test" deleted
+```
+
+
+
+ **范例：volume 生成配置文件并更新生效**
+
+```yaml
+# configmap资源定义
+[root@master1 cm] # vim storage-configmap-simple-volume.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-volume
+data:
+  author: wangxiaochun
+  file.conf: |
+    [app]
+    config1
+    config2
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-volume-test
+spec:
+  volumes:
+  - name: volume-config  # 指定卷名
+    configMap:
+      name: cm-volume    # 指定卷来自cm
+  containers:
+  - name: nginx
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    volumeMounts:
+    - name: volume-config # 调用前面定义的卷名
+      mountPath: /cmap/   # 指定Pod中的挂载点目录
+      
+# 应用
+[root@master1 cm] # kubectl apply -f storage-configmap-simple-volume.yaml 
+configmap/cm-volume created
+pod/pod-volume-test created
+
+# 查看
+[root@master1 cm] # kubectl get pod
+NAME              READY   STATUS    RESTARTS   AGE
+pod-volume-test   1/1     Running   0          4s
+
+[root@master1 cm] # kubectl exec pod-volume-test -- ls /cmap/
+author
+file.conf
+
+# 进入容器查看
+[root@master1 cm] # kubectl exec -it pod-volume-test -- sh
+# cd /cmap     
+# ls
+author	file.conf
+# ls -al
+total 12
+drwxrwxrwx 3 root root 4096 Jan  1 09:26 .
+drwxr-xr-x 1 root root 4096 Jan  1 09:26 ..
+drwxr-xr-x 2 root root 4096 Jan  1 09:26 ..2025_01_01_09_26_31.673800736
+lrwxrwxrwx 1 root root   31 Jan  1 09:26 ..data -> ..2025_01_01_09_26_31.673800736
+lrwxrwxrwx 1 root root   13 Jan  1 09:26 author -> ..data/author
+lrwxrwxrwx 1 root root   16 Jan  1 09:26 file.conf -> ..data/file.conf
+# cd ..2025*        
+# ls
+author	file.conf
+
+# 结果显示：
+# 这些文件虽然看起来是挂载在目录下，实际上，它是经过两层的软链接才能找到真正的挂载的文件，容器内挂载目录的生成的文件
+# ..2025_01_01_09_26_31.673800736
+# ..data -> ..2025_01_01_09_26_31.673800736
+# author -> ..data/author
+# file.conf -> ..data/file.conf
+# 通过这种双层软连接的方式，只要容器支持重载技术，那么只需要更改配置文件就可以实现容器应用的变动
+
+# 修改cm
+[root@master1 cm] # kubectl edit cm cm-volume 
+apiVersion: v1
+data:
+ author: wang  #修改此行
+ file.conf: |
+   [app]
+   config1
+   config2
+   config3  #加此行
+kind: ConfigMap
+.....
+configmap/cm-volume edited
+
+# 等一会儿进入pod可以看到配置文件变化
+[root@master1 cm] # kubectl exec -it pod-volume-test -- sh
+# cd /cmap
+# ls -al
+total 12
+drwxrwxrwx 3 root root 4096 Jan  1 09:33 .
+drwxr-xr-x 1 root root 4096 Jan  1 09:26 ..
+drwxr-xr-x 2 root root 4096 Jan  1 09:33 ..2025_01_01_09_33_42.2079151602
+lrwxrwxrwx 1 root root   32 Jan  1 09:33 ..data -> ..2025_01_01_09_33_42.2079151602
+lrwxrwxrwx 1 root root   13 Jan  1 09:26 author -> ..data/author
+lrwxrwxrwx 1 root root   16 Jan  1 09:26 file.conf -> ..data/file.conf
+# cat file.conf                     
+[app]
+config1
+config2
+config3
+# exit
+
+#删除
+[root@master1 cm] # kubectl delete -f storage-configmap-simple-volume.yaml 
+configmap "cm-volume" deleted
+pod "pod-volume-test" deleted
+```
+
+
+
+**范例：volume 挂载全部内容**
+
+```yaml
+# 命令行创建CM，创建Nginx的配置信息
+[root@master1 nginx.conf.d] # vim default.conf
+server {
+    listen 8080;
+    server_name localhost;
+    location / {
+        root /usr/share/nginx/html;
+        index index.html index.htm;
+    }
+    error_page 500 502 503 504 /50x.html;
+    location /50x.html {
+        root /usr/share/nginx/html;
+    }
+}
+
+# 命令行创建CM
+[root@master1 cm] # kubectl create configmap cm-nginx-conf-files --from-file=nginx.conf.d/
+configmap/cm-nginx-conf-files created
+
+# 查看
+[root@master1 cm]#kubectl get cm
+NAME                  DATA   AGE
+cm-nginx-conf-files   1      87s
+
+# 清单文件
+[root@master1 cm] # vim storage-configmap-nginx-file.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-nginx-index
+data:
+  index.html: "Nginx Configmap Page!" # 单行内容生成configmap
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-nginx-conf-configmap
+spec:
+  volumes:
+  - name: nginx-conf
+    configMap:
+      name: cm-nginx-conf-files
+      optional: false
+  - name: nginx-index
+    configMap:
+      name: cm-nginx-index
+      optional: false
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    name: nginx
+    volumeMounts:
+    - name: nginx-conf
+      mountPath: /etc/nginx/conf.d/
+      readOnly: true
+    - name: nginx-index
+      mountPath: /usr/share/nginx/html/
+      readOnly: true
+      
+      
+# 应用
+[root@master1 cm] # kubectl apply -f storage-configmap-nginx-file.yaml 
+configmap/cm-nginx-index created
+pod/pod-nginx-conf-configmap created
+
+# 查看
+[root@master1 cm] # kubectl get cm
+NAME                  DATA   AGE
+cm-nginx-conf-files   1      7m31s
+cm-nginx-index        1      55s
+
+# 测试效果
+[root@master1 cm] # kubectl get pod -o wide
+NAME                       READY   STATUS    RESTARTS   AGE   IP             NODE    NOMINATED NODE   READINESS GATES
+pod-nginx-conf-configmap   1/1     Running   0          77s   10.244.3.138   node3   <none>           <none>
+
+[root@master1 cm] # curl 10.244.3.138
+curl: (7) Failed to connect to 10.244.3.138 port 80 after 0 ms: 拒绝连接
+
+# 读取了configmap传入的配置文件
+[root@master1 cm] # curl 10.244.3.138:8080
+Nginx Configmap Page!
+
+# 删除
+[root@master1 cm] # kubectl delete -f storage-configmap-nginx-file.yaml 
+configmap "cm-nginx-index" deleted
+pod "pod-nginx-conf-configmap" deleted
+
+[root@master1 cm] # kubectl delete cm cm-nginx-conf-files 
+configmap "cm-nginx-conf-files" deleted
+```
+
+
+
+**范例：volume 挂载 CM 中部分文件**
+
+```yaml
+# 准备配置文件
+[root@master1 nginx.conf.d] #ls
+default.conf  myserver.conf  myserver-gzip.cfg  myserver-status.cfg
+
+# 配置文件
+[root@master1 cm] #cat nginx.conf.d/myserver.conf 
+server {
+    listen 8888;
+    server_name www.wang.org;
+    include /etc/nginx/conf.d/myserver-*.cfg
+    location / {
+        root /usr/share/nginx/html;
+    }
+}
+
+# 子配置文件,注意:文件是以cfg为后缀,不能以conf文件后缀,会导致冲突
+[root@master1 cm] # cat nginx.conf.d/myserver-gzip.cfg 
+gzip on;
+gzip_comp_level 5;
+gzip_proxied     expired no-cache no-store private auth;
+gzip_types text/plain text/css application/xml text/javascript;
+
+[root@master1 cm] # cat nginx.conf.d/myserver-status.cfg 
+location /nginx-status {
+   stub_status on;
+   access_log off;
+}
+
+# 创建cm
+[root@master1 cm] # kubectl create cm cm-nginx-conf-files --from-file=nginx.conf.d/
+configmap/cm-nginx-conf-files created
+
+# 清单文件
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-nginx-index
+data:
+  index.html: "Nginx Sub Configmap Page\n"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-cm-nginx-conf
+spec:
+  volumes:
+  - name: nginx-conf
+    configMap:
+      name: cm-nginx-conf-files
+      items:                            # 指定cm中的key
+      - key: myserver.conf              # cm中的key名称
+        path: myserver.conf             # Pod中的文件名
+        mode: 0644                      # Pod中的文件权限
+      - key: myserver-status.cfg
+        path: myserver-status.cfg
+        mode: 0644
+      - key: myserver-gzip.cfg
+        path: myserver-gzip.cfg
+        mode: 0644
+      optional: false
+  - name: nginx-index
+    configMap:
+      name: cm-nginx-index
+      optional: false
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    name: pod-cm-nginx-conf-container
+    volumeMounts:
+    - name: nginx-conf
+      mountPath: /etc/nginx/conf.d/
+      readOnly: true
+    - name: nginx-index
+      mountPath: /usr/share/nginx/html/
+      readOnly: true
+
+# 应用
+[root@master1 cm] # kubectl apply -f storage-configmap-nginx-subfile.yaml 
+configmap/cm-nginx-index created
+pod/pod-cm-nginx-conf created
+
+# 查看
+[root@master1 cm]#kubectl exec pod-cm-nginx-conf -- ls /etc/nginx/conf.d
+myserver-gzip.cfg
+myserver-status.cfg
+myserver.conf
+
+# 查看资源
+[root@master1 cm]#kubectl get cm cm-nginx-conf-files -o yaml
+apiVersion: v1
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        server_name localhost;
+        location / {
+            root /usr/share/nginx/html;
+            index index.html index.htm;
+        }
+        error_page 500 502 503 504 /50x.html;
+        location /50x.html {
+            root /usr/share/nginx/html;
+        }
+    }
+  myserver-gzip.cfg: |
+    gzip on;
+    gzip_comp_level 5;
+    gzip_proxied     expired no-cache no-store private auth;
+    gzip_types text/plain text/css application/xml text/javascript;
+  myserver-status.cfg: |+
+    location /nginx-status {
+       stub_status on;
+       access_log off;
+    }
+
+  myserver.conf: |
+    server {
+        listen 8888;
+        server_name www.wang.org;
+        include /etc/nginx/conf.d/myserver-*.cfg;
+        location / {
+            root /usr/share/nginx/html;
+        }
+    }
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2025-01-01T10:54:52Z"
+  name: cm-nginx-conf-files
+  namespace: default
+  resourceVersion: "224964"
+  uid: 80862286-fb45-4dc2-ba8a-4d886f88e015
+  
+# 查看效果
+[root@master1 cm] # curl 10.244.3.140:8888
+Nginx Sub Configmap Page
+
+# 删除资源
+#删除资源
+[root@master1 yaml] #kubectl delete -f storage-configmap-nginx-subfile.yaml
+[root@master1 yaml] #kubectl delete cm cm-nginx-conf-files
+```
+
+
+
+**范例：volume 基于subpath实现挂载CM部分文件并修改配置文件名称**
+
+```yaml
+kubectl explain pod.spec.volumes.configMap.items
+
+FIELDS:
+   key <string> -required-
+     key is the key to project.
+     
+   mode <integer>
+     mode is Optional: mode bits used to set permissions on this file. Must be
+     an octal value between 0000 and 0777 or a decimal value between 0 and 511.
+     YAML accepts both octal and decimal values, JSON requires decimal values
+     for mode bits. If not specified, the volume defaultMode will be used. This
+     might be in conflict with other options that affect the file mode, like
+     fsGroup, and the result can be other mode bits set.
+     
+   path <string> -required-
+     path is the relative path of the file to map the key to. May not be an
+     absolute path. May not contain the path element '..'. May not start with
+     the string '..'.
+     
+kubectl explain pod.spec.containers.volumeMounts
+FIELDS:
+   mountPath <string> -required-
+     Path within the container at which the volume should be mounted. Must not
+     contain ':'.
+     
+   mountPropagation <string>
+     mountPropagation determines how mounts are propagated from the host to
+     container and the other way around. When not set, MountPropagationNone is
+     used. This field is beta in 1.10.
+     
+   name <string> -required-
+     This must match the Name of a Volume.
+     
+   readOnly <boolean>
+     Mounted read-only if true, read-write otherwise (false or unspecified).
+     Defaults to false.
+     
+   subPath <string>
+     Path within the volume from which the container's volume should be mounted.
+     Defaults to "" (volume's root).
+
+   subPathExpr <string>
+     Expanded path within the volume from which the container's volume should be
+     mounted. Behaves similarly to SubPath but environment variable references
+     $(VAR_NAME) are expanded using the container's environment. Defaults to ""
+     (volume's root). SubPathExpr and SubPath are mutually exclusive
+```
+
+**范例**
+
+```yaml
+# 准备配置文件同上一样
+[root@master1 cm] #ls nginx.conf.d/
+default.conf  myserver.conf  myserver-gzip.cfg  myserver-status.cfg
+
+# 将上面的配置文件都加入cm
+[root@master1 cm] # kubectl create cm cm-nginx-conf-files --from-file=nginx.conf.d/
+configmap/cm-nginx-conf-files created
+
+# 清单文件
+[root@master1 cm] # vim storage-configmap-nginx-usesubfile.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-nginx-index
+data:
+  index.html: "Nginx Use Sub Configmap Page\n"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-cm-nginx-conf
+spec:
+  volumes:
+  - name: nginx-conf
+    configMap:
+      name: cm-nginx-conf-files
+      optional: false
+  - name: nginx-index
+    configMap:
+      name: cm-nginx-index
+      optional: false
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    name: pod-cm-nginx-conf-container
+    volumeMounts:
+    - name: nginx-conf
+      mountPath: /etc/nginx/conf.d/myserver2.conf   # 修改生成的配置文件名
+      subPath: myserver.conf                        # 指定nginx-conf中的特定文件，而非所有文件
+      readOnly: true
+    - name: nginx-conf
+      mountPath: /etc/nginx/conf.d/myserver-gzip2.cfg   # 修改生成的配置文件名
+      subPath: myserver-gzip.cfg                        # 指定nginx-conf中的特定文件，而非所有文件
+      readOnly: true
+    - name: nginx-index
+      mountPath: /usr/share/nginx/html/
+      readOnly: true
+
+
+[root@master1 cm] # kubectl apply -f storage-configmap-nginx-usesubfile.yaml 
+configmap/cm-nginx-index created
+pod/pod-cm-nginx-conf created
+
+[root@master1 cm] # kubectl get pod
+NAME                READY   STATUS    RESTARTS   AGE
+pod-cm-nginx-conf   1/1     Running   0          2s
+
+[root@master1 cm] # kubectl get pod -o wide
+NAME                READY   STATUS    RESTARTS   AGE   IP             NODE    NOMINATED NODE   READINESS GATES
+pod-cm-nginx-conf   1/1     Running   0          15s   10.244.3.142   node3   <none>           <none>
+
+[root@master1 cm] # kubectl exec pod-cm-nginx-conf -- ls /etc/nginx/conf.d
+default.conf
+myserver-gzip2.cfg
+myserver2.conf
+
+# 删除
+
+```
+
+
+
+**范例：volume 基于subPath 挂载CM 部分文件并保留原目录中的其它文件**
+
+```yaml
+# 查看容器内的文件列表
+[root@master1 cm] # docker run --rm --name nginx wangxiaochun/nginx:1.20.0 ls /etc/nginx/
+conf.d
+fastcgi_params
+mime.types
+modules
+nginx.conf
+scgi_params
+uwsgi_params
+
+# 导出配置文件
+[root@master1 cm] # docker run --rm --name nginx wangxiaochun/nginx:1.20.0 cat /etc/nginx/nginx.conf > nginx.conf
+
+# 创建configmap
+[root@master1 cm] # kubectl create cm cm-nginx-conf --from-file=nginx.conf
+configmap/cm-nginx-conf created
+
+# 查看配置内容
+[root@master1 cm] # kubectl describe cm cm-nginx-conf 
+Name:         cm-nginx-conf
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Data
+====
+nginx.conf:
+----
+
+user  nginx;
+worker_processes  auto;
+
+error_log  /var/log/nginx/error.log notice;
+pid        /var/run/nginx.pid;
+
+
+events {
+    worker_connections  1024;
+}
+
+
+http {
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile        on;
+    #tcp_nopush     on;
+
+    keepalive_timeout  65;
+
+    #gzip  on;
+
+    include /etc/nginx/conf.d/*.conf;
+}
+
+
+BinaryData
+====
+
+Events:  <none>
+
+
+# 准备配置文件
+[root@master1 cm] # vim storage-configmap-subPath-nginx-1.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-cn-nginx-conf
+spec:
+  volumes:
+  - name: volume-nginx-conf
+    configMap:
+      name: cm-nginx-conf
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    name: pod-cm-nginx-conf-container
+    command: ["sh", "-c", "sleep 3600"]
+    volumeMounts:
+    - name: volume-nginx-conf
+      mountPath: /etc/nginx/
+
+# 应用
+[root@master1 cm] # kubectl apply -f storage-configmap-subPath-nginx-1.yaml 
+pod/pod-cn-nginx-conf created
+
+# 查看
+[root@master1 cm] # kubectl get pod
+NAME                READY   STATUS    RESTARTS   AGE
+pod-cn-nginx-conf   1/1     Running   0          3s
+
+# 直接将整个目录覆盖了
+[root@master1 cm] # kubectl exec pod-cn-nginx-conf -- ls /etc/nginx
+nginx.conf
+
+# 删除
+[root@master1 cm] # kubectl delete -f storage-configmap-subPath-nginx-1.yaml 
+pod "pod-cn-nginx-conf" deleted
+
+# 修改清单文件
+[root@master1 cm] # cat storage-configmap-subPath-nginx-2.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-cm-nginx-conf
+spec:
+  volumes:
+  - name: volume-nginx-conf
+    configMap:
+      name: cm-nginx-conf
+      items:
+      - key: nginx.conf
+        path: etc/nginx/nginx.conf       # 必须是相对路径，且和下面subPath路径相同
+  containers:
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    name: pod-cm-nginx-conf-container
+    command: ["sh", "-c", "sleep 3600"]
+    volumeMounts:
+    - name: volume-nginx-conf
+      mountPath: /etc/nginx/nginx.conf
+      subPath: etc/nginx/nginx.conf     # 必须是相对路径，且和volumes的path路径相同
+      
+[root@master1 cm] # kubectl apply -f storage-configmap-subPath-nginx-2.yaml 
+pod/pod-cm-nginx-conf created
+
+[root@master1 cm] # kubectl get pod
+NAME                READY   STATUS    RESTARTS   AGE
+pod-cm-nginx-conf   1/1     Running   0          3s
+
+[root@master1 cm] # kubectl exec -it pod-cm-nginx-conf -- ls /etc/nginx/
+conf.d		mime.types  nginx.conf	 uwsgi_params
+fastcgi_params	modules     scgi_params
+```
+
+
+
+**关于上面案例中，volumes.configMap.items.path相对路径补充说明：**
+
+在 `ConfigMap` 中，`path` 是用来指定该键值对在 **`volume` 根目录下的相对路径**。
+
+- **必须是相对路径的原因**： Kubernetes 的设计中，`ConfigMap` 的 `items` 是将键值对映射为文件，并存储到 `volume` 的临时文件目录中。这个目录是动态创建的，无法提前确定一个具体的绝对路径。因此，`path` 是相对于 **`volume` 的根目录** 的相对路径
+
+
+
+**详细解释：它相对于谁的路径？**
+
+**卷（`volume`）的根目录**：
+
+- `ConfigMap` 数据被挂载到容器之前，Kubernetes 会将数据放在一个临时目录中，比如：
+
+  ```js
+  /var/lib/kubelet/pods/<pod-id>/volumes/kubernetes.io~configmap/<volume-name>/
+  ```
+
+- 在 `path` 中指定的路径是 **相对于这个临时目录** 的相对路径。
+
+- 假设 `ConfigMap` 中有一条定义：
+
+  ```yaml
+  items:
+    - key: nginx.conf
+      path: etc/nginx/nginx.conf
+  ```
+
+- Kubernetes 会将键`nginx.conf`的值写入文件：
+
+  ```js
+  /var/lib/kubelet/pods/<pod-id>/volumes/kubernetes.io~configmap/<volume-name>/etc/nginx/nginx.conf
+  ```
+
+**挂载点的层次化设计:**
+
+- `path` 是相对于 `volume` 内容的根路径，而不是容器内的 `mountPath`。
+- 如果允许 `path` 是绝对路径（如 `/etc/nginx/nginx.conf`），则 Kubernetes 无法将它挂载到 `volume` 的临时目录中，因为这样会和文件系统结构冲突。
+
+
+
+**`mountPath` 和 `subPath` 的关系**
+
+- **`mountPath`**：是容器中挂载点的绝对路径，表示挂载点在容器文件系统中的位置。
+- **`subPath`**：表示挂载点内部（`volume` 内部）的相对路径，它从 `volumes` 指定的资源（如 `ConfigMap` 或 `PersistentVolume`）的根目录开始。
+
+
+
+**挂载路径的逻辑**
+
+- `mountPath` 定义了容器中的文件/目录挂载位置，比如 `/etc/nginx/nginx.conf`。
+- `subPath` 定义了在卷中选择具体的文件或路径，比如 `etc/nginx/nginx.conf`。
+- **`subPath` 是相对于 `volumes` 挂载内容的路径，而不是 `mountPath` 的路径。**
+
+
+
+
+
+### Secret
+
+
+
+#### Secret介绍
+
+![image-20250101212836061](D:\git_repository\cyber_security_learning\markdown_img\image-20250101212836061.png)
+
+Secret 和 Configmap 相似，也可以提供配置数据，但主要用于为Pod提供敏感需要加密的信息
+
+Secret 主要用于存储密码、证书私钥，SSH 密钥，OAuth令牌等敏感信息，这些敏感信息采用base64编 码保存，相对明文存储更安全
+
+相比于直接将敏感数据配置在Pod的定义或者镜像中，Secret提供了更加安全的机制，将需要共享的数 据进行加密，防止数据泄露。
+
+Secret的对象需要单独定义并创建，通常以数据卷的形式挂载到Pod中，Secret的数据将以文件的形式 保存，容器通过读取文件可以获取需要的数据
+
+Secret volume是通过tmpfs（内存文件系统）实现的，所以**这种类型的volume不是永久存储的。**
+
+**每个Secret的数据不能超过1MB**，支持通过资源限额控制每个名称空间的Secret的数量
+
+**注意: Secret 属于名称空间级别，只能被同一个名称空间的Pod引用**
+
+
+
+**Secret 分成以下常见大的分类**
+
+| 类型            | 解析                                                         |
+| --------------- | ------------------------------------------------------------ |
+| generic         | 通用类型，基于**base64编码**用来存储密码，公钥等。<br />常见的子类型有： Opaque,kubernetes.io/service-account-token,kubernetes.io/basicauth,kubernetes.io/ssh-auth,bootstrap.kubernetes.io/token,kubernetes.io/rbd |
+| tls             | 专门用于保存tls/ssl用到证书和配对的私钥,常见的子类型:kubernetes.io/tls |
+| docker-registry | 专用于让kubelet启动Pod时从私有镜像仓库pull镜像时，首先认证到仓库Registry时使用 <br />常见的子类型:kubernetes.io/dockercfg,kubernetes.io/dockerconfigjson |
+
+
+
+**Secret 细化为的子类型(Type)**
+
+| 大类型          | Builtin Type                       | 说明                                        |
+| --------------- | ---------------------------------- | ------------------------------------------- |
+| generic         | opaque                             | arbitrary user-defined data                 |
+| generic         | kubernetes.io/service-accounttoken | service account token                       |
+| generic         | kubernetes.io/basic-auth           | credentials for basic authentication        |
+| generic         | kubernetes.io/ssh-auth             | credentials for SSH authentication          |
+| generic         | bootstrap.kubernetes.io/token      | bootstrap token data 初始化                 |
+| tls             | kubernetes.io/tls                  | data for a TLS client or server             |
+| docker-registry | kubernetes.io/dockerconfigjson     | serialized ~/ .docker/config.json file 新版 |
+| docker-registry | kubernetes.io/dockercfg            | serialized -/ .dockercfg file 旧版          |
+
+
+
+**注意：**
+
+不同类型的Secret，在定义时支持使用的标准字段也有所不同
+
+例如: ssh-auth类型的Secret应该使用ssh-privatekey，而basic-auth类型的Secret则需要使用 username和password等
+
+另外也可能存在一些特殊的类型, 用于支撑第三方需求，例如: ceph的keyring信息使用的 kubernetes.io/rbd等
+
+
+
+**Secret 创建方式**
+
+- **手动创建**：用户自行创建的Secret 常用来存储用户私有的一些信息
+- **自动创建**：集群自动创建的Secret 用来作为集群中各个组件之间通信的身份校验使用
+
+
+
+**查看Secret**
+
+```bash
+[root@master1 cm]# kubectl get secrets -A
+NAMESPACE     NAME                     TYPE                            DATA   AGE
+kube-system   bootstrap-token-8loc6r   bootstrap.kubernetes.io/token   6      4d6h
+
+[root@master1 cm]# kubectl get secrets -n kube-system  bootstrap-token-8loc6r -o yaml
+apiVersion: v1
+data:
+  auth-extra-groups: c3lzdGVtOmJvb3RzdHJhcHBlcnM6a3ViZWFkbTpkZWZhdWx0LW5vZGUtdG9rZW4=
+  description: VGhlIGRlZmF1bHQgYm9vdHN0cmFwIHRva2VuIGdlbmVyYXRlZCBieSAna3ViZWFkbSBpbml0Jy4=
+  token-id: OGxvYzZy
+  token-secret: cjFybWE3dzQ4eG1kdmJudA==
+  usage-bootstrap-authentication: dHJ1ZQ==
+  usage-bootstrap-signing: dHJ1ZQ==
+kind: Secret
+metadata:
+  creationTimestamp: "2024-12-28T07:55:15Z"
+  name: bootstrap-token-8loc6r
+  namespace: kube-system
+  resourceVersion: "215"
+  uid: b50e2dd9-50e8-4f60-879f-89086ff35b2f
+type: bootstrap.kubernetes.io/token
+
+# basey64解码查看description具体数据
+[root@master1 cm]#echo -n "VGhlIGRlZmF1bHQgYm9vdHN0cmFwIHRva2VuIGdlbmVyYXRlZCBieSAna3ViZWFkbSBpbml0Jy4="|base64 -d
+The default bootstrap token generated by 'kubeadm init'.
+```
+
+
+
+#### Secret命令式创建
+
+
+
+![image-20250101223713630](D:\git_repository\cyber_security_learning\markdown_img\image-20250101223713630.png)
+
+
+
+**格式**
+
+```bash
+ kubectl create secret [flags] [options] [-n <namespace>]
+```
+
+
+
+**命令格式**
+
+```bash
+# generic类型
+kubectl create secret generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1]
+
+--from-literal=key1=value1       #以命令行设置键值对的环境变量方式配置数据
+--from-env-file=/PATH/FILE       #以环境变量的专用文件的方式配置数据
+--from-file=[key=]/PATH/FILE     #以配置文件的方式创建配置数据，如不指定key，FILE名称为key名
+--from-file=/PATH/DIR            #以配置文件所在目录的方式创建配置数据
+
+#该命令中的--type选项进行定义除了后面docker-registry和tls命令之外的其它子类型，有些类型有key的特定要求
+#注意: 如果vaule中有特殊字符,比如:$,\,*,=,!等,需要用\进行转义或用单引号''引起来
+
+#tls类型
+kubectl create secret tls NAME --cert=/path/file --key=/path/file
+#其保存cert文件内容的key名称不能指定自动为tls.crt，而保存private key的key不能指定自动tls.key
+
+#docker-registry类型
+#方式1:基于用户名和密码方式实现
+kubectl create secret docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-file=[key=]source]
+
+#方式2:基于dockerconfig文件方式实现
+kubectl create secret docker-registry KEYNAME --fromfile=.dockerconfigjson=path/to/.docker/config.json
+#从已有的json格式的文件加载生成的就是dockerconfigjson类型，命令行直接生成的也是该类型
+```
+
+
+
+**范例**
+
+```bash
+# 创建generic类型
+kubectl create secret generic my-secret-generic --from-file=/path/bar
+
+kubectl create secret generic my-secret-generic --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
+
+kubectl create secret generic my-secret-generic --from-literal=username=admin --from-literal=password=123456
+
+kubectl create secret generic my-secret-generic --from-env-file=path/to/bar.env
+
+
+# 创建tls类型
+kubectl create secret tls my-secret-tls --cert=certs/wang.org.cert --key=certs/wang.org.key
+
+#创建docker-registry类型
+#参考示例：https://Kubernetesmeetup.github.io/docs/tasks/configure-podcontainer/pull-image-private-registry/
+#基于私有仓库的用户名和密码
+kubectl create secret docker-registry my-secret-docker-registry --docker-server=harbor.wang.org --docker-username=admin --docker-password=123456 --docker-email=29308620@qq.com
+
+#先登录并认证到目标仓库server上，认证凭据自动保存在dockercfg文件中,基于dockerconfig文件实现
+kubectl create secret docker-registry dockerharbor-auth --from-file=.dockerconfigjson=/root/.docker/config.json
+
+kubectl create secret generic dockerharbor-auth --
+type='kubernetes.io/dockerconfigjson' --from-file=.dockerconfigjson=/root/.docker/config.json
+```
 
 
 
