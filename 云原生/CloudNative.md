@@ -443,11 +443,506 @@ OCI 目前有三个主要规范：
 
 ### Docker安装
 
+#### Ubuntu内置仓库安装
+
+```bash
+[root@mystical ~]# apt update && apt install -y docker.io
+
+# 查看
+[root@mystical ~]# docker info
+Client:
+ Version:    24.0.7
+ Context:    default
+ Debug Mode: false
+
+Server:
+ Containers: 0
+  Running: 0
+  Paused: 0
+  Stopped: 0
+ Images: 0
+ Server Version: 24.0.7
+ Storage Driver: overlay2
+  Backing Filesystem: extfs
+  Supports d_type: true
+  Using metacopy: false
+  Native Overlay Diff: true
+  userxattr: false
+ Logging Driver: json-file
+ Cgroup Driver: systemd
+ Cgroup Version: 2
+ Plugins:
+  Volume: local
+  Network: bridge host ipvlan macvlan null overlay
+  Log: awslogs fluentd gcplogs gelf journald json-file local logentries splunk syslog
+ Swarm: inactive
+ Runtimes: io.containerd.runc.v2 runc
+ Default Runtime: runc
+ Init Binary: docker-init
+ containerd version: 
+ runc version: 
+ init version: 
+ Security Options:
+  apparmor
+  seccomp
+   Profile: builtin
+  cgroupns
+ Kernel Version: 5.15.0-102-generic
+ Operating System: Ubuntu 22.04.3 LTS
+ OSType: linux
+ Architecture: x86_64
+ CPUs: 2
+ Total Memory: 1.883GiB
+ Name: mystical
+ ID: ca263d13-ae96-4c86-bba5-be8480d1ea64
+ Docker Root Dir: /var/lib/docker
+ Debug Mode: false
+ Experimental: false
+ Insecure Registries:
+  127.0.0.0/8
+ Live Restore Enabled: false
+```
+
+
+
+#### 官方仓库安装
+
+**阿里云官方仓库**
+
+- 官方地址
+
+```http
+https://developer.aliyun.com/mirror/docker-ce?spm=a2c6h.13651102.0.0.57e31b11DDIh92
+```
+
+- 官方操作（可以看做是脚本运行）
+
+```bash
+# step 1: 安装必要的一些系统工具
+sudo apt-get update
+sudo apt-get -y install apt-transport-https ca-certificates curl software-properties-common
+# step 2: 安装GPG证书
+curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | sudo apt-key add -
+# Step 3: 写入软件源信息
+sudo add-apt-repository "deb [arch=amd64] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(lsb_release -cs) stable"
+# Step 4: 更新并安装Docker-CE
+sudo apt-get -y update
+sudo apt-get -y install docker-ce # 默认下载最新版
+
+# 安装Docker-CE特定版本
+sudo apt-get -y install docker-ce=[VERSION] docker-ce-cli=[VERSION]
+```
+
+
+
+#### 二进制安装（离线）
+
+本方法适用于无法上网或无法通过包安装方式安装的主机上安装docker
+
+```bash
+# 二进制安装下载路径
+https://download.docker.com/linux/
+https://mirrors.aliyun.com/docker-ce/linux/static/stable/x86_64/
+```
+
+示例：在CentOS上实现二进制安装docker
+
+```bash
+wget https://download.docker.com/linux/static/stable/x86_64/docker-19.03.5.tgz
+
+# 解压到指定目录
+tar xvf docker-19.03.5.tgz    
+
+# 加入环境变量
+cp docker/* /usr/bin/
+
+# 创建 service文件
+cat > /lib/systemd/system/docker.service <<-EOF
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target firewalld.service
+Wants=network-online.target
+[Service]
+Type=notify
+# the default is not to use systemd for cgroups because the delegate issues 
+still
+# exists and systemd currently does not support the cgroup feature set required
+# for containers run by docker
+ExecStart=/usr/bin/dockerd -H unix://var/run/docker.sock
+ExecReload=/bin/kill -s HUP \$MAINPID
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this version.
+#TasksMax=infinity
+TimeoutStartSec=0
+# set delegate yes so that systemd does not reset the cgroups of docker 
+containers
+Delegate=yes
+# kill only the docker process, not all processes in the cgroup
+KillMode=process
+# restart the docker process if it exits prematurely
+Restart=on-failure
+StartLimitBurst=3
+StartLimitInterval=60s
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 重启
+systemctl daemon-reload
+systemctl enable --now docker   
+```
+
+
+
+#### 脚本安装
+
+- install_docker_offine.sh
+
+```bash
+#!/bin/bash
+#
+#********************************************************************
+#Author:            wangxiaochun
+#QQ:                29308620
+#Date:              2022-10-14
+#FileName:          install_docker_offline.sh
+#URL:               http://www.wangxiaochun.com
+#Description:       The test script
+#Copyright (C):     2022 All rights reserved
+#********************************************************************
+
+#支持在线和离线安装
+
+DOCKER_VERSION=26.1.4
+#DOCKER_VERSION=26.0.0
+#DOCKER_VERSION=24.0.7
+#DOCKER_VERSION=24.0.5
+#DOCKER_VERSION=23.0.3
+#DOCKER_VERSION=20.10.19
+
+URL=https://mirrors.tuna.tsinghua.edu.cn
+#URL=https://mirrors.aliyun.com
+#URL=https://download.docker.com
+
+color () {
+    RES_COL=60
+    MOVE_TO_COL="echo -en \\033[${RES_COL}G"
+    SETCOLOR_SUCCESS="echo -en \\033[1;32m"
+    SETCOLOR_FAILURE="echo -en \\033[1;31m"
+    SETCOLOR_WARNING="echo -en \\033[1;33m"
+    SETCOLOR_NORMAL="echo -en \E[0m"
+    echo -n "$1" && $MOVE_TO_COL
+    echo -n "["
+    if [ $2 = "success" -o $2 = "0" ] ;then
+        ${SETCOLOR_SUCCESS}
+        echo -n $"  OK  "    
+    elif [ $2 = "failure" -o $2 = "1"  ] ;then 
+        ${SETCOLOR_FAILURE}
+        echo -n $"FAILED"
+    else
+        ${SETCOLOR_WARNING}
+        echo -n $"WARNING"
+    fi
+    ${SETCOLOR_NORMAL}
+    echo -n "]"
+    echo 
+}
+
+prepare () {
+    if [ ! -e docker-${DOCKER_VERSION}.tgz ];then
+        #wget ${URL}/docker-ce/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz
+        wget ${URL}/docker-ce/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz
+    fi
+    [ $? -ne 0  ] && { echo "文件下载失败"; exit; }
+}
+
+install_docker () {
+    tar xf docker-${DOCKER_VERSION}.tgz -C /usr/local/
+    cp /usr/local/docker/* /usr/local/bin/
+    cat > /lib/systemd/system/docker.service <<-EOF
+[Unit]
+Description=Docker Application Container Engine
+Documentation=https://docs.docker.com
+After=network-online.target firewalld.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+# the default is not to use systemd for cgroups because the delegate issues still
+# exists and systemd currently does not support the cgroup feature set required
+# for containers run by docker
+ExecStart=/usr/local/bin/dockerd -H unix://var/run/docker.sock
+ExecReload=/bin/kill -s HUP \$MAINPID
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+# Uncomment TasksMax if your systemd version supports it.
+# Only systemd 226 and above support this version.
+#TasksMax=infinity
+TimeoutStartSec=0
+# set delegate yes so that systemd does not reset the cgroups of docker containers
+Delegate=yes
+# kill only the docker process, not all processes in the cgroup
+KillMode=process
+# restart the docker process if it exits prematurely
+Restart=on-failure
+StartLimitBurst=3
+StartLimitInterval=60s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    systemctl daemon-reload
+}
+
+config_docker () {
+    mkdir -p /etc/docker
+    tee /etc/docker/daemon.json <<-'EOF'
+    {
+      "registry-mirrors": ["https://si7y70hh.mirror.aliyuncs.com"]
+     }
+EOF
+    #systemctl restart docker
+
+}
+
+start_docker (){
+    systemctl enable --now docker
+    docker version && color "Docker 安装成功" 0 ||  color "Docker 安装失败" 1
+}
+
+
+config_docker_completion () {
+    wget -P /etc/bash_completion.d http://www.wangxiaochun.com:8888/testdir/docker/docker_completion 
+    #source /etc/bash_completion.d/docker_completion
+}
+
+
+prepare
+
+install_docker
+
+config_docker
+
+start_docker
+
+config_docker_completion
+```
+
+
+
+#### Docker卸载
+
+```bash
+apt purge docker-ce
+rm -rf /var/lib/docker
+```
+
+
+
+#### 停止Docker服务
+
+```bash
+# 仅停止docker.service，暂停后会被自动激活
+systemctl stop docker.service
+
+# 想停止该服务，还需停止docker.socket
+systemctl stop docker.service docker.socket
+```
+
 
 
 
 
 ### Docker配置优化
+
+#### 优化方法1：用空间足够的高速磁盘用来存放docker的相关数据
+
+```shell
+# 在/etc/docker/目录下创建配置文件daemon.json(该文件默认不存在，需要自己创建)
+vim /etc/docker/daemon.json
+
+# daemon.json
+{
+  #指定docker数据目录,新版24.0.0不支持，
+  # 实现：修改service文件
+  # ExecStart=/usr/bin/dockerd --data-root=/data/docker
+  "graph": "/data/docker",  
+}
+```
+
+#### 优化方法2：从自建仓库下载镜像
+
+```shell
+# 查看docker信息
+docker info
+
+# 默认不信任外部仓库
+···
+Insecure Registries:
+  127.0.0.0/8
+···
+
+# 需要在配置文件中添加信任的仓库
+vim /etc/docker/daemon.json
+{
+  "insecure-registries": ["harbor.wang.org","172.18.0.253"]
+}
+
+# 添加后重启
+systemctl restart docker
+
+# 再次查看docker信息
+docker info
+···
+Insecure Registries:
+  harbor.wang.org
+  172.18.0.253
+  127.0.0.0/8
+```
+
+#### 优化方法3：调整允许最多同时下载docker镜像的数量（使其性能更好）
+
+```shell
+vim /etc/docker/daemon.json
+{
+  # 允许最多同时下载docker镜像的数量
+  "max-concurrent-downloads": 10,
+  # 最大允许同时上传多少个
+  "max-concurrent-uploads": 5
+}
+```
+
+#### 优化方法4：对容器中生成的日志进行约束
+
+```shell
+vim /etc/docker/daemon.json
+{
+  # 防止容器的日志过大，撑满磁盘
+  "log-opts": {
+    # 指定容器日志文件的最大值
+    "max-size": "300m",
+    # 指定容器日志文件的个数
+    # 循环写入日志文件
+    # 即一个日志满，会写入第二个
+    "max-file": "2"
+  }
+}
+```
+
+#### 优化方法5：镜像加速，加快镜像下载速度
+
+```shell
+# docker网站被墙的情况下，该加速无效
+vim /etc/docker/daemon.json
+{
+  "registry-mirrors": [
+    "https://registry.docker-cn.com",
+    "http://hub-mirror.c.163.com",
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://si7y70hh.mirror.aliyuncs.com/"
+  ]
+}
+```
+
+#### 扩展：docker远程连接
+
+```shell
+systemctl cat docker
+
+...
+# -H 指定客户端和服务端通信的媒介
+# docker客户端通过该socket文件发送指令
+# docker服务端通过该socket通过该文件接收指令
+# for containers run by docker
+ExecStart=/usr/bin/dockerd -H unix://var/run/docker.sock  --data-root=/data/docker
+ExecReload=/bin/kill -s HUP $MAINPID
+...
+# 但是这只能保证同主机间的通信
+# 如果客户端和服务器端不再同一主机
+# 比如在10.0.0.101的客户端，去访问10.0.0.100的docker服务端，需要打开远程连接
+# 方法：在dockerd的守护进程上开启远程连接
+# -H,--host=
+# tcp://host:port,
+# 默认2375端口（不加密），加密：2376
+# unix://path/to/socket
+# fd://* or fd://socketfd
+```
+
+#### 远程连接的实现方法1
+
+**方法1：修改service文件**
+
+```shell
+vim /lib/systemd/system/docker.service
+# 后面加一行 -H tcp://0.0.0.0:2375
+ExecStart=/usr/bin/dockerd -H unix://var/run/docker.sock  --data-root=/data/docker -H tcp://0.0.0.0:2375
+```
+
+**问题：当虚拟机的全局环境变量开启代理，该虚拟机远程连接其他机器的docker服务端失效**
+
+```shell
+cat .bashrc
+...
+export http_proxy=http://10.0.0.1:10809
+export https_proxy=http://10.0.0.1:10809
+export ftp_proxy=ftp://10.0.0.1:10809
+```
+
+此时运行`docker -H 10.0.0.208 version`失败
+
+原因：Docker 客户端直接连接：Docker 客户端连接 Docker 守护进程通常通过直接 TCP 连接 (tcp://) 而不是 HTTP(S) 代理。代理的设置会导致 Docker 客户端尝试通过代理去连接，而代理并不支持这种直接 TCP 连接，从而导致连接失败。
+
+**解决方案**
+
+```shell
+export http_proxy=http://10.0.0.1:10809
+export https_proxy=http://10.0.0.1:10809
+export ftp_proxy=ftp://10.0.0.1:10809
+export NO_PROXY="10.0.0.208"
+```
+
+指定连接10.0.0.208的通信不走代理即可
+
+#### 远程连接的实现方法2（更安全）
+
+通过ssh远程连接
+
+```shell
+docker -H ssh://root@10.0.0.206 version
+```
+
+实现ssh远程连接的前提
+
+- 打通key验证
+
+```shell
+# 生成密钥私钥对
+ssh-keygen
+
+# 将公钥拷贝到指定服务器
+ssh-copy-id root@10.0.0.206
+```
+
+
+#### 优化方法6：重启docker不影响容器运行
+
+```shell
+vim /etc/docker/daemon.json
+
+{
+  # docker.service重启，不影响容器的运行
+  "live-restore": true
+}
+```
 
 
 
@@ -473,7 +968,260 @@ OCI 目前有三个主要规范：
 
 ## 容器网络管理
 
+### 浅谈容器网络
 
+**这个被隔离的容器进程，该如何跟其他 Network Namespace 里的容器进程进行交互呢？**
+
+为了理解这个问题，你其实可以把每一个容器看做一台主机，它们都有一套独立的“网络栈”。
+
+如果你想要实现两台主机之间的通信，最直接的办法，就是把它们用一根网线连接起来；而如果你想要实现多台主机之间的通信，那就需要**用网线，把它们连接在一台交换机上**。
+
+在 Linux 中，能够起到虚拟交换机作用的网络设备，是**网桥（Bridge）**。它是一个**工作在数据链路层（Data Link）的设备**，主要功能是**根据 MAC 地址学习来将数据包转发到网桥的不同端口（Port）上**。
+
+而为了实现上述目的，Docker 项目会默认在宿主机上创建一个名叫 docker0 的网桥，凡是连接在 docker0 网桥上的容器，就可以通过它来进行通信。
+
+可是，我们又该如何把这些容器“连接”到 docker0 网桥上呢？
+
+这时候，我们就需要使用一种名叫**Veth Pair**的虚拟设备了。
+
+**Veth Pair 设备**的特点是：它被创建出来后，总是以两张虚拟网卡（Veth Peer）的形式成对出现的。并且，**从其中一个“网卡”发出的数据包，可以直接出现在与它对应的另一张“网卡”上**，哪怕这两个“网卡”在不同的 Network Namespace 里。
+
+这就使得 Veth Pair 常常被用作连接不同 Network Namespace 的“网线”。
+
+```bash
+# 拉取一个测试镜像
+[root@mystical ~]# docker pull ubuntu
+
+# 启动两个容器
+[root@mystical ~]# docker run -d --name myubuntu ubuntu sleep 3600
+[root@mystical ~]# docker run -d --name myubuntu2 ubuntu sleep 3600
+
+# 查看IP
+[root@mystical ~]# ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether 00:0c:29:1b:11:2e brd ff:ff:ff:ff:ff:ff
+    altname enp2s1
+    altname ens33
+    inet 10.0.0.150/24 brd 10.0.0.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fe1b:112e/64 scope link 
+       valid_lft forever preferred_lft forever
+3: docker0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:65:02:5c:d1 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:65ff:fe02:5cd1/64 scope link 
+       valid_lft forever preferred_lft forever
+5: vethebb1471@if4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default 
+    link/ether e6:f4:5f:1b:1c:82 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::e4f4:5fff:fe1b:1c82/64 scope link 
+       valid_lft forever preferred_lft forever
+7: veth753a3ed@if6: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default 
+    link/ether 4a:0d:31:f2:1f:3c brd ff:ff:ff:ff:ff:ff link-netnsid 1
+    inet6 fe80::480d:31ff:fef2:1f3c/64 scope link 
+       valid_lft forever preferred_lft foreve
+       
+      
+# 查看网桥
+[root@mystical ~]# brctl show
+bridge name	bridge id		STP enabled	interfaces
+docker0		8000.024265025cd1	no		veth753a3ed
+							            vethebb1471
+
+# 查看容器内的网络
+[root@mystical ~]# docker inspect myubuntu|grep -i pid
+            "Pid": 3940,
+            "PidMode": "",
+            "PidsLimit": null,
+            
+[root@mystical ~]# nsenter -t 3940 -n ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+4: eth0@if5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:02 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.2/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+       
+[root@mystical ~]# docker inspect myubuntu2|grep -i pid
+            "Pid": 4030,
+            "PidMode": "",
+            "PidsLimit": null,
+[root@mystical ~]# nsenter -t 4030 -n ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+6: eth0@if7: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:ac:11:00:03 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 172.17.0.3/16 brd 172.17.255.255 scope global eth0
+       valid_lft forever preferred_lft forever
+
+```
+
+
+
+基于上述的`brctl show`可以看出，`veth753a3ed `和 `vethebb1471`都“插”在docker0网桥上
+
+此时`myubuntu`和`myubuntu2`这两个容器进行通信，其中原理如下
+
+- 当在`myubuntu`容器里访问`myubuntu2`容器的IP地址（比如：`ping 172.17.0.3`）的时候，这个目的IP地址会匹配到myubuntu容器里的第二条路由规则，可以看到，这条路由规则的**网关（Gateway）是 0.0.0.0**，这就意味着这是一条直连规则，即：凡是匹配到这条规则的 IP 包，应该经过本机的 eth0 网卡，通过二层网络直接发往目的主机。
+
+  ```bash
+  [root@mystical ~]# nsenter -t 4030 -n route -n
+  Kernel IP routing table
+  Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+  0.0.0.0         172.17.0.1      0.0.0.0         UG    0      0        0 eth0
+  172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 eth0
+  ```
+
+  
+
+- 而要通过二层网络到达 `myubuntu2` 容器，就需要有 `172.17.0.3` 这个 IP 地址对应的 MAC 地址。所以 `myubuntu` 容器的网络协议栈，就需要通过 eth0 网卡发送一个 ARP 广播，来通过 IP 地址查找对应的 MAC 地址
+
+
+
+- 前面提到过，这个 eth0 网卡，是一个 Veth Pair，它的一端在这个 nginx-1 容器的 Network Namespace 里，而另一端则位于宿主机上（Host Namespace），并且被“插”在了宿主机的 docker0 网桥上。
+
+  - 一旦一张虚拟网卡被“插”在网桥上，它就会变成该网桥的“从设备”。从设备会被“剥夺”调用网络协议栈处理数据包的资格，从而“降级”成为网桥上的一个端口。而这个端口唯一的作用，就是接收流入的数据包，然后把这些数据包的“生杀大权”（比如转发或者丢弃），全部交给对应的网桥。
+  - 所以，在收到这些 ARP 请求之后，docker0 网桥就会扮演二层交换机的角色，把 ARP 广播转发到其他被“插”在 docker0 上的虚拟网卡上。这样，同样连接在 docker0 上的 nginx-2 容器的网络协议栈就会收到这个 ARP 请求，从而将 172.17.0.3 所对应的 MAC 地址回复给`myubuntu`容器
+
+  
+
+- 有了这个目的 MAC 地址，`myubuntu` 容器的 eth0 网卡就可以将数据包发出去。
+
+
+
+- 而根据 Veth Pair 设备的原理，这个数据包会立刻出现在宿主机上的 `vethebb1471` 虚拟网卡上。不过，此时这个 `vethebb1471` 网卡的网络协议栈的资格已经被“剥夺”，所以这个数据包就直接流入到了 docker0 网桥里。
+
+
+
+- docker0 处理转发的过程，则继续扮演二层交换机的角色。此时，docker0 网桥根据数据包的目的 MAC 地址（也就是 `ubuntu2` 容器的 MAC 地址），在它的 CAM 表（即交换机通过 MAC 地址学习维护的端口和 MAC 地址的对应表）里查到对应的端口（Port）为：vethb4963f3，然后把数据包发往这个端口。
+
+  ```bash
+  [root@mystical ~]# brctl showmacs docker0
+  port no	mac addr		is local?	ageing timer
+    2	4a:0d:31:f2:1f:3c	yes		   0.00
+    2	4a:0d:31:f2:1f:3c	yes		   0.00
+    1	e6:f4:5f:1b:1c:82	yes		   0.00
+    1	e6:f4:5f:1b:1c:82	yes		   0.00
+    
+  [root@mystical ~]# ip a
+  ......
+  5: vethebb1471@if4: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default 
+      link/ether e6:f4:5f:1b:1c:82 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+      inet6 fe80::e4f4:5fff:fe1b:1c82/64 scope link 
+         valid_lft forever preferred_lft forever
+  7: veth753a3ed@if6: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master docker0 state UP group default 
+      link/ether 4a:0d:31:f2:1f:3c brd ff:ff:ff:ff:ff:ff link-netnsid 1
+      inet6 fe80::480d:31ff:fef2:1f3c/64 scope link 
+         valid_lft forever preferred_lft forever
+  ```
+
+
+
+- 而这个端口，正是 `ubuntu2` 容器“插”在 docker0 网桥上的另一块虚拟网卡，当然，它也是一个 Veth Pair 设备。这样，数据包就进入到了 `ubuntu2` 容器的 Network Namespace 里。
+
+
+
+![image-20250116152542027](D:\git_repository\cyber_security_learning\markdown_img\image-20250116152542027.png)
+
+
+
+```ABAP
+在实际的数据传递时，上述数据的传递过程在网络协议栈的不同层次，都有 Linux 内核 Netfilter 参与其中
+以通过打开 iptables 的 TRACE 功能查看到数据包的传输过程
+# 在宿主机上执行
+$ iptables -t raw -A OUTPUT -p icmp -j TRACE
+$ iptables -t raw -A PREROUTING -p icmp -j TRACE
+
+less /var/log/syslog
+Jan 16 06:42:16 mystical kernel: [ 7105.605200] eth0: renamed from vetha24fcee
+Jan 16 06:42:16 mystical systemd-networkd[838]: veth753a3ed: Gained carrier
+Jan 16 06:42:16 mystical kernel: [ 7105.615808] IPv6: ADDRCONF(NETDEV_CHANGE): veth753a3ed: link becomes ready
+Jan 16 06:42:16 mystical kernel: [ 7105.615858] docker0: port 2(veth753a3ed) entered blocking state
+Jan 16 06:42:16 mystical kernel: [ 7105.615860] docker0: port 2(veth753a3ed) entered forwarding state
+```
+
+
+
+当容器试图连接到另外一个宿主机时，比如：`ping 10.0.0.151`，最终到达 10.168.0.3 对应的宿主机上。当然，这个过程的实现要求这两台宿主机本身是连通的。这个过程的示意图，如下所示：
+
+![image-20250116153904758](D:\git_repository\cyber_security_learning\markdown_img\image-20250116153904758.png)
+
+这里当容器内的数据包从容器的 `eth0` 到达宿主机的 `eth0` 时，**Linux 内核在某种程度上扮演了路由器的角色**，处理了数据包的转发。
+
+
+
+**容器到宿主机的数据转发过程**
+
+- **容器内的 `eth0` 发送数据包：**
+
+  - 数据包从容器内的应用程序发出，经过容器的虚拟网络接口（`eth0`）。
+  - `eth0` 是容器内部的虚拟网络设备，通常连接到宿主机的虚拟接口（如 `vethXXX`）。
+
+- **通过虚拟接口进入宿主机：**
+
+  - 容器的 `eth0` 另一端是宿主机上的 `vethXXX` 设备。
+  - `vethXXX` 是一个虚拟以太网设备，与容器的 `eth0` 成对，数据包通过它进入宿主机网络栈
+
+- **宿主机的 `docker0` 网桥处理数据包：**
+
+  - 宿主机的 `docker0` 是一个 Linux 桥接设备，扮演了二层交换机的角色。
+  - 如果目标是同一宿主机内的其他容器，`docker0` 会根据 MAC 地址表（CAM 表）将数据包转发到对应的容器。
+
+- **从 `docker0` 网桥到宿主机的 `eth0`（外部网络）：**
+
+  - 如果数据包的目标地址不是容器，而是外部网络（如互联网），则会通过 NAT 和路由规则转发到宿主机的 `eth0` 接口。
+
+- **宿主机执行 NAT 转换：**
+
+  - 在默认的 Docker 设置中，宿主机为容器提供 NAT 转换，将容器的源地址（如 `172.17.x.x`）转换为宿主机的 IP 地址。
+  - 这是通过 `iptables` 的 `POSTROUTING` 链实现的。
+
+  ```bash
+  [root@mystical ~]# iptables -t nat -vnL
+  Chain POSTROUTING (policy ACCEPT 0 packets, 0 bytes)
+   pkts bytes target     prot opt in     out     source               destination         
+      3   252 MASQUERADE  all  --  *      !docker0  172.17.0.0/16        0.0.0.0/0 
+      
+  # MASQUERADE 是一种特殊的 NAT 操作，会修改匹配数据包的源地址，使其看起来像是从宿主机的出口 IP 地址发出。
+  # out --> !docker0 : !docker0 表示数据包的出口接口不是 docker0，即不处理通过 docker0 网桥发送的数据包。
+  # source (源地址)：172.17.0.0/16 表示匹配容器子网（docker0 默认创建的子网）。
+  # destination (目标地址)：0.0.0.0/0 表示匹配所有目标地址（发送到任意外部网络）
+  ```
+
+- **隔离与转发：**
+
+  - 内核中的网桥（如 `docker0`）和虚拟以太网设备负责在容器和宿主机之间转发数据包，同时维护隔离。
+
+  ```ABAP
+  当容器访问外部（或另一个宿主机）时，数据包不需要在 docker0 网桥上处理。
+  容器直接通过宿主机的出口网卡发出。
+  ```
+
+  - 在宿主机查看追踪表，看SNAT信息
+
+  ```bash
+  root@mystical ~]# nsenter -t 5234 -n curl 10.0.0.151
+  hello
+  [root@mystical ~]# conntrack -L
+  tcp      6 113 TIME_WAIT src=172.17.0.3 dst=10.0.0.151 sport=51906 dport=80 src=10.0.0.151 dst=10.0.0.150 sport=80 dport=51906 [ASSURED] mark=0 use=1
+  tcp      6 96 TIME_WAIT src=172.17.0.3 dst=10.0.0.151 sport=42030 dport=80 src=10.0.0.151 dst=10.0.0.150 sport=80 dport=42030 [ASSURED] mark=0 use=1
+  ```
+
+  
 
 
 
@@ -513,13 +1261,2132 @@ OCI 目前有三个主要规范：
 
 
 
+# Skywalking
+
 
 
 # 微服务
 
+## ZooKeeper
+
+![image-20250123173725567](D:\git_repository\cyber_security_learning\markdown_img\image-20250123173725567.png)
 
 
 
+### Zookeeper解决的问题
+
+- 实现了服务注册,服务发现
+- 即实现了分布式服务管理
+
+
+
+### Zookeeper的功能
+
+- 实现了服务的**命名服务**
+
+  - 即给每个服务取个名称进行存放，并对其进行对应的解析，解析成对应的地址，实现服务发现，服务注册
+
+- Zookeeper内部可以看作是一个树状存储数据库
+
+  - 在启动一个服务的时候，可以将自己的地址信息注册到Zookeeper的树状数据库中，在数据库中将每个服务的地址，端口号注册进Zookeeper(类比：pod的启动的时候会将自己的地址和端口号注册进service的endpoint中)，
+    - 后续有程序需要使用这个服务，就取Zookeeper中查询即可
+    - Zookeeper做注册中心，需要在java程序中配置注册中心（Zookeeper）的地址
+  - 然后zookeeper给每个服务取一个名称，通过名称借助数据库解析为对应的ip地址和端口
+  - 同时Zookeeper也可以存放一些状态信息
+  - Zookeeper也可以做配置中心
+
+  
+
+#### 解决的问题
+
+- 服务的地址端口预先不确定的情况下，如何实现服务间通讯
+
+
+
+### 单机部署Zookeeper
+
+#### 包安装
+
+```bash
+[root@ubuntu2204 ~]#apt list zookeeper
+正在列表... 完成
+zookeeper/jammy-security,jammy-updates 3.4.13-6ubuntu4.1 all
+
+apt -y install zookeeper
+
+# 启动zookeeper
+/usr/share/zookeeper/bin/zkServer.sh start
+```
+
+
+
+#### 二进制安装
+
+```bash
+# 安装java环境
+apt install -y openjdk-11-jdk
+# 下载zookeeper
+wget https://mirrors.tuna.tsinghua.edu.cn/apache/zookeeper/current/apache-zookeeper-3.9.3-bin.tar.gz
+
+# 解压并放入指定目录
+tar xf apache-zookeeper-3.9.2-bin.tar.gz -C /usr/local/
+
+# 将其放入PATH目录中
+# vim /etc/profile
+PATH=$PATH:/usr/local/zookeeper/bin/
+
+# 加载
+. /etc/profile
+
+# 创建配置文件zoo.cfg
+cd /usr/local/zookeeper/conf
+cp zoo_sample.cfg zoo.cfg
+
+# 启动zookeeper并查看状态
+[root@ubuntu2204 conf]#zkServer.sh start
+/usr/bin/java
+ZooKeeper JMX enabled by default
+Using config: /usr/local/zookeeper/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+[root@ubuntu2204 conf]#zkServer.sh status
+/usr/bin/java
+ZooKeeper JMX enabled by default
+Using config: /usr/local/zookeeper/bin/../conf/zoo.cfg
+Client port found: 2181. Client address: localhost. Client SSL: false.
+Mode: standalone  # 表示是单机模式，不是集群
+
+# 查看zookeeper端口（2181以打开），本质上就是java程序
+[root@ubuntu2204 conf]#ss -nltp
+State      Recv-Q     Send-Q         Local Address:Port          Peer Address:Port    Process                                       
+LISTEN     0          4096           127.0.0.53%lo:53                 0.0.0.0:*        users:(("systemd-resolve",pid=810,fd=14))    
+LISTEN     0          128                  0.0.0.0:22                 0.0.0.0:*        users:(("sshd",pid=862,fd=3))                
+LISTEN     0          50                         *:2181                     *:*        users:(("java",pid=16738,fd=77))             
+LISTEN     0          50                         *:8080                     *:*        users:(("java",pid=16738,fd=69))             
+LISTEN     0          50                         *:32785                    *:*        users:(("java",pid=16738,fd=68))             
+LISTEN     0          128                     [::]:22                    [::]:*        users:(("sshd",pid=862,fd=4)) 
+```
+
+
+
+#### Zookeeper配置文件
+
+```bash
+# 可以更改配置使其暴露端口被Prometheus监控
+cat /usr/local/zookeeper/conf/zoo.cfg
+# The number of milliseconds of each tick
+tickTime=2000  # 滴答时间，是后续时间的基本单位
+# The number of ticks that the initial 
+# synchronization phase can take
+initLimit=10   # 因为滴答时间是2000毫秒，也就是2秒，因此这里initlimit的时间是20s
+# The number of ticks that can pass between 
+# sending a request and getting an acknowledgement
+syncLimit=5
+# the directory where the snapshot is stored.
+# do not use /tmp for storage, /tmp here is just 
+# example sakes.
+dataDir=/tmp/zookeeper        # 指定数据目录，这里不建议使用tmp目录，因为tmp目录下的数据无法持久化
+# the port at which the clients will connect
+clientPort=2181
+# the maximum number of client connections.
+# increase this if you need to handle more clients
+#maxClientCnxns=60
+#
+# Be sure to read the maintenance section of the 
+# administrator guide before turning on autopurge.
+#
+# https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_maintenance
+#
+# The number of snapshots to retain in dataDir
+#autopurge.snapRetainCount=3    # 只保留最近的3个版本的镜像文件
+# Purge task interval in hours
+# Set to "0" to disable auto purge feature
+#autopurge.purgeInterval=1    # 自动数据清理
+
+## Metrics Providers
+#
+# https://prometheus.io Metrics Exporter
+metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider
+metricsProvider.httpHost=0.0.0.0
+metricsProvider.httpPort=7000    # 打开7000端口
+metricsProvider.exportJvmInfo=true
+```
+
+
+
+**访问Prometheus指标**
+
+```bash
+curl 127.0.0.1:7000/metrics
+```
+
+
+
+#### 前台执行Zookeeper(制作镜像时使用)
+
+```bash
+zkServer.sh start-foreground
+```
+
+**注意**
+
+```http
+如果配置service，zkServer.sh和systemctl不要混用，否则无法启用
+```
+
+
+
+#### Service文件
+
+```bash
+cat > /lib/systemd/system/zookeeper.service <<EOF
+[Unit]
+Description=zookeeper.service
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/zookeeper/bin/zkServer.sh start
+ExecStop=/usr/local/zookeeper/bin/zkServer.sh stop
+ExecReload=/usr/local/zookeeper/bin/zkServer.sh restart
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+
+systemctl enable --now zookeeper.service
+```
+
+
+
+### Zookeeper集群部署
+
+- 因为选举机制，半数以上可用，所以建议奇数个节点
+- Zookeeper的选举基于ZAB协议（原子广播协议）
+  - Zab(Zookeeper Atomic Broadcast原子广播)：强一致性协议
+- 集群中节点数越多，写性能越差，读性能越好
+
+
+
+#### 集群角色
+
+- 领导者(Leader)
+  - 负责处理写入请求的，事务请求的唯一调度和处理者，负责进行投票发起和决议，更新系统状态
+
+- 跟随者(Follower)
+  - 接收客户请求并向客户端返回结果，在选Leader中参与投票
+
+- 观察者(Observer)
+  - 转交客户端写请求给leader节点，和同步leader状态和Follower唯一区别就是不参与Leader投票，也不参与写操作的“过半写成功”策略
+  - 它的作用类似于专用于Zookeeper集群的反向代理
+
+- 学习者(Learner)
+  - 和leader进行状态同步的节点统称Learner，包括Follower和Observer
+
+- 客户端(Client)
+  - 请求发起者
+
+#### 选举ID
+
+- ZXID(zookeeper transaction id): 每个改变Zookeeper状态的操作都会自动生成一个对应的zxid。ZXID最大的节点优先选为Leader
+  - ZXID大说明该节点的数据是最新的，ZXID可以理解为事务ID
+- myid: 服务器的唯一标识(SID)，通过配置myid文件指定，集群中唯一，当ZXID一样时，myid大的节点优先选为Leader
+
+
+
+#### 协议说明（重要）
+
+在分布式系统中，有多种协议被设计来解决一致性问题，Paxos、Raft、ZAB等分布式算法经常会被称作是“强一致性”的分布式共识协议
+
+**ZAB(Zookeeper Atomic Broadcast 原子广播)**
+
+Zab协议是由Apache Zookeeper项目提出的一种原子广播协议，是为分布式协调服务Zookeeper专门设计的一种支持崩溃恢复的原子广播协议。在Zookeeper中，主要依赖ZAB协议来实现分布式数据一致性，基于该协议，Zookeeper实现了一种主备模式的系统架构来保持集群中各个副本之间的数据一致性
+
+**Raft**
+
+Raft是一个为分布式系统提供一致性的算法。与Paxos相比，Raft的主要目标是提供一种更加易于理解和实现的一致性算法。Raft通过选举算法确保了分布式系统中的领导者唯一性所有的写操作都通过领导者完成，这样就可以确保所有的复制节点上的数据一致性，一些知名的分布式系统，如：kafka,etcd,nacos和Consul，都采用了Raft算法
+
+
+
+#### Zookeeper集群部署实现
+
+```bash
+# 在三台机器上安装Zookeeper
+
+# 当所有的机器都准备好Zookeeper之后，准备配置文件
+# 配置文件的最后添加
+# 将路径指向指定的myid所在路径
+dataDir=/usr/local/zookeeper/data
+# 格式：server.MyID服务器唯一编号=服务器IP:Leader和Follower的数据同步端口(只有leader才会打开)：Leader和Follower选举端口(L和F都有)
+server.1=10.0.0.131:2888:3888
+server.2=10.0.0.132:2888:3888
+server.3=10.0.0.133:2888:3888
+
+# 2888是集群中节点之间数据的同步，通过2888
+# 3888是选举端口
+
+# 如果添加节点，只需要在所有节点上添加新节点的上面形式的配置行，在新节点创建myid文件，并重启所有节点服务即可
+
+# 将配置文件同步到其他机器
+scp /usr/local/zookeeper/conf/zoo.cfg 10.0.0.132:/usr/local/zookeeper/conf/
+scp /usr/local/zookeeper/conf/zoo.cfg 10.0.0.133:/usr/local/zookeeper/conf/
+```
+
+**在各个节点生成ID文件**
+
+```bash
+echo 1 > /usr/local/zookeeper/data/myid
+echo 2 > /usr/local/zookeeper/data/myid
+echo 3 > /usr/local/zookeeper/data/myid
+```
+
+**各服务启动Zookeeper**
+
+```bash
+zkServer.sh start   # 三台机器都启动
+
+# node1
+[root@ubuntu2204 conf]#zkServer.sh status
+/usr/bin/java
+ZooKeeper JMX enabled by default
+Using config: /usr/local/zookeeper/bin/../conf/zoo.cfg
+Client port found: 2181. Client address: localhost. Client SSL: false.
+Mode: follower
+
+# node2
+[root@ubuntu2204 zookeeper]#zkServer.sh status
+/usr/bin/java
+ZooKeeper JMX enabled by default
+Using config: /usr/local/zookeeper/bin/../conf/zoo.cfg
+Client port found: 2181. Client address: localhost. Client SSL: false.
+Mode: leader
+
+# node3
+[root@ubuntu2204 data]#zkServer.sh status
+/usr/bin/java
+ZooKeeper JMX enabled by default
+Using config: /usr/local/zookeeper/bin/../conf/zoo.cfg
+Client port found: 2181. Client address: localhost. Client SSL: false.
+Mode: follower
+```
+
+
+
+### ZooKeeper客户端访问
+
+#### 命令行客户端访问ZooKeeper
+
+```bash
+# 使用命令行访问
+# 如果不写ip:port，默认本机
+zkCli.sh -server 10.0.0.131:2181
+
+[zk: 10.0.0.132:2181(CONNECTED) 1] ls /
+[zookeeper]
+
+# 查看zookeeper集群数据
+[zk: 10.0.0.132:2181(CONNECTED) 4] ls /zookeeper 
+[config, quota]
+[zk: 10.0.0.132:2181(CONNECTED) 5] ls /zookeeper/config 
+[]
+[zk: 10.0.0.132:2181(CONNECTED) 6] get /zookeeper/config 
+server.1=10.0.0.131:2888:3888:participant
+server.2=10.0.0.132:2888:3888:participant
+server.3=10.0.0.133:2888:3888:participant
+version=0
+
+# 在zookeeper中创建子目录create,以及在文件中添加数据set
+# zookeeper中，目录即是目录也是可以保存数据的文件
+[zk: 10.0.0.132:2181(CONNECTED) 7] ls /
+[zookeeper]
+[zk: 10.0.0.132:2181(CONNECTED) 8] create /myapp1
+Created /myapp1
+[zk: 10.0.0.132:2181(CONNECTED) 9] ls /
+[myapp1, zookeeper]
+[zk: 10.0.0.132:2181(CONNECTED) 10] set /myapp1 M58
+[zk: 10.0.0.132:2181(CONNECTED) 11] get /myaap1
+Node does not exist: /myaap1
+[zk: 10.0.0.132:2181(CONNECTED) 12] get /myapp1
+M58
+```
+
+
+
+#### nc访问Zookeeper
+
+Zookeeper支持某些特定的四字命令字母与其交互，它们大多是查询命令，用来获取ZooKeeper服务的当前状态和相关信息
+
+**常用命令列表**
+
+```bash
+conf #输出相关服务配置的详细信息
+cons #列出所有连接到服务器的客户端的完全的连接/会话的详细信息
+envi #输出关于服务环境的详细信息
+dump #列出未经处理的会话和临时节点
+stat #查看哪个节点被选择作为Follower或者Leader
+ruok #测试是否启动了该Server，若回复imok表示已经启动
+mntr #输出一些运行时信息
+reqs #列出未经处理的请求
+wchs #列出服务器watch的简要信息
+wchc #通过session列出服务器watch的详细信息
+wchp #通过路径列出服务器watch的详细信息
+```
+
+**命令安全限制**
+
+```bash
+# 默认情况下，这些4字命令有可能会被拒绝，提示如下报错
+xxxx is not executed because it is not in the whitelist.
+
+#解决办法:在 zoo.cfg文件中添加如下配置,如果是集群需要在所有节点上添加下面配置
+# vim conf/zoo.cfg
+4lw.commands.whitelist=*
+
+#在服务状态查看命令中有很多存在隐患的命令，为了避免生产中的安全隐患，要对这些"危险"命令进行一些安全限制，只需要编辑服务的zoo.cfg文件即可
+
+# vim conf/zoo.cfg
+4lw.commands.whitelist=conf,stat,ruok,isro
+```
+
+
+
+### 图形化客户端Zoolnspector
+
+#### Linux客户端
+
+**编译zooinspector**
+
+注意：此软件因年代久远，仅支持JAVA-8，且不支持Ubuntu20.04但支持Ubuntu22.04和Rocky8
+
+```bash
+#Ubuntu22.04编译
+apt update && apt -y install openjdk-8-jdk
+apt update && apt -y install maven
+
+# 添加阿里云加速
+vim /etc/maven/settings.xml 
+<mirrors>
+   <!--阿里云镜像-->
+   <mirror>
+       <id>nexus-aliyun</id>
+       <mirrorOf>*</mirrorOf>
+       <name>Nexus aliyun</name>
+       <url>http://maven.aliyun.com/nexus/content/groups/public</url>
+   </mirror>                                                                                               
+</mirrors>
+
+# 下载zooInspector
+git clone https://mirror.ghproxy.com/https://github.com/zzhang5/zooinspector.git
+
+cd zooinspector/
+mvn clean package -Dmaven.test.skip=true
+
+# 授权
+chmod +x zooinspector-pkg/bin/zooinspector.sh
+
+# windows宿主机上开启Xmanager
+
+# Linux定义环境变量
+export DISPLAY=10.0.0.1:0.0
+
+# 运行
+./zooinspector-pkg/bin/zooinspector.sh
+```
+
+
+
+## Kafka
+
+### 消息队列简介
+
+#### MQ定义
+
+```http
+#阿里云消息队列
+https://www.aliyun.com/product/ons?spm=5176.234368.h2v3icoap.427.2620db25lcHi1Q&amp;aly_as=Tz_Lue_o
+```
+
+在分布式场景中，相对于大量的用户请求来说，内部的功能主机之间、功能模块之间等，数据传递的数据量是无法想象的，因为一个用户请求，会涉及到各种内部的业务逻辑跳转等操作。那么，在大量用户的业务场景中，如何保证所有的内部业务逻辑请求都处于稳定而且快捷的 数据传递呢? 消息队列(Message Queue)技术可以满足此需求
+
+消息队列（Message Queue，简称 MQ）是构建分布式互联网应用的基础设施，通过 MQ 实现的松耦合架构设计可以提高系统可用性以及可扩展性，是适用于现代应用的最佳设计方案。
+
+消息队列是一种异步的服务间通信方式，适用于无服务器和微服务架构。消息在被处理和删除之前一直存储在队列上。每条消息仅可被一位用户处理一次。消息队列可被用于分离重量级处理、缓冲或批处理工作以及缓解高峰期工作负载。
+
+
+
+#### MQ 使用场合
+
+消息队列作为高并发系统的核心组件之一，能够帮助业务系统结构提升开发效率和系统稳定性
+
+**消息队列主要有以下应用场景**
+
+- **削峰填谷**
+  - 诸如电商业务中的秒杀、抢红包、企业开门红等大型活动时皆会带来较高的流量脉冲，或因没做相应的保护而导致系统超负荷甚至崩溃，或因限制太过导致请求大量失败而影响用户体验，消息队列可提供削峰填谷的服务来解决该问题。
+- **异步解耦**
+  - 交易系统作为淘宝等电商的最核心的系统，每笔交易订单数据的产生会引起几百个下游业务系统的关注，包括物流、购物车、积分、流计算分析等等，整体业务系统庞大而且复杂，消息队列可实现异步通信和应用解耦，确保主站业务的连续性。
+
+- **顺序收发**
+  - 细数日常中需要保证顺序的应用场景非常多，例如证券交易过程时间优先原则，交易系统中的订单创建、支付、退款等流程，航班中的旅客登机消息处理等等。与先进先出FIFO（First In First Out）原理类似，消息队列提供的顺序消息即保证消息FIFO。
+
+- **分布式事务一致性**
+  - 交易系统、支付红包等场景需要确保数据的最终一致性，大量引入消息队列的分布式事务，既可以实现系统之间的解耦，又可以保证最终的数据一致性。
+
+- **大数据分析**
+  - 数据在“流动”中产生价值，传统数据分析大多是基于批量计算模型，而无法做到实时的数据分析，利用消息队列与流式计算引擎相结合，可以很方便的实现业务数据的实时分析。
+
+- **分布式缓存同步**
+  - 电商的大促，各个分会场琳琅满目的商品需要实时感知价格变化，大量并发访问数据库导致会场页面响应时间长，集中式缓存因带宽瓶颈，限制了商品变更的访问流量，通过消息队列构建分布式缓存，实时通知商品数据的变化
+
+- **蓄流压测**
+  - 线上有些链路不方便做压力测试，可以通过堆积一定量消息再放开来压测
+
+
+
+
+#### 主流MQ
+
+目前主流的消息队列软件有 **Kafka**、**RabbitMQ**、ActiveMQ、**RocketMQ**等，还有相对小众的消息队列软件如ZeroMQ、Apache Qpid 
+
+
+
+### Kafka介绍
+
+![image-20250124113709879](D:\git_repository\cyber_security_learning\markdown_img\image-20250124113709879.png)
+
+Kafka 被称为下一代分布式消息系统，由 Scala 和 Java编写，是非营利性组织ASF(Apache Software Foundation)基金会中的一个开源项 目，比如:HTTP Server、Tomcat、Hadoop、ActiveMQ等开源软件都属于 Apache基金会的开源软件，类似的消息系统还有RabbitMQ、 ActiveMQ、ZeroMQ。
+
+Kafka用于构建实时数据管道和流应用程序。 它具有水平可伸缩性，容错性，快速性，可在数千家组织中同时投入生产协同工作。
+
+
+
+### Kafka 特点和优势
+
+![image-20250124114136074](D:\git_repository\cyber_security_learning\markdown_img\image-20250124114136074.png)
+
+**特点**
+
+- **分布式**: 支持分布式多主机部署实现
+- **分区**: 一个消息.可以拆分出多个，分别存储在多个位置
+- **多副本**: 防止信息丢失，可以多来几个备份
+- **多订阅者**: 可以有很多应用连接kafka
+- **Zookeeper**: 早期版本的Kafka依赖于zookeeper， **2021年**4月19日**Kafka 2.8.0**正式发布，此版本包括了很多重要改动，最主要的是 kafka通过自我管理的仲裁来替代ZooKeeper，即Kafka**将不再需要ZooKeeper！**
+
+
+
+**优势**
+
+- Kafka 通过 O(1)的磁盘数据结构提供消息的持久化，这种结构对于即使数以 TB 级别以上的消息存储也能够保持长时间的稳定性能。
+- **高吞吐量**：即使是非常普通的硬件Kafka也可以支持每秒数百万的消息。支持通过Kafka 服务器分区消息。
+- **分布式**： Kafka 基于分布式集群实现高可用的容错机制，可以实现自动的故障转移
+- **顺序保证**：在大多数使用场景下，数据处理的顺序都很重要。大部分消息队列本来就是排序的，并且能保证数据会按照特定的顺序来处理。 Kafka保证一个Partiton内的消息的有序性（分区间数据是无序的，如果对数据的顺序有要求，应将在创建主题时将分区数partitions设置为1）
+- 支持 Hadoop 并行数据加载
+- 通常用于大数据场合,传递单条消息比较大，而Rabbitmq 消息主要是传输业务的指令数据,单条数据较小
+
+
+
+### Kafka角色和流程
+
+####  Kafka概念
+
+
+
+
+
+
+
+
+
+
+
+
+
+## RabbitMQ
+
+### RabbitMQ介绍
+
+![image-20250117100208552](D:\git_repository\cyber_security_learning\markdown_img\image-20250117100208552.png)
+
+
+
+**官网**
+
+```http
+https://www.rabbitmq.com/
+```
+
+
+
+RabbitMQ 基于 Erlang 语言开发，Erlang 语言由爱立信 Ericson 开发设计
+
+Erlang语言在高并发,分布式编程和故障恢复方面表现优异，因此在电信领域被广泛使用
+
+
+
+**Erlang版本和RabbitMQ版本的对应**
+
+```http
+https://www.rabbitmq.com/which-erlang.html
+https://www.rabbitmq.com/docs/which-erlang
+```
+
+
+
+**RabbitMQ优势**
+
+- 基于Erlang 语言开发，具有高并发优点、支持分布式
+- 具有消息确认机制、消息持久化机制，消息可靠性和集群可靠性高、简单易用、运行稳定、跨平台、多语言
+- 自带图形 Web 管理功能
+- 开源
+
+
+
+### RabbitMQ架构
+
+![image-20250117100723696](D:\git_repository\cyber_security_learning\markdown_img\image-20250117100723696.png)
+
+
+
+**Message:** 消息，消息是不具名的，它由消息头和消息体组成。消息体是不透明的，而消息头则由一系列的可选属性组成，这些属性包括 routing-key（路由键）、priority（相对于其他消息的优先权）、delivery-mode（指出该消息可能需要持久性存储）等。
+
+**Publisher:** 消息的生产者，就是一个向交换器发布消息的客户端应用程序。
+
+**Consumer:** 消息的消费者，表示一个从消息队列中取得消息的客户端应用程序。
+
+**Broker:** 接收和分发消息的应用，表示消息队列服务器实体。**RabbitMQ Server 就是Message Broker。**
+
+**Virtual host:** 为了支持多租户和安全原因，当多个不同的用户使用同一个RabbitMQ Server时，可以先划分出多个 vhost，每个用户使用独 立的vhost创建exchange／queue 等。每一个虚拟主机表示一批交换器、消息队列和相关对象的集合。虚拟主机是共享相同的身份认证和加 密环境的独立服务器域。每个 vhost 本质上就是一个 mini 版的 RabbitMQ 服务器，拥有自己的队列、交换器、绑定和权限机制。vhost 是 AMQP 概念的基础，必须在连接时指定，RabbitMQ 默认的 vhost 是 / 。
+
+**Exchange:** 交换器，用来接收生产者发送的消息并将这些消息路由给服务器中的队列。message 到达 broker 会由Exchange 根据分发规 则，匹配查询表中的路由信息，分发消息到队列中。常用的类型：direct (point to poing 点对点),topic (publish subscribe发布者订阅者) 和 fanout (multicast多播)等
+
+**Queue:** 消息队列，用来保存消息直到发送给消费者。它是消息的容器，也是消息的终点。一个消息可投入一个或多个队列。消息一直在队 列里面，等待消费者连接到这个队列将其取走。
+
+**Binding:** 绑定，用于消息队列和交换器之间的关联。一个绑定就是基于路由键将交换器和消息队列连接起来的路由规则，所以可以将交换器 理解成一个由绑定构成的路由表。exchange 和 queue 之间的虚拟连接，binding 中可以包含 routing key。Binding 信息被保存到 exchange 中的查询表中，用于message 的分发依据。
+
+**Connection:** 网络连接，比如一个TCP连接。publisher／consumer 和 broker 之间的TCP 连接。**（类似ssh的会话，每个会话独占一个TCP连接）**
+
+**Channel:** 信道，多路复用连接中的一条独立的双向数据流通道。信道是建立在真实的TCP连接内部的虚拟连接，AMQP 命令都是通过信道 发出去的，不管是发布消息、订阅队列还是接收消息，这些动作都是通过信道完成。因为对于操作系统来说建立和销毁 TCP 都是非常昂贵的 开销，所以引入了信道的概念，以复用一条 TCP 连接。Channel 是在 connection内部建立的逻辑连接，如果应用程序支持多线程，通常每 个 thread创建单独的channel 进行通讯，AMQP method 包含了channel id 帮助客户端和messagebroker极大减少了操作系统建立TCP  connection 的开销**（类比ssh的隧道，一个会话可以有多个隧道，多个隧道共用一个TCP连接）**
+
+
+
+### RabbitMQ 生产者消费者
+
+![image-20250117101848248](D:\git_repository\cyber_security_learning\markdown_img\image-20250117101848248.png)
+
+
+
+- 生产者发送消息到 broker server（RabbitMQ）
+- 在 Broker 内部，用户创建Exchange／Queue，通过 Binding 规则将两者联系在一起
+- Exchange 分发消息，根据类型／binding 的不同分发策略有区别
+- 消息最后来到Queue 中，等待消费者取走。
+
+
+
+
+
+### RabbitMQ 单机部署
+
+
+
+#### 基于Docker部署RabbitMQ
+
+```bash
+[root@mystical ~]# docker run -d --name rabbitmq-single-node --name rabbitmq -p 5672:5672 -p 15672:15672 rabbitmq:3-management
+Unable to find image 'rabbitmq:3-management' locally
+3-management: Pulling from library/rabbitmq
+de44b265507a: Pull complete 
+609d1f44794c: Pull complete 
+93bc35f205f7: Pull complete 
+ae78677340ad: Pull complete 
+f4546f4074da: Pull complete 
+25a4431bdb90: Pull complete 
+d18e4e86d7da: Pull complete 
+fb48d524e912: Pull complete 
+e7dfc1785660: Pull complete 
+eb2c807d46cb: Pull complete 
+Digest: sha256:29ded394fc8639f891e0c80fac7b8f594bb8edaa83e15dc8c5795ef8d6c15f6a
+Status: Downloaded newer image for rabbitmq:3-management
+765260f64c9d5bbd63a0e4f1ff466876a0fdcbf1f8a5e27e6c553adbe3998033
+
+
+# 查看
+[root@mystical ~]# docker ps
+CONTAINER ID   IMAGE                   COMMAND                  CREATED         STATUS         PORTS                                                                                                                                                 NAMES
+765260f64c9d   rabbitmq:3-management   "docker-entrypoint.s…"   2 minutes ago   Up 2 minutes   4369/tcp, 5671/tcp, 0.0.0.0:5672->5672/tcp, :::5672->5672/tcp, 15671/tcp, 15691-15692/tcp, 25672/tcp, 0.0.0.0:15672->15672/tcp, :::15672->15672/tcp   rabbitmq
+
+# 访问浏览器：http://IP:15672
+# 默认用户密码都是guest/guest
+# 5672端口：客户端访问
+# 15672端口：web访问
+```
+
+
+
+![image-20250117103535991](D:\git_repository\cyber_security_learning\markdown_img\image-20250117103535991.png)
+
+![image-20250117103607691](D:\git_repository\cyber_security_learning\markdown_img\image-20250117103607691.png)
+
+
+
+
+
+
+
+#### 基于包方式在Ubuntu 安装单机版 RabbitMQ
+
+##### 主机名解析（可选）
+
+早期版本安装必须做主机名解析,否则无法启动RabbitMQ服务,并且后续不能再修改主机名
+
+**注意**: 当前版本不再有此限制
+
+在当前MQ 服务器配置本地主机名解析
+
+```bash
+[root@mystical ~]# hostnamectl set-hostname rabbitmq.mystical.org
+
+[root@mystical ~]# vim /etc/hosts
+10.0.0.151 rabbitmq.mystical.org rabbitmq
+```
+
+
+
+##### 系统内置仓库安装
+
+```bash
+[root@mystical ~]# apt list |grep -i rabbitmq
+
+WARNING: apt does not have a stable CLI interface. Use with caution in scripts.
+
+kamailio-rabbitmq-modules/jammy 5.5.4-1 amd64
+libanyevent-rabbitmq-perl/jammy 1.22~dfsg-1 all
+libmojo-rabbitmq-client-perl/jammy 0.3.1-2 all
+libmono-messaging-rabbitmq4.0-cil/jammy 6.8.0.105+dfsg-3.2 all
+libmono-rabbitmq4.0-cil/jammy 6.8.0.105+dfsg-3.2 all
+librabbitmq-client-java/jammy 5.0.0-1.1 all
+librabbitmq-dev/jammy 0.10.0-1ubuntu2 amd64
+librabbitmq4/jammy 0.10.0-1ubuntu2 amd64
+nagios-plugins-rabbitmq/jammy 1:1.2.0-2.2ubuntu1 all
+puppet-module-puppetlabs-rabbitmq/jammy 8.5.0-7 all
+rabbitmq-server/jammy-updates 3.9.27-0ubuntu0.1 all
+
+[root@mystical ~]# apt install -y rabbitmq-server
+```
+
+
+
+##### 官方仓库脚本包安装指定较新版本
+
+```http
+https://www.rabbitmq.com/docs/install-debian#apt-quick-start-cloudsmith
+```
+
+
+
+
+
+![image-20250117104808492](D:\git_repository\cyber_security_learning\markdown_img\image-20250117104808492.png)
+
+
+
+```bash
+# Ubuntu2204
+
+#!/bin/sh
+
+sudo apt update && apt-get install curl gnupg apt-transport-https -y
+
+## Team RabbitMQ's main signing key
+curl -1sLf "https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA" | sudo gpg --dearmor | sudo tee /usr/share/keyrings/com.rabbitmq.team.gpg > /dev/null
+
+## Community mirror of Cloudsmith: modern Erlang repository
+curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg > /dev/null
+
+## Community mirror of Cloudsmith: RabbitMQ repository
+curl -1sLf https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key | sudo gpg --dearmor | sudo tee /usr/share/keyrings/rabbitmq.9F4587F226208342.gpg > /dev/null
+
+## Add apt repositories maintained by Team RabbitMQ
+sudo tee /etc/apt/sources.list.d/rabbitmq.list <<EOF
+## Provides modern Erlang/OTP releases
+##
+deb [arch=amd64 signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.rabbitmq.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa1.rabbitmq.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+
+# another mirror for redundancy
+deb [arch=amd64 signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.rabbitmq.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+deb-src [signed-by=/usr/share/keyrings/rabbitmq.E495BB49CC4BBE5B.gpg] https://ppa2.rabbitmq.com/rabbitmq/rabbitmq-erlang/deb/ubuntu jammy main
+
+## Provides RabbitMQ
+##
+deb [arch=amd64 signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa1.rabbitmq.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa1.rabbitmq.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+
+# another mirror for redundancy
+deb [arch=amd64 signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.rabbitmq.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+deb-src [signed-by=/usr/share/keyrings/rabbitmq.9F4587F226208342.gpg] https://ppa2.rabbitmq.com/rabbitmq/rabbitmq-server/deb/ubuntu jammy main
+EOF
+
+## Update package indices
+sudo apt-get update -y
+
+## Install Erlang packages
+sudo apt-get install -y erlang-base \
+                        erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets \
+                        erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key \
+                        erlang-runtime-tools erlang-snmp erlang-ssl \
+                        erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl
+
+## Install rabbitmq-server and its dependencies
+sudo apt-get install rabbitmq-server -y --fix-missing
+```
+
+
+
+
+
+#### 二进制安装RabbitMQ
+
+**通用二进制安装官方说明**
+
+```http
+https://www.rabbitmq.com/install-generic-unix.html
+```
+
+
+
+**RabbitMQ版本和Erlang版本对应要求**
+
+```http
+https://www.rabbitmq.com/which-erlang.html
+```
+
+
+
+**RabbitMQ和Erlang各版本二进制tar包下载**
+
+```bash
+# RabbitMQ:
+https://github.com/rabbitmq/rabbitmq-server
+
+# Erlang:
+https://github.com/erlang/otp/releases
+```
+
+
+
+
+
+**范例：二进制安装一键安装脚本**
+
+```bash
+#!/bin/bash
+
+RABBITMQ_VERSION=3.13.7
+OPT_VERSION=26.2.5.1
+INSTALL_DIR="/usr/local/rabbitmq"
+
+SRC_DIR=`pwd`
+CPUS=`grep -c processor /proc/cpuinfo`
+GREEN="echo -e \E[32;1m"
+END="\E[0m"
+HOST=`hostname -I|awk '{print $1}'`
+
+. /etc/os-release
+
+color () {
+    RES_COL=60
+    MOVE_TO_COL="echo -en \\033[${RES_COL}G"
+    SETCOLOR_SUCCESS="echo -en \\033[1;32m"
+    SETCOLOR_FAILURE="echo -en \\033[1;31m"
+    SETCOLOR_WARNING="echo -en \\033[1;33m"
+    SETCOLOR_NORMAL="echo -en \E[0m"
+    echo -n "$1" && $MOVE_TO_COL
+    echo -n "["
+    if [ $2 = "success" -o $2 = "0" ] ;then
+        ${SETCOLOR_SUCCESS}
+        echo -n $" OK "    
+    elif [ $2 = "failure" -o $2 = "1" ] ;then
+        ${SETCOLOR_FAILURE}
+        echo -n $"FAILED"
+    else
+        ${SETCOLOR_WARNING}
+        echo -n $"WARNING"
+    fi
+    ${SETCOLOR_NORMAL}
+    echo -n "]"
+    echo
+}
+
+install_erlang() {
+
+   apt update
+   apt -y install gcc build-essential make ncurses-dev libssl-dev libncurses5-dev libwxgtk3.0-gtk3-dev libalien-wxwidgets-perl pkg-config default-jdk unixodbc unixodbc-dev g++ xsltproc fop libxml2-utils socat || { color "安装相关包失败!" 1;exit; }
+   [ -e otp_src_${OPT_VERSION}.tar.gz ] || { color "otp-src-${OPT_VERSION}.tar.gz 文件不存在!" 1;wget https://mirror.ghproxy.com/https://github.com/erlang/otp/releases/download/OTP-${OPT_VERSION}/otp_src_${OPT_VERSION}.tar.gz ; }
+   tar xf otp_src_${OPT_VERSION}.tar.gz -C /usr/local
+    cd /usr/local/otp_src_${OPT_VERSION}
+   ./configure --prefix=/apps/erlang \
+            --enable-kernel-poll \
+            --enable-threads \
+            --enable-smp-support \
+            --enable-dirty-schedulers \
+            --with-ssl=/usr \
+            --enable-dynamic-ssl-lib \
+            --enable-sharing-of-heap \
+            --enable-hipe \
+            --enable-escript
+    make -j $CPUS && make install 
+    echo 'PATH=/apps/erlang/bin:$PATH' >> /etc/profile
+    ln -s /apps/erlang/bin/* /usr/bin/
+}
+
+install_rabbitmq() {
+    cd $SRC_DIR
+   [ -e rabbitmq-server-generic-unix-${RABBITMQ_VERSION}.tar.xz ] || { color "rabbitmq-server-genericunix-${RABBITMQ_VERSION}.tar.xz 文件不存在!" 1;wget https://mirror.ghproxy.com/https://github.com/rabbitmq/rabbitmq-server/releases/download/v${RABBITMQ_VERSION}/rabbitmq-server-generic-unix-${RABBITMQ_VERSION}.tar.xz; }
+   tar xf rabbitmq-server-generic-unix-${RABBITMQ_VERSION}.tar.xz -C /usr/local/
+   [ -e `dirname ${INSTALL_DIR}` ] || mkdir `dirname ${INSTALL_DIR}`
+    ln -s /usr/local/rabbitmq_server-${RABBITMQ_VERSION}  ${INSTALL_DIR}
+    ln -s ${INSTALL_DIR}/sbin/* /usr/sbin/
+    useradd -r -m rabbitmq
+    chown -R rabbitmq.rabbitmq ${INSTALL_DIR}/
+    
+    cat > /lib/systemd/system/rabbitmq-server.service <<EOF
+# systemd unit example
+[Unit]
+Description=RabbitMQ broker
+After=network.target epmd@0.0.0.0.socket
+Wants=network.target epmd@0.0.0.0.socket
+[Service]
+Type=notify
+User=rabbitmq
+Group=rabbitmq
+UMask=0027
+NotifyAccess=all
+TimeoutStartSec=600
+# To override LimitNOFILE, create the following file:
+#
+# /etc/systemd/system/rabbitmq-server.service.d/limits.conf
+#
+# with the following content:
+#
+# [Service]
+# LimitNOFILE=65536
+LimitNOFILE=32768
+# The following setting will automatically restart RabbitMQ
+# in the event of a failure. systemd service restarts are not a
+# replacement for service monitoring. Please see
+# https://www.rabbitmq.com/monitoring.html
+Restart=on-failure
+RestartSec=10
+#WorkingDirectory=/var/lib/rabbitmq
+ExecStart=${INSTALL_DIR}/sbin/rabbitmq-server
+ExecStop=${INSTALL_DIR}/sbin/rabbitmqctl shutdown
+# See rabbitmq/rabbitmq-server-release#51
+SuccessExitStatus=69
+[Install]
+WantedBy=multi-user.target
+EOF
+   systemctl daemon-reload
+   systemctl enable rabbitmq-server.service
+}
+
+config_rabbitmq(){
+    rabbitmq-plugins enable rabbitmq_management
+    echo  "loopback_users = none" > ${INSTALL_DIR}/etc/rabbitmq/rabbitmq.conf 
+    systemctl restart rabbitmq-server.service
+}
+
+start_rabbitmq() { 
+   systemctl is-active rabbitmq-server.service    
+    if [ $?  -eq 0 ];then  
+        echo
+       color "RabbitMQ安装完成!" 0
+        echo "-------------------------------------------------------------------"
+        echo -e "访问链接: \c"
+        ${GREEN}"http://${HOST}:15672/"${END}
+        echo -e "用户和密码: \c"
+ ${GREEN}"guest/guest"${END}
+    else
+       color "RabbitMQ安装失败!" 1
+        exit
+    fi
+}
+
+
+install_erlang
+install_rabbitmq
+config_rabbitmq
+start_rabbitmq
+```
+
+
+
+### RabbitMQ管理
+
+#### 启用远程登录Web管理页面
+
+##### RabbitMQ 插件管理说明
+
+**官方文档：**
+
+```http
+https://www.rabbitmq.com/management.html
+```
+
+
+
+**端口说明：**
+
+```bash
+5672   #客户端访问的端口
+15672  #web 管理端口,默认没有打开,需要启用插件
+25672  #集群状态通信端口
+```
+
+
+
+##### 安装Web管理插件rabbitmq_management
+
+```bash
+# 添加web管理插件
+[root@mystical /apps/erlang/bin]# rabbitmq-plugins enable rabbitmq_management
+Enabling plugins on node rabbit@mystical:
+rabbitmq_management
+The following plugins have been configured:
+  rabbitmq_management
+  rabbitmq_management_agent
+  rabbitmq_web_dispatch
+Applying plugin configuration to rabbit@mystical...
+The following plugins have been enabled:
+  rabbitmq_management
+  rabbitmq_management_agent
+  rabbitmq_web_dispatch
+
+set 3 plugins.
+Offline change; changes will take effect at broker restart.
+
+# 重启服务
+[root@mystical /apps/erlang/bin]# systemctl restart rabbitmq-server.service
+
+# 可以看到15762/tcp端口打开
+[root@mystical /apps/erlang/bin]# ss -nlt
+State       Recv-Q      Send-Q             Local Address:Port              Peer Address:Port      Process   
+LISTEN      0           1024                     0.0.0.0:15672                  0.0.0.0:*                   
+LISTEN      0           4096                     0.0.0.0:4369                   0.0.0.0:*                   
+LISTEN      0           128                      0.0.0.0:22                     0.0.0.0:*                   
+LISTEN      0           128                      0.0.0.0:25672                  0.0.0.0:*                   
+LISTEN      0           4096                     127.0.0.53%lo:53               0.0.0.0:*    
+
+#开启插件本质修改了如下文件
+[root@mq-server ~]#cat /etc/rabbitmg/enabled plugins
+[rabbitmg management]
+
+# 注意: rabbitmq 从 3.3.0 开始禁止使用guest/guest 权限通过除localhost外的访问，直接访问报错
+# 因此需要开启用户 guest 远程登录功能
+```
+
+
+
+#####  开启用户 guest 远程登录功能
+
+```bash
+[root@mystical ~]# ls /etc/rabbitmq/
+enabled_plugins
+
+#创建配置文件开启远程登录功能
+[root@mystical ~]# echo "loopback_users = none" > /etc/rabbitmq/rabbitmq.conf 
+[root@mystical ~]# systemctl restart rabbitmq-server.service
+
+#如果多台主机需要打开远程Web访问功能，可以将两个文件同步到其它主机
+[root@mq-server ~]#scp /etc/rabbitmq/* 10.0.0.101:/etc/rabbitmq/
+root@10.0.0.101's password: 
+enabled_plugins                                                  100%   23    55.1KB/s   00:00    
+rabbitmq.conf                                                    100%   22    34.6KB/s   00:00 
+
+#再次用户guest远程登录验证
+```
+
+![image-20250117173542516](D:\git_repository\cyber_security_learning\markdown_img\image-20250117173542516.png)
+
+
+
+#### 修改guest密码
+
+![image-20250117173638076](D:\git_repository\cyber_security_learning\markdown_img\image-20250117173638076.png)
+
+
+
+![image-20250117173740711](D:\git_repository\cyber_security_learning\markdown_img\image-20250117173740711.png)
+
+![image-20250117173838985](D:\git_repository\cyber_security_learning\markdown_img\image-20250117173838985.png)
+
+
+
+#### 创建新用户
+
+上面可以设置guest用户远程登录,但基于安全起见建议创建新的管理用户
+
+```bash
+# 查看用户
+[root@mystical ~]# rabbitmqctl list_users
+Listing users ...
+user	tags
+guest	[administrator]
+
+# 可能出现的报错
+[root@mystical ~]# rabbitmqctl cluster_status
+Error: unable to perform an operation on node 'rabbit@mystical'. Please see diagnostics information and suggestions below.
+
+# 出错原因：Erlang Cookie不一致 或者 host主机名和节点名称不一致
+# 解决方案：
+# 包安装：确保两个文件内容一致
+cat /var/lib/rabbitmq/.erlang.cookie
+cat ~/.erlang.cookie
+
+# 编译安装，确保下面两个文件内容一致
+[root@mystical ~]# find / -name '.erlang.cookie'
+/home/rabbitmq/.erlang.cookie
+/root/.erlang.cookie
+
+[root@mystical ~]# cp /home/rabbitmq/.erlang.cookie ~/.erlang.cookie
+
+# 重启服务
+[root@mystical ~]# systemctl restart rabbitmq-server.service 
+```
+
+#### 管理用户
+
+```bash
+# 创建用户
+[root@mystical ~]# rabbitmqctl add_user admin 123456
+Adding user "admin" ...
+Done. Don't forget to grant the user permissions to some virtual hosts! See 'rabbitmqctl help set_permissions' to learn more.
+
+# 查看用户
+[root@mystical ~]# rabbitmqctl list_users
+Listing users ...
+user	tags
+admin	[]
+guest	[administrator]
+
+# 修改密码
+[root@mystical ~]# rabbitmqctl change_password admin 646130
+Changing password for user "admin" ...
+
+# 加入管理员角色，可以登录Web管理页面进行管理，但仍然无法访问virtual hosts,需要授权才可以
+[root@mystical ~]# rabbitmqctl set_user_tags admin administrator
+Setting tags for user "admin" to [administrator] ...
+
+# 查看
+[root@mystical ~]# rabbitmqctl list_users
+Listing users ...
+user	tags
+admin	[administrator]
+guest	[administrator]
+
+# 设置vhost权限，格式如下
+rabbitmqctl [--node <node>] [--longnames] [--quiet] set_permissions [--vhost <vhost>] <username> <conf> 
+<write> <read>
+
+# 设置对vhost “/” 给admin用户授予:configure配置，write写，read读的权限，“.*”表示正则表达式的任意字符串
+# 默认vhost为 "/"
+
+# 示例
+[root@mystical ~]# rabbitmqctl set_permissions [--vhost /] admin ".*" ".*" ".*"
+Setting permissions for user "admin" in vhost "/" ...
+
+# 验证权限
+[root@mystical ~]# rabbitmqctl list_user_permissions admin
+Listing permissions for user "admin" ...
+vhost	configure	write	read
+/	.*	.*	.*
+
+# 给指定vhost设置权限
+```
+
+#### 删除用户
+
+```bash
+[root@mq-server ~]#rabbitmqctl list_users
+Listing users ...
+user tags
+admin [administrator]
+wang [administrator]
+guest [administrator]
+
+[root@mq-server ~]#rabbitmqctl delete_user wang
+Deleting user "wang" ...
+```
+
+
+
+#### 创建vhost
+
+![image-20250118092128743](D:\git_repository\cyber_security_learning\markdown_img\image-20250118092128743.png)
+
+![image-20250118092621666](D:\git_repository\cyber_security_learning\markdown_img\image-20250118092621666.png)
+
+
+
+**命令行操作vhost**
+
+```bash
+[root@mystical ~]# rabbitmqctl 
+......
+Virtual hosts:
+
+   add_vhost                                     Creates a virtual host
+   clear_vhost_limits                            Clears virtual host limits
+   delete_vhost                                  Deletes a virtual host
+   list_vhost_limits                             Displays configured virtual host limits
+   reconcile_vhosts                              Makes sure all virtual hosts were initialized on all                                                        reachable cluster nodes
+   restart_vhost                                 Restarts a failed vhost data stores and queues
+   set_vhost_limits                              Sets virtual host limits
+   set_vhost_tags                                Sets virtual host tags
+   trace_off                                     
+   trace_on                                      
+   update_vhost_metadata                         Updates metadata (tags, description, default queue type) a                                                  virtual host
+
+......
+```
+
+
+
+#### 创建Queue
+
+**Queue类似于Kafka的Topic，后续可以向里面写入数据**
+
+![image-20250118093126680](D:\git_repository\cyber_security_learning\markdown_img\image-20250118093126680.png)
+
+
+
+**Durability字段解析**
+
+- **Durable**：
+
+  - 队列是持久化的。
+
+  - 即使 RabbitMQ 服务重启，队列仍然会保留。
+
+  - 队列的元数据存储在磁盘上，而不是仅保存在内存中。
+
+- **Transient**：
+
+  - 队列是非持久化的。
+
+  - 当 RabbitMQ 服务重启时，队列会被删除。
+
+  - 队列的元数据仅存储在内存中。
+
+- **Durable 参数的作用**
+
+  - `Durable` 参数是在声明队列时指定的，其主要目的是控制队列是否在 RabbitMQ 服务重启后保留。
+
+  - **设置 Durable 为 true**：
+    - 队列的元数据会被存储到磁盘。
+    - 在服务重启后，队列依然存在。
+
+  - **设置 Durable 为 false**：
+    - 队列仅存在于内存中。
+    - 如果 RabbitMQ 服务重启，队列会丢失。
+
+- **消息持久化 vs 队列持久化**
+  - 需要注意的是，**队列的持久化**（通过 `Durable` 参数设置）和**消息的持久化**是两个不同的概念：
+  - **队列持久化**：
+    - 队列的元数据存储到磁盘。
+    - 通过声明队列时设置 `Durable=true`。
+  - **消息持久化**：
+    - 消息存储到磁盘。
+    - 需要在消息发布时，将消息的 `delivery_mode` 属性设置为 2（持久化）。
+  - **持久化队列不等于持久化消息**：
+    - 即使队列是持久化的，如果消息没有设置持久化属性，服务重启后消息仍然会丢失。
+    - 反之，若队列是非持久化的，即使消息设置了持久化，服务重启后消息也会丢失。
+
+```ABAP
+生产环境通常会设置队列为持久化（Durable=true），并确保消息的 delivery_mode=2，以实现高可靠性数据传输。
+```
+
+
+
+
+
+
+
+### Python客户端访问RabbitMQ
+
+#### 生产者（producter）
+
+队列消息的产生者，负责生产消息，并将消息传入队列
+
+```bash
+[root@mystical ~]# apt install -y python3 python3-pip
+
+# 加速配置
+[root@mystical ~]# python3 -m pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
+Writing to /root/.config/pip/pip.conf
+
+# 下载pika模块
+[root@mystical ~]# pip3 install pika
+Looking in indexes: https://pypi.tuna.tsinghua.edu.cn/simple
+Collecting pika
+  Downloading https://pypi.tuna.tsinghua.edu.cn/packages/f9/f3/f412836ec714d36f0f4ab581b84c491e3f42c6b5b97a6c6ed1817f3c16d0/pika-1.3.2-py3-none-any.whl (155 kB)
+     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 155.4/155.4 KB 7.4 MB/s eta 0:00:00
+Installing collected packages: pika
+Successfully installed pika-1.3.2
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+```
+
+```python
+import pika
+import json
+
+username = 'guest'
+password = 'guest'
+host = '127.0.0.1'
+port = 5672
+
+def publish_messages():
+   credentials = pika.PlainCredentials(username, password)
+   connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, port=port, virtual_host='/', 
+credentials=credentials))
+   channel = connection.channel()
+    
+   queue_name = 'new_test'
+   channel.queue_declare(queue=queue_name)
+    
+   for i in range(10):
+       message = json.dumps({'OrderId': f"1000{i}"})
+       channel.basic_publish(exchange='', routing_key=queue_name, body=message)
+       print(message)
+        
+   connection.close()
+
+if __name__ == "__main__":
+   publish_messages()
+```
+
+```bash
+# 运行脚本
+[root@mystical ~]# python3 rabbitmq_product.py 
+{"OrderId": "10000"}
+{"OrderId": "10001"}
+{"OrderId": "10002"}
+{"OrderId": "10003"}
+{"OrderId": "10004"}
+{"OrderId": "10005"}
+{"OrderId": "10006"}
+{"OrderId": "10007"}
+{"OrderId": "10008"}
+{"OrderId": "10009"}
+```
+
+![image-20250118095737801](D:\git_repository\cyber_security_learning\markdown_img\image-20250118095737801.png)
+
+
+
+#### 消费者（consumer）
+
+```python
+import pika
+
+# Define MQ parameters
+username = 'guest'
+password = '123456'
+host = '10.0.0.150'
+port = 5672
+
+def consume_messages():
+   credentials = pika.PlainCredentials(username, password)
+   connection = pika.BlockingConnection(pika.ConnectionParameters(host=host, port=port, virtual_host='/', credentials=credentials))
+   channel = connection.channel()
+
+   channel.queue_declare(queue='new_test', durable=False)
+    
+   def callback(ch, method, properties, body):
+       print(body.decode())
+       ch.basic_ack(delivery_tag=method.delivery_tag)
+    
+   channel.basic_consume(queue='new_test', on_message_callback=callback, auto_ack=False)
+
+   channel.start_consuming()
+    
+if __name__ == "__main__":
+   consume_messages()
+```
+
+
+
+**查看队列和删除**
+
+```bash
+# 查看队列
+[root@mystical ~]# rabbitmqctl list_queues
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name	messages
+new_test	0
+rabbit-test 10
+test	0
+
+# 删除队列
+[root@mystical ~]# rabbitmqctl delete_queue new_test
+Deleting queue 'new_test' on vhost '/' ...
+Queue was successfully deleted with 0 ready messages
+
+#清空队列
+[root@mystical ~]# rabbitmqctl purge_queue rabbit-test
+Purging queue 'rabbit-test' in vhost '/' ...
+
+# 再次查看
+[root@mq-server ~]#rabbitmqctl list_queues
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name messages
+rabbit-test 0
+```
+
+
+
+### RabbitMQ集群部署
+
+#### RabbitMQ集群模式
+
+RabbitMQ集群模式分为两种:普通和镜像模式
+
+- **普通集群模式：**
+  - 创建好RabbitMQ集群之后的默认模式
+  - queue 创建之后，如果没有其它policy，消息实体只存在于其中一个节点
+  - 假设 A、B 两个 Rabbitmq节点仅有相同的元数据，即队列结构，但队列的数据仅保存有一份，即创建该队列的rabbitmq节点（A 节 点）
+  - 当消息进入 A 节点的 Queue 中后，consumer 从 B节点拉取时，RabbitMQ 会临时在 A、B 间进行消息传输，把 A中的消息实体取出 并经过 B 发送给consumer，所以 consumer可以连接每一个节点，从中取消息
+  - 该模式存在一个问题就是当 A 节点故障后，B节点无法取到A 节点中还未消费的消息实体。可能会丢失数据
+  - **缺点： 没有数据高可用**
+  - **优点：多个节点可以实现负载均衡**
+
+
+
+- **镜像集群模式：** 
+  - 把需要的队列做成镜像队列，存在于多个节点，属于 RabbitMQ 的 HA方案（镜像模式是在普通模式的基础上，增加一些镜像策略）
+  - 该模式解决了普通模式中的数据丢失问题，其实质和普通模式不同之处在于，消息实体会主动在镜像节点间同步，而不是在consumer 取数据时临时拉取
+  - 该模式带来的副作用也很明显，除了降低系统性能外，如果镜像队列数量过多，加之大量的消息进入，集群内部的网络带宽将会被这种 同步通讯大大消耗掉，所以在对可靠性要求较高的场合中适用
+  - 一个队列想做成镜像队列，需要先设置policy， 然后客户端创建队列的时候，rabbitmq集群根据“队列名称”自动设置是普通集群模式或 镜像队列
+  - **优点：此模式因数据有冗余,比较常用**
+  - **缺点：性能不佳**
+
+
+
+- **集群中两种节点类型:**
+  - 内存节点：只将数据保存到内存
+  - 磁盘节点：保存数据到内存和磁盘。
+
+```ABAP
+内存节点执行效率比磁盘节点要高，集群中只需要一个磁盘节点来保存数据就可以
+如果集群中只有内存节点，那么不能全部停止它们，否则所有数据消息在服务器全部停机之后都会丢失。
+```
+
+
+
+ **推荐设计架构**
+
+在一个rabbitmq 集群里，有 3 台或以上机器，其中 1台使用磁盘模式，其它节点使用内存模式，内存节点访问速度更快，由于磁盘IO相对 较慢，因此可作为数据备份使用。
+
+
+
+#### 安装RabbitMQ集群
+
+##### 环境准备
+
+集群节点之间通信依赖主机名，每个节点需要有唯一的主机名
+
+集群环境准备三台服务器，不同节点需要指定的主机名
+
+```bash
+[root@ubuntu1804 ~]#hostnamectl set-hostname node1.wang.org
+[root@ubuntu1804 ~]#hostnamectl set-hostname node2.wang.org
+[root@ubuntu1804 ~]#hostnamectl set-hostname node3.wang.org
+
+[root@node1 ~]#cat >> /etc/hosts <<EOF
+10.0.0.101 node1.wang.org node1
+10.0.0.102 node2.wang.org node2
+10.0.0.103 node3.wang.org node3
+EOF
+
+[root@node1 ~]#scp /etc/hosts node2:/etc/hosts
+[root@node1 ~]#scp /etc/hosts node3:/etc/hosts
+```
+
+
+
+##### 各节点分别安装RabbitMQ并启用Web管理
+
+```bash
+# 下载rabbitmq
+[root@node1 ~]# wget https://www.mysticalrecluse.com/script/tools/rabbitmq-server-generic-unix-3.13.7.tar.xz
+[root@node1 ~]# wget https://www.mysticalrecluse.com/script/tools/otp_src_26.2.5.1.tar.gz
+
+# 下载RabbitMQ安装脚本
+[root@node1 ~]# wget https://www.mysticalrecluse.com/script/Shell/install_rabbitmq.sh
+
+# 访问IP:15672,验证各个节点都可以用guest/guest登录
+```
+
+![image-20250118115201944](D:\git_repository\cyber_security_learning\markdown_img\image-20250118115201944.png)
+
+
+
+##### 同步 cookie 文件
+
+RabbitMQ 的集群是依赖于 erlang 的集群来工作的，所以必须先构建起 erlang的集群环境
+
+而 Erlang 的集群中各节点是通过一个 magic cookie来实现的
+
+这个 cookie 存放在 `/var/lib/rabbitmq/.erlang.cookie` 中，编译安装是在`/home/rabbitmq/.erlang.cookie`
+
+文件是 400的权限,所以必须保证各节点cookie 保持一致，否则节点之间就无法通信。
+
+```bash
+[root@node1 ~]# ll /home/rabbitmq/.erlang.cookie 
+-r-------- 1 rabbitmq rabbitmq 20 Jan 18 00:00 /home/rabbitmq/.erlang.cookie
+
+[root@node1 ~]# cat /home/rabbitmq/.erlang.cookie 
+QQYNWDZEONWPFROEDSFM
+
+[root@node1 ~]# scp /home/rabbitmq/.erlang.cookie node2:/home/rabbitmq/.erlang.cookie
+.erlang.cookie                                                               100%   20    61.7KB/s   00:00    
+[root@node1 ~]# scp /home/rabbitmq/.erlang.cookie node3:/home/rabbitmq/.erlang.cookie
+.erlang.cookie                                                               100%   20    54.2KB/s   00:00 
+
+# 重启服务生效
+[root@node1 ~]# systemctl restart rabbitmq-server.service
+[root@node2 ~]# systemctl restart rabbitmq-server.service
+[root@node3 ~]# systemctl restart rabbitmq-server.service
+```
+
+
+
+##### 创建集群
+
+```bash
+# 在 node2,node3 节点执行以下命令作为内存节点添加到 node1 所在集群
+# 将 node2 加入集群
+[root@node2 ~]# rabbitmqctl stop_app                    # 停止app服务
+Stopping rabbit application on node rabbit@node2 ...
+
+[root@node2 ~]# rabbitmqctl reset                       # 清空元数据
+Resetting node rabbit@node2 ...
+
+#将node2添加到集群当中，并成为内存节点，不加--ram 默认是磁盘节点,此步依赖于/etc/hosts的名称解析
+[root@node2 ~]# rabbitmqctl join_cluster rabbit@node1 --ram
+Clustering node rabbit@node2 with rabbit@node1
+
+# 启动app服务
+[root@node3 ~]# rabbitmqctl start_app
+Starting node rabbit@node3 ...
+
+# 将 node3 加入集群
+[root@node3 ~]# rabbitmqctl stop_app
+Stopping rabbit application on node rabbit@node3 ...
+
+[root@node3 ~]# rabbitmqctl reset
+Resetting node rabbit@node3 ...
+
+[root@node3 ~]# rabbitmqctl join_cluster rabbit@node1 --ram
+Clustering node rabbit@node3 with rabbit@node1
+
+[root@node3 ~]# rabbitmqctl start_app
+Starting node rabbit@node3 ...
+```
+
+![image-20250118120333681](D:\git_repository\cyber_security_learning\markdown_img\image-20250118120333681.png)
+
+
+
+##### 将集群设置为镜像模式
+
+创建的集群默认为普通模式,没有冗余性,可以修改为镜像模式
+
+```bash
+# 命令说明
+rabbitmqctl set_policy [-p Vhost] Name Pattern Definition [Priority]
+
+# 参数说明
+-p Vhost                # 可选参数，针对指定vhost下的queue进行设置
+Name                    # policy的名称
+Pattern                 # queue的匹配模式(正则表达式)
+Definition              # 镜像定义，包括三个部分ha-mode, ha-params, ha-sync-mode
+ha-mode                 #指明镜像队列的模式，有效值为 all/exactly/nodes
+all                     # 表示在集群中所有的节点上进行镜像
+exactly                 # 表示在指定个数的节点上进行镜像，节点的个数由ha-params指定
+nodes                   # 表示在指定的节点上进行镜像，节点名称通过ha-params指定
+ha-params               # ha-mode模式需要用到的参数
+ha-sync-mode            # 进行队列中消息的同步方式，有效值为automatic和manual
+priority                # 可选参数，policy的优先级
+```
+
+默认模式为普通模式,无数据冗余功能,可以通过设置镜像模式,实现集群的高可用性功能
+
+```bash
+#在任意一个节点执行一次下面操作即可
+[root@node1 ~]# rabbitmqctl set_policy ha-all "^" '{"ha-mode":"all"}'
+Setting policy "ha-all" for pattern "^" to "{"ha-mode":"all"}" with priority "0" for vhost "/" ...
+
+# 查看
+[root@node1 ~]# rabbitmqctl list_policies
+Listing policies for vhost "/" ...
+vhost	name	pattern	apply-to	definition	priority
+/	ha-all	^	all	{"ha-mode":"all"}	0
+```
+
+
+
+##### 验证镜像模式
+
+```bash
+#在任意节点创建用户并设置权限,会自动同步至其它节点
+[root@node1 ~]# rabbitmqctl add_user mystical 123456
+Adding user "mystical" ...
+Done. Don't forget to grant the user permissions to some virtual hosts! See 'rabbitmqctl help set_permissions' to learn more.
+
+[root@node1 ~]# rabbitmqctl set_user_tags mystical administrator
+Setting tags for user "mystical" to [administrator] ...
+
+[root@node1 ~]# rabbitmqctl set_permissions mystical ".*" ".*" ".*" 
+Setting permissions for user "mystical" in vhost "/" ...
+
+[root@node1 ~]# rabbitmqctl list_users
+Listing users ...
+user	tags
+mystical	[administrator]
+guest	[administrator]
+
+# 在任何其他节点上查看用户信息
+[root@node2 ~]# rabbitmqctl list_users
+Listing users ...
+user	tags
+mystical	[administrator]
+guest	    [administrator]
+```
+
+
+
+
+
+## MINIO
+
+
+
+**内容概述**
+
+- **MINIO 介绍**
+- **MINIO 部署**
+- **MINIO 使用**
+- **MINIO 故障恢复**
+- **MINIO 扩容和缩容**
+- **MINIO 备份和还原**
+- **MINIO 监控**
+
+
+
+### MINIO介绍
+
+![image-20250118123718005](D:\git_repository\cyber_security_learning\markdown_img\image-20250118123718005.png)
+
+MinIO 是GlusterFS创始人之一Anand Babu Periasamy发布的新的开源项目。
+
+MinlO 是一个**用 GoLang 语言开发**的基于 **GNU AGPL v3** 开源协议的对象存储服务(Object Storage  Service, OSS)
+
+对象存储服务是一种海量、安全、低成本、高可靠的云存储服务，适合存放任意类型的文件。
+
+对象存储服务支持容量和处理能力弹性扩展，多种存储类型供选择，全面优化存储成本。
+
+MinlO **兼容亚马逊S3云存储服务接口**，非常适合于存储大容量非结构化的数据，例如:图片、视频、日志 文件、备份数据和容器/虚拟机镜像等
+
+MinlO 支持的一个对象文件可以是任意大小，从几kb到最大5T不等
+
+MinlO 是一个非常轻量的服务， 可以很简单的和其他应用的结合,也支持各种操作系统,比 如:Linux,Windows,Mac等
+
+**对于中小型企业的对象存储**，如果不选择公有云存储，那么Minio是个不错的选择
+
+MinIO 除了直接作为对象存储使用,还可以作为云上对象存储服务的网关层，无缝对接到Amazon S3、 MicroSoft Azure。
+
+
+
+**MINIO特点**
+
+- MinIO 提供高性能、与S3 兼容的对象存储系统，让你自己能够构建自己的云储存服务。
+- MinIO 使用和部署非常简单，可以让您在最快的时间内实现下载到生产环境的部署。
+- MinIO 读写性能优异,高性能MinIO 是世界上最快的对象存储，没有之一。在 32 个 NVMe 驱动器节点和 100Gbe 网络上发布的 GET/PUT 结果超过 325 GiB/秒和 165 GiB/秒
+- MinIO 支持的对象文件小到几kb到最大5T,并实现了数据的高可用
+- MinIO 原生支持 Kubernetes，它可用于每个独立的公共云、每个 Kubernetes 发行版、私有云和 边缘的对象存储套件
+- MinIO 是软件定义的，不需要购买其他任何硬件，在 GNU AGPL v3 下是 100% 开源的
+
+
+
+**MINIO性能**
+
+```ABAP
+节点越多，性能越好
+```
+
+![image-20250118152114187](D:\git_repository\cyber_security_learning\markdown_img\image-20250118152114187.png)
+
+
+
+### MINIO工作机制
+
+#### MINIO相关术语
+
+- **0bject 对象**
+  - 存储到Minio的基本对象,如文件、字节流等任意数据
+- **Bucket 桶**
+  - 用来存储Object的逻辑空间。
+  - 每个Bucket之间的数据是相互隔离的。
+  - 对于客户端而言，就相当于一个存放文件的顶层文件夹，用于实现不同资源的分类存储
+  - 通常一个项目或同一类资源可以对应于一个Bucket
+- **Drive 驱动器**
+  - 即存储数据的磁盘,**一个Drive通常对应一块物理磁盘**或者一个独立目录
+  - **在MinIO启动时，以参数的方式传入**
+  - Minio 中所有的对象数据都会存储在Drive里
+- **Set 存储集**
+  - 一组Drive的集合,即一组相关的磁盘的集合
+  - 分布式部署时,MinIO会根据集群规模自动划分一个或多个Set，每个Set中的Drive分布在不同位置。
+  - 一个对象存储在一个Set上
+  - 一个集群划分为多个Set
+  - 一个Set包含的Drive数量是固定的， 默认由系统根据集群规模自动计算得出
+  - 一个Set中的Drive尽可能分布在不同的节点上
+
+
+
+####  纠删码EC（Erasure Code）
+
+分布式存储，很关键的点在于数据的可靠性，即保证数据的完整,不丢失，不损坏。只有在可靠性实现的 前提下，才有了追求一-致性、高可用、高性能的基础。而对于在存储领域，一 般对于保证数据可靠性的 方法主要有两类，一类是**冗余法**，一 类是**校验法**。
+
+
+
+- **冗余法**
+  - 冗余法即对存储的数据进行副本备份，当数据出现丢失，损坏，即可使用备份内容进行恢复，而副 本备份的多少，决定了数据可靠性的高低。这其中会有成本的考量，副本数据越多，数据越可靠， 但需要的设备就越多，成本就越高。可靠性是允许丢失其中一份数据。
+  - 当前有很多分布式系统采用此种方式实现，如：ELasticsearch的索引副本，Kafka的副本，Redis 的集群，MySQL的主从模式，Hadoop的多副本的文件系统
+- **校验法**
+  - 校验法即通过校验码的数学计算的方式，对出现丢失、损坏的数据可以实现**校验**和**还原**两个功能
+  - 通过对数据进行校验和( checksum )进行计算，可以检查数据是否完整，有无损坏或更改，在数据 传输和保存时经常用到，如TCP协议
+  - 恢复还原，通过对数据结合校验码进行数学计算，还原丢失或损坏的数据，可以在保证数据可靠的 前提下，降低冗余，如单机硬盘存储中的RAID技术，纠删码(Erasure Code)技术等。
+  - **MinlO采用的就是纠删码技术**
+
+
+
+MinIO 纠删码EC (Erasure Code) 是一种数据冗余和可用性功能，允许具有多个驱动器的 MinIO 部署即 时自动重建对象，即使群集中丢失了多个驱动器或节点。 纠删码提供了**对象级修复**
+
+Minio使用纠删码erasure code 和校验和checksum来保护数据免受硬件故障和无声数据损坏。即便您 丢失一 半数量(N/2) 的硬盘,您仍然可以恢复数据
+
+纠删码是一种恢复铁和损坏数据的数学算法，Minio采用Reed-Solomon code将对象拆分成N/2数据和 N/2奇偶校验块。
+
+```ABAP
+当损坏总磁盘数的一半磁盘时,只能读取而不能上传新的文件,只要保证正常磁盘数大于等n/2+1时,就可以支持写入新数据
+```
+
+这就意味着如果是12块盘，一个对象会被分成6个数据块、6个奇偶校验块，你可以失任意6块盘(不管其 是存放的数据块还是奇偶校验块)，你仍可以从剩下的盘中的数据进行恢复
+
+```ABAP
+实现纠删码 EC 至少需要4块磁盘以上
+```
+
+纠删码是可以通过数学计算,实现数据冗余,功能上类似于RAID技术,当磁盘损坏时,可以通过计算把丢失的 数据进行还原，它可以将n份原始数据,增加m份数据,并能通过n+m份中的任意n份数据,还原为原始数 据。即如果有**任意小于等于m份**的数据失效,仍然能通过剩下的数据还原出来。
+
+
+
+#### MinIO 工作流程
+
+![image-20250118155634053](D:\git_repository\cyber_security_learning\markdown_img\image-20250118155634053.png)
+
+### MINIO部署
+
+
+
+ **部署模式**
+
+- **单机单硬盘**
+- **单机多硬盘**
+- **多机多硬盘**
+
+
+
+**部署方法**
+
+- **包安装**
+- **二进制安装**
+- **Docker容器化安装**
+- **基于Kubernetes部署**
+
+
+
+#### 单机部署
+
+minio server的standalone模式，即单机模式，所有管理的磁盘都在一个主机上。
+
+该启动模式一般仅用于实验环境、测试环境、开发环境的验证和学习使用。
+
+在standalone模式下，还可以分为**non-erasure code mode**和**erasure code mode(纠删码)**。
+
+- **non-erasure code mode**
+  - 当minio server 运行时只传入一个本地磁盘参数。即为 non-erasure code mode
+  - 在此启动模式下，对于每一份对象数据， minio直接存储这份数据，不会建立副本，也不会启用纠删码机制。
+  - 因此,这种模式无论是服务实例还是磁盘都是”单点"，无任何高可用保障，磁盘损坏就意味着数据丢失。
+- **erasure code mode**
+  - 此模式需要为minio server实例传入多个本地磁盘参数。
+  - 一旦遇到多于一 个磁盘的参数， minio server会自动启用erasure code mode.
+  - erasure code对磁盘的个数是有要求的，至少4个磁盘, 如不满足要求，实例启动将失败。
+  - erasure code启用后，要求传给minio server的endpoint(standalone模式下，即本地磁盘上的目录)至少为4个。
+
+
+
+##### 包安装
+
+**Debian/Ubuntu包安装**
+
+```bash
+# 下载deb包
+[root@mystical ~]# wget https://dl.min.io/server/minio/release/linux-amd64/archive/minio_20230829230735.0.0_amd64.deb -O minio.deb
+
+# 安装
+[root@mystical ~]# dqkg -i minio.deb
+
+# 查看
+[root@mystical ~]# which minio
+/usr/local/bin/minio
+
+[root@mystical ~]# minio -v
+minio version RELEASE.2023-08-29T23-07-35Z (commit-id=07b1281046c8934c47184d1b56c78995ef960f7d)
+Runtime: go1.19.12 linux/amd64
+License: GNU AGPLv3 <https://www.gnu.org/licenses/agpl-3.0.html>
+Copyright: 2015-2023 MinIO, Inc.
+
+# 查看service文件
+[root@mystical ~]# grep -Ev "#|^$" /lib/systemd/system/minio.service
+[Unit]
+Description=MinIO
+Documentation=https://docs.min.io
+Wants=network-online.target
+After=network-online.target
+AssertFileIsExecutable=/usr/local/bin/minio
+[Service]
+Type=notify
+WorkingDirectory=/usr/local
+User=minio-user
+Group=minio-user
+ProtectProc=invisible
+EnvironmentFile=-/etc/default/minio
+ExecStartPre=/bin/bash -c "if [ -z \"${MINIO_VOLUMES}\" ]; then echo \"Variable MINIO_VOLUMES not set in /etc/default/minio\"; exit 1; fi"
+ExecStart=/usr/local/bin/minio server $MINIO_OPTS $MINIO_VOLUMES
+Restart=always
+LimitNOFILE=1048576
+TasksMax=infinity
+TimeoutStopSec=infinity
+SendSIGKILL=no
+[Install]
+WantedBy=multi-user.target
+
+# 需自行创建用户
+[root@mystical ~]# groupadd -r minio-user
+[root@mystical ~]# useradd -M -r -s /sbin/nologin -g minio-user minio-user
+
+# 准备多个数据目录,minio数据目录不允许和根文件系统在一起，注意：新版允许
+[root@mystical ~]# mkdir -p /data
+
+# 在现有卷组中，切10G逻辑卷
+[root@mystical ~]# lvcreate -n minio -L 10G ubuntu-vg 
+  Logical volume "minio" created.
+  
+# 给新逻辑卷创建文件系统
+[root@mystical ~]# mkfs.ext4 /dev/ubuntu-vg/minio 
+mke2fs 1.46.5 (30-Dec-2021)
+Creating filesystem with 2621440 4k blocks and 655360 inodes
+Filesystem UUID: 956b6bf3-8709-4c30-a8e1-97eda95cba2a
+Superblock backups stored on blocks: 
+	32768, 98304, 163840, 229376, 294912, 819200, 884736, 1605632
+
+Allocating group tables: done                            
+Writing inode tables: done                            
+Creating journal (16384 blocks): done
+Writing superblocks and filesystem accounting information: done 
+
+# 配置持久化
+[root@mystical ~]# echo /dev/ubuntu-vg/minio /data ext4 defaults 0 0 >> /etc/fstab
+
+# 挂载
+[root@mystical ~]# mount -a
+
+[root@mystical ~]# mkdir -p /data/minio{1..4} 
+[root@mystical ~]# chown -R minio-user.minio-user /data/
+[root@mystical ~]# ll -d /data/minio{1..4}
+drwxr-xr-x 2 minio-user minio-user 4096 Jan 18 08:22 /data/minio1/
+drwxr-xr-x 2 minio-user minio-user 4096 Jan 18 08:22 /data/minio2/
+drwxr-xr-x 2 minio-user minio-user 4096 Jan 18 08:22 /data/minio3/
+drwxr-xr-x 2 minio-user minio-user 4096 Jan 18 08:22 /data/minio4/
+
+# 创建初始化参数（注意在实验时将注释去掉，防止干扰）
+[root@mystical ~]# cat > /etc/default/minio <<EOF
+> MINIO_ROOT_USER=admin                #默认minioadmin
+MINIO_ROOT_PASSWORD=12345678           #默认minioadmin
+MINIO_VOLUMES="/data/minio{1...4}"     #必选项
+MINIO_OPTS='--console-address :9001'   #默认端口随机端口
+> EOF
+
+# 开机自启服务并启动minio
+[root@mystical ~]# systemctl enable --now minio.service 
+
+#登录 http://10.0.0.100:9001/ 用户名密码:admin/12345678 
+```
+
+![image-20250118163000487](D:\git_repository\cyber_security_learning\markdown_img\image-20250118163000487.png)
+
+![image-20250118163045830](D:\git_repository\cyber_security_learning\markdown_img\image-20250118163045830.png)
+
+
+
+**红帽系统包安装**
+
+```bash
+# 下载rpm包
+[root@localhost ~]# wget https://dl.min.io/server/minio/release/linux-amd64/archive/minio-20230829230735.0.0.x86_64.rpm -O minio.rpm
+
+# 安装
+[root@localhost ~]# yum install -y ./minio.rpm 
+
+# 应用
+[root@localhost ~]# mkdir ~/minio
+[root@localhost ~]# minio server ~/minio --console-address :9090
+
+#默认用户和密码
+#RootUser: minioadmin 
+#RootPass: minioadmin 
+```
+
+
+
+![image-20250118163714513](D:\git_repository\cyber_security_learning\markdown_img\image-20250118163714513.png)
+
+
+
+![image-20250118163758269](D:\git_repository\cyber_security_learning\markdown_img\image-20250118163758269.png)
+
+
+
+
+
+##### 二进制表示部署
+
+```bash
+# 官方下载网站
+https://dl.min.io/server/minio/release/linux-amd64/
+
+# 下载二进制文件
+[root@mystical ~]# wget https://dl.min.io/server/minio/release/linux-amd64/minio
+
+# 添加到PATH路径并添加执行权限
+[root@mystical ~]# install minio /usr/local/bin
+
+# 准备数据目录，建议此目录为逻辑卷，方便后期动态扩容
+[root@mystical /data/minio]# lvcreate -n minio -L 10G ubuntu-vg
+[root@mystical /data/minio]# mkdir -p /data
+[root@mystical /data/minio]# mkfs.ext4 /dev/ubuntu-vg/minio 
+[root@mystical /data/minio]# echo /dev/ubuntu-vg/minio /data ext4 defaults 0 0 >> /etc/fstab
+[root@mystical /data/minio]# mount -a
+# 实际生产中，4个目录对应4块独立硬盘，这里仅做模拟
+[root@mystical /data/minio]# mkdir -p /data/minio{1..4}
+[root@mystical /data/minio]# chown -R minio.minio /data/
+
+# 创建用户
+[root@mystical ~]# useradd -s /sbin/nologin -r minio
+
+# 给目录授权
+[root@mystical ~]# chown -R minio.minio /data/minio/
+
+# 创建service文件，新版对密码强度有要求，不要用弱密码
+[root@mystical /data/minio]# cat /lib/systemd/system/minio.service
+[Unit]
+Description=Minio
+After=systemd-networkd.service systemd-resolved.service
+Documentation=https://min.io
+[Service]
+Type=notify
+Environment=MINIO_ROOT_USER=admin MINIO_ROOT_PASSWORD=Zyf123456
+ExecStart=/usr/local/bin/minio server /data/minio{1...4} --console-address ":9999"
+Restart=on-failure
+User=minio
+Group=minio
+LimitNOFILE=infinity
+LimitNPROC=infinity
+LimitCORE=infinity
+[Install]
+WantedBy=multi-user.target
+
+[root@mystical /data/minio]# systemctl enable --now minio
+
+# 访问10.0.0.151:9999
+```
+
+![image-20250118181523507](D:\git_repository\cyber_security_learning\markdown_img\image-20250118181523507.png)
+
+
+
+
+
+#### 分布式集群部署
+
+
+
+![image-20250118182057118](D:\git_repository\cyber_security_learning\markdown_img\image-20250118182057118.png)
+
+
+
+**分布式Minio优势**
+
+- **数据保护**
+  - 分布式Minio采用纠删码来防范多个节点宕机和位衰减bit rot。
+  - 分布式Minio至少需要4个硬盘，使用分布式Minio 会自动引入纠删码功能
+- **高可用**
+  - 单机Minio服务存在单点故障，相反，如果是一个有N块硬盘的分布式Minio,只要有N/2硬盘在线， 数据就是安全的。不过你需要至少有N/2+1个硬盘来创建新的对象。
+  - 例如，一个16节点Minio集群，每个节点16块硬盘，就算8台服务器宕机，这个集群仍然可读的， 不过需要9台服务器才能写数据。
+- **性能**
+  - 多个节点负载均衡，提升性能
+- **一致性**
+  - Minio在分布式和单机模式下，所有读写操作都严格遵守read-after-write一致性模型。
+
+
+
+**分布式Minio实现条件**
+
+- 在所有节点运行同样的命令启动一个分布式Minio实例，只需要把硬盘位置做为参数传给minio  server命令即可
+- 分布式Minio中的所有节点需要有同样的环境变量MINIO_ACCESS_KEY和MINIO_SECRET_KEY，才 能建立分布式集群
+  - 注意：新版本使用环境变量 **MINIO_ROOT_USER**和**MINIO_ROOT_PASSWORD**
+- 分布式Minio使用的磁盘里必须是干净的，里面没有数据
+- 分布式Minio里的节点时间差不能超过3秒，可以使用NTP来保证时间一致
+
+
+
+**分布式Minio注意事项**
+
+- minio服务器多块数据磁盘需申请独立的磁盘，在物理底层要相互独立避免遇到磁盘io竞争，导致 minio性能直线下降,如果性能下降严重，数据量大时甚至会导致集群不可用
+- minio数据磁盘最大不超过2T,如果使用lvm逻辑卷，逻辑卷大小也不要超过2T，过大的磁盘或文件 系统会导致后期IO延迟较高导致minio性能降
+- minio集群共M节点每个节点N块数据磁盘，磁盘只要存活M*N/2，minio集群数据就是安全的，在 节点数剩余M/2+1时节点可以正常读写
+- 如果使用lvm方式扩展集群容量，请在部署阶段minio数据目录就使用lvm。
+- 如果需要备份minio集群数据，请准备存放minio集群所有对象数据的空间容量
+  - 比如: 一个2T/盘*4块/节点*8节点=64T的集群所有容量的一半存储空间即32T服务器，配置内存 CPU配置不需要太高
+- 如果网络环境允许请把minio集群节点配置双网卡，节点通信网络与客户端访问网络分开避免网络瓶颈
+- 配置反向代理实现MinIO的负载均衡, 可以使用云服务SLB或者2台haproxy/nginx结合keepalived 实现高可用
+- minio系统中不要安装消耗IO较高的应用,比如:updatedb程序，如安装请排除扫描minio数据目录, 否则可以会导致磁盘io延迟过高，会导致cpu负载过高，从而降低minio性能
+
+
+
+**二进制安装MinIO 实现3节点4磁盘的分布式集群部署**
+
+```bash
+#准备三台主机,在所有节点上做好名称解析
+[root@minio1 ~]# cat /etc/hosts
+10.0.0.150 minio1.mystical.org minio1
+10.0.0.151 minio2.mystical.org minio2
+10.0.0.152 minio3.mystical.org minio3
+
+# 在所有节点下载二进制程序
+[root@minio1 ~]# wget https://dl.min.io/server/minio/release/linux-amd64/minio
+[root@minio1 ~]# install minio /usr/local/bin/minio
+
+#在所有节点上准备数据目录和用户
+[root@minio1 ~]# lvcreate -n minio -L 10G ubuntu-vg
+[root@minio1 ~]# mkfs.ext4 /dev/ubuntu-vg/minio
+[root@minio1 ~]# echo /dev/ubuntu-vg/minio /data/ ext4 defaults 0 0 >> /etc/fstab
+[root@minio1 ~]# mkdir -p /data
+[root@minio1 ~]# mkdir -p /data/minio{1..4}
+[root@minio1 ~]# useradd -r -s /sbin/nologin minio
+[root@minio1 ~]# chown -R minio. /data
+
+# 在所有节点上准备环境变量
+[root@minio3 ~]# cat > /etc/default/minio <<EOF
+> MINIO_ROOT_USER=admin
+MINIO_ROOT_PASSWORD=12345678
+MINIO_VOLUMES='http://minio{1...3}.mystical.org:9000/data/minio{1...4}'
+MINIO_OPTS='--console-address :9001'
+MINIO_PROMETHEUS_AUTH_TYPE="public"
+> EOF
+
+
+#在所有节点上创建service文件
+[root@minio1 ~]# vim/lib/systemd/system/minio.service
+[Unit]
+Description=MinIO
+Documentation=https://docs.min.io
+Wants=network-noline.target
+After=network-noline.target
+
+[Service]
+WorkingDirectory=/usr/local
+User=minio
+Group=minio
+EnvironmentFile=-/etc/default/minio
+ExecStartPre=/bin/bash -c "if [ -z \"${MINIO_VOLUMES}\" ]; then echo \"Variable MINIO_VOLUMES not set in /etc/default/minio\"; exit 1; fi"
+ExecStart=/usr/local/bin/minio server $MINIO_OPTS $MINIO_VOLUMES
+Restart=always
+LimitNOFILE=1048576
+TasksMax=infinity
+
+[Install]
+WantedBy=multi-user.target
+
+
+# 在所有节点启动服务
+#浏览器访问 http://minio{1..3}.wang.org:9000/ 用户名密码:admin/12345678
+```
+
+![image-20250118212508562](D:\git_repository\cyber_security_learning\markdown_img\image-20250118212508562.png)
+
+
+
+**配置反向代理，通过haproxy或nginx实现minio的反向代理**
+
+```bash
+#配置反向代理,通过Haproxy或者Nginx实现minio的反向代理
+#Haproxy配置
+[root@mystical ~]# apt update && apt -y instapt update && apt -y install haproxy
+
+[root@mystical ~]# vim /etc/haproxy/haproxy.cfg
+...
+listen stats
+   mode http
+   bind 0.0.0.0:9999
+   stats enable
+   log global
+   stats uri /haproxy-status
+   stats auth admin:123456
+listen minio
+   bind 10.0.0.100:9000
+   mode http
+   log global
+   server 10.0.0.101 10.0.0.101:9000 check inter 3000 fall 2 rise 5
+   server 10.0.0.102 10.0.0.102:9000 check inter 3000 fall 2 rise 5
+   server 10.0.0.103 10.0.0.103:9000 check inter 3000 fall 2 rise 5
+listen minio_console
+   bind 10.0.0.100:9001
+   mode http
+   log global
+   server 10.0.0.101 10.0.0.101:9001 check inter 3000 fall 2 rise 5
+   server 10.0.0.102 10.0.0.102:9001 check inter 3000 fall 2 rise 5
+   server 10.0.0.103 10.0.0.103:9001 check inter 3000 fall 2 rise 5
+
+# 重启haproxy
+[root@mystical ~]# systemctl restart haproxy.service
+
+# 访问10.0.0.100:9000
+```
+
+![image-20250118214910766](D:\git_repository\cyber_security_learning\markdown_img\image-20250118214910766.png)
+
+
+
+
+
+
+
+
+
+​                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
 
 # Kubernetes
 
@@ -8346,7 +11213,7 @@ metadata:
   name: service-nodeport
 spec:
   type: NodePort
-  #externalTrafficPolicy: Local # 默认值为Cluster,如果是Local只能被当前运行Pod的节点处理流量，并>且可以获取客户端真实IP
+  #externalTrafficPolicy: Local # 默认值为Cluster,如果是Local只能被当前运行Pod的节点处理流量，并且可以获取客户端真实IP
   selector:
     app: myweb
   ports:
@@ -20257,6 +23124,12 @@ subjects:
   apiGroup: rbac.authorization.k8s.io
 ```
 
+**注意**
+
+```ABAP
+RoleBinding 的权限作用范围仅限于其所在的命名空间。即使绑定的角色（Role）定义了可以操作某些资源的权限，这些权限也只能在 RoleBinding 所在的命名空间内生效。
+```
+
 
 
 
@@ -20292,14 +23165,26 @@ kubectl create rolebinding tom-attachto-pods-viewer --role=pods-viewer --user=to
 **范例: 配置文件**
 
 ```yaml
+# 准备一个role资源文件，允许用户操作Deployment，Pod，RS的所有权限
+[root@master1 sa] # cat security-role-myrole.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: myrole
+rules:
+- apiGroups: ["", "extensions", "apps"]
+  resources: ["pods", "deployments", "replicasets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  
+  
 # 以pod-sa-admin或者wang的subject来与myrole进行一次模拟绑定查看属性效果
-[root@master1 ~]#kubectl create rolebinding wang-myrole --role=myrole --user=wang -o yaml --dry-run
+[root@master1 ~]#kubectl create rolebinding test-myrole --role=myrole --user=test -o yaml --dry-run
 W0109 22:24:54.445293  235536 helpers.go:703] --dry-run is deprecated and can be replaced with --dry-run=client.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   creationTimestamp: null
-  name: wang-myrole
+  name: test-myrole
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -20307,13 +23192,1050 @@ roleRef:
 subjects:
 - apiGroup: rbac.authorization.k8s.io
   kind: User
-  name: wang
+  name: test
+
+
+# 创建kubeconfig文件
+[root@master1 sa] # kubectl config set-cluster mykube --embed-certs=true --certificate-authority=/etc/kubernetes/pki/ca.crt --server="https://10.0.0.201:6443" --kubeconfig=$HOME/.kube/mykube.conf
+Cluster "mykube" set.
+
+[root@master1 sa] # kubectl config set-credentials test --token="fd3e78.2a0395a1c58fb561" --kubeconfig=$HOME/.kube/mykube.conf
+User "test" set.
+
+[root@master1 sa] # kubectl config set-context test@mykube --cluster=mykube --user=test --kubeconfig=$HOME/.kube/mykube.conf 
+Context "test@mykube" created.
+[root@master1 sa]#
+
+# 使用被授权的test账号进行测试
+# default下的pod资源可以访问
+[root@master1 sa] # kubectl get pod --context=test@mykube --kubeconfig=$HOME/.kube/mykube.conf
+NAME           READY   STATUS    RESTARTS        AGE
+pod-sa-admin   1/1     Running   2 (3h33m ago)   2d21h
+
+# default下的secrets资源没有权限访问
+[root@master1 sa]#kubectl get secrets --context=test@mykube --kubeconfig=$HOME/.kube/mykube.conf
+Error from server (Forbidden): secrets is forbidden: User "test" cannot list resource "secrets" in API group "" in the namespace "default"
+
+# 其他名称空间的pod资源也没有权限访问
+[root@master1 sa]#kubectl get pod -n kube-system --context=test@mykube --kubeconfig=$HOME/.kube/mykube.conf
+Error from server (Forbidden): pods is forbidden: User "test" cannot list resource "pods" in API group "" in the namespace "kube-system"
+```
+
+
+
+##### SA绑定
+
+SA可以跨名称空间进行授权，比如:名称空间A的SA帐号可以授权给名称空间B的权限，甚至对所有名称空间授权
+
+
+
+**命令格式**
+
+```bash
+# 查看sa的角色绑定格式
+kubectl create rolebinding NAME --role=NAME [--serviceaccount=namespace:serviceaccoutname] [--namespace=namespace_name]
+
+# 注意：在基于服务账号进行关联的时候，需要关注一下该SA所属的namespace信息。
+```
+
+
+
+**范例**
+
+```bash
+# 自建的sa是admin而且是属于default空间，先将admin和myrole进行绑定，查看一下效果
+[root@master1 sa] # kubectl create rolebinding myrolebinding1 --role=myrole --serviceaccount=default:admin
+rolebinding.rbac.authorization.k8s.io/myrolebinding1 created
+
+# 查看效果
+[root@master1 sa]#kubectl describe rolebinding myrolebinding1 
+Name:         myrolebinding1
+Labels:       <none>
+Annotations:  <none>
+Role:
+  Kind:  Role
+  Name:  myrole
+Subjects:
+  Kind            Name   Namespace
+  ----            ----   ---------
+  ServiceAccount  admin  default
+```
+
+
+
+##### 综合案例
+
+**实现Jenkins的权限**
+
+运行Kubernetes上的Jenkins，为能够动态创建jenkins-slave相关的Pod，需要对运行该Pod对应的ServiceAccount进行认证和授权
+
+```yaml
+# 创建Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-master
+  namespace: jenkins
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+
+---
+# 创建SA
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-master
+  namespace: jenkins
+
+---
+# 角色绑定
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-master
+  namespace: jenkins
+roleRef:
+  kind: Role
+  name: jenkins-master
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: jenkins-master
+  namespace: jenkins     # 这里指定SA是jenkins名称空间下的SA，因为SA是名称空间级别的资源
+```
+
+
+
+#### ClusterRole和ClusterRoleBinding组合实现
+
+cluster级别的实践主要涉及到clusterRole和ClusterRoleBinding之间的操作，即可以操作**集群内所有 namespace空间的资源**。
+
+
+
+##### 创建Clusterrole
+
+```bash
+# kubectl explain clusterrole
+aggregationRule     <Object>   #可以实现role的嵌套关系
+apiVersion <string>
+kind <string>
+metadata     <Object>
+rules        <[]Object>
+  apiGroups           <[]string>
+  nonResourceURLs     <[]string>
+  resourceNames       <[]string>
+  resources           <[]string>
+  verbs               <[]string> -required-
+  
+#结果显示：clusterrole相对于role的属性多了一个集中控制器的属性aggregationRule，而这是一个可选的属性
+
+
+# 查看一个简单的配置格式
+[root@master1 sa]#kubectl create clusterrole myclusterrole --verb=get,list --resource=pods -o yaml --dry-run=client
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: myclusterrole
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+#结果显示：单从模板的资源配置样式来说，其配置信息与role的配置信息几乎一样
+```
+
+
+
+**`aggregationRule` 的含义和用法**
+
+在 Kubernetes 中，`aggregationRule` 是 `ClusterRole` 的一个属性，它允许实现**角色的嵌套关系**。通过 `aggregationRule`，你可以动态组合多个 `ClusterRole` 的权限，使得一个 `ClusterRole` 可以聚合其他角色的权限。
+
+
+
+**`aggregationRule` 的结构**
+
+- **`clusterRoleSelectors`**：这是 `aggregationRule` 的核心字段，用于指定一个 LabelSelector，通过匹配其他 `ClusterRole` 的标签来聚合其权限。
+
+  - 结构示例
+
+  ```yaml
+  aggregationRule:
+    clusterRoleSelectors:
+    - matchLabels:
+        rbac.example.com/aggregate-to-admin: "true"
+    - matchLabels:
+        rbac.example.com/aggregate-to-edit: "true"
+  ```
+
+  
+
+**`aggregationRule` 的用法**
+
+- **动态聚合角色权限**
+  - `aggregationRule` 允许将其他 `ClusterRole` 的规则动态地组合到当前角色中。
+  - 如果某个 `ClusterRole` 的标签匹配了 `aggregationRule` 中的 `clusterRoleSelectors`，它的权限会自动添加到定义了 `aggregationRule` 的角色中。
+
+
+
+**详细示例**
+
+- **场景:** 假设我们希望创建一个名为 `super-admin` 的角色，该角色需要聚合两个子角色的权限
+  - 一个角色 `read-only`，只能对资源执行只读操作。
+  - 一个角色 `edit`，可以编辑资源。
+
+- **子角色定义**：
+
+  - **`read-only` ClusterRole**
+
+  ```YAML
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: read-only
+    labels:
+      rbac.example.com/aggregate-to-super-admin: "true"
+  rules:
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list"]
+  ```
+
+  - **`edit` ClusterRole**
+
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: edit
+    labels:
+      rbac.example.com/aggregate-to-super-admin: "true"
+  rules:
+  - apiGroups: [""]
+    resources: ["pods", "services"]
+    verbs: ["get", "list", "create", "update", "delete"]
+  ```
+
+- **聚合角色定义**
+
+  - 使用 `aggregationRule` 动态聚合这两个角色：
+
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: super-admin
+  aggregationRule:
+    clusterRoleSelectors:
+    - matchLabels:
+        rbac.example.com/aggregate-to-super-admin: "true"
+  ```
+
+  - **聚合结果**
+    - `super-admin` 角色自动继承了 `read-only` 和 `edit` 的规则。
+    - 不需要手动写规则，只要某个角色被打上 `rbac.example.com/aggregate-to-super-admin: "true"` 标签，它的权限就会动态添加到 `super-admin` 中。
+
+
+
+**`aggregationRule` 的优势**
+
+- **动态聚合权限**：
+  - 无需手动维护组合角色的权限规则，只需给子角色打上特定的标签即可
+- **模块化和复用**：
+  - 子角色可以单独使用，也可以通过聚合规则组合成更大的权限集，便于复用。
+- **简化管理**
+  - 当需要扩展权限时，只需创建新角色并添加对应的标签，主聚合角色会自动更新权限
+
+
+
+**`aggregationRule` 注意事项**
+
+- **只适用于 `ClusterRole`**：
+  - 目前 `aggregationRule` 仅能用于聚合 `ClusterRole`，不能用于 `Role`。
+- **动态更新**：
+  - 如果修改了某个子角色的规则或标签，聚合角色会动态更新，无需重新创建。
+- **标签管理**：
+  - 子角色需要正确配置标签，确保能被聚合规则选择到。
+
+
+
+
+
+##### 角色绑定Clusterrolebinding
+
+```bash
+# 命令格式
+kubectl create clusterrolebinding NAME --clusterrole=NAME [--user=username] [--group=groupname]
+[--serviceaccount=namespace:serviceaccountname] [--dry-run=server|client|none] [options]
+
+#属性解析:对于clusterrolebinding来说，仅仅允许集群角色进行和其进行绑定，对于普通的role来说就无效了
+
+#将wang用户和myclasterrole进行角色绑定，查看资源配置效果
+[root@master1 sa]#kubectl create clusterrolebinding myclusterrolebinding --clusterrole=myclusterrole --user=test --dry-run=client -o yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  creationTimestamp: null
+  name: myclusterrolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: myclusterrole
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: User
+  name: test
+
+#属性解析：这里的属性配置与我们之前的role和rolebinding的方法几乎一样,区别就是kind和--clusterrole的不同
+```
+
+
+
+##### 案例: 实现 Prometheus 的权限
+
+将Prometheus部署运行于Kubernetes之上并监控集群时，需要使用专用的ServiceAccount运行该Pod 并认证和授权到API Server
+
+```yaml
+[root@master1 sa] # vim clusterrolebinding-prometheus.yaml
+# ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - nodes/proxy
+  - services
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups:
+  - extensions
+  resources:
+  - ingresses
+  verbs: ["get", "list", "watch"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+
+---
+# 创建SA
+apiVersion: v1 
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: prom
+
+---
+# ClusterRoleBinding
+apiVersion: rbac.authoriaztion.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: prom
+```
+
+
+
+#### ClusterRole和RoleBingding混合组合实现
+
+
+
+##### 实现对指定多个名称空间的资源设置特定权限
+
+实现对指定多个名称空间的资源设置特定权限的方法，但需要组合使用 **`RoleBinding`** 和 **`ClusterRole`**
+
+**实现思路**
+
+- 创建一个 `ClusterRole`
+  - `ClusterRole` 是集群级别的角色，可以指定资源的操作权限，但不绑定到任何特定名称空间。
+- 在目标名称空间中创建多个 `RoleBinding`
+  - 每个 `RoleBinding` 将该 `ClusterRole` 绑定到指定的名称空间和对应的用户或服务账户
+
+
+
+**示例配置**：假设需要在 `namespace1` 和 `namespace2` 中，赋予 `UserA` 对 `pods` 和 `services` 资源的只读权限。
+
+- **创建 `ClusterRole`**
+
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: readonly-pods-services
+  rules:
+  - apiGroups: [""]
+    resources:
+    - pods
+    - services
+    verbs:
+    - get
+    - list
+    - watch
+  ```
+
+- **为 `namespace1` 创建 `RoleBinding`**
+
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: readonly-access
+    namespace: namespace1  # 绑定到 namespace1
+  subjects:
+  - kind: User
+    name: UserA  # 授予权限的用户
+    apiGroup: rbac.authorization.k8s.io
+  roleRef:
+    kind: ClusterRole
+    name: readonly-pods-services  # 引用上面定义的 ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+  ```
+
+- **为 `namespace2` 创建 `RoleBinding`**
+
+  ```yaml
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: readonly-access
+    namespace: namespace2  # 绑定到 namespace2
+  subjects:
+  - kind: User
+    name: UserA  # 授予权限的用户
+    apiGroup: rbac.authorization.k8s.io
+  roleRef:
+    kind: ClusterRole
+    name: readonly-pods-services  # 引用上面定义的 ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+  ```
+
+
+
+**工作原理**
+
+- `ClusterRole` 定义了对资源的具体权限，但不限定作用范围
+- `RoleBinding` 将该 `ClusterRole` 的权限限定在指定的名称空间中，并指定用户或服务账户。
+- 每个 `RoleBinding` 只在其所在的名称空间中生效，因此可以通过在多个名称空间中创建 `RoleBinding`，实现对特定多个名称空间的资源进行权限控制。
+
+
+
+### 图形化面板
+
+#### kuboard
+
+```ABAP
+官网：https://kuboard.cn/install/v3/install.html
+```
+
+![image-20250111162025438](D:\git_repository\cyber_security_learning\markdown_img\image-20250111162025438.png)
+
+
+
+##### 以Docker方式在集群外部署
+
+```bash
+sudo docker run -d \
+  --restart=unless-stopped \
+  --name=kuboard \
+  -p 80:80/tcp \
+  -p 10081:10081/tcp \
+  -e KUBOARD_ENDPOINT="http://内网IP:80" \
+  -e KUBOARD_AGENT_SERVER_TCP_PORT="10081" \
+  -v /root/kuboard-data:/data \
+  eipwork/kuboard:v3
+  # 也可以使用镜像 swr.cn-east-2.myhuaweicloud.com/kuboard/kuboard:v3 ，可以更快地完成镜像下载。
+  # 请不要使用 127.0.0.1 或者 localhost 作为内网 IP \
+  # Kuboard 不需要和 K8S 在同一个网段，Kuboard Agent 甚至可以通过代理访问 Kuboard Server \
 
 ```
 
 
 
 
+
+##### 基于Kubernetes集群中部署
+
+**使用StorageClass持久化**
+
+```yaml
+[root@master1 nfc-sc] # cat rbac.yaml 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nfs-provisioner-demo
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nfs-client-provisioner
+  # replace with namespace where provisioner is deployed 根据业务需要修改此处名称空间
+  namespace: nfs-provisioner-demo
+  
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nfs-client-provisioner-runner
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "delete"]
+    
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: run-nfs-client-provisioner
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    # replace with namespace where provisioner is deployed
+    namespace: nfs-provisioner-demo
+roleRef:
+  kind: ClusterRole
+  name: nfs-client-provisioner-runner
+  apiGroup: rbac.authorization.k8s.io
+  
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  # replace with namespace where provisioner is deployed
+  namespace: nfs-provisioner-demo
+rules:
+  - apiGroups: [""]
+    resources: ["endpoints"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+    
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: leader-locking-nfs-client-provisioner
+  # replace with namespace where provisioner is deployed
+  namespace: nfs-provisioner-demo
+subjects:
+  - kind: ServiceAccount
+    name: nfs-client-provisioner
+    # replace with namespace where provisioner is deployed
+    namespace: nfs-provisioner-demo
+roleRef:
+  kind: Role
+  name: leader-locking-nfs-client-provisioner
+  apiGroup: rbac.authorization.k8s.io
+
+
+[root@master1 nfc-sc] # cat nfs-client-provisioner.yaml 
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nfs-client-provisioner
+  labels:
+    app: nfs-client-provisioner
+  namespace: nfs-provisioner-demo
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccountName: nfs-client-provisioner
+      containers:
+      - name: nfs-client-provisioner     
+        image: k8s.gcr.io/sig-storage/nfs-subdir-external-provisioner:v4.0.2 #此镜像国内可能无法访问
+        imagePullPolicy: IfNotPresent
+        volumeMounts:
+        - name: nfs-client-root
+          mountPath: /persistentvolumes
+        env:
+        - name: PROVISIONER_NAME
+          value: k8s-sigs.io/nfs-subdir-external-provisioner # 名称确保与nfs-StorageClass.yaml文件中的provisioner名称保持一致
+        - name: NFS_SERVER
+          value: nfs.mystical.org
+        - name: NFS_PATH
+          value: /nfs-data/sc-nfs
+      volumes:
+      - name: nfs-client-root
+        nfs:
+          server: nfs.mystical.org
+          path: /nfs-data/sc-nfs
+
+
+[root@master1 nfc-sc] # cat nfs-storageClass.yaml 
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: sc-nfs
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false" # 是否设置为默认的storageClass
+provisioner: k8s-sigs.io/nfs-subdir-external-provisioner # or choose another name, must match deployment's env PROVISIONER_NAME
+parameters:
+  archiveOnDelete: "true"   # 即使删除PVC，依然会保留数据
+```
+
+
+
+**获取部署 Kuboard 所需的 YAML 文件**
+
+```bash
+curl -o kuboard-v3.yaml https://addons.kuboard.cn/kuboard/kuboard-v3-storage-class.yaml
+```
+
+
+
+**编辑 `kuboard-v3.yaml` 文件中的配置，该部署文件中，有两处配置必须修改**
+
+```bash
+# KUBOARD_ENDPOINT
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kuboard-v3-config
+  namespace: kuboard
+data:
+  # 关于如下参数的解释，请参考文档 https://kuboard.cn/install/v3/install-built-in.html
+  # [common]
+  KUBOARD_ENDPOINT: 'http://your-node-ip-address:30080' # 这里改为自己指定的域名，后续用ingress暴露，所以不用写端口
+ #KUBOARD_ENDPOINT: 'http://kuboard.mystical.org'
+  KUBOARD_AGENT_SERVER_UDP_PORT: '30081'
+  KUBOARD_AGENT_SERVER_TCP_PORT: '30081'
+
+# storageClassName
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      # 请填写一个有效的 StorageClass name
+      storageClassName: please-provide-a-valid-StorageClass-name-here
+      #storageClassName: sc-nfs
+      accessModes: [ "ReadWriteMany" ]
+      resources:
+        requests:
+          storage: 5Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kuboard-data-pvc
+  namespace: kuborad   # 这里官方没有加名称空间，但是PVC是名称空间资源，这里需要加上
+spec:
+  kjjjj# 请填写一个有效的 StorageClass name
+  storageClassName:  please-provide-a-valid-StorageClass-name-here
+  #storageClassName: sc-nfs
+  accessModes:
+    - ReadWriteOnce
+    
+    
+# 上述官方文件修改后，应用
+[root@master1 ~] # kubectl apply -f kuboard-v3.yaml 
+namespace/kuboard created
+configmap/kuboard-v3-config created
+statefulset.apps/kuboard-etcd created
+persistentvolumeclaim/kuboard-data-pvc created
+service/kuboard-etcd created
+deployment.apps/kuboard-v3 created
+service/kuboard-v3 created
+
+
+# 添加ingress，要提前部署ingress-nginx
+[root@ubuntu2204 ~]# kubectl create ingress kuboard-ingress --rule=kuboard.mystical.org/*=kuboard-v3:80 --class ngixn -n kuboard -o yaml --dry-run=client > kuboard-ingress.yaml
+
+[root@ubuntu2204 ~]#kubectl apply -f kuboard-ingress.yaml 
+ingress.networking.k8s.io/kuboard-ingress created
+
+[root@ubuntu2204 ~]#kubectl get ingress -n kuboard
+NAME              CLASS   HOSTS                  ADDRESS     PORTS   AGE
+kuboard-ingress   nginx   kuboard.mystical.org   10.0.0.10   80      21s
+
+# 在宿主机解析域名后在浏览器访问kuboard.mystical.org
+# 默认用户名：admin
+# 默认密码：Kuboard123
+```
+
+![image-20250111203856817](D:\git_repository\cyber_security_learning\markdown_img\image-20250111203856817.png)
+
+![image-20250112195241195](D:\git_repository\cyber_security_learning\markdown_img\image-20250112195241195.png)
+
+
+
+#### KubeSphere
+
+```ABAP
+官网：https://www.kubesphere.io/zh/docs/v3.4/installing-on-linux/introduction/multioverview/
+```
+
+
+
+![image-20250111162716226](D:\git_repository\cyber_security_learning\markdown_img\image-20250111162716226.png)
+
+
+
+
+
+
+
+## Kubernetes有状态服务管理
+
+
+
+
+
+## Kubernetes包管理Helm
+
+
+
+
+
+## Kubernetes网络剖析
+
+在Docker模块的**`浅谈容器网络`**中，介绍了宿主机中的容器间通信是通过docker0作为网桥，将宿主机内的容器都连在这个网桥上。
+
+那么Kubernetes中，不同节点间的容器进行通信，是不是可以**通过软件的方式，创建一个整个集群“公用”的网桥，然后把集群里的所有容器都连接到这个网桥上，不就可以相互通信了吗?**
+
+这样一来，我们整个集群里的容器网络就会类似于下图所示的样子：
+
+![image-20250116155827857](D:\git_repository\cyber_security_learning\markdown_img\image-20250116155827857.png)
+
+可以看到，构建这种容器网络的核心在于：我们需要在已有的宿主机网络上，再**通过软件构建一个覆盖在已有宿主机网络之上的、可以把所有容器连通在一起的虚拟网络**。所以，这种技术就被称为：**Overlay Network（覆盖网络）**。
+
+
+
+
+
+### 深入了解容器跨主机网络
+
+
+
+#### Flannel概述
+
+Flannel 项目是 CoreOS 公司主推的容器网络方案。事实上，Flannel 项目本身只是一个框架，真正为我们提供容器网络功能的，是 Flannel 的后端实现。目前，Flannel 支持三种后端实现，分别是：
+
+- **VXLAN**
+- **host-gw**
+- **UDP**
+
+
+
+这三种不同的后端实现，正代表了三种容器跨主网络的主流实现方法
+
+
+
+##### UDP模式的跨主网络实现原理（已废弃）
+
+假设有两台宿主机
+
+- 宿主机 Node 1 上有一个容器 container-1，它的 IP 地址是 10.244.2.20，对应的 docker0 网桥的地址是：172.17.0.1/16
+- 宿主机 Node 2 上有一个容器 container-2，它的 IP 地址是 10.244.3.27，对应的 docker0 网桥的地址是：172.17.0.1/16
+
+
+
+**让 container-1 访问 container-2**
+
+
+
+container-1 容器里的进程发起的 IP 包，其源地址就是 10.244.2.20，目的地址就是 10.244.3.27。由于目的地址 10.244.3.27 并不在 Node 1 的 docker0 网桥的网段里，所以这个 IP 包会被交给默认路由规则，通过容器的网关进入 docker0 网桥（如果是同一台宿主机上的容器间通信，走的是直连规则），从而出现在宿主机上。
+
+
+
+这时候，这个 IP 包的下一个目的地，就取决于宿主机上的路由规则了。此时，Flannel 已经在宿主机上创建出了一系列的路由规则，以 Node 1 为例，如下所示：
+
+```bash
+[root@node1 ~]# route -n
+内核 IP 路由表
+目标            网关            子网掩码        标志  跃点   引用  使用 接口
+0.0.0.0         10.0.0.2        0.0.0.0         UG    0      0        0 eth0
+10.0.0.0        0.0.0.0         255.255.255.0   U     0      0        0 eth0
+10.244.0.0      10.244.0.0      255.255.255.0   UG    0      0        0 flannel.1 # 命中，并进入flannel1.1设备
+10.244.1.0      0.0.0.0         255.255.255.0   U     0      0        0 cni0
+10.244.2.0      10.244.2.0      255.255.255.0   UG    0      0        0 flannel.1
+10.244.3.0      10.244.3.0      255.255.255.0   UG    0      0        0 flannel.1   
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+```
+
+由于我们的 IP 包的目的地址是10.244.3.27，它匹配不到本机 docker0 网桥对应的 172.17.0.1/16 网段，只能匹配到第三条、也就是 10.244.0.0/16 对应的这条路由规则，从而进入到一个叫作 flannel1.1 的设备中。
+
+
+
+ **flannel1.1 设备是一个TUN设备（Tunnel 设备）。**
+
+```ABAP
+在 Linux 中，TUN 设备是一种工作在三层（Network Layer）的虚拟网络设备。TUN 设备的功能非常简单，即：在操作系统内核和用户应用程序之间传递 IP 包。
+```
+
+
+
+当操作系统将一个 IP 包发送给 flannel0 设备之后，flannel0 就会把这个 IP 包，交给创建这个设备的应用程序，也就是 Flannel 进程。这是一个从内核态（Linux 操作系统）向用户态（Flannel 进程）的流动方向。
+
+```ABAP
+Container1-eth0 ---> 根据路由 ---> flannel1.1 ---> flanneld进程处理
+```
+
+
+
+反之，如果 Flannel 进程向 flannel0 设备发送了一个 IP 包，那么这个 IP 包就会出现在宿主机网络栈中，然后根据宿主机的路由表进行下一步处理。这是一个从用户态向内核态的流动方向。
+
+当 IP 包从容器经过 docker0 出现在宿主机，然后又根据路由表进入 flannel0 设备后，宿主机上的 flanneld 进程（Flannel 项目在每个宿主机上的主进程），就会收到这个 IP 包。然后，flanneld 看到了这个 IP 包的目的地址，是 10.244.3.27，就把它发送给了 Node 2 宿主机。
+
+
+
+**flanneld 又是如何知道这个 IP 地址对应的容器，是运行在 Node 2 上的呢？**
+
+
+
+ Flannel 项目里一个非常重要的概念：子网（Subnet）。
+
+事实上，在由 Flannel 管理的容器网络里，一台宿主机上的所有容器，都属于该宿主机被分配的一个“子网”。在我们的例子中，Node 1 的子网是 100.96.1.0/24，container-1 的 IP 地址是 100.96.1.2。Node 2 的子网是 100.96.2.0/24，container-2 的 IP 地址是 100.96.2.3。
+
+而这些子网与宿主机的对应关系，正是保存在 Etcd 当中，如下所示：
+
+```bash
+$ etcdctl ls /coreos.com/network/subnets
+/coreos.com/network/subnets/100.96.1.0-24
+/coreos.com/network/subnets/100.96.2.0-24
+/coreos.com/network/subnets/100.96.3.0-24
+```
+
+
+
+**注意：****如果 `--kube-subnet-mgr` 参数存在**，说明 Flannel 使用 Kubernetes API 而非 etcd 存储数据。
+
+```bash
+[root@master1 net.d]#kubectl -n kube-flannel describe daemonsets.apps kube-flannel-ds |grep -P "\-\-kube-subnet-mgr"
+      --kube-subnet-mgr  # 说明Flannel使用的Kubernetes API
+
+```
+
+
+
+在Kubernetes API模式下，Flannel的子网分配信息存储在每个节点上的Annotation中，可以通过一下命令查看
+
+```bash
+[root@master1 ~]#kubectl get nodes -o json | jq '.items[] | {name: .metadata.name, podCIDR: .spec.podCIDR, flannelSubnet: .metadata.annotations["flannel.alpha.coreos.com/subnet"]}'
+{
+  "name": "master1",
+  "podCIDR": "10.244.0.0/24",
+  "flannelSubnet": null
+}
+{
+  "name": "node1",
+  "podCIDR": "10.244.1.0/24",
+  "flannelSubnet": null
+}
+{
+  "name": "node2",
+  "podCIDR": "10.244.2.0/24",
+  "flannelSubnet": null
+}
+{
+  "name": "node3",
+  "podCIDR": "10.244.3.0/24",
+  "flannelSubnet": null
+}
+```
+
+
+
+所以，flanneld 进程在处理由 flannel0 传入的 IP 包时，就可以根据目的 IP 的地址（比如 100.96.2.3），匹配到对应的子网（比如 100.96.2.0/24），从 Etcd 中找到这个子网对应的宿主机的 IP 地址
+
+
+
+**当container-1发起对container-2的访问请求时，数据包的通信过程如下**
+
+- container-1发出一个IP包，源地址为`10.244.2.20`，目的地址为`10.244.3.27`
+- 这个IP包首先到达Node 1的docker0网桥**（这里进行一次判断）**。由于目的地址`10.244.3.37`不在docker0网桥的网段内，所以这个IP包会被转发给默认路由**。(此时进行第一次用户态和内核态的切换)**
+- 根据Node 1上的路由规则，这个IP包会被送往一个名为flannel0的设备。flannel0是一个TUN设备，它在三层网络上工作。
+- flannel0设备会将这个IP包交给用户态的flanneld进程处理。**(此时进行第二次用户态和内核态的切换)**
+- flanneld进程通过查询Etcd（或者**Kubernetes API**），得知目的IP地址10.244.3.27所在的子网对应的宿主机是Node 2，其IP地址为`10.0.0.202`。
+- flanneld将原始的IP包封装在一个UDP包里，然后发送给Node 2的8285端口（flanneld默认监听的端口）。**(此时进行三次用户态和内核态的切换)**
+- 当这个UDP包到达Node 2后，会被Node 2上的flanneld进程接收和解包，还原出原始的IP包。**(此时另一台主机进行一次用户态和内核态的切换)**
+- Node 2的flanneld将还原出的IP包交给本机的flannel0设备。**(此时另一台主机进行二次用户态和内核态的切换)**
+- flannel0设备将IP包转发给docker0网桥。
+- docker0网桥根据目的IP地址，将包转发给container-2。**(此时另一台主机进行三次用户态和内核态的切换)**
+
+
+
+**UDP封装与解封装过程**
+
+- **封装过程包括以下步骤**
+
+  - flanneld首先检查数据包的目的IP地址，确定目标容器所在的宿主机
+  - flanneld然后创建一个新的UDP数据包。这个UDP数据包的源IP地址是当前宿主机的IP地址，目的IP地址是目标容器所在宿主机的IP地址。UDP端口通常是8285。
+  - 原始的IP数据包被放入这个UDP数据包的负载部分。
+  - flanneld将封装好的UDP数据包交给宿主机的网络栈，由宿主机的网络栈负责将这个UDP包发送出去。
+
+  
+
+- **拆解UDP解封装过程**
+
+  - 目标宿主机的网络栈接收到UDP包，发现目的端口是8285，于是将这个包交给监听在8285端口的flanneld进程。
+  - flanneld进程接收到UDP包后，从UDP包的负载中提取出原始的IP数据包
+  - flanneld将提取出的原始IP包写入本机的flannel0设备。
+  - Linux内核接收到这个IP包，根据路由规则将其转发给docker0网桥。
+  - docker0网桥根据IP包的目的地址，将包转发给目标容器。
+
+
+
+
+
+**UDP网络模式性能问题在实际应用中的表现可能如下:**
+
+- **较高的网络延迟**: 由于每个数据包都需要经过多次处理和状态切换，网络延迟会显著增加。
+- **CPU使用率升高**: 频繁的状态切换和数据拷贝会消耗大量的CPU资源。
+- **吞吐量受限**: 由于单个flanneld进程需要处理所有流量，在高并发情况下可能会成为瓶颈。
+- **内存带宽压力**: 多次数据拷贝会增加内存带宽的使用。
+- **网络效率降低**: UDP封装增加了数据包大小，降低了网络的有效载荷比例。
+
+
+
+正是由于这些性能问题，UDP模式在实际生产环境中很少被使用。 相比之下，VXLAN模式通过在内核态实现封装和解封装，大大减少了用户态和内核态的切换，同时也减少了数据拷贝的次数，因此能够提供更好的性能
+
+
+
+##### VXLAN网络模式剖析
+
+VXLAN，即 Virtual Extensible LAN（虚拟可扩展局域网），是 Linux 内核本身就支持的一种网络虚似化技术。所以说，VXLAN 可以完全在内核态实现上述封装和解封装的工作，从而通过与前面相似的“隧道”机制，构建出覆盖网络（Overlay Network）。
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Kubernetes网络插件详解
+
+
+
+**Kubernetes网络** 
+
+- **Node网络**
+  - 各Node是否在同一网段（子网）会影响可以使用的Pod的网络模型
+- **Service网络**
+  - 由集群自行管理（Kube proxy）
+- **Pod网络**
+  - 只提供了CNI，具体实现交给第三方
+  - Flanny
+    - 默认网段：10.244.0.0/16
+  - Calico
+    - 默认网段：192.168.0.0/16
+  - Cilium
+    - 默认网段：192.168.0.0/16
+
+
+
+**将容器接入到网络中**
+
+- 首先要有虚拟网络接口提供给容器，即向容器**注入虚拟网络接口**（创建Pod时）
+- 为Pod**准备好专有网络**（由网络插件负责）
+- 将Pod容器的网络接口连入到Pod网络（创建Pod时）
+- 为该Pod的网络接口提供IP地址（启动Pod时，关闭Pod释放IP地址）
+
+```ABAP
+除了准备Pod网络是在部署网络插件时一次性提供好的之外，后续的注入接口，配置地址等，都和Pod自身的生命周期相关，而和网络插件无关
+```
+
+
+
+**真正给Pod分配地址的程序，是位于每个节点上都有一个节点范围的地址的维护程序，而不是整个集群范围的**
+
+- 这个程序通常在节点范围内维护一个地址池，并从该地址池中分配 IP 地址给新创建的 Pod。这种设计体现了 Kubernetes 网络的去中心化特点。
+
+
+
+**详细解释**
+
+- **节点范围的地址池**
+  - 每个节点上的 CNI 插件负责**从节点范围内的地址池**中为 Pod 分配 IP 地址。
+  - 每个节点通常会分配一个**子网范围的地址池**，这个地址池是由网络插件在初始化时分配的。例如，节点 A 的地址池可能是 `10.244.1.0/24`，节点 B 的地址池可能是 `10.244.2.0/24`。
+  - Pod 的 IP 地址是从该子网中分配的，比如节点 A 上的 Pod IP 可能是 `10.244.1.2`，而节点 B 上的 Pod IP 可能是 `10.244.2.3`。
+- **本地分配与全局通信**
+  - 分配 IP 的过程是本地化的，网络插件在每个节点上独立运行，不需要与整个集群的控制平面直接通信。
+  - 分配完成后，Kubernetes 的控制平面（API Server 等）会知道每个 Pod 的 IP 地址，以便进行网络通信的路由设置。
+- **去中心化的优势**
+  - 去中心化分配降低了中心节点的负载，因为 IP 地址的分配和管理是分布式的。
+  - 即使集群规模扩大，由于地址分配是每个节点独立完成的，分配速度不会显著受到影响
+
+
+
+
+
+**如何避免每个节点上独立的网络地址分配程序所分配的IP在不同节点上不相互冲突**
+
+整个Kubernetes有很多个节点，通常在节点上维护节点上Pod地址的是节点级的插件，叫**IPAM插件**（IP Addresses Manager）
+
+**Flanny解决方案**
+
+- 为每个节点分配一个子网
+- 总的子网是10.244.0.0/16，将其再做子网划分，默认使用**24bits**掩码
+- 因此，每个节点的子网是0-255，而整个Kubernetes集群**最多能管理256个节点**
+- 每个节点上的**可用地址为254个**（256-2）
+
+```ABAP
+默认情况下，Kubernetes为每个节点最多调度运行的Pod数量为110个
+```
+
+
+
+**Calico解决方案**
+
+- 总的子网是192.168.0.0/16
+- 默认使用**26bits**掩码，进行子网划分
+
+
+
+## Kubernetes调度框架
 
 
 

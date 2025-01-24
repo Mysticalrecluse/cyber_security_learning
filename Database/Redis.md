@@ -481,7 +481,98 @@ auto-aof-rewrite-min-size 64mb
 aof-load-truncated yes
 ```
 
+
+
+#### AOF启动后的文件解析
+
+```bash
+[root@mystical ~]# tree /apps/
+/apps/
+└── redis
+    └── data
+        ├── appendonlydir
+        │   ├── appendonly.aof.1.base.rdb
+        │   ├── appendonly.aof.1.incr.aof
+        │   └── appendonly.aof.manifest
+        └── dump.rdb
+        
+# 查看
+[root@mystical ~]# ll /apps/redis/data/appendonlydir/
+total 16
+drwxr-x--- 2 redis redis 4096 Jan 15 09:59 ./
+drwxr-xr-x 3 redis redis 4096 Jan 15 09:59 ../
+-rw-rw---- 1 redis redis   88 Jan 15 09:59 appendonly.aof.1.base.rdb
+-rw-r----- 1 redis redis    0 Jan 15 09:59 appendonly.aof.1.incr.aof
+-rw-r----- 1 redis redis   88 Jan 15 09:59 appendonly.aof.manifest
+```
+
+
+
+**`appendonly.aof.1.base.rdb`**
+
+- **作用：**
+  - 这是一个 RDB 格式的文件，代表 AOF 的基础快照。Redis 在某个时间点上创建该文件以保存当前数据集的完整状态。
+  - 当 Redis 启用混合持久化（AOF + RDB 混合模式）时，这个文件用于存储初始的数据库状态。
+  - 在恢复过程中，Redis 首先加载此文件，然后再应用增量 AOF 文件的命令来还原完整数据集。
+- **特性：**
+  - 文件内容是二进制格式，与标准 RDB 文件类似。
+  - 在 AOF 重写过程中，Redis 会生成或更新该文件。
+
+------
+
+**`appendonly.aof.1.incr.aof`**
+
+- **作用：**
+  - 这是增量 AOF 文件，存储了自 `appendonly.aof.1.base.rdb` 生成之后的写入命令。
+  - 文件以 AOF 格式（命令行形式）记录 Redis 的写操作。
+  - 在恢复时，Redis 会按顺序应用这些写命令到基础 RDB 快照上，确保数据的完整性。
+- **特性：**
+  - 文件可能非常小（例如为 0 字节），如果没有写入操作或刚完成了 AOF 重写。
+  - 每次新的写操作会追加到此文件中。
+
+------
+
+**`appendonly.aof.manifest`**
+
+- **作用：**
+
+  - 这是 AOF 文件的元数据清单，描述了 Redis 如何组合使用上述文件来恢复数据。
+  - 文件内容列出了所有参与恢复的数据文件（基础 RDB 和增量 AOF 文件）及其顺序。
+
+- **内容示例：**
+
+  ```
+  txtCopy codefile appendonly.aof.1.base.rdb
+  file appendonly.aof.1.incr.aof
+  ```
+
+  - **`file`** 表示要加载的文件。
+  - 加载顺序从上到下，Redis 会先加载 `base.rdb`，然后应用 `incr.aof`。
+
+------
+
+**工作流程**
+
+1. Redis 在启动时，首先读取 `appendonly.aof.manifest` 文件。
+2. 按照清单文件的顺序加载 `appendonly.aof.1.base.rdb` 快照。
+3. 应用 `appendonly.aof.1.incr.aof` 中的命令以还原增量数据。
+4. 恢复完成后，Redis 开始正常运行。
+
+------
+
+**为什么分为多个文件？**
+
+- 提高性能：
+  - RDB 格式文件的生成效率高，减少了单一大型 AOF 文件的写入开销。
+- 提高恢复效率：
+  - 加载 RDB 文件速度比逐行解析 AOF 文件快得多。
+- 简化管理：
+  - 将基础数据与增量数据分开，可以更灵活地进行文件操作（如压缩或备份）。
+
+
+
 ### AOF日志格式
+
 ```shell
 # set testkey testvalue的日志格式
 *3                  # 这个3意味着当前命令有3个部分
@@ -1055,7 +1146,7 @@ redis-cli -a 123456 --no-auth-warning CONFIG SET requirepass ""
 redis-cli --cluster import <集群任意节点服务器IP:Port> --cluster-from <外部Redis node-IP:Port> --cluster-copy --cluster-replace
 # 只使用cluster-copy，则要导入集群中的key不能存在
 # 如果集群中已有同样的key，如果需要替换，可以--cluster-copy --cluster-replace联用，这样集群中的key就会被替换为外部数据
-``` 
+```
 
 - 还原安全配置
 ```shell

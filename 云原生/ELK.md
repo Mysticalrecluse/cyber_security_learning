@@ -343,7 +343,7 @@ vim /usr/local/elasticsearch/config/elasticsearch.yml
 #### 启动Elasticsearch
 ```shell
 echo 'PATH=/usr/local/elasticsearch/bin:$PATH' > /etc/profile.d/elasticsearch.sh
-``` 
+```
 
 #### 创建service文件
 ```shell
