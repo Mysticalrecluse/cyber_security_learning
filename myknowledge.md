@@ -278,7 +278,8 @@ RUN rm -f /bigfile
 # 由于镜像分层，每一次相互独立，因此在最后一行执行rm指令，并不能减少镜像空间大小
 ```
 
-#### 镜像调整时区
+**镜像调整时区**
+
 ```dockerfile
 FROM alpine: 3.19.1
 LABEL author=mystical class=m58
@@ -287,7 +288,21 @@ RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/' /etc/apk/rep
     apk update && apk --no-cache add curl bash tzdata && ln -s /usr/share/zoneinfo/Asia/Shanghai /etc/locatime 
 ```
 
+**多个前后RUN 命令独立无关和shell命令不同**
+
+```bash
+#world.txt并不存放在/app内
+RUN cd /app
+RUN echo "hello" > world.txt
+
+#下面写法可以实现关联关系
+RUN cd /app &&  echo "hello" > world.txt
+```
+
+
+
 #### ENV: 定义环境变量
+
 ```dockerfile
 FROM alpine:3.20.0
 LABEL maintainer="mystical<mysticalrecluse@gmail.com>"
@@ -386,7 +401,7 @@ nginx -g "daemon off;"
 ```
 - 启动容器
 ```shell
-docker run -p 80:80 -e SERVER=59 --rm --name nginx01 nginx-mx:1.27
+docker run -p 80:80 -e SERVER=m59 --rm --name nginx01 nginx-mx:1.27
 ```
 
 #### ENTRYPOINT: 类似于CMD

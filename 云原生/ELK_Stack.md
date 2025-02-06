@@ -1,4 +1,4 @@
-# ELK概述
+# 	ELK概述
 
 ![image-20250119195308988](D:\git_repository\cyber_security_learning\markdown_img\image-20250119195308988.png)
 
@@ -3554,15 +3554,2528 @@ setup.template.pattern: "tomcat-*"
 
 
 
+### 利用 Filebeat 收集 Nginx 日志到 Redis
+
+将 filebeat收集的日志,发送至Redis 格式如下
+
+```yaml
+output.redis:
+  hosts: ["localhost:6379"]
+  password: "my_password"
+  key: "filebeat"
+  db: 0
+  timeout: 5
+```
+
+
+
+#### 安装 Nginx 配置访问日志使用 Json格式
+
+ ```bash
+ [root@web01 ~]#cat /etc/nginx/nginx.conf	
+     ##
+ 	# Logging Settings
+ 	##
+     log_format access_json '{"@timestamp":"$time_iso8601",'
+     '"host":"$server_addr",'
+     '"clientip":"$remote_addr",'
+     '"size":$body_bytes_sent,'
+     '"responsetime":$request_time,'
+     '"upstreamtime":"$upstream_response_time",'
+     '"upstreamhost":"$upstream_addr",'
+     '"http_host":"$host",'
+     '"uri":"$uri",'
+     '"domain":"$host",'
+     '"xff":"$http_x_forwarded_for",'
+     '"referer":"$http_referer",'
+     '"tcp_xff":"$proxy_protocol_addr",'
+     '"http_user_agent":"$http_user_agent",'
+     '"status":"$status"}';
+ 
+ 	access_log /var/log/nginx/access_json.log access_json;
+ 	error_log /var/log/nginx/error.log;
+ 	
+ [root@web01 ~]#nginx -s reload
+ ```
+
+
+
+#### 安装和配置 Redis
+
+```bash
+[root@web01 ~]# apt install -y redis
+[root@web01 ~]# sed -i.bak '/^bind.*/c bind 0.0.0.0'  /etc/redis/redis.conf
+[root@web01 ~]# systemctl restart  redis
+```
+
+
+
+#### 修改 Filebeat 配置文件
+
+```bash
+[root@web01 ~]# cat /etc/filebeat/filebeat.yml 
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+  - /var/log/nginx/access_json.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+  tags: ["nginx-access"]
+
+- type: log
+  enabled: true
+  paths:
+  - /var/log/nginx/error.log
+  tags: ["nginx-error"]
+
+output.redis:
+  hosts: ["10.0.0.104:6379"]
+  key: "filebeat"
+```
+
+
+
+#### 查看redis验证
+
+```bash
+[root@web01 ~]#redis-cli
+127.0.0.1:6379> keys *
+1) "filebeat"
+127.0.0.1:6379> type filebeat
+list
+127.0.0.1:6379> lindex filebeat 0
+"{\"@timestamp\":\"2025-01-28T09:11:15.000Z\",\"@metadata\":{\"beat\":\"filebeat\",\"type\":\"_doc\",\"version\":\"8.15.0\"},\"tags\":[\"nginx-access\"],\"upstreamhost\":\"-\",\"log\":{\"offset\":0,\"file\":{\"path\":\"/var/log/nginx/access_json.log\"}},\"uri\":\"/index.nginx-debian.html\",\"xff\":\"-\",\"referer\":\"-\",\"tcp_xff\":\"-\",\"host\":{\"name\":\"web01\"},\"clientip\":\"10.0.0.102\",\"ecs\":{\"version\":\"8.0.0\"},\"agent\":{\"name\":\"web01\",\"type\":\"filebeat\",\"version\":\"8.15.0\",\"ephemeral_id\":\"0d736cd1-4ceb-46f5-9589-30b0b03cf642\",\"id\":\"52dc5551-3312-4428-9923-914dfa240323\"},\"status\":\"200\",\"http_host\":\"10.0.0.104\",\"domain\":\"10.0.0.104\",\"http_user_agent\":\"curl/7.81.0\",\"size\":612,\"upstreamtime\":\"-\",\"responsetime\":0,\"input\":{\"type\":\"log\"}}"
+127.0.0.1:6379> exit
+```
+
+
+
+### 从标准输入读取再输出至 Kafka
+
+#### 编辑 filebeat.yml
+
+```bash
+[root@ubuntu2204 ~]#cat /etc/filebeat/filebeat.yml 
+filebeat.inputs:
+- type: stdin
+  enabled: true
+
+output.kafka:
+  hosts: ["10.0.0.105:9092"]
+  topic: mystical
+  partition.round_robin:
+    reachable_only: true
+  required_acks: 1
+  compression: gzip
+  max_message_bytes: 1000000
+```
+
+#### 输出测试
+
+```bash
+# 输出测试
+[root@ubuntu2204 ~]# filebeat
+hello, world
+hello,python
+
+# 从Kafka消费消息
+[root@ubuntu2204 ~]# /usr/local/kafka/bin/kafka-console-consumer.sh --topic mystical --bootstrap-server 10.0.0.105:9092 --from-beginning
+{"@timestamp":"2025-01-28T09:45:41.199Z","@metadata":{"beat":"filebeat","type":"_doc","version":"8.15.0"},"log":{"offset":0,"file":{"path":""}},"message":"hello, world","input":{"type":"stdin"},"ecs":{"version":"8.0.0"},"host":{"name":"ubuntu2204.wang.org"},"agent":{"name":"ubuntu2204.wang.org","type":"filebeat","version":"8.15.0","ephemeral_id":"f3bfa984-a8e4-4a11-b4c8-dbc1184582a2","id":"2e53b66f-23b4-4f30-80a6-7de2d388006e"}}
+{"@timestamp":"2025-01-28T09:46:54.507Z","@metadata":{"beat":"filebeat","type":"_doc","version":"8.15.0"},"host":{"name":"ubuntu2204.wang.org"},"agent":{"ephemeral_id":"f3bfa984-a8e4-4a11-b4c8-dbc1184582a2","id":"2e53b66f-23b4-4f30-80a6-7de2d388006e","name":"ubuntu2204.wang.org","type":"filebeat","version":"8.15.0"},"log":{"offset":0,"file":{"path":""}},"message":"hello,python","input":{"type":"stdin"},"ecs":{"version":"8.0.0"}}
+```
+
+
+
+### 从标准输入读取再输出至 Logstash
+
+#### 编辑filebeat.yml
+
+```bash
+[root@elk-web1 ~]#vim /etc/filebeat/filebeat.yml 
+filebeat.inputs:
+- type: stdin
+  enabled: true
+  
+output.logstash:
+  hosts: ["10.0.0.104:5044","10.0.0.105:5044"]
+  index: filebeat  
+  loadbalance: true     #默认为false,只随机输出至一个可用的logstash,设为true,则输出至全部logstash
+  worker: 1             #线程数量        
+  compression_level: 3  #压缩比
+```
 
 
 
 
 
+# Logstash 过滤
+
+## Logstash 介绍
+
+![image-20250128175852633](D:\git_repository\cyber_security_learning\markdown_img\image-20250128175852633.png)
+
+Logstash 是免费且开放的**服务器端数据处理管道**，能够从多个来源采集数据，转换数据，然后将数据发送到您最喜欢的一个或多个“存储库”中
+
+Logstash 是整个ELK中拥有最丰富插件的一个组件,而且支持可以水平伸缩
+
+Logstash 基于 **Java** 和 **Ruby** 语言开发
+
+Logstash  官网:
+
+```http
+https://www.elastic.co/cn/logstash/
+```
+
+ Logstash 官方说明
+
+```http
+https://www.elastic.co/guide/en/logstash/current/index.html
+https://www.elastic.co/guide/en/logstash/7.6/index.html
+```
+
+
+
+**Logstash 架构**
+
+- 输入 Input：用于日志收集,常见插件: Stdin、File、Kafka、Redis、Filebeat、Http
+- 过滤 Filter：日志过滤和转换,常用插件: grok、date、geoip、mutate、useragent
+- 输出 Output：将过滤转换过的日志输出, 常见插件: File,Stdout,Elasticsearch,MySQL,Redis,Kafka
+
+
+
+**Logstash 和 Filebeat 比较**
+
+- Logstash 功能更丰富,可以支持直接将非Josn 格式的日志统一转换为Json格式,且支持多目标输出, 和filebeat相比有更为强大的过滤转换功能
+- Logstash 资源消耗更多,不适合在每个需要收集日志的主机上安装
+
+
+
+## Logstash 安装
+
+安装要求
+
+```http
+https://www.elastic.co/guide/en/logstash/current/getting-started-with-logstash.html
+```
+
+安装方法
+
+```http
+https://www.elastic.co/guide/en/logstash/current/installing-logstash.html
+```
+
+可以支持下面安装方法
+
+- 二进制
+- 包安装
+- Docker容器
+
+
+
+### 环境准备安装 Java 环境
+
+注意: 8.X版本之后的logstash包已经内置了JDK无需安装
+
+新版 Logstash 要求 JAVA 要求 11和17 
+
+```http
+https://www.elastic.co/guide/en/logstash/current/getting-started-with-logstash.html
+```
+
+
+
+###  Ubuntu 环境准备
+
+```bash
+#8.X要求安装JDK11或17,新版logstash包已经内置了JDK无需安装
+[root@logstash ~]#apt update && apt -y install openjdk-17-jdk
+[root@logstash ~]#apt update && apt -y install openjdk-11-jdk
+
+#7.X 要求安装JDK8
+[root@logstash ~]#apt -y install openjdk-8-jdk
+```
+
+
+
+### CentOS 环境准备
+
+关闭防火墙和 SELinux
+
+```bash
+[root@logstash ~]# systemctl disable --now firewalld
+ [root@logstash ~]# sed -i '/SELINUX/s/enforcing/disabled/' /etc/selinux/config
+ [root@logstash ~]# setenforce 0
+```
+
+安装 Java 环境
+
+```bash
+#安装oracle 的JDK
+[root@logstash ~]# yum install jdk-8u121-linux-x64.rpm
+[root@logstash ~]# java -version
+java version "1.8.0_121"
+Java(TM) SE Runtime Environment (build 1.8.0_121-b13)
+Java HotSpot(TM) 64-Bit Server VM (build 25.121-b13, mixed mode)
+
+#或者安装OpenJDK
+[root@logstash ~]# yum -y install java-1.8.0-openjdk
+[root@logstash ~]# java -version
+openjdk version "1.8.0_302"
+OpenJDK Runtime Environment (build 1.8.0_302-b08)
+OpenJDK 64-Bit Server VM (build 25.302-b08, mixed mode)
+```
+
+
+
+### 包安装 Logstash
+
+注意:  Logstash 版本要和 Elasticsearch 相同的版本，否则可能会出错
+
+Logstash 官方下载链接:
+
+```http
+https://www.elastic.co/cn/downloads/logstash
+https://www.elastic.co/cn/downloads/past-releases#logstash
+```
+
+镜像网站下载链接
+
+```http
+https://mirrors.tuna.tsinghua.edu.cn/elasticstack/
+```
+
+
+
+### Ubuntu 安装 Logstash
+
+范例：8.X版本的包安装
+
+```bash
+[root@logstash ~]# wget https://mirrors.tuna.tsinghua.edu.cn/elasticstack/8.x/apt/pool/main/l/logstash/logstash-8.6.1-amd64.deb
+[root@logstash ~]# dpkg -i logstash-8.6.1-amd64.deb
+[root@logstash ~]# systemctl enable --now logstash.service
+```
+
+
+
+### RHEL系列安装 Logstash
+
+范例: 包安装
+
+```bash
+[root@logstash ~]# wget https://mirrors.tuna.tsinghua.edu.cn/elasticstack/7.x/yum/7.6.2/logstash-7.6.2.rpm
+[root@logstash ~]# yum install logstash-7.6.2.rpm
+[root@logstash ~]# chown logstash.logstash /usr/share/logstash/data/queue –R #权限更改为logstash用户和组，否则启动的时候日志报错
+```
+
+
+
+### 修改 Logstash 配置(可选)
+
+```bash
+#默认配置可以不做修改
+[root@logstash ~]#vim /etc/logstash/logstash.yml
+[root@logstash ~]#grep -Ev '#|^$' /etc/logstash/logstash.yml
+node.name: logstash-node01
+pipeline.workers: 2
+pipeline.batch.size: 1000      #批量从IPNPUT读取的消息个数，可以根据ES的性能做性能优化
+pipeline.batch.delay: 5        #处理下一个事件前的最长等待时长，以毫秒ms为单位,可以根据ES的性能做性能优化
+path.data: /var/lib/logstash   #默认值
+path.logs: /var/log/logstash   #默认值
+
+#内存优化
+[root@logstash ~]# vim /etc/logstash/jvm.options
+-Xms1g
+-Xmx1g
+
+#Logstash默认以logstash用户运行,如果logstash需要收集本机的日志,可能会有权限问题,可以修改为root
+[root@logstash ~]#vim /lib/systemd/system/logstash.service
+[Service]
+User=root
+Group=root
+
+#查看子配置文件路径:/etc/logstash/conf.d/*.conf
+[root@logstash ~]#cat /etc/logstash/pipelines.yml 
+# This file is where you define your pipelines. You can define multiple.
+# For more information on multiple pipelines, see the documentation:
+# https://www.elastic.co/guide/en/logstash/current/multiple-pipelines.html
+- pipeline.id: main
+  path.config: "/etc/logstash/conf.d/*.conf"
+
+[root@logstash ~]#systemctl daemon-reload && systemctl restart logstash
+```
+
+
+
+## Logstash 使用
+
+**查看帮助**
+
+```bash
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash --help
+
+#常用选项
+-e 指定配置内容
+-f 指定配置文件，支持绝对路径，如果用相对路径，是相对于/usr/share/logstash/的路径
+-t 语法检查
+-r 修改配置文件后自动加载生效,注意:有时候修改配置还需要重新启动生效
+
+#服务方式启动,由于默认没有配置文件,所以7.X无法启动，8.X可以启动
+[root@logstash ~]#systemctl start logstash
+```
+
+
+
+**各种插件帮助**
+
+```http
+https://www.elastic.co/guide/en/logstash/current/index.html
+```
+
+
+
+**列出所有插件**
+
+```bash
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash-plugin list
+```
+
+ 
+
+**Github logstash插件链接**
+
+```http
+https://github.com/logstash-plugins
+```
+
+
+
+### Logstash 输入 Input 插件
+
+官方链接
+
+```http
+https://www.elastic.co/guide/en/logstash/7.6/input-plugins.html
+```
+
+
+
+#### 标准输入
+
+codec 用于输入数据的编解码器，默认值为plain表示单行字符串，若设置为json，表示按照json方式解析
+
+范例: 交互式实现标准输入
+
+```bash
+#标准输入和输出,codec => rubydebug指输出格式，是默认值，可以省略，也支持设为json，以json格式输出
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash -e 'input { stdin{} } output { stdout{} }'
+# 输入
+hello,python  
+# 输出
+{
+          "host" => {
+        "hostname" => "logstash1"
+    },
+       "message" => "hello,python",
+    "@timestamp" => 2025-01-28T10:55:14.459186056Z,
+      "@version" => "1",
+         "event" => {
+        "original" => "hello,python"
+    }
+}
+
+# 输入json格式的数据
+{ "name" : "mystical", "age" : "18"}
+# 输出：未解析json格式
+{
+          "host" => {
+        "hostname" => "logstash1"
+    },
+       "message" => "{ \"name\" : \"mystical\", \"age\" : \"18\"}",
+    "@timestamp" => 2025-01-28T10:57:46.303054636Z,
+      "@version" => "1",
+         "event" => {
+        "original" => "{ \"name\" : \"mystical\", \"age\" : \"18\"}"
+    }
+}
+
+# 解析json格式数据，code => rubydebug为默认选项，可以省略
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash -e 'input { stdin{ codec => json } } output { stdout{ codec => rubydebug } }'
+# 输入json格式数据
+{ "name": "mystical", "age": "18", "gender": "men" }
+
+# 输出时，会解析json数据
+{
+           "age" => "18",
+    "@timestamp" => 2025-01-28T11:31:34.453097351Z,
+         "event" => {
+        "original" => "{ \"name\": \"mystical\", \"age\": \"18\", \"gender\": \"men\" }\n"
+    },
+          "name" => "mystical",
+      "@version" => "1",
+        "gender" => "men",
+          "host" => {
+        "hostname" => "logstash1"
+    }
+}
+
+# 输入非json数据，会提示解析失败，并存放message字段
+hello,python
+[WARN ] 2025-01-28 19:37:16.620 [[main]<stdin] jsonlines - JSON parse error, original data now in message field {:message=>"Unrecognized token 'hello': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')\n at [Source: (String)\"hello,python\"; line: 1, column: 6]", :exception=>LogStash::Json::ParserError, :data=>"hello,python"}
+{
+    "@timestamp" => 2025-01-28T11:37:16.626204699Z,
+         "event" => {
+        "original" => "hello,python\n"
+    },
+      "@version" => "1",
+       "message" => "hello,python",
+          "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+          "host" => {
+        "hostname" => "logstash1"
+    }
+}
+
+#添加tag和type
+/usr/share/logstash/bin/logstash  -e 'input { stdin{  tags => "stdin_tag"  type => "stdin_type" codec => json }  } output { stdout{  }}'
+
+# 输入json数据
+{ "name":"mystical", "age":"18","position":"sg"}
+
+# 输出，其中type是键值对，而tags是一个列表
+{
+      "position" => "sg",
+          "tags" => [
+        [0] "stdin_tag"
+    ],
+          "name" => "mystical",
+    "@timestamp" => 2025-01-28T11:40:08.725851262Z,
+      "@version" => "1",
+         "event" => {
+        "original" => "{ \"name\":\"mystical\", \"age\":\"18\",\"position\":\"sg\"}\n"
+    },
+          "type" => "stdin_type",
+           "age" => "18",
+          "host" => {
+        "hostname" => "logstash1"
+    }
+}
+
+```
+
+以配置文件实现标准输入
+
+```bash
+[root@logstash1 conf.d]#cat stdin_to_stdout.conf 
+input {
+    stdin {
+        type => "stdin_type"
+        tags => "stdin_tag"
+        codec => "json"
+    }
+}
+
+output {
+    stdout {
+        codec => "rubydebug" # 默认值
+    }
+}
+
+# 执行
+[root@logstash1 conf.d]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/stdin_to_stdout.conf
+# 输入json格式数据
+{"name":"mystical", "age":"18"}
+
+# 输出
+{
+          "name" => "mystical",
+      "@version" => "1",
+         "event" => {
+        "original" => "{\"name\":\"mystical\", \"age\":\"18\"}\n"
+    },
+    "@timestamp" => 2025-01-28T12:05:22.790372226Z,
+          "type" => "stdin_type",
+          "tags" => [
+        [0] "stdin_tag"
+    ],
+           "age" => "18",
+          "host" => {
+        "hostname" => "logstash1"
+    }
+}
+```
 
 
 
 
+
+#### 从文件输入
+
+Logstash 会记录每个文件的读取位置,下次自动从此位置继续向后读取
+
+每个文件的读取位置记录在下面对应的文件中（此文件包括文件的 inode号, 大小等信息）
+
+```bash
+#新版：8.11.1
+/usr/share/logstash/data/plugins/inputs/file/.sincedb_f5fdf6ea0ea92860c6a6b2b354bfcbbc
+
+#旧版
+/var/lib/logstash/plugins/inputs/file/.sincedb_xxxx
+```
+
+范例:
+
+```bash
+[root@logstash1 conf.d]#cat file_to_stdout.conf 
+input {
+    file {
+        path => "/tmp/wang.*"
+        type => "wanglog"                     # 添加自定义的type字段,可以用于条件判断,和filebeat中tag功能相似
+        exclude => "*.txt"                    # 排除不采集数据的文件，使用通配符glob匹配语法
+        start_position => "beginning"         # 第一次从头开始读取文件,可以取值为:beginning和end,默认为end,即只从最后尾部读取日志
+        stat_interval => "3"                  # 定时检查文件是否更新，默认1s
+        codec => json                         # 如果文件是Json格式,需要指定此项才能解析,如果不是Json格式而添加此行也不会影响结果
+    }
+    
+    file {
+        path => "/var/log/syslog"
+        type => "syslog"
+        start_position => "beginning"
+        stat_interval => "3"
+    }
+
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 测试
+[root@logstash1 conf.d]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/file_to_stdout.conf 
+```
+
+
+
+#### 从 Http 请求买取数据
+
+```bash
+[root@logstash ~]# cat /etc/logstash/conf.d/http_to_stdout.conf
+input {
+    http {
+        port => 6666
+        codec => json
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 测试
+[root@ubuntu2204 ~]# curl -XPOST -d "This is a test data" 10.0.0.106:6666
+ok
+
+# 在10.0.0.106的logstash收到请求体内容
+[root@logstash1 conf.d]# /usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/http_to_stdout.conf 
+{
+           "url" => {
+          "path" => "/",
+          "port" => 6666,
+        "domain" => "10.0.0.106"
+    },
+      "@version" => "1",
+    "@timestamp" => 2025-01-28T13:07:47.020281752Z,
+          "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+          "http" => {
+        "version" => "HTTP/1.1",
+         "method" => "POST",
+        "request" => {
+                 "body" => {
+                "bytes" => "19"
+            },
+            "mime_type" => "application/x-www-form-urlencoded"
+        }
+    },
+       "message" => "This is a test data",
+    "user_agent" => {
+        "original" => "curl/7.81.0"
+    },
+          "host" => {
+        "ip" => "10.0.0.105"
+    }
+}
+
+# 默认可以解析json数据
+[root@ubuntu2204 ~]#curl -XPOST -d '{"name":"mystcal", "age":"18"}' 10.0.0.106:6666
+ok
+
+# 在10.0.0.106的logstash收到请求体内容 
+# json数据成功被解析
+{
+           "url" => {
+          "path" => "/",
+          "port" => 6666,
+        "domain" => "10.0.0.106"
+    },
+      "@version" => "1",
+    "@timestamp" => 2025-01-28T13:14:24.742440563Z,
+          "name" => "mystcal",
+         "event" => {
+        "original" => "{\"name\":\"mystcal\", \"age\":\"18\"}"
+    },
+          "http" => {
+        "version" => "HTTP/1.1",
+         "method" => "POST",
+        "request" => {
+                 "body" => {
+                "bytes" => "30"
+            },
+            "mime_type" => "application/x-www-form-urlencoded"
+        }
+    },
+    "user_agent" => {
+        "original" => "curl/7.81.0"
+    },
+           "age" => "18",
+          "host" => {
+        "ip" => "10.0.0.105"
+    }
+}
+```
+
+
+
+####  从 Filebeat 读取数据
+
+```bash
+#filebeat配置
+[root@elk-web1 ~]# vim /etc/filebeat/filebeat.yml 
+filebeat.inputs:
+- type: log
+  enabled: true                            #开启日志 
+  paths:
+  - /var/log/nginx/access_json.log         #指定收集的日志文件     
+  json.keys_under_root: true
+  tags: ["nginx-access"]
+  
+- type: log
+  enabled: true            
+  paths:
+  - /var/log/syslog                       #指定收集的日志文件        
+  fields:
+    logtype: "syslog"                     #添加自定义字段logtype
+
+#output.console:
+#  pretty: true
+#  enable: true
+
+output.logstash:
+  hosts: ["10.0.0.106:5044"]             #指定Logstash服务器的地址和端口
+  
+
+# Logstash配置
+[root@logstash ~]# cat /etc/logstash/conf.d/filebeat_to_stdout.conf
+input {
+    beats {
+       port => 5044
+    }
+ }
+ 
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 测试
+[root@web01 ~]#systemctl restart filebeat.service 
+# 访问filebeat所在机器上的nginx
+[root@node3 local]#curl 10.0.0.104
+
+# filebeat将nginx产生的日志传给logstash
+[root@logstash1 conf.d]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/filebeat_to_stdout.conf
+{
+       "upstreamtime" => "-",
+            "referer" => "-",
+                "ecs" => {
+        "version" => "8.0.0"
+    },
+       "upstreamhost" => "-",
+            "tcp_xff" => "-",
+          "http_host" => "10.0.0.104",
+         "@timestamp" => 2025-01-28T13:33:34.565Z,
+           "@version" => "1",
+    "http_user_agent" => "curl/7.81.0",
+                "log" => {
+          "file" => {
+            "path" => "/var/log/nginx/access_json.log"
+        },
+        "offset" => 322
+    },
+              "agent" => {
+        "ephemeral_id" => "ceca0e07-f91a-42b3-b064-b8a11cb1e96c",
+                  "id" => "52dc5551-3312-4428-9923-914dfa240323",
+                "name" => "web01",
+                "type" => "filebeat",
+             "version" => "8.15.0"
+    },
+           "clientip" => "10.0.0.102",
+               "host" => {
+        "name" => "web01"
+    },
+              "input" => {
+        "type" => "log"
+    },
+                "xff" => "-",
+                "uri" => "/index.nginx-debian.html",
+               "tags" => [
+        [0] "nginx-access",
+        [1] "beats_input_raw_event"
+    ],
+               "size" => 612,
+             "domain" => "10.0.0.104",
+       "responsetime" => 0,
+             "status" => "200"
+}
+
+```
+
+
+
+####  从 Redis 中读取数据
+
+支持由多个 Logstash 从 Redis 读取日志,提高性能
+
+Logstash 从 Redis 收集完数据后,将删除对应的列表Key
+
+```bash
+# 初始在redis所在服务器上，即10.0.0.104，有三条数据
+[root@web01 ~]#redis-cli -a 123456 -h 10.0.0.104
+10.0.0.104:6379> llen filebeat
+(integer) 3
+
+# 编辑logstash配置文件
+[root@logstash1 conf.d] #cat redis_to_stdout.conf 
+input {
+    redis {
+        host => '10.0.0.104'
+        port => "6379"
+        password => "123456"
+        db => "0"
+        data_type => 'list'
+        key => "filebeat"
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 启动logstash，会输出redis的key-filebeat里的数据
+[root@logstash1 conf.d]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/redis_to_stdout.conf
+...
+
+# 再次查看redis，数据被取走了
+[root@web01 ~]#redis-cli -a 123456 -h 10.0.0.104
+10.0.0.104:6379> llen filebeat
+(integer) 0
+```
+
+
+
+#### Filebeat -> Redis -> Logstatsh
+
+```bash
+# filebeat配置
+[root@web01 ~]#cat /etc/filebeat/filebeat.yml 
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+  - /var/log/nginx/access_json.log
+  json.keys_under_root: true
+  json.overwrite_keys: true
+  tags: ["nginx-access"]
+
+- type: log
+  enabled: true
+  paths:
+  - /var/log/nginx/error.log
+  tags: ["nginx-error"]
+
+output.redis:
+  hosts: ["10.0.0.104:6379"]
+  key: "filebeat"
+  password: "123456"
+  
+#logstatsh配置
+[root@logstash1 ~]#cat /etc/logstash/conf.d/redis_to_stdout.conf 
+input {
+    redis {
+        host => '10.0.0.104'
+        port => "6379"
+        password => "123456"
+        db => "0"
+        data_type => 'list'
+        key => "filebeat"
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 测试
+# 使用10.0.0.100访问10.0.0.104上的nginx
+[root@node1 config]#curl 10.0.0.104
+
+# 在10.0.0.106，也就是logstash的服务器上，收到消息
+[root@logstash1 conf.d]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/redis_to_stdout.conf 
+{
+              "input" => {
+        "type" => "log"
+    },
+               "tags" => [
+        [0] "nginx-access"
+    ],
+              "event" => {
+        "original" => "{\"@timestamp\":\"2025-01-28T14:47:32.000Z\",\"@metadata\":{\"beat\":\"filebeat\",\"type\":\"_doc\",\"version\":\"8.15.0\"},\"upstreamtime\":\"-\",\"xff\":\"-\",\"host\":{\"name\":\"web01\"},\"http_host\":\"10.0.0.104\",\"input\":{\"type\":\"log\"},\"status\":\"200\",\"responsetime\":0,\"upstreamhost\":\"-\",\"tags\":[\"nginx-access\"],\"log\":{\"offset\":966,\"file\":{\"path\":\"/var/log/nginx/access_json.log\"}},\"domain\":\"10.0.0.104\",\"tcp_xff\":\"-\",\"size\":612,\"uri\":\"/index.nginx-debian.html\",\"referer\":\"-\",\"clientip\":\"10.0.0.100\",\"http_user_agent\":\"curl/7.81.0\",\"ecs\":{\"version\":\"8.0.0\"},\"agent\":{\"ephemeral_id\":\"9afd9c68-255e-4e55-b734-8a78298a26e2\",\"id\":\"52dc5551-3312-4428-9923-914dfa240323\",\"name\":\"web01\",\"type\":\"filebeat\",\"version\":\"8.15.0\"}}"
+    },
+          "http_host" => "10.0.0.104",
+           "@version" => "1",
+       "upstreamhost" => "-",
+            "referer" => "-",
+                "xff" => "-",
+            "tcp_xff" => "-",
+         "@timestamp" => 2025-01-28T14:47:32.000Z,
+               "host" => {
+        "name" => "web01"
+    },
+       "responsetime" => 0,
+           "clientip" => "10.0.0.100",
+               "size" => 612,
+       "upstreamtime" => "-",
+             "domain" => "10.0.0.104",
+                "log" => {
+          "file" => {
+            "path" => "/var/log/nginx/access_json.log"
+        },
+        "offset" => 966
+    },
+    "http_user_agent" => "curl/7.81.0",
+                "ecs" => {
+        "version" => "8.0.0"
+    },
+             "status" => "200",
+                "uri" => "/index.nginx-debian.html",
+              "agent" => {
+        "ephemeral_id" => "9afd9c68-255e-4e55-b734-8a78298a26e2",
+                  "id" => "52dc5551-3312-4428-9923-914dfa240323",
+                "name" => "web01",
+                "type" => "filebeat",
+             "version" => "8.15.0"
+    }
+}
+```
+
+
+
+#### 从 Kafka 中读取数据
+
+```bash
+#logstash会读取kafka最新生成的消息数据，原有的消息不会读取
+[root@logstash ~]#cat /etc/logstash/conf.d/kakfa_to_stdout.conf
+input {
+    kafka {
+        bootstrap_servers => "10.0.0.201:9092,10.0.0.202:9092,10.0.0.203:9092"
+        group_id => "logstash" #多个logstash的group_id如果不同，将实现消息共享（发布者/订阅者模式），如果相同（建议使用），则消息独占（生产者/消费者模式）
+        topics => ["nginx-accesslog","nginx-errorlog"]
+        codec => "json"
+        consumer_threads => 8
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+```
+
+
+
+#### Filebeat -> Kafka -> Logstash
+
+```bash
+# 注意：Kafka开放端口，默认仅本机可以访问
+[root@ubuntu2204 ~]#vim /usr/local/kafka/config/server.properties
+listeners=PLAINTEXT://0.0.0.0:9092
+advertised.listeners=PLAINTEXT://10.0.0.105:9092
+
+# 重启Kafka，重启的时候，注意Kafka等待一段时间，才会开放端口，耐心等待
+[root@ubuntu2204 ~]#systemctl restart kafka
+
+# kafka创建nginx-access和nginx-error的topic
+[root@ubuntu2204 ~]#/usr/local/kafka/bin/kafka-topics.sh --create --topic nginx-access --bootstrap-server 10.0.0.105:9092
+[root@ubuntu2204 ~]#/usr/local/kafka/bin/kafka-topics.sh --create --topic nginx-error --bootstrap-server 10.0.0.105:9092
+
+# filebeat编辑
+[root@web01 filebeat]#cat /etc/filebeat/filebeat.yml 
+filebeat.inputs:
+- type: log
+  json.keys_under_root: true
+  json.overwrite_keys: true       # 设为ture，使用json格式日志中自定义的key替代默认的message，此项可选
+  enabled: true                   # 开启日志
+  paths:
+  - /var/log/nginx/access_json.log
+  fields:
+    log_type: nginx-access
+  fields_under_root: true
+
+- type: log
+  enabled: true
+  paths:
+  - /var/log/nginx/error.log
+  fields:
+    log_type: nginx-error
+  fields_under_root: true
+
+output.kafka:
+  # 配置 Kafka 的连接信息
+  hosts: ["10.0.0.105:9092"]  # 替换为你的 Kafka broker 地址
+  topic: '%{[log_type]}'  # 动态设置 topic，使用 log_type 字段
+  partition.round_robin:
+    reachable_only: true  # 仅将消息发送到可用分区
+  required_acks: 1        # 消息发送成功时的确认级别
+  compression: gzip       # 启用数据压缩（可选）
+  max_message_bytes: 1000000  # 最大消息大小（根据 Kafka 配置调整
+
+# 重启filebeat
+[root@web01 filebeat]#systemctl restart filebeat.service 
+
+# 编辑logstash
+[root@logstash1 ~]#cat /etc/logstash/conf.d/kafka_to_stdout.conf 
+input {
+    kafka {
+        bootstrap_servers => "10.0.0.105:9092"
+        group_id => "logstash" #多个logstash的group_id如果不同，将实现消息共享（发布者/订阅者模式），如果相同（建议使用），则消息独占（生产者/消费者模式）
+        topics => ["nginx-access","nginx-error"]
+        codec => "json"
+        consumer_threads => 8
+    }
+ }
+
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+```
+
+
+
+#### 从syslog输入数据
+
+```bash
+# 配合rsyslog使用
+# 在rsyslog配置文件中添加：*.*  @10.0.0.105（514是默认端口，可以不写）
+[root@logstash1 conf.d]#cat syslog_to_stdout.conf 
+input {
+    syslog {
+        host => "0.0.0.0"
+        port => "514"       # 指定监听的UDP/TCP端口，注意普通用户无法监听特权端口（0-1024）
+        type => "haproxy"
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+```
+
+
+
+#### 从TCP/UDP协会输入数据
+
+```bash
+[root@logstash1 conf.d]#cat tcp_to_stdout.conf 
+input {
+    tcp {
+        port => "9527"
+        host => "0.0.0.0"
+        type => "tcplog"
+        codec => json
+        mode => "server"
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 启用
+[root@logstash1 conf.d]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/tcp_to_stdout.conf 
+
+# 远程服务器使用nc连接
+nc 10.0.0.106 9527
+hello, test
+
+# logstash上显示
+{
+          "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+       "message" => "hello, test",
+      "@version" => "1",
+          "type" => "tcplog",
+    "@timestamp" => 2025-01-29T00:43:41.440597604Z
+}
+```
+
+
+
+### Logstash 过滤 Filter 插件
+
+数据从源传输到存储库的过程中，Logstash 过滤器能够解析各个事件，识别已命名的字段以构建结构， 并将它们转换成通用格式，以便进行更强大的分析和实现商业价值。
+
+Logstash 能够动态地转换和解析数据，不受格式或复杂度的影响
+
+常见的 Filter 插件:
+
+- 利用 **Grok** 从非结构化数据中转化为结构数据
+- 利用 GEOIP 根据 IP 地址找出对应的地理位置坐标
+- 利用 useragent 从请求中分析操作系统、设备类型
+- 利用 Mutate 从请求中整理字段
+
+
+
+**官方链接**
+
+```http
+https://www.elastic.co/guide/en/logstash/current/filter-plugins.html
+https://www.elastic.co/guide/en/logstash/7.6/filter-plugins.html
+```
+
+
+
+#### Grok 插件
+
+Grok  是一个过滤器插件，可帮助用户描述日志格式的结构。有超过200种 grok模式抽象概念，如IPv6 地址，UNIX路径和月份名称。
+
+为了将日志行与格式匹配, 生产环境常需要将非结构化的数据解析成 json 结构化数据格式
+
+Grok 可以解析任意文本并把它结构化。因此 Grok 是**将非结构化的日志数据解析为可查询的结构化数据**的好方法。
+
+Grok 非常适合将syslog 日志、apache 和其他 web 服务器日志、MySQL 日志等日志格式转换为JSON格 式。
+
+**比如下面行**
+
+```bash
+2016-09-19T18:19:00 [8.8.8.8:prd] DEBUG this is an example log message
+```
+
+使用  Grok 插件可以基于正则表达式技术利用其内置的正则表达式的别名来表示和匹配上面的日志,如下效果
+
+```bash
+%{TIMESTAMP_ISO8601:timestamp} \[%{IPV4:ip};%{WORD:environment}\] %{LOGLEVEL:log_level} %{GREEDYDATA:message}
+```
+
+最终转换为以下格式
+
+```json
+{
+  "timestamp": "2016-09-19T18:19:00",
+  "ip": "8.8.8.8",
+  "environment": "prd",
+  "log_level": "DEBUG",
+  "message": "this is an example log message"
+}
+```
+
+**参考网站**
+
+```http
+# 可以直接问CHATGPT
+```
+
+示例
+
+```bash
+# 编辑logstash
+[root@logstash1 conf.d]#cat tcp_to_stdout.conf 
+input {
+    tcp {
+        port => "9527"
+        host => "0.0.0.0"
+        type => "tcplog"
+        codec => json
+        mode => "server"
+    }
+}
+
+
+filter {
+    grok {
+        match => {
+            # TIME匹配的值，作为timestamp这个健的值，WORD的值，作为log_level这个健的值...
+            "message" => "%{YEAR}/%{MONTHNUM}/%{MONTHDAY} %{TIME:timestamp} \[%{WORD:log_level}\] %{NUMBER:pid1}#%{NUMBER:pid2}: %{GREEDYDATA:message}"
+        }
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 在另一个服务器上使用nc连接10.0.0.106,即logstash所在服务器的9527端口
+[root@web01 ~]#nc 10.0.0.106 9527
+2025/01/28 15:03:26 [notice] 2299#2299: using inherited sockets from "6;7;"
+
+# 在logstash所在服务器上启动logstash，然后等待数据输出
+# -r 表示可以动态加载logstash的配置文件
+[root@logstash1 conf.d]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/tcp_to_stdout.conf -r
+{
+          "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+          "pid2" => "2299",
+     "timestamp" => "15:03:26",
+     "log_level" => "notice",
+       "message" => [
+        [0] "2025/01/28 15:03:26 [notice] 2299#2299: using inherited sockets from \"6;7;\"",
+        [1] "using inherited sockets from \"6;7;\""
+    ],
+      "@version" => "1",
+    "@timestamp" => 2025-01-29T10:28:23.098915063Z,
+          "type" => "tcplog",
+          "pid1" => "2299"
+}
+```
+
+
+
+##### 在 Grok 中使用自定义正则表达式
+
+Grok 允许你用 `(?<字段名>正则表达式)` 的形式定义自定义字段匹配规则。例如
+
+示例日志
+
+```bash
+192.168.1.100 - - [28/Jan/2025:15:03:26 +0000] "GET /index.html HTTP/1.1" 200 1024
+```
+
+使用自定义正则
+
+```bash
+# 这里 (?<request>.*?) 中.*? 表示非贪婪匹配
+(?<client_ip>\d+\.\d+\.\d+\.\d+) - - \[(?<timestamp>\d{2}/[A-Za-z]+/\d{4}:\d{2}:\d{2}:\d{2} [+\-]\d{4})\] "(?<method>\w+) (?<request>.*?) HTTP/(?<http_version>\d+\.\d+)" (?<status>\d{3}) (?<bytes>\d+)
+```
+
+解析结果
+
+```json
+{
+  "client_ip": "192.168.1.100",
+  "timestamp": "28/Jan/2025:15:03:26 +0000",
+  "method": "GET",
+  "request": "/index.html",
+  "http_version": "1.1",
+  "status": "200",
+  "bytes": "1024"
+}
+```
+
+
+
+##### 在 Logstash 中使用自定义正则
+
+如果 Grok 预定义的模式不能满足需求，你可以直接在 `logstash.conf` 中使用自定义正则表达式。
+
+示例：解析 Nginx error.log
+
+```bash
+2025/01/28 15:03:26 [error] 2299#2299: failed to open file "/var/log/nginx/access.log"
+```
+
+logstash Grok配置
+
+```bash
+filter {
+  grok {
+    match => {
+      "message" => "(?<year>\d{4})/(?<month>\d{2})/(?<day>\d{2}) (?<time>\d{2}:\d{2}:\d{2}) \[(?<log_level>\w+)\] (?<pid1>\d+)#(?<pid2>\d+): (?<message>.*)"
+    }
+  }
+  
+  # 字段合并
+  mutate {
+    add_field => { "full_timestamp" => "%{year}-%{month}-%{day} %{time}" }
+  }
+
+  date {
+    match => [ "full_timestamp", "yyyy-MM-dd HH:mm:ss" ]
+    target => "@timestamp"
+    timezone => "UTC"
+  }
+}
+
+```
+
+解析结果
+
+```bash
+{
+  "@timestamp": "2025-01-28T15:03:26.000Z",
+  "log_level": "error",
+  "pid1": "2299",
+  "pid2": "2299",
+  "message": "failed to open file \"/var/log/nginx/access.log\""
+}
+```
+
+
+
+##### 结合 Grok 和 自定义正则
+
+你还可以在 Grok 规则中混合使用 Grok 预定义模式和自定义正则。
+
+```bash
+grok {
+  match => { "message" => "%{YEAR}/%{MONTHNUM}/%{MONTHDAY} (?<time>\d{2}:\d{2}:\d{2}) \[%{WORD:log_level}\] (?<pid1>\d+)#(?<pid2>\d+): (?<message>.*)" }
+}
+```
+
+
+
+##### 使用 `patterns_dir` 定义自定义 Grok 规则
+
+如果你需要经常使用自定义模式，可以将它们存入 `patterns_dir` 目录，然后在 Grok 过滤器中引用。
+
+- 创建自定义 Grok 规则文件
+
+```bash
+mkdir -p /etc/logstash/patterns
+vi /etc/logstash/patterns/nginx
+```
+
+- 在 `nginx` 文件中定义模式
+
+```bash
+NGINX_ERROR_LOG %{YEAR}/%{MONTHNUM}/%{MONTHDAY} %{TIME} \[%{WORD:log_level}\] %{NUMBER:pid1}#%{NUMBER:pid2}: %{GREEDYDATA:message}
+```
+
+- 在 `logstash.conf` 中引用模式
+
+```bash
+filter {
+  grok {
+    patterns_dir => ["/etc/logstash/patterns"]
+    match => { "message" => "%{NGINX_ERROR_LOG}" }
+  }
+}
+```
+
+
+
+#### GeoIP 插件
+
+geoip 根据 ip 地址提供的对应地域信息，比如:经纬度,国家,城市名等,以方便进行地理数据分析
+
+```bash
+# 查看IP地理位置数据库的路径
+[root@logstash1 vendor]#dpkg -L logstash|grep mmdb
+/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-filter-geoip-7.2.12-java/vendor/GeoLite2-ASN.mmdb
+/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-filter-geoip-7.2.12-java/vendor/GeoLite2-City.mmdb   # 用这个
+```
+
+示例
+
+```bash
+[root@logstash1 vendor]#cat /etc/logstash/conf.d/tcp_to_stdout.conf 
+input {
+    tcp {
+        port => "9527"
+        host => "0.0.0.0"
+        type => "tcplog"
+        codec => json
+        mode => "server"
+    }
+}
+
+
+filter {
+    grok {
+        match => {
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+        }
+    
+    date {
+        match => ["timestamp", "UNIX", "dd/MMM/yyyy:HH:mm:ss Z"]
+        target => "@timestamp"        
+        timezone => "Asia/Shanghai"
+       }
+    useragent {
+        source => "message"
+        target => "useragent"
+      }
+
+    geoip {
+        # 新版的database字段必须添加
+        database => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-filter-geoip-7.2.12-java/vendor/GeoLite2-City.mmdb"
+        # 8.x添加经纬度字段，用于后期画地图使用
+        add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lon]}"]
+        add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lat]}"]
+        source => "client_ip"
+        target => "geoip"
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 在nc所在服务器上输入日志信息，输入的日志信息的IP必须是公网IP
+[root@web01 ~]#nc 10.0.0.106 9527
+162.142.125.221 - - [15/Mar/2024:15:49:41 +0800] "GET / HTTP/1.1" 403 146 "-" "Mozilla/5.0 (compatible; CensysInspect/1.1; +https://about.censys.io/)
+
+# logstash上显示
+{
+           "bytes" => "146",
+           "ident" => "-",
+            "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+          "method" => "GET",
+         "message" => "162.142.125.221 - - [15/Mar/2024:15:49:41 +0800] \"GET / HTTP/1.1\" 403 146 \"-\" \"Mozilla/5.0 (compatible; CensysInspect/1.1; +https://about.censys.io/)\"",
+       "useragent" => {
+            "os" => {
+            "name" => "Other",
+            "full" => "Other"
+        },
+        "device" => {
+            "name" => "Other"
+        },
+          "name" => "Other"
+    },
+       "timestamp" => "15/Mar/2024:15:49:41 +0800",
+       "client_ip" => "162.142.125.221",
+           "geoip" => {
+                "geo" => {
+                    "location" => {
+                "lon" => -97.822,
+                "lat" => 37.751
+            },
+              "continent_code" => "NA",
+                "country_name" => "United States",
+            "country_iso_code" => "US",
+                    "timezone" => "America/Chicago"
+        },
+                 "ip" => "162.142.125.221",
+        # 这个是添加的字段，用于画图时使用的经纬度
+        "coordinates" => [
+            [0] "-97.822",
+            [1] "37.751"
+        ]
+    },
+      "@timestamp" => 2024-03-15T07:49:41.000Z,
+        "@version" => "1",
+            "type" => "tcplog",
+            "user" => "-",
+         "request" => "/",
+    "http_version" => "1.1",
+          "status" => "403"
+}
+```
+
+只显示指定的geoip的字段信息
+
+```bash
+[root@logstash1 ~]#cat /etc/logstash/conf.d/tcp_to_stdout.conf 
+input {
+    tcp {
+        port => "9527"
+        host => "0.0.0.0"
+        type => "tcplog"
+        codec => json
+        mode => "server"
+    }
+}
+
+
+filter {
+    grok {
+        match => {
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+        }
+    
+    date {
+        match => ["timestamp", "UNIX", "dd/MMM/yyyy:HH:mm:ss Z"]
+        target => "@timestamp"        
+        timezone => "Asia/Shanghai"
+       }
+    useragent {
+        source => "message"
+        target => "useragent"
+      }
+
+    geoip {
+        database => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-filter-geoip-7.2.12-java/vendor/GeoLite2-City.mmdb"
+        add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lon]}"]
+        add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lat]}"]
+        source => "client_ip"
+        target => "geoip"
+        # 以上面提取clientip字段为源，获取地域信息，并指定只保留显示的字段
+        fields => ["continent_code", "region_name", "city_name", "timezone", "longitude", "latitude"]
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 使用nc连接logstash服务器，并输入日志信息
+[root@web01 ~]#nc 10.0.0.106 9527
+118.123.105.92 - - [15/Mar/2024:11:33:18 +0800] "GET /favicon.ico HTTP/1.1" 404 548 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4 240.111 Safari/537.36"
+
+# logstash服务器显示
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/tcp_to_stdout.conf -r
+{
+            "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+      "@timestamp" => 2024-03-15T03:33:18.000Z,
+       "timestamp" => "15/Mar/2024:11:33:18 +0800",
+       "client_ip" => "118.123.105.92",
+          "method" => "GET",
+         "message" => "118.123.105.92 - - [15/Mar/2024:11:33:18 +0800] \"GET /favicon.ico HTTP/1.1\" 404 548 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4 240.111 Safari/537.36\"",
+    "http_version" => "1.1",
+           "ident" => "-",
+       "useragent" => {
+          "name" => "favicon",
+            "os" => {
+            "name" => "Linux",
+            "full" => "Linux"
+        },
+        "device" => {
+            "name" => "Spider"
+        }
+    },
+        "@version" => "1",
+         "request" => "/favicon.ico",
+            "type" => "tcplog",
+            "user" => "-",
+          "status" => "404",
+           "geoip" => {
+        "coordinates" => [
+            [0] "104.0667",
+            [1] "30.6667"
+        ],
+        
+        # geo只显示指定字段
+                "geo" => {
+              "country_name" => "China",
+            "continent_code" => "AS",
+                  "location" => {
+                "lat" => 30.6667,
+                "lon" => 104.0667
+            },
+              "region_name" => "Sichuan",
+                  "timezone" => "Asia/Shanghai"
+        }
+    },
+           "bytes" => "548"
+}
+
+```
+
+更新数据库地理位置
+
+早期直接下载,现在必须注册登录后,在用户帐户页面下载
+
+官网链接
+
+```http
+https://www.maxmind.com/en/home
+```
+
+![image-20250131145820821](D:\git_repository\cyber_security_learning\markdown_img\image-20250131145820821.png)
+
+注册账号
+
+![image-20250131145932129](D:\git_repository\cyber_security_learning\markdown_img\image-20250131145932129.png)
+
+注册成功后，登录账户即可下载最新的数据
+
+![image-20250131150023119](D:\git_repository\cyber_security_learning\markdown_img\image-20250131150023119.png)
+
+
+
+![image-20250131150053981](D:\git_repository\cyber_security_learning\markdown_img\image-20250131150053981.png)
+
+
+
+#### Date 插件
+
+Date插件可以将日志中的指定的日期字符串对应的源字段生成新的目标字段
+
+然后替换@timestamp 字段(此字段默认为当前写入logstash的时间而非日志本身的时间)或指定的其他字段
+
+```bash
+match         # 类型为数组，用于指定需要使用的源字段名和对应的时间格式
+target        # 类型为字符串，用于指定生成的目标字段名，默认是 @timestamp
+timezone      # 类型为字符串，用于指定时区域
+```
+
+官方说明
+
+```http
+https://www.elastic.co/guide/en/logstash/current/plugins-filters-date.html
+```
+
+时区格式参考
+
+```http
+http://joda-time.sourceforge.net/timezones.html
+```
+
+利用源字段timestamp生成新的字段名access_time
+
+```bash
+[root@logstash1 conf.d]# vim tcp_to_stdout.conf 
+input {
+    tcp {
+        port => "9527"
+        host => "0.0.0.0"
+        type => "tcplog"
+        codec => json
+        mode => "server"
+    }
+}
+
+
+filter {
+    grok {
+        match => {
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+        }
+        
+    #解析源字段timestamp的date日期格式: 14/Jul/2020:15:07:27 +0800
+    date {
+        match => ["timestamp", "dd/MMM/yyyy:HH:mm:ss Z" ] # 这里的时间格式必须和timestamp的实际格式匹配
+        target => "access_time"         #将时间写入新生成的access_time字段，源字段仍保留
+        #target => "@timestamp"         #将时间覆盖原有的@timestamp字段
+        timezone => "Asia/Shanghai"
+       }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 在另一台设备上nc 10.0.0.106 9527然后输入nginx的日志
+[root@web01 ~]#nc 10.0.0.106 9527
+10.0.0.102 - - [29/Jan/2025:22:55:08 +0800] "GET / HTTP/1.1" 200 612 "-" "curl/7.81.0"
+
+# 在logstash上会显示
+{
+           "bytes" => "612",
+           "ident" => "-",
+            "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+          "method" => "GET",
+         "message" => "10.0.0.102 - - [29/Jan/2025:22:55:08 +0800] \"GET / HTTP/1.1\" 200 612 \"-\" \"curl/7.81.0\"",
+       "timestamp" => "29/Jan/2025:22:55:08 +0800",
+       "client_ip" => "10.0.0.102",
+     "access_time" => 2025-01-29T14:55:08.000Z,          # 会将时间写入指定字段
+      "@timestamp" => 2025-01-29T15:10:39.724041888Z,
+        "@version" => "1",
+            "type" => "tcplog",
+            "user" => "-",
+         "request" => "/",
+    "http_version" => "1.1",
+          "status" => "200"
+}
+
+# 如果target是@timestamp，则显示如下
+{
+           "bytes" => "612",
+           "ident" => "-",
+            "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+          "method" => "GET",
+         "message" => "10.0.0.102 - - [29/Jan/2025:22:55:08 +0800] \"GET / HTTP/1.1\" 200 612 \"-\" \"curl/7.81.0\"",
+       "timestamp" => "29/Jan/2025:22:55:08 +0800",
+       "client_ip" => "10.0.0.102",
+      "@timestamp" => 2025-01-29T14:55:08.000Z,        # @timestamp和timestamp相同
+        "@version" => "1",
+            "type" => "tcplog",
+            "user" => "-",
+         "request" => "/",
+    "http_version" => "1.1",
+          "status" => "200"
+}
+```
+
+
+
+#### Useragent 插件
+
+useragent 插件可以根据请求中的 user-agent 字段，解析出浏览器设备、操作系统等信息, 以方便后续的分析使用
+
+```bash
+[root@logstash ~]#cat /etc/logstash/conf.d/http_grok_useragent_stdout.conf
+input {
+    http {
+        port => 6666
+    }
+}
+
+filter {
+    #将nginx日志格式化为json格式
+    grok {
+        match => {
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+        }
+    }
+    #解析date日期如: 10/Dec/2020:10:40:10 +0800
+    date {
+        match => ["timestamp", "dd/MMM/yyyy:HH:mm:ss Z" ]
+        target => "@timestamp"
+        #target => "access_time"
+        timezone => "Asia/Shanghai"
+    }
+    #提取agent字段，进行解析
+    useragent {
+        #source => "agent"                    #7,X指定从哪个字段获取数据
+        source => "message"                   #8.X指定从哪个字段获取数据
+        #source => "[user_agent][original]"   #8.X指定从哪个字段获取数据,直接分析日志文件，curl或insomnia此方式不成功
+        #source => "[user_agent][original][1]" #8.X指定从哪个字段获取数据，如果利用insomnia此方式不成功工具发送http请求，需要加[1]
+        target => "useragent" #指定生成新的字典类型的字段的名称，包括os，device等内容
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# logstash上显示
+{
+           "bytes" => "396",
+           "ident" => "-",
+            "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+          "method" => "GET",
+         "message" => "10.0.0.1 - - [29/Jan/2025:23:43:47 +0800] \"GET / HTTP/1.1\" 200 396 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0\"",
+       "useragent" => {
+        "version" => "132.0.0.0",
+             "os" => {
+            "version" => "10",
+               "name" => "Windows",
+               "full" => "Windows 10"
+        },
+         "device" => {
+            "name" => "Other"
+        },
+           "name" => "Edge"
+    },
+       "timestamp" => "29/Jan/2025:23:43:47 +0800",
+       "client_ip" => "10.0.0.1",
+      "@timestamp" => 2025-01-29T15:43:47.000Z,
+        "@version" => "1",
+            "type" => "tcplog",
+            "user" => "-",
+         "request" => "/",
+    "http_version" => "1.1",
+          "status" => "200"
+}
+```
+
+
+
+#### Mutate 插件
+
+官方链接
+
+```http
+https://www.elastic.co/guide/en/logstash/master/plugins-filters-mutate.html https://www.elastic.co/guide/en/logstash/7.6/plugins-filters-mutate.html
+```
+
+ Mutate 插件主要是对字段进行、类型转换、删除、替换、更新等操作,可以使用以下函数
+
+```bash
+remove_field   #删除字段
+split          #字符串切割,相当于awk取列
+add_field      #添加字段    
+convert        #字符串替换
+gsub           #类型转换，支持的数据类型：integer，integer_eu，float，float_eu，string，boolean 
+rename         #字符串改名
+lowercase      #转换字符串为小写 
+```
+
+
+
+##### remove_field 删除字段
+
+```bash
+[root@logstash1 ~]#cat /etc/logstash/conf.d/tcp_to_stdout.conf
+input {
+    tcp {
+        port => "9527"
+        host => "0.0.0.0"
+        type => "tcplog"
+        codec => json
+        mode => "server"
+    }
+}
+
+
+filter {
+    grok {
+        match => {
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+        }
+    
+    date {
+        match => ["timestamp", "UNIX", "dd/MMM/yyyy:HH:mm:ss Z"]
+        target => "@timestamp"        
+        timezone => "Asia/Shanghai"
+       }
+    useragent {
+        source => "message"
+        target => "useragent"
+      }
+
+    geoip {
+        database => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-filter-geoip-7.2.12-java/vendor/GeoLite2-City.mmdb"
+        add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lon]}"]
+        add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lat]}"]
+        source => "client_ip"
+        target => "geoip"
+        fields => ["continent_code", "country_name", "region_name", "timezone", "longitude", "latitude"]
+    }
+    # 删除指定字段
+    mutate {
+        remove_field => ["timestamp", "message"]
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+
+# 使用nc连接logstash服务器，并输入日志信息
+[root@web01 ~]#nc 10.0.0.106 9527
+118.123.105.92 - - [15/Mar/2024:11:33:18 +0800] "GET /favicon.ico HTTP/1.1" 404 548 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4 240.111 Safari/537.36"
+
+# logstash服务器显示
+# 原来的timestamp和message都被删除了
+{
+            "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+      "@timestamp" => 2024-03-15T03:33:18.000Z,
+          "method" => "GET",
+       "client_ip" => "118.123.105.92",
+    "http_version" => "1.1",
+           "ident" => "-",
+       "useragent" => {
+          "name" => "favicon",
+            "os" => {
+            "name" => "Linux",
+            "full" => "Linux"
+        },
+        "device" => {
+            "name" => "Spider"
+        }
+    },
+        "@version" => "1",
+         "request" => "/favicon.ico",
+            "type" => "tcplog",
+            "user" => "-",
+          "status" => "404",
+           "geoip" => {
+        "coordinates" => [
+            [0] "104.0667",
+            [1] "30.6667"
+        ],
+                "geo" => {
+              "country_name" => "China",
+            "continent_code" => "AS",
+                  "location" => {
+                "lat" => 30.6667,
+                "lon" => 104.0667
+            },
+               "region_name" => "Sichuan",
+                  "timezone" => "Asia/Shanghai"
+        }
+    },
+           "bytes" => "548"
+}
+```
+
+
+
+##### Split 切割
+
+mutate 中的 split 字符串切割，指定字符做为分隔符，切割的结果用于生成新的列表元素
+
+示例：1000|提交订单|2020-01-08 09:10:21
+
+```bash
+[root@logstash1 conf.d]#vim http_to_stdout.conf 
+input {
+    http {
+        port => 6666
+        codec => json
+    }
+}
+
+filter {
+    mutate {
+        split => {"message" => "|"}
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+
+# 启动logstash
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/http_to_stdout.conf -r
+
+# 在另一台服务器上使用curl，携带请求体，访问10.0.0.106:6666
+[root@web01 ~]#curl -XPOST -d '1000|提交订单|2020-01-08 09:10:21' http://10.0.0.106:6666
+ok
+
+# 在logstash服务器上显示
+{
+           "url" => {
+          "path" => "/",
+          "port" => 6666,
+        "domain" => "10.0.0.106"
+    },
+      "@version" => "1",
+    "@timestamp" => 2025-01-30T01:40:02.101039609Z,
+    "user_agent" => {
+        "original" => "curl/7.81.0"
+    },
+       "message" => [
+        [0] "1000",
+        [1] "提交订单",
+        [2] "2020-01-08 09:10:21"
+    ],
+          "tags" => [
+        [0] "_jsonparsefailure"
+    ],
+          "host" => {
+        "ip" => "10.0.0.104"
+    },
+          "http" => {
+        "version" => "HTTP/1.1",
+         "method" => "POST",
+        "request" => {
+            "mime_type" => "application/x-www-form-urlencoded",
+                 "body" => {
+                "bytes" => "37"
+            }
+        }
+    }
+}
+```
+
+
+
+##### add_field 添加字段
+
+用指定源字段添加新的字段，添加完成后源字段还存在
+
+```bash
+[root@logstash1 conf.d]#vim http_to_stdout.conf 
+input {
+    http {
+        port => 6666
+        codec => json
+    }
+}
+
+filter {
+    mutate {
+        split => {"message" => "|"}
+        # 添加字段，将message的列表的第0个元素添加字段名user_id...
+        add_field => {
+            "user_id" => "%{[message][0]}"
+            "action" => "%{[message][1]}"
+            "time" => "%{[message][2]}"
+        }
+        # 添加字段做索引名
+        # add_field => {"[@metadata][target_index]" => "app-%{+YYY.MM.dd}"}
+        # 删除无用字段
+        remove_field => ["headers", "message"]
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+```
+
+
+
+##### convert 转换
+
+mutate 中的 convert 可以实现数据类型的转换。 支持转换integer、float、string等类型
+
+```bash
+[root@logstash1 conf.d]#vim http_to_stdout.conf
+input {
+    http {
+        port => 6666
+        codec => json
+    }
+}
+
+filter {
+    mutate {
+        split => {"message" => "|"}
+        add_field => {
+            "user_id" => "%{[message][0]}"
+            "action" => "%{[message][1]}"
+            "time" => "%{[message][2]}"
+        }
+
+        remove_field => ["headers", "message"]
+        # 数据类型转换
+        convert => {
+            "user_id" => "integer"
+            "action" => "string"
+            "time" => "string"
+        }
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+```
+
+
+
+##### gsub 替换
+
+gsub 实现字符串的替换
+
+```bash
+filter {
+    mutate {
+        gsub=>["message","\n", " "] #将message字段中的换行替换为空格
+    }
+}
+```
+
+
+
+#### 条件判断
+
+Filter 语句块中支持 if 条件判断功能
+
+```bash
+# vim /etc/filebeat/filebeat.yml
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+  - /var/log/nginx/access.log
+  tags: ["access"]
+  
+- type: log
+  enabled: true
+  paths:
+  - /var/log/nginx/error.log
+  tags: ["error"]
+  
+- type: log
+  enabled: true
+  paths:- /var/log/syslog
+  tags: ["system"]
+  
+output.logstash:
+  hosts: ["10.0.0.104:5044","10.0.0.105:5044"]
+  #loadbalance: true        #负载均衡
+  #worker: 2 #number of hosts * workers #开启多进程
+  
+# vim /etc/logstash/conf.d/filebeat_logstash_es.conf 
+input {
+    beats {
+        port => 5044
+    }
+}
+
+filter {
+    if "access" in [tags][0] {
+        mutate {
+            add_field => {"target_index" => "access-%{+YYYY.MM.dd}"}
+        }
+    }
+    else if "error" in [tags][0] {
+        mutate {
+            add_field => {"target_index" => "error-%{+YYYY.MM.dd}"}
+        }
+    }
+    else if "system" in [tags][0] {
+        mutate {
+            add_field => {"target_index" => "system-%{+YYYY.MM.dd}"}
+        }
+    }
+
+}
+
+output {
+    elasticsearch {
+        hosts => ["10.0.0.100:9200", "10.0.0.101:9200", "10.0.0.102:9200"]
+        index => "%{[target_index]}"
+        template_overwrite => true   # 覆盖索引模版
+    }
+}
+```
+
+范例2：
+
+```bash
+# vim /etc/filebeat/filebeat.yml
+filebeat.inputs:
+- type: log
+  enable: true
+  paths:
+  - /var/log/nginx/access/log
+  fields:
+    project: test-access
+    env: test
+
+output.logstash:
+  hosts: ["10.0.0.104:5044", "10.0.0.105:5044"]
+  
+# vim /etc/logstash/conf.d/filebeat_logstash_es.conf 
+input {
+    beats {
+        port => 5044
+    }
+    file {
+        path => "/tmp/mystical.log"
+        type => mysticallog   # 自定义类型，可用于条件判断
+        start_position => "beginning"
+        stat_interval => "3"
+    }
+}
+
+output {
+    if [fields][env] == "test" {
+        elasticsearch {
+            hosts => ["10.0.0.100:9200","10.0.0.101:9200","10.0.0.102:9200"]
+            index => "test-nginx-%{+YYYY.MM.dd}"
+        }
+    }
+    if [type] == "mysticallog" {
+        stdout {
+            codec => rubydebug
+        }
+    }
+}
+```
+
+
+
+### Logstash 输出 Output插件
+
+官方链接
+
+```http
+https://www.elastic.co/guide/en/logstash/7.6/output-plugins.html
+```
+
+
+
+#### Stdout 插件
+
+stdout 插件将数据输出到屏幕终端，主要用于调试
+
+```bash
+output {
+    stdout {
+        codec => rubydebug
+    }
+}
+```
+
+
+
+#### File 插件
+
+输出到文件，可以将分散在多个文件的数据统一存放到一个文件
+
+示例: 将所有 web 机器的日志收集到一个文件中，从而方便统一管理
+
+```bash
+[root@ubuntu2204 ~]#cat /etc/logstash/conf.d/stdin_file.conf
+input {
+    stdin {}
+}
+output {
+    stdout {
+        codec => rubydebug
+    }
+    file {
+        path => "/var/log/test.log"
+    }
+}
+```
+
+
+
+#### Elasticsearch 插件
+
+官方说明
+
+```http
+https://www.elastic.co/guide/en/logstash/7.6/plugins-outputs-elasticsearch.html
+```
+
+索引的时间格式说明
+
+```http
+https://www.joda.org/joda-time/apidocs/org/joda/time/format/DateTimeFormat.html
+```
+
+当日志量较小时，可以按月或周生成索引，当日志量比较大时，会按天生成索引，以方便后续按天删除
+
+```bash
+output {
+    elasticsearch {
+        hosts => ["10.0.0.100:9200", "10.0.0.101:9200", "10.0.0.102:9200"]  # 一般写ES中data节点地址
+        index => "app-%{+YYYY.MM.dd}"               # 指定索引名称，建议加时间，按天建立索引
+        # index => "%{[@metadata][target_index]}"   # 使用字段[metadata][target_index]值做为索引名
+        template_overwrite => true                  # 覆盖索引模版，此项可选，默认值为false
+    }
+}
+```
+
+```ABAP
+注意: 索引名必须为小写
+```
+
+
+
+#### Redis 插件
+
+Logstash 支持将日志转发至 Redis
+
+官方链接：
+
+```http
+https://www.elastic.co/guide/en/logstash/7.6/plugins-outputs-redis.html
+```
+
+范例
+
+```bash
+[root@logstash ~]#cat /etc/logstash/conf.d/file_to_redis.conf
+input {
+    file {
+        path => "/var/log/nginx/access/log"
+        type => 'nginx-accesslog'
+        start_postion => "beginning"
+        start_interval => "3"
+        codec => json
+    }
+    stdin { }
+}
+output {
+    if [type] == 'nginx-accesslog' {
+        redis {
+            host => 'Redis_IP'
+            port => "6379"
+            password => "123456"
+            db => "0"
+            data_type => 'list'
+            key => "nginx-accesslog"
+        }
+    }
+    stdout {
+        codec => rubydebug
+    }
+}
+```
+
+
+
+#### Kafka 插件
+
+Logstash 支持将日志转发至 Kafka
+
+官方链接：
+
+```http
+https://www.elastic.co/guide/en/logstash/7.6/plugins-outputs-kafka.html
+```
+
+范例
+
+```bash
+[root@logstash ~]#cat /etc/logstash/conf.d/file_to_kafka.conf
+input {
+    file {
+        path => "/var/log/nginx/access.log"
+        type => 'nginx-accesslog'
+        start_position => "beginning"
+        start_interval => "3"
+        codec => json
+    }
+    file {
+        path => "/var/log/nginx/error.log"
+        type => "nginx-errorlog"
+        start_position => "beginning"
+        start_interval => "3"
+    }
+}
+
+output {
+    # stdout {}
+    if [type] == 'nginx-accesslog' {
+        kafka {
+           bootstrap_server => '10.0.0.105:9092,10.0.0.107:9092,10.0.0.108:9092'
+           topic_id => 'nginx-accesslog'
+           codec => 'json'   # 如果是Json格式，需要标识的字段
+        }
+    }
+    if [type] == 'nginx-errorlog' {
+        kafka {
+           bootstrap_server => '10.0.0.105:9092,10.0.0.107:9092,10.0.0.108:9092'
+           topic_id => 'nginx-errorlog'
+           codec => 'json'  # 为了保留logstash添加的字段,比如:type字段,也需要指定json格式,否则会丢失logstash添加的字段
+        }
+    }
+}
+```
+
+
+
+
+
+### Logstash 实战案例
+
+#### 收集应用特定格式的日志输出至 Elasticsearch 并利用 Kibana 展示
+
+![image-20250130105839369](D:\git_repository\cyber_security_learning\markdown_img\image-20250130105839369.png)
+
+##### 应用日志收集项目说明
+
+应用的日志格式如下
+
+```bash
+[root@web01 ~]#tail -n 10 mall_app.log 
+[INFO] 2018-06-30 23:59:29 [www.mall.com] - DAU|2467|浏览页面|2018-06-30 05:41:24
+[INFO] 2018-06-30 23:59:33 [www.mall.com] - DAU|2231|领取优惠券|2018-06-30 12:09:03
+[INFO] 2018-06-30 23:59:35 [www.mall.com] - DAU|1808|提交订单|2018-06-30 04:48:33
+[INFO] 2018-06-30 23:59:39 [www.mall.com] - DAU|3385|加入收藏|2018-06-30 15:32:12
+[INFO] 2018-06-30 23:59:40 [www.mall.com] - DAU|937|评论商品|2018-06-30 08:10:35
+[INFO] 2018-06-30 23:59:44 [www.mall.com] - DAU|6446|搜索|2018-06-30 12:55:40
+[INFO] 2018-06-30 23:59:45 [www.mall.com] - DAU|4208|搜索|2018-06-30 06:43:24
+[INFO] 2018-06-30 23:59:48 [www.mall.com] - DAU|76|查看订单|2018-06-30 09:50:37
+[INFO] 2018-06-30 23:59:52 [www.mall.com] - DAU|2538|加入收藏|2018-06-30 06:58:41
+[INFO] 2018-06-30 23:59:55 [www.mall.com] - DAU|9008|加入收藏|2018-06-30 13:56:26
+```
+
+将日志收集利用 Logstash 进行格式转换后发给 Elasticsearch,并利用Kibana展示
+
+
+
+##### 实现过程
+
+**配置filebeat**
+
+```bash
+[root@web01 ~]# cat /etc/filebeat/filebeat.yml 
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+  - /var/log/mall_app.log
+
+output.logstash:
+  hosts: ["10.0.0.106:6666"]
+```
+
+**配置 Logstash**
+
+```bash
+[root@logstash1 conf.d]#cat app_filebeat_fileter_es.conf 
+input {
+    beats {
+        port => 6666
+    }
+}
+
+filter {
+    mutate {
+        split => {"message" => "|"}
+        add_field => {
+            "user_id" => "%{[message][1]}"
+            "action" => "%{[message][2]}"
+            "time" => "%{[message][3]}"
+        }
+
+        remove_field => ["message"]
+    
+        convert => {
+            "user_id" => "integer"
+            "action" => "string"
+            "time" => "string"
+        }
+    }
+
+    date {
+        match => ["time", "yyyy-MM-dd HH:mm:ss"]
+        target => "@timestamp"
+        timezone => "Asia/Shanghai"
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+    elasticsearch {
+        hosts => ["10.0.0.100:9200", "10.0.0.101:9200", "10.0.0.102:9200"]
+        index => "mall-app-%{+YYYY.MM.dd}"
+        template_overwrite => true
+    }
+}
+
+ #启动，观察结果
+ [root@logstash ~]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/app_filebeat_filter_es.conf -r
+......
+{
+       "user_id" => "9008",
+         "event" => {
+        "original" => "[INFO] 2018-06-30 23:59:55 [www.mall.com] - DAU|9008|加入收藏|2018-06-30 13:56:26"
+    },
+         "input" => {
+        "type" => "log"
+    },
+    "@timestamp" => 2018-06-30T05:56:26.000Z,
+          "host" => {
+        "name" => "web01"
+    },
+        "action" => "加入收藏",
+          "time" => "2018-06-30 13:56:26",
+      "@version" => "1",
+           "log" => {
+          "file" => {
+            "path" => "/var/log/mall_app.log"
+        },
+        "offset" => 14313461
+    },
+           "ecs" => {
+        "version" => "8.0.0"
+    },
+          "tags" => [
+        [0] "beats_input_codec_plain_applied"
+    ],
+         "agent" => {
+                  "id" => "52dc5551-3312-4428-9923-914dfa240323",
+                "name" => "web01",
+                "type" => "filebeat",
+        "ephemeral_id" => "b4b84c1c-0e89-4c0c-bbfa-0921204f1a5f",
+             "version" => "8.15.0"
+    }
+}
+```
+
+ **插件查看索引**
+
+![image-20250130112114322](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112114322.png)
+
+注意：因为是历史数据，所以需要选择正确的时间段
+
+![image-20250130112234029](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112234029.png)
+
+
+
+##### Kibana 展示
+
+![image-20250130112342396](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112342396.png)
+
+![image-20250130112412257](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112412257.png)
+
+![image-20250130112438271](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112438271.png)
+
+![image-20250130112459217](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112459217.png)
+
+![image-20250130112521022](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112521022.png)
+
+![image-20250130112535573](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112535573.png)
+
+![image-20250130112557741](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112557741.png)
+
+![image-20250130112631559](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112631559.png)
+
+![image-20250130112652545](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112652545.png)
+
+![image-20250130112720311](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112720311.png)
+
+
+
+![image-20250130112804067](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112804067.png)
+
+![image-20250130112821255](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112821255.png)
+
+![image-20250130112919146](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112919146.png)
+
+后续根据上述方法，创建云图
+
+![image-20250130113028284](D:\git_repository\cyber_security_learning\markdown_img\image-20250130113028284.png)
+
+点击共享，可以将大屏共享到指定链接或者自己的html网站中
+
+![image-20250130113117733](D:\git_repository\cyber_security_learning\markdown_img\image-20250130113117733.png)
 
 
 
@@ -3694,3 +6207,702 @@ LISTEN      0           511                     0.0.0.0:5601                  0.
 **安装并连接Kibana后，Kibana会自动生成很多元数据索引，可以使用cerebro进行观看**
 
 ![image-20250121163907063](D:\git_repository\cyber_security_learning\markdown_img\image-20250121163907063.png)
+
+
+
+
+
+# ELK 综合实战案例
+
+## Filebeat 收集Nginx日志并写入 Kafka 缓存发送至 Elasticsearch
+
+### 环境准备
+
+![image-20250130215315585](D:\git_repository\cyber_security_learning\markdown_img\image-20250130215315585.png)
+
+
+```bash
+#三台ES集群
+10.0.0.100
+10.0.0.101
+10.0.0.102
+
+#logstash
+10.0.0.106 logstash1
+10.0.0.107 logstash2
+
+# kafka准备的单机
+10.0.0.105
+10.0.0.107
+10.0.0.108
+
+# filebeat和nginx
+10.0.0.104
+```
+
+![image-20250131144641023](D:\git_repository\cyber_security_learning\markdown_img\image-20250131144641023.png)
+
+### Filebeat 收集 Nginx 的访问和错误日志并发送至 kafka
+
+```bash
+[root@web01 nginx]#cat /etc/filebeat/filebeat.yml 
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+  - /var/log/nginx/mystical.access.log
+  tags: ["nginx-access"]
+
+- type: log
+  enable: true
+  paths:
+  - /var/log/nginx/mystical.error.log
+  tags: ["nginx-error"]
+
+output.kafka:
+  hosts: ["10.0.0.105:9092", "10.0.0.107:9092", "10.0.0.108:9092"]
+  topic: nginx-log
+  partition.round_robin:
+    reachable_only: true
+  required_acks: 1
+  compression: gzip
+  max_message_bytes: 1000000
+  
+# 重启加载filebeat服务
+[root@web01 ~]#systemctl restart filebeat.service 
+```
+
+查看kafka中的数据
+
+![image-20250131103038074](D:\git_repository\cyber_security_learning\markdown_img\image-20250131103038074.png)
+
+
+
+### 配置 Logstash 读取 Kafka 日志发送到 Elasticsearch
+
+```bash
+[root@logstash1 conf.d]#cat kafka-to-es.conf 
+input {
+    kafka {
+        bootstrap_servers => "10.0.0.105:9092, 10.0.0.107:9092, 10.0.0.108:9092"
+        topics => "nginx-log"
+        consumer_threads => "3"
+        codec => "json"
+    }
+}
+
+filter {
+    if "nginx-access" in [tags] {
+            grok {
+                match => {
+                    "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] (?:%{QS:request}|%{DATA:raw_request}) %{NUMBER:status} %{NUMBER:bytes} %{QS:referer} %{QS:user_agent}"
+
+                }
+            }
+            
+            date {
+                match => ["timestamp", "UNIX", "dd/MMM/yyyy:HH:mm:ss Z"]
+                target => "@timestamp"        
+                timezone => "Asia/Shanghai"
+               }
+            useragent {
+                source => "message"
+                target => "useragent"
+              }
+        
+            geoip {
+                database => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-filter-geoip-7.2.12-java/vendor/GeoLite2-City.mmdb"
+                add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lon]}"]
+                add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lat]}"]
+                source => "client_ip"
+                target => "geoip"
+                fields => ["continent_code", "country_name", "region_name", "timezone", "longitude", "latitude"]
+            }
+        
+            mutate {
+                remove_field => ["timestamp", "message"]
+                convert => [ "[geoip][coordinates]", "float"]
+            }
+        
+
+    } else if "nginx-error" in [tags] {
+            grok {
+                match => { 
+                    "message" => "%{YEAR:year}/%{MONTHNUM:month}/%{MONTHDAY:day} %{TIME:time} \[%{WORD:log_level}\] %{NUMBER:pid}#%{NUMBER:worker_id}: \*%{NUMBER:request_id} %{WORD:action}\(\) \"%{DATA:file_path}\" %{WORD:status} \(%{NUMBER:error_code}: %{DATA:error_message}\), client: %{IP:client_ip}, server: %{DATA:server_name}, request: \"%{WORD:method} %{DATA:request_uri} HTTP/%{NUMBER:http_version}\", host: \"%{DATA:host}\""
+                }
+            }
+            
+        
+            geoip {
+                database => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-filter-geoip-7.2.12-java/vendor/GeoLite2-City.mmdb"
+                add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lon]}"]
+                add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lat]}"]
+                source => "client_ip"
+                target => "geoip"
+                fields => ["continent_code", "country_name", "region_name", "timezone", "longitude", "latitude"]
+            }
+        
+            mutate {
+                add_field => { "full_timestamp" => "%{year}-%{month}-%{day} %{time}" }
+                remove_field => ["year", "message", "month", "day", "time"]
+                convert => [ "[geoip][coordinates]", "float"]
+          }
+        
+            date {
+                match => [ "full_timestamp", "yyyy-MM-dd HH:mm:ss" ]
+                target => "@timestamp"
+                timezone => "Asia/Shanghai"
+            }
+
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+    
+    if "nginx-access" in [tags] {
+        elasticsearch {
+            hosts => ["10.0.0.100:9200", "10.0.0.101:9200", "10.0.0.102:9200"]
+            index => "logstash-kafka-nginx-accesslog-%{+YYYY.MM.dd}"
+            template_overwrite => true
+        }
+    } else if "nginx-error" in [tags] {
+        elasticsearch {
+            hosts => ["10.0.0.100:9200", "10.0.0.101:9200", "10.0.0.102:9200"]
+            index => "logstash-kafka-nginx-errorlog-%{+YYYY.MM.dd}"
+            template_overwrite => true
+        }
+    }
+
+}
+
+# 启动logstash
+
+```
+
+也可以根据Kafka的图形工具，观察消息积压状况
+
+![image-20250131144938030](D:\git_repository\cyber_security_learning\markdown_img\image-20250131144938030.png)
+
+观察Kabana上的索引是否生成，如果有，说明elasticsearch成功接收数据
+
+![image-20250131145127613](D:\git_repository\cyber_security_learning\markdown_img\image-20250131145127613.png)
+
+创建视图
+
+![image-20250131151836675](D:\git_repository\cyber_security_learning\markdown_img\image-20250131151836675.png)
+
+![image-20250131151909764](D:\git_repository\cyber_security_learning\markdown_img\image-20250131151909764.png)
+
+查看Discover，并做好调试
+
+![image-20250131152050448](D:\git_repository\cyber_security_learning\markdown_img\image-20250131152050448.png)
+
+![image-20250131152200659](D:\git_repository\cyber_security_learning\markdown_img\image-20250131152200659.png)
+
+### Kibana 创建地图数据
+
+对于区域地图、坐标地图、Coordinate Map之类的图形展示，新版的Kibana已经将其整合到了一个统 一的功能模块 Map.
+
+通过左侧边栏的 analytics的Maps中来创建图形
+
+```ABAP
+ES8 要求地图数据类型geo_point类型，在logstash的地址信息的格式使用mutate（支持的数据类型：
+integer，integer_eu，float，float_eu，string，boolean）可以转换成 float类型而不支持geo_point类
+型，所以需要转换一下logstash在传递信息到es时候的模板信息，将地址信息转换成geo_point类型即可
+```
+
+解决方案：
+
+- 获取模板
+- 修改模板
+- 使用模板
+
+
+
+在开发工具执行下面指令，获取模版设置，复制mappings块中的所有内容
+
+```bash
+# 查看生成的索引信息
+GET /logstash-kafka-nginx-accesslog-2022.03.02
+
+#复制mappings开始的行到settings行之前结束,并最后再加一个 }
+```
+
+![image-20250131152645703](D:\git_repository\cyber_security_learning\markdown_img\image-20250131152645703.png)
+
+![image-20250131152816851](D:\git_repository\cyber_security_learning\markdown_img\image-20250131152816851.png)
+
+![image-20250131153228759](D:\git_repository\cyber_security_learning\markdown_img\image-20250131153228759.png)
+
+![image-20250131153255307](D:\git_repository\cyber_security_learning\markdown_img\image-20250131153255307.png)
+
+执行下面操作生成索引模板，将上面的mappings部分内容复制到下面，只修改"coordinates": {  "type":  "geo_point" } 部分
+
+```bash
+PUT /_template/template_nginx_accesslog
+{
+  "index_patterns" : [
+    "logstash-kafka-nginx-accesslog-*" 
+  ],
+  "order" : 0,
+  "aliases" : { },
+  "mappings" {
+  ...
+   "geoip": {
+          "properties": {
+            "coordinates": {
+              "type": "geo_point"    # 这里把类型改为geo_point
+            },
+  ......
+  
+} # 最后补一个 }
+```
+
+![image-20250131162509928](D:\git_repository\cyber_security_learning\markdown_img\image-20250131162509928.png)
+
+查看生成的索引模板
+
+![image-20250131162852511](D:\git_repository\cyber_security_learning\markdown_img\image-20250131162852511.png)
+
+必须先删除旧有索引重新生成数据才能生
+
+![image-20250131163151654](D:\git_repository\cyber_security_learning\markdown_img\image-20250131163151654.png)
+
+重新生成数据，确认类型是否更改
+
+![image-20250131165421406](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165421406.png)
+
+修改好数据类型后，重新导入数据，生成地图
+
+![image-20250131165537145](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165537145.png)
+
+![image-20250131165644298](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165644298.png)
+
+![image-20250131165708987](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165708987.png)
+
+![image-20250131165838774](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165838774.png)
+
+![image-20250131165907568](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165907568.png)
+
+![image-20250131170134325](D:\git_repository\cyber_security_learning\markdown_img\image-20250131170134325.png)
+
+
+
+
+
+## Logstash收集日志写入 MySQL 数据库
+
+ES中的日志后续会被删除,但有些重要数据,比如状态码、客户端IP、客户端浏览器版本等，后期可以会按月或年做数据统计等,因此需要持久保存
+
+可以将重要数据写入数据库达到持久保存目的
+
+![image-20250131205922262](D:\git_repository\cyber_security_learning\markdown_img\image-20250131205922262.png)
+
+
+
+###  安装 MySQL 数据库
+
+```bash
+[root@ubuntu2204 ~]#apt update && apt install -y mysql-server
+# 查看端口
+[root@ubuntu2204 ~]#ss -nlt    
+LISTEN        0              70                         127.0.0.1:33060                      0.0.0.0:*      
+LISTEN        0              151                        127.0.0.1:3306                       0.0.0.0:* 
+
+# 公开端口
+[root@ubuntu2204 ~]#sed -i  '/127.0.0.1/s/^/#/' /etc/mysql/mysql.conf.d/mysqld.cnf 
+[root@ubuntu2204 ~]#systemctl restart mysql
+
+# 再次查看端口
+LISTEN        0              70                                 *:33060                            *:*       
+LISTEN        0              151                                *:3306                             *:*   
+```
+
+
+
+### 创建库和表并授权用户登录
+
+```bash
+[root@ubuntu2204 ~]#mysql
+mysql> create database elk;
+Query OK, 1 row affected (0.02 sec)
+
+mysql> create user elk@"10.0.0.%" identified by '123456';
+Query OK, 0 rows affected (0.03 sec)
+
+mysql> grant all privileges on elk.* to elk@"10.0.0.%";
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> flush privileges;
+Query OK, 0 rows affected (0.00 sec)
+
+#创建表,字段对应需要保存的数据字段
+mysql> use elk;
+Database changed
+
+mysql> create table elklog (clientip varchar(39),bytes int,uri varchar(256),status char(3));
+Query OK, 0 rows affected, 1 warning (0.03 sec)
+
+# 查看创建的表
+mysql> desc elklog;
++--------------+--------------+------+-----+---------+-------+
+| Field        | Type         | Null | Key | Default | Extra |
++--------------+--------------+------+-----+---------+-------+
+| clientip     | varchar(39)  | YES  |     | NULL    |       |
+| bytes        | int          | YES  |     | NULL    |       |
+| uri          | varchar(256) | YES  |     | NULL    |       |
+| status       | char(3)      | YES  |     | NULL    |       |
++--------------+--------------+------+-----+---------+-------+
+4 rows in set (0.01 sec)
+```
+
+
+
+###  测试用户从 Logstash 主机远程登录(可选)
+
+```bash
+[root@logstash1 ~]#mysql -uelk -h10.0.0.109 -p123456 -e "show databases";
+mysql: [Warning] Using a password on the command line interface can be insecure.
++--------------------+
+| Database           |
++--------------------+
+| elk                |
+| information_schema |
+| performance_schema |
++--------------------+
+```
+
+
+
+### Logstash 配置 mysql-connector-java 包
+
+MySQL Connector/J是MySQL官方JDBC驱动程序，JDBC（Java Data Base Connectivity,java数据库连接）是一种用于执行SQL语句的Java API，可以为多种关系数据库提供统一访问，它由一组用Java语言编 写的类和接口组成。
+
+官方下载地址
+
+```http
+https://dev.mysql.com/downloads/connector/
+```
+
+![image-20250131220452111](D:\git_repository\cyber_security_learning\markdown_img\image-20250131220452111.png)
+
+选择合适的版本
+
+![image-20250131221154737](D:\git_repository\cyber_security_learning\markdown_img\image-20250131221154737.png)
+
+![image-20250131221312513](D:\git_repository\cyber_security_learning\markdown_img\image-20250131221312513.png)
+
+Ubuntu22.04 安装 mysql-connector
+
+```bash
+[root@logstash1 ~]#wget https://downloads.mysql.com/archives/get/p/3/file/mysql-connector-j_8.0.33-1ubuntu22.10_all.deb
+
+
+# 安装
+[root@logstash1 ~]#dpkg -i mysql-connector-j_8.0.33-1ubuntu22.10_all.deb 
+正在选中未选择的软件包 mysql-connector-j。
+(正在读取数据库 ... 系统当前共安装有 124632 个文件和目录。)
+准备解压 mysql-connector-j_8.0.33-1ubuntu22.10_all.deb  ...
+正在解压 mysql-connector-j (8.0.33-1ubuntu22.10) ...
+正在设置 mysql-connector-j (8.0.33-1ubuntu22.10) ...
+
+# 查看mysql-connector-j的jar包所在路径
+[root@logstash1 ~]#dpkg -L mysql-connector-j
+/.
+/usr
+/usr/share
+/usr/share/doc
+/usr/share/doc/mysql-connector-j
+/usr/share/doc/mysql-connector-j/CHANGES.gz
+/usr/share/doc/mysql-connector-j/INFO_BIN
+/usr/share/doc/mysql-connector-j/INFO_SRC
+/usr/share/doc/mysql-connector-j/LICENSE.gz
+/usr/share/doc/mysql-connector-j/README
+/usr/share/doc/mysql-connector-j/changelog.Debian.gz
+/usr/share/doc/mysql-connector-j/copyright
+/usr/share/java
+/usr/share/java/mysql-connector-j-8.0.33.jar
+/usr/share/java/mysql-connector-java-8.0.33.jar
+
+# 查看
+[root@logstash1 ~]#ll /usr/share/java/mysql-connector-j-8.0.33.jar /usr/share/java/mysql-connector-java-8.0.33.jar
+-rw-r--r-- 1 root root 2481543  3月  8  2023 /usr/share/java/mysql-connector-j-8.0.33.jar
+lrwxrwxrwx 1 root root      28  3月  8  2023 /usr/share/java/mysql-connector-java-8.0.33.jar -> mysql-connector-j-8.0.33.jar
+
+# 复制jar文件到logstash指定的目录下
+[root@logstash1 ~]#mkdir -p  /usr/share/logstash/vendor/jar/jdbc
+[root@logstash1 ~]#cp /usr/share/java/mysql-connector-j-8.0.33.jar /usr/share/logstash/vendor/jar/jdbc/
+
+# 此步可选
+[root@logstash1 ~]#chown -R logstash.logstash /usr/share/logstash/vendor/jar/
+[root@logstash1 ~]#ll  /usr/share/logstash/vendor/jar/jdbc/ -h
+总计 2.4M
+drwxr-xr-x 2 logstash logstash 4.0K  1月 31 22:17 ./
+drwxr-xr-x 3 logstash logstash 4.0K  1月 31 22:16 ../
+-rw-r--r-- 1 logstash logstash 2.4M  1月 31 22:17 mysql-connector-j-8.0.33.jar
+```
+
+
+
+### 安装logstash-output-jdbc插件
+
+```bash
+#查看安装拆插件,默认只有input-jdbc插件,需要安装output-jdbc插件
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash-plugin list|grep jdbc
+......
+logstash-integration-jdbc
+├── logstash-input-jdbc
+├── logstash-filter-jdbc_streaming
+└── logstash-filter-jdbc_static
+ 
+#在线安装output-jdbc插件,可能会等较长时间,20240524花10分钟
+# 建议开代理翻墙下载
+# 选做
+[root@logstash1 ~]#vim .bashrc
+export http_proxy=http://10.0.0.1:10809
+export https_proxy=http://10.0.0.1:10809
+
+# 开始下载
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash-plugin install  logstash-output-jdbc
+Using bundled JDK: /usr/share/logstash/jdk
+Validating logstash-output-jdbc
+Resolving mixin dependencies
+Installing logstash-output-jdbc
+Installation successful
+
+#离线安装方法
+#如果无法在线安装,可以先从已经安装的主机导出插件,再导入
+#导出插件
+[root@ubuntu2204 ~]#/usr/share/logstash/bin/logstash-plugin prepare-offline-pack logstash-output-jdbc
+Using bundled JDK: /usr/share/logstash/jdk
+Offline package created at: /usr/share/logstash/logstash-offline-plugins-8.6.1.zip
+
+ You can install it with this command `bin/logstash-plugin install file:///usr/share/logstash/logstash-offline-plugins-8.6.1.zip`
+
+#离线导入插件
+[root@ubuntu2204 ~]#/usr/share/logstash/bin/logstash-plugin install file:///usr/share/logstash/logstash-offline-plugins-8.6.1.zip
+Using bundled JDK: /usr/share/logstash/jdk
+Installing file: /usr/share/logstash/logstash-offline-plugins-8.6.1.zip
+Resolving dependencies..................................
+Install successful
+
+#检查插件安装成功
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash-plugin list|grep jdbc
+logstash-integration-jdbc
+ ├── logstash-input-jdbc
+ ├── logstash-filter-jdbc_streaming
+ └── logstash-filter-jdbc_static
+logstash-output-jdbc
+
+#删除插件
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash-plugin remove logstash-output-jdbc
+```
+
+
+
+### 配置 Filebeat 配置文件
+
+```bash
+[root@web01 ~]#cat /etc/filebeat/filebeat.yml 
+filebeat.inputs:
+- type: log
+  enabled: true
+  paths:
+  - /var/log/nginx/mystical.access.log
+  tags: ["nginx-access"]
+
+- type: log
+  enable: true
+  paths:
+  - /var/log/nginx/mystical.error.log
+  tags: ["nginx-error"]
+
+output.kafka:
+  hosts: ["10.0.0.105:9092", "10.0.0.107:9092", "10.0.0.108:9092"]
+  topic: nginx-log
+  partition.round_robin:
+    reachable_only: true
+  required_acks: 1
+  compression: gzip
+  max_message_bytes: 1000000
+```
+
+
+
+### 配置 Logstash 将日志写入数据库
+
+```bash
+[root@logstash1 conf.d]#cat kafka-to-es.conf 
+input {
+    kafka {
+        bootstrap_servers => "10.0.0.105:9092, 10.0.0.107:9092, 10.0.0.108:9092"
+        topics => "nginx-log"
+        consumer_threads => "3"
+        codec => "json"
+    }
+}
+
+filter {
+    if "nginx-access" in [tags] {
+
+            grok {
+                match => {
+                    "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] (?:%{QS:request}|%{DATA:raw_request}) %{NUMBER:status} %{NUMBER:bytes} %{QS:referer} %{QS:user_agent}"
+
+                }
+            }
+            
+            date {
+                match => ["timestamp", "UNIX", "dd/MMM/yyyy:HH:mm:ss Z"]
+                target => "@timestamp"        
+                timezone => "Asia/Shanghai"
+               }
+            useragent {
+                source => "message"
+                target => "useragent"
+              }
+        
+            geoip {
+                database => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-filter-geoip-7.2.12-java/vendor/GeoLite2-City.mmdb"
+                add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lon]}"]
+                add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lat]}"]
+                source => "client_ip"
+                target => "geoip"
+                fields => ["continent_code", "country_name", "region_name", "timezone", "longitude", "latitude"]
+            }
+        
+            mutate {
+                remove_field => ["timestamp", "message"]
+                convert => [ "[geoip][coordinates]", "float"]
+            }
+        
+
+    } else if "nginx-error" in [tags] {
+            grok {
+                match => { 
+                    "message" => "%{YEAR:year}/%{MONTHNUM:month}/%{MONTHDAY:day} %{TIME:time} \[%{WORD:log_level}\] %{NUMBER:pid}#%{NUMBER:worker_id}: \*%{NUMBER:request_id} %{WORD:action}\(\) \"%{DATA:file_path}\" %{WORD:status} \(%{NUMBER:error_code}: %{DATA:error_message}\), client: %{IP:client_ip}, server: %{DATA:server_name}, request: \"%{WORD:method} %{DATA:request_uri} HTTP/%{NUMBER:http_version}\", host: \"%{DATA:host}\""
+                }
+            }
+            
+        
+            geoip {
+                database => "/usr/share/logstash/vendor/bundle/jruby/2.6.0/gems/logstash-filter-geoip-7.2.12-java/vendor/GeoLite2-City.mmdb"
+                add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lon]}"]
+                add_field => ["[geoip][coordinates]", "%{[geoip][geo][location][lat]}"]
+                source => "client_ip"
+                target => "geoip"
+                fields => ["continent_code", "country_name", "region_name", "timezone", "longitude", "latitude"]
+            }
+        
+            mutate {
+                add_field => { "full_timestamp" => "%{year}-%{month}-%{day} %{time}" }
+                remove_field => ["year", "message", "month", "day", "time"]
+                convert => [ "[geoip][coordinates]", "float"]
+          }
+        
+            date {
+                match => [ "full_timestamp", "yyyy-MM-dd HH:mm:ss" ]
+                target => "@timestamp"
+                timezone => "Asia/Shanghai"
+            }
+
+    }
+}
+
+output {
+    stdout {
+        codec => rubydebug
+    }
+    
+    if "nginx-access" in [tags] {
+        elasticsearch {
+            hosts => ["10.0.0.100:9200", "10.0.0.101:9200", "10.0.0.102:9200"]
+            index => "logstash-kafka-nginx-accesslog-%{+YYYY.MM.dd}"
+            template_overwrite => true
+        }
+ 
+        jdbc {
+            connection_string => "jdbc:mysql://10.0.0.109/elk?user=elk&password=123456&useUnicode=true&characterEncoding=UTF8"
+            statement => ["INSERT INTO elklog (clientip,bytes,uri,status) VALUES(?,?,?,?)","client_ip","bytes","request","status"]
+    }
+      
+
+    } else if "nginx-error" in [tags] {
+        elasticsearch {
+            hosts => ["10.0.0.100:9200", "10.0.0.101:9200", "10.0.0.102:9200"]
+            index => "logstash-kafka-nginx-errorlog-%{+YYYY.MM.dd}"
+            template_overwrite => true
+        }
+    }
+
+}
+```
+
+
+
+### 检查 Logstash 配置并重启服务
+
+```bash
+[root@logstash1 ~]#/usr/share/logstash/bin/logstash -f /etc/logstash/conf.d/kafka-to-es.conf -t
+[root@logstash1 ~]#systemctl restart logstash.service
+```
+
+
+
+### 访问 Nginx 产生日志
+
+```bash
+# 为方便测试，手动追加数据至日志文件
+[root@web01 nginx]#cat mysql.test.log >> mystical.access.log
+```
+
+
+
+### 验证数据库是否写入数据
+
+```bash
+mysql> select * from elklog;
++-----------------+-------+------------------------------------------------------------------------------+--------+
+| clientip        | bytes | uri                                                                          | status |
++-----------------+-------+------------------------------------------------------------------------------+--------+
+| 178.20.42.24    |     5 | "GET / HTTP/1.1"                                                             | 301    |
+| 109.205.213.198 |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 40.77.167.181   |   134 | "GET /robots.txt HTTP/2.0"                                                   | 200    |
+| 220.196.160.146 |     0 | "GET / HTTP/2.0"                                                             | 301    |
+| 185.196.220.253 |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 101.35.250.82   |    31 | "POST /wp-cron.php?doing_wp_cron=1738280215.6015350818634033203125 HTTP/1.1" | 200    |
+| 54.36.149.15    | 12380 | "GET /computer-composition-principles/ HTTP/2.0"                             | 200    |
+| 182.44.9.147    |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 220.196.160.83  |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 54.36.148.212   | 14113 | "GET /tag/base/ HTTP/2.0"                                                    | 200    |
+| 66.249.75.44    |   145 | "GET /robots.txt HTTP/1.1"                                                   | 200    |
+| 146.19.24.168   |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 185.242.226.155 | 18498 | "GET / HTTP/1.1"                                                             | 200    |
+| 46.19.143.58    |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 180.101.245.252 |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 66.249.69.102   |     5 | "GET /robots.txt HTTP/1.1"                                                   | 301    |
+| 120.237.87.26   |   145 | "GET /robots.txt HTTP/1.1"                                                   | 200    |
+| 178.20.42.24    | 76858 | "GET / HTTP/1.1"                                                             | 200    |
+| 51.254.49.101   |     5 | "GET / HTTP/1.1"                                                             | 301    |
+| 37.19.223.24    |     0 | "GET / HTTP/1.0"                                                             | 301    |
+| 220.196.160.144 |     5 | "GET / HTTP/1.1"                                                             | 301    |
+| 59.83.208.105   |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 195.3.223.55    |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 220.196.160.65  |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 85.208.96.196   |   145 | "GET /robots.txt HTTP/1.1"                                                   | 200    |
+| 51.195.148.211  |  3818 | "POST /wp-login.php HTTP/1.1"                                                | 200    |
+| 59.83.208.107   | 18492 | "GET / HTTP/2.0"                                                             | 200    |
+| 51.8.102.58     |   134 | "GET /robots.txt HTTP/2.0"                                                   | 200    |
+| 66.249.75.44    | 18497 | "GET / HTTP/1.1"                                                             | 200    |
+| 220.196.160.53  | 18498 | "GET / HTTP/2.0"                                                             | 200    |
+| 31.202.47.201   |   162 | "GET / HTTP/1.1"                                                             | 301    |
+| 182.44.9.147    | 18508 | "GET / HTTP/1.1"                                                             | 200    |
+| 101.35.250.82   |    31 | "POST /wp-cron.php?doing_wp_cron=1738283189.4807469844818115234375 HTTP/1.1" | 200    |
+| 66.249.69.100   |     5 | "GET / HTTP/1.1"                                                             | 301    |
++-----------------+-------+------------------------------------------------------------------------------+--------+
+34 rows in set (0.00 sec)
+```
+

@@ -20,6 +20,7 @@ for i in range(5):
 
 print("")
 # random.choices(x, y, k=1); y表示权重，和前面的x一一对应，x和y的列表元素数量必须一致，否则报错; 默认k=1， k表示随机取N个值的列表，列表中的值可以重复取
+# x是指定元素，y指定权重，k表示生成列表的元素数量
 for i in range(5):
     print(random.choices(x, y, k=7))
 
