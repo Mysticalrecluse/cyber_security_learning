@@ -1,6 +1,6 @@
 # 	ELK概述
 
-![image-20250119195308988](..\markdown_img\image-20250119195308988.png)
+![image-20250119195308988](../markdown_img/image-20250119195308988.png)
 
 ## 什么是ELK
 
@@ -53,7 +53,7 @@ https://docs.fluentd.org/
 
 ### Elasticsearch 介绍
 
-![image-20250119200330753](..\markdown_img\image-20250119200330753.png)
+![image-20250119200330753](../markdown_img/image-20250119200330753.png)
 
 **官方介绍**
 
@@ -203,7 +203,7 @@ Replicas的重要性主要体现在以下两个特征：
 https://www.elastic.co/cn/what-is/elasticsearch
 ```
 
-![image-20250119215819291](..\markdown_img\image-20250119215819291.png)
+![image-20250119215819291](../markdown_img/image-20250119215819291.png)
 
 Logstash 是 Elastic Stack 的核心产品之一，可用来对数据进行聚合和处理，并将数据发送到 Elasticsearch。
 
@@ -265,7 +265,7 @@ Kibana 与 Elasticsearch 和更广意义上的 Elastic Stack 紧密的集成在�
 
 ## ELK应用架构
 
-![image-20250119195308988](..\markdown_img\image-20250119195308988.png)
+![image-20250119195308988](../markdown_img/image-20250119195308988.png)
 
 
 
@@ -287,7 +287,7 @@ ELK: Elasticsearch，Logstash，filebeat，Kibana
 https://www.fluentd.org/
 ```
 
-![image-20250119220444011](..\markdown_img\image-20250119220444011.png)
+![image-20250119220444011](../markdown_img/image-20250119220444011.png)
 
 Fluentd 是开源社区中流行的日志收集工具，td-agent是其商业化版本，由Treasure Data公司维护，是本文选用的评测版本。
 
@@ -363,7 +363,7 @@ Fluent Bit 很节省资源，因为它占用的空间很小。
 
 ### Loki
 
-![image-20250119221835644](..\markdown_img\image-20250119221835644.png)
+![image-20250119221835644](../markdown_img/image-20250119221835644.png)
 
 ```bash
 #Loki文档网址：
@@ -440,7 +440,7 @@ https://www.elastic.co/guide/en/elasticsearch/reference/master/install-elasticse
 https://www.elastic.co/cn/support/matrix
 ```
 
-![image-20250119222614301](..\markdown_img\image-20250119222614301.png)
+![image-20250119222614301](../markdown_img/image-20250119222614301.png)
 
 
 
@@ -506,7 +506,7 @@ CPU 2C
 
 使用默认系统配置，**二进制安装时会提示下面错误**，**包安装会自动修改此配置**
 
-![image-20250119223514888](..\markdown_img\image-20250119223514888.png)
+![image-20250119223514888](../markdown_img/image-20250119223514888.png)
 
 ```bash
 #查看默认值
@@ -586,7 +586,7 @@ https://mirrors.tuna.tsinghua.edu.cn/elasticstack/
 
 
 
-![image-20250119224534985](..\markdown_img\image-20250119224534985.png)
+![image-20250119224534985](../markdown_img/image-20250119224534985.png)
 
 
 
@@ -666,7 +666,7 @@ how to fix it, please visit the web page mentioned above.
 # 忽略证书也不行，401报错，需要认证
 # 8.X版本特性
 [root@ubuntu2204 ~]#curl https://10.0.0.121:9200 -k
-{"error":{"root_cause":[{"type":"security_exception","reason":"missing authentication credentials for REST request [/]","header":{"WWW-Authenticate":["Basic realm=\"security\", charset=\"UTF-8\"","Bearer realm=\"security\"","ApiKey"]}}],"type":"security_exception","reason":"missing authentication credentials for REST request [/]","header":{"WWW-Authenticate":["Basic realm=\"security\", charset=\"UTF-8\"","Bearer realm=\"security\"","ApiKey"]}},"status":401}
+{"error":{"root_cause":[{"type":"security_exception","reason":"missing authentication credentials for REST request [/]","header":{"WWW-Authenticate":["Basic realm=/"security/", charset=/"UTF-8/"","Bearer realm=/"security/"","ApiKey"]}}],"type":"security_exception","reason":"missing authentication credentials for REST request [/]","header":{"WWW-Authenticate":["Basic realm=/"security/", charset=/"UTF-8/"","Bearer realm=/"security/"","ApiKey"]}},"status":401}
 ```
 
 
@@ -784,7 +784,7 @@ https://www.elastic.co/guide/en/elasticsearch/reference/master/targz.html
 https://www.elastic.co/cn/downloads/elasticsearch
 ```
 
-![image-20250120180545468](..\markdown_img\image-20250120180545468.png)
+![image-20250120180545468](../markdown_img/image-20250120180545468.png)
 
 
 
@@ -1208,7 +1208,7 @@ Head 是一个 ES 在生产较为常用的插件，目前此插件更新较慢�
 
 **注意：要打开开发者模式**
 
-![image-20250120175237353](..\markdown_img\image-20250120175237353.png)
+![image-20250120175237353](../markdown_img/image-20250120175237353.png)
 
 ```bash
 # 下载Head插件安装包
@@ -1217,15 +1217,15 @@ https://www.mysticalrecluse.com/script/tools/ElasticSearch-Head-0.1.5_0.zip
 # 解压后将文件夹导入浏览器
 ```
 
-![image-20250120175807173](..\markdown_img\image-20250120175807173.png)
+![image-20250120175807173](../markdown_img/image-20250120175807173.png)
 
-![image-20250120175837414](..\markdown_img\image-20250120175837414.png)
+![image-20250120175837414](../markdown_img/image-20250120175837414.png)
 
-![image-20250120175856082](..\markdown_img\image-20250120175856082.png)
+![image-20250120175856082](../markdown_img/image-20250120175856082.png)
 
 **输入地址链接**
 
-![image-20250120175956894](..\markdown_img\image-20250120175956894.png)
+![image-20250120175956894](../markdown_img/image-20250120175956894.png)
 
 
 
@@ -1233,7 +1233,7 @@ https://www.mysticalrecluse.com/script/tools/ElasticSearch-Head-0.1.5_0.zip
 
 #### cerebro插件介绍
 
-![image-20250121152023926](..\markdown_img\image-20250121152023926.png)
+![image-20250121152023926](../markdown_img/image-20250121152023926.png)
 
 Cerebro 是开源的 elasticsearch 集群 Web 管理程序，此工具应用也很广泛，此项目升级比 Head 频繁
 
@@ -1251,7 +1251,7 @@ Cerebro v0.9.4 版本更高版本需要 Java11
 https://github.com/lmenezes/cerebro
 ```
 
-![image-20250121152207033](..\markdown_img\image-20250121152207033.png)
+![image-20250121152207033](../markdown_img/image-20250121152207033.png)
 
 
 
@@ -1289,9 +1289,9 @@ drwxr-xr-x 2 cerebro cerebro 4096  1月 21 15:52 /var/lib/cerebro/
 # 访问浏览器：10.0.0.132:9000,并输入es集群IP连接
 ```
 
-![image-20250121155806662](..\markdown_img\image-20250121155806662.png)
+![image-20250121155806662](../markdown_img/image-20250121155806662.png)
 
-![image-20250121155819105](..\markdown_img\image-20250121155819105.png)
+![image-20250121155819105](../markdown_img/image-20250121155819105.png)
 
 
 
@@ -1387,7 +1387,7 @@ zo37jquZSimiJTu7kCMjmA 10.0.0.152 10.0.0.152 es-node3
 # 根据下图显示可以看出：没有分片（因为显示0），但是有一个副本（不包括原始数据自己，只计算副本数）
 ```
 
-![image-20250121130543467](..\markdown_img\image-20250121130543467.png)
+![image-20250121130543467](../markdown_img/image-20250121130543467.png)
 
 ```bash
 # 关闭es-node1节点，再观察
@@ -1399,7 +1399,7 @@ zo37jquZSimiJTu7kCMjmA 10.0.0.152 10.0.0.152 es-node3
 1737436100 05:08:20 my-es1 yellow 2 2 1 1 0 0 1 0 - 50.0%
 ```
 
-![image-20250121130731207](..\markdown_img\image-20250121130731207.png)
+![image-20250121130731207](../markdown_img/image-20250121130731207.png)
 
 ```bash
 # 过一段时间后，会在node2上重建副本，集群变为绿色
@@ -1407,7 +1407,7 @@ zo37jquZSimiJTu7kCMjmA 10.0.0.152 10.0.0.152 es-node3
 1737436100 05:08:20 my-es1 green 2 2 2 1 0 0 0 0 - 100.0%
 ```
 
-![image-20250121130959573](..\markdown_img\image-20250121130959573.png)
+![image-20250121130959573](../markdown_img/image-20250121130959573.png)
 
 ```ABAP
 颜色含义：
@@ -1423,7 +1423,7 @@ zo37jquZSimiJTu7kCMjmA 10.0.0.152 10.0.0.152 es-node3
 # 因为少于半数以上可用，即3个节点的集群，关了两个，因此集群不可用，es无法访问
 ```
 
-![image-20250121131436529](..\markdown_img\image-20250121131436529.png)
+![image-20250121131436529](../markdown_img/image-20250121131436529.png)
 
 ```bash
 #创建索引index2,格式化输出
@@ -1482,7 +1482,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 
 ```
 
-![image-20250121132533883](..\markdown_img\image-20250121132533883.png)
+![image-20250121132533883](../markdown_img/image-20250121132533883.png)
 
 ```bash
 # 创建3分片，1副本（生产中建议分片数和节点数相同，实现负载均衡）
@@ -1500,7 +1500,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 # ES自动将分片数据均匀的放在不同节点上，实现高可用
 ```
 
-![image-20250121132811946](..\markdown_img\image-20250121132811946.png)
+![image-20250121132811946](../markdown_img/image-20250121132811946.png)
 
 ```bash
 # 关闭es-node2
@@ -1511,7 +1511,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 1737437626 05:33:46 my-es1 yellow 2 2 16 8 0 0 3 0 - 84.2%
 ```
 
-![image-20250121133408182](..\markdown_img\image-20250121133408182.png)
+![image-20250121133408182](../markdown_img/image-20250121133408182.png)
 
 ```bash
 # 创建副本index5,3分片，0副本
@@ -1527,7 +1527,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 {"acknowledged":true,"shards_acknowledged":true,"index":"index5"}
 ```
 
-![image-20250121133712189](..\markdown_img\image-20250121133712189.png)
+![image-20250121133712189](../markdown_img/image-20250121133712189.png)
 
 ```bash
 # 关闭es-node2，会造成index5的数据缺失，从而导致集群变为红色
@@ -1538,7 +1538,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 1737437941 05:39:01 my-es1 red 2 2 15 10 0 0 7 0 - 68.2%
 ```
 
-![image-20250121133936563](..\markdown_img\image-20250121133936563.png)
+![image-20250121133936563](../markdown_img/image-20250121133936563.png)
 
 ```bash
 # 启动es-node2
@@ -1568,7 +1568,7 @@ green open index2 ThbaBIClSUazA8YQ33WqPQ 1 1 0 0  498b 249b 249b
 0  1  2  _state
 ```
 
-![image-20250121134718614](..\markdown_img\image-20250121134718614.png)
+![image-20250121134718614](../markdown_img/image-20250121134718614.png)
 
 
 
@@ -1584,7 +1584,7 @@ green open index2 ThbaBIClSUazA8YQ33WqPQ 1 1 0 0  498b 249b 249b
 # 浏览器图形界面，可以看到刚才插入的数据，每个插入的文档都会随机分片一个编号，即id
 ```
 
-![image-20250121135527505](..\markdown_img\image-20250121135527505.png)
+![image-20250121135527505](../markdown_img/image-20250121135527505.png)
 
 ```bash
 # 指定编号，插入文档（通常是系统分配）
@@ -1607,7 +1607,7 @@ green open index2 ThbaBIClSUazA8YQ33WqPQ 1 1 0 0  498b 249b 249b
 # 查看浏览器，id为自己指定的3
 ```
 
-![image-20250121135942316](..\markdown_img\image-20250121135942316.png)
+![image-20250121135942316](../markdown_img/image-20250121135942316.png)
 
 
 
@@ -1894,7 +1894,7 @@ ip         name     id
 10.0.0.150 es-node1 0el3duwhQs6Ry1WsA-Xafg
 
 # 查看Node ID，方法2
-[root@mystical ~]# curl -XGET "http://10.0.0.150:9200/_cluster/state?pretty"|grep node_id|grep -Po "\".*\" : \".*\""
+[root@mystical ~]# curl -XGET "http://10.0.0.150:9200/_cluster/state?pretty"|grep node_id|grep -Po "/".*/" : /".*/""
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
 100 3459k    0 3459k    0     0  59.0M      0 --:--:-- --:--:-- --:--:-- 59.2M
@@ -2002,7 +2002,7 @@ Elasticsearch为了提高写操作的性能，允许在主分片写入数据后�
 
 故障转移指的是，当集群中有节点发生故障时，ES集群会进行自动修复
 
-![image-20250121175601325](..\markdown_img\image-20250121175601325.png)
+![image-20250121175601325](../markdown_img/image-20250121175601325.png)
 
 如上图，假设由3个节点的ES集群组成,有一个索引index_mystical，三个主分片，三个副本分片，如果其中一个节点宕机
 
@@ -2015,7 +2015,7 @@ Elasticsearch为了提高写操作的性能，允许在主分片写入数据后�
   - 比如这次选择 node2 为 新 master 节点；此时集群状态变为yellow 状态
   - 其实无论选举出的新Master节点是哪个节点，都不影响后续的分片的重新分布结果
 
-![image-20250121175830942](..\markdown_img\image-20250121175830942.png)
+![image-20250121175830942](../markdown_img/image-20250121175830942.png)
 
 - **主分片调整**
   - 新的Master节点 node2 发现在原来在node3上的主分片 P1 丢失
@@ -2025,14 +2025,14 @@ Elasticsearch为了提高写操作的性能，允许在主分片写入数据后�
 - **副本分片调整**
   - node1 将 P1 和 node2上的P2 主分片重新生成新的副本分片 R1、R2，此时集群状态变为 Green
 
-![image-20250121175932581](..\markdown_img\image-20250121175932581.png)
+![image-20250121175932581](../markdown_img/image-20250121175932581.png)
 
 - 后续修复好node3节点后，Master 不会重新选举，但会自动将各个分片重新均匀分配
   - 保证主分片尽可能分布在每个节点上
   - 副本分片也尽可能分布不同的节点上
   - 重新分配的过程需要一段时间才能完成
 
-![image-20250121180438208](..\markdown_img\image-20250121180438208.png)
+![image-20250121180438208](../markdown_img/image-20250121180438208.png)
 
 ```ABAP
 一定是主分片将数据复制给副本分片，所以没有主分片的数据，要现将副本分片提升为主分片
@@ -2061,7 +2061,7 @@ number_of_primary_shards #主分片数
 
 
 
-![image-20250121181107339](..\markdown_img\image-20250121181107339.png)
+![image-20250121181107339](../markdown_img/image-20250121181107339.png)
 
 可以发送请求到集群中的任一节点。每个节点都知道集群中任一文档位置， 每个节点都有能力接收请求, 再接将请求转发到真正存储数据的节点上
 
@@ -2069,7 +2069,7 @@ number_of_primary_shards #主分片数
 
 #### ES 文档创建删除流程
 
-![image-20250121181541492](..\markdown_img\image-20250121181541492.png)
+![image-20250121181541492](../markdown_img/image-20250121181541492.png)
 
 - 客户端向集群中某个节点 Node1 发送**新建索引文档**或者**删除索引文档**请求
 - Node1节点使用文档的 _id 通过上面的算法确定文档属于分片 0 
@@ -2085,7 +2085,7 @@ number_of_primary_shards #主分片数
 
 可以从主分片或者从其它任意副本分片读取文档 ，读取流程如下图所示 ：
 
-![image-20250121181827402](..\markdown_img\image-20250121181827402.png)
+![image-20250121181827402](../markdown_img/image-20250121181827402.png)
 
 - 客户端向集群中某个节点 Node1 发送读取请求
 - 节点使用文档的 _id 来确定文档属于分片 0 。分片 0 的主副本分片存在于所有的三个节点上
@@ -2152,7 +2152,7 @@ fs.file-max = 1000000
 [root@mystical /es/log]# systemctl restart elasticsearch.service
 ```
 
-![image-20250121203409221](..\markdown_img\image-20250121203409221.png)
+![image-20250121203409221](../markdown_img/image-20250121203409221.png)
 
 
 
@@ -2171,7 +2171,7 @@ fs.file-max = 1000000
 [root@mystical /es/log]# systemctl stop elasticsearch.service
 ```
 
-![image-20250121204518014](..\markdown_img\image-20250121204518014.png)
+![image-20250121204518014](../markdown_img/image-20250121204518014.png)
 
 ```ABAP
 以上述图片为例，绝不能同时通知node3和node5，否则就会出现分片1丢失的问题，如果确定要将node3和node5移出集群
@@ -2194,7 +2194,7 @@ logstash运行时最少也会需要额外的500M的以上的内存，会消耗�
 
 
 
-![image-20250121205310305](..\markdown_img\image-20250121205310305.png)
+![image-20250121205310305](../markdown_img/image-20250121205310305.png)
 
 **官方链接**
 
@@ -2218,7 +2218,7 @@ https://www.elastic.co/cn/downloads/beats
 
 **Beats 是一些工具集,包括以下,其中 filebeat 应用最为广泛**
 
-![image-20250121205605253](..\markdown_img\image-20250121205605253.png)
+![image-20250121205605253](../markdown_img/image-20250121205605253.png)
 
 注意: Beats 版本要和 Elasticsearch 相同的版本，否则可能会出错
 
@@ -2298,7 +2298,7 @@ output.elasticsearch:
 
 新版`.ds-metricbeat-<时间>-<版本>`
 
-![image-20250121215017651](..\markdown_img\image-20250121215017651.png)
+![image-20250121215017651](../markdown_img/image-20250121215017651.png)
 
 
 
@@ -2306,7 +2306,7 @@ output.elasticsearch:
 
 **8.X版本界面**
 
-![image-20250121215242609](..\markdown_img\image-20250121215242609.png)
+![image-20250121215242609](../markdown_img/image-20250121215242609.png)
 
 
 
@@ -2453,7 +2453,7 @@ setup.template.settings:
 
 ### cerebro插件查看索引
 
-![image-20250121222236027](..\markdown_img\image-20250121222236027.png)
+![image-20250121222236027](../markdown_img/image-20250121222236027.png)
 
 
 
@@ -2466,14 +2466,14 @@ Observability---运行时间---监测 Uptime Monitors
 
 
 
-![image-20250121222503550](..\markdown_img\image-20250121222503550.png)
+![image-20250121222503550](../markdown_img/image-20250121222503550.png)
 
 ```bash
 # 在被观测节点安装nginx，打开80端口
 [root@web02 ~]# apt install -y nginx
 ```
 
-![image-20250121223146570](..\markdown_img\image-20250121223146570.png)
+![image-20250121223146570](../markdown_img/image-20250121223146570.png)
 
 
 
@@ -2507,7 +2507,7 @@ https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-overview.html
 https://www.elastic.co/guide/en/beats/filebeat/current/configuring-howto-filebeat.htm
 ```
 
-![image-20250122091225320](..\markdown_img\image-20250122091225320.png)
+![image-20250122091225320](../markdown_img/image-20250122091225320.png)
 
 **输入和输出官方说明**
 
@@ -2667,7 +2667,7 @@ hello, world
     "type": "_doc",
     "version": "8.15.0"
   },
-  "message": "{\"name\" : \"wangxiaochun\", \"age\" : \"18\", \"phone\" : \"0123456789\"}", # 没有解析json数据
+  "message": "{/"name/" : /"wangxiaochun/", /"age/" : /"18/", /"phone/" : /"0123456789/"}", # 没有解析json数据
   "input": {
     "type": "stdin"
   },
@@ -3093,19 +3093,19 @@ output.elasticsearch:
 
 **通过cerebro查看收集的日志信息**
 
-![image-20250122110443183](..\markdown_img\image-20250122110443183.png)
+![image-20250122110443183](../markdown_img/image-20250122110443183.png)
 
 **通过Kibana查看收集的日志信息 (8.X版本 — 数据视图；7.X版本 — 索引模式)**
 
-![image-20250122112341415](..\markdown_img\image-20250122112341415.png)
+![image-20250122112341415](../markdown_img/image-20250122112341415.png)
 
-![image-20250122112453394](..\markdown_img\image-20250122112453394.png)
+![image-20250122112453394](../markdown_img/image-20250122112453394.png)
 
-![image-20250122112633883](..\markdown_img\image-20250122112633883.png)
+![image-20250122112633883](../markdown_img/image-20250122112633883.png)
 
-![image-20250122112751286](..\markdown_img\image-20250122112751286.png)
+![image-20250122112751286](../markdown_img/image-20250122112751286.png)
 
-![image-20250122112810615](..\markdown_img\image-20250122112810615.png)
+![image-20250122112810615](../markdown_img/image-20250122112810615.png)
 
 ```bash
 # 测试
@@ -3114,11 +3114,11 @@ output.elasticsearch:
 # 在Kibana中搜索查询
 ```
 
-![image-20250122112933908](..\markdown_img\image-20250122112933908.png)
+![image-20250122112933908](../markdown_img/image-20250122112933908.png)
 
-![image-20250122113345402](..\markdown_img\image-20250122113345402.png)
+![image-20250122113345402](../markdown_img/image-20250122113345402.png)
 
-![image-20250122113358029](..\markdown_img\image-20250122113358029.png)
+![image-20250122113358029](../markdown_img/image-20250122113358029.png)
 
 
 
@@ -3164,15 +3164,15 @@ setup.template.settings:
 
 **使用cerebro插件查看**
 
-![image-20250122115259861](..\markdown_img\image-20250122115259861.png)
+![image-20250122115259861](../markdown_img/image-20250122115259861.png)
 
 
 
 **使用Kibana数据视图查看**
 
-![image-20250122120537111](..\markdown_img\image-20250122120537111.png)
+![image-20250122120537111](../markdown_img/image-20250122120537111.png)
 
-![image-20250122120513796](..\markdown_img\image-20250122120513796.png)
+![image-20250122120513796](../markdown_img/image-20250122120513796.png)
 
 
 
@@ -3281,15 +3281,15 @@ setup.template.settings:
 
 #### **Cerebro插件查看索引**
 
-![image-20250122141031491](..\markdown_img\image-20250122141031491.png)
+![image-20250122141031491](../markdown_img/image-20250122141031491.png)
 
 
 
 #### 使用Kibana查看索引
 
-![image-20250122141316537](..\markdown_img\image-20250122141316537.png)
+![image-20250122141316537](../markdown_img/image-20250122141316537.png)
 
-![image-20250122141357867](..\markdown_img\image-20250122141357867.png)
+![image-20250122141357867](../markdown_img/image-20250122141357867.png)
 
 
 
@@ -3363,13 +3363,13 @@ setup.template.settings:
 
 #### **Cerebro插件查看索引**
 
-![image-20250122144529051](..\markdown_img\image-20250122144529051.png)
+![image-20250122144529051](../markdown_img/image-20250122144529051.png)
 
 
 
 #### 使用Kibana查看索引
 
-![image-20250122144835128](..\markdown_img\image-20250122144835128.png)
+![image-20250122144835128](../markdown_img/image-20250122144835128.png)
 
 
 
@@ -3448,13 +3448,13 @@ setup.template.pattern: "tomcat-*"
 
 #### 插件查看索引
 
-![image-20250123145535819](..\markdown_img\image-20250123145535819.png)
+![image-20250123145535819](../markdown_img/image-20250123145535819.png)
 
-![image-20250123145814580](..\markdown_img\image-20250123145814580.png)
+![image-20250123145814580](../markdown_img/image-20250123145814580.png)
 
-![image-20250123145854123](..\markdown_img\image-20250123145854123.png)
+![image-20250123145854123](../markdown_img/image-20250123145854123.png)
 
-![image-20250123150017701](..\markdown_img\image-20250123150017701.png)
+![image-20250123150017701](../markdown_img/image-20250123150017701.png)
 
 
 
@@ -3508,7 +3508,7 @@ https://www.elastic.co/guide/en/beats/filebeat/7.0/multiline-examples.html
 
 
 
-![image-20250123151144386](..\markdown_img\image-20250123151144386.png)
+![image-20250123151144386](../markdown_img/image-20250123151144386.png)
 
 #### 修改Filebeat文件
 
@@ -3529,7 +3529,7 @@ filebeat.inputs:
   - /var/log/tomcat9/catalina.*.log
   tags: ["tomcat-error"]
   multiline.type: pattern            # 此为默认值，可省略
-  multiline.pattern: '^[0-3][0-9]'   # 此正则表达式匹配以两位，或者为'^\d{2}',因为要匹配以日期开头
+  multiline.pattern: '^[0-3][0-9]'   # 此正则表达式匹配以两位，或者为'^/d{2}',因为要匹配以日期开头
   multiline.negate: true             # negate否定无效
   multiline.match: after
   multiline.max_lines: 5000          # 默认只合并5000行，指定最大合并5000行
@@ -3645,7 +3645,7 @@ output.redis:
 127.0.0.1:6379> type filebeat
 list
 127.0.0.1:6379> lindex filebeat 0
-"{\"@timestamp\":\"2025-01-28T09:11:15.000Z\",\"@metadata\":{\"beat\":\"filebeat\",\"type\":\"_doc\",\"version\":\"8.15.0\"},\"tags\":[\"nginx-access\"],\"upstreamhost\":\"-\",\"log\":{\"offset\":0,\"file\":{\"path\":\"/var/log/nginx/access_json.log\"}},\"uri\":\"/index.nginx-debian.html\",\"xff\":\"-\",\"referer\":\"-\",\"tcp_xff\":\"-\",\"host\":{\"name\":\"web01\"},\"clientip\":\"10.0.0.102\",\"ecs\":{\"version\":\"8.0.0\"},\"agent\":{\"name\":\"web01\",\"type\":\"filebeat\",\"version\":\"8.15.0\",\"ephemeral_id\":\"0d736cd1-4ceb-46f5-9589-30b0b03cf642\",\"id\":\"52dc5551-3312-4428-9923-914dfa240323\"},\"status\":\"200\",\"http_host\":\"10.0.0.104\",\"domain\":\"10.0.0.104\",\"http_user_agent\":\"curl/7.81.0\",\"size\":612,\"upstreamtime\":\"-\",\"responsetime\":0,\"input\":{\"type\":\"log\"}}"
+"{/"@timestamp/":/"2025-01-28T09:11:15.000Z/",/"@metadata/":{/"beat/":/"filebeat/",/"type/":/"_doc/",/"version/":/"8.15.0/"},/"tags/":[/"nginx-access/"],/"upstreamhost/":/"-/",/"log/":{/"offset/":0,/"file/":{/"path/":/"/var/log/nginx/access_json.log/"}},/"uri/":/"/index.nginx-debian.html/",/"xff/":/"-/",/"referer/":/"-/",/"tcp_xff/":/"-/",/"host/":{/"name/":/"web01/"},/"clientip/":/"10.0.0.102/",/"ecs/":{/"version/":/"8.0.0/"},/"agent/":{/"name/":/"web01/",/"type/":/"filebeat/",/"version/":/"8.15.0/",/"ephemeral_id/":/"0d736cd1-4ceb-46f5-9589-30b0b03cf642/",/"id/":/"52dc5551-3312-4428-9923-914dfa240323/"},/"status/":/"200/",/"http_host/":/"10.0.0.104/",/"domain/":/"10.0.0.104/",/"http_user_agent/":/"curl/7.81.0/",/"size/":612,/"upstreamtime/":/"-/",/"responsetime/":0,/"input/":{/"type/":/"log/"}}"
 127.0.0.1:6379> exit
 ```
 
@@ -3713,7 +3713,7 @@ output.logstash:
 
 ## Logstash 介绍
 
-![image-20250128175852633](..\markdown_img\image-20250128175852633.png)
+![image-20250128175852633](../markdown_img/image-20250128175852633.png)
 
 Logstash 是免费且开放的**服务器端数据处理管道**，能够从多个来源采集数据，转换数据，然后将数据发送到您最喜欢的一个或多个“存储库”中
 
@@ -3992,11 +3992,11 @@ hello,python
           "host" => {
         "hostname" => "logstash1"
     },
-       "message" => "{ \"name\" : \"mystical\", \"age\" : \"18\"}",
+       "message" => "{ /"name/" : /"mystical/", /"age/" : /"18/"}",
     "@timestamp" => 2025-01-28T10:57:46.303054636Z,
       "@version" => "1",
          "event" => {
-        "original" => "{ \"name\" : \"mystical\", \"age\" : \"18\"}"
+        "original" => "{ /"name/" : /"mystical/", /"age/" : /"18/"}"
     }
 }
 
@@ -4010,7 +4010,7 @@ hello,python
            "age" => "18",
     "@timestamp" => 2025-01-28T11:31:34.453097351Z,
          "event" => {
-        "original" => "{ \"name\": \"mystical\", \"age\": \"18\", \"gender\": \"men\" }\n"
+        "original" => "{ /"name/": /"mystical/", /"age/": /"18/", /"gender/": /"men/" }/n"
     },
           "name" => "mystical",
       "@version" => "1",
@@ -4022,11 +4022,11 @@ hello,python
 
 # 输入非json数据，会提示解析失败，并存放message字段
 hello,python
-[WARN ] 2025-01-28 19:37:16.620 [[main]<stdin] jsonlines - JSON parse error, original data now in message field {:message=>"Unrecognized token 'hello': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')\n at [Source: (String)\"hello,python\"; line: 1, column: 6]", :exception=>LogStash::Json::ParserError, :data=>"hello,python"}
+[WARN ] 2025-01-28 19:37:16.620 [[main]<stdin] jsonlines - JSON parse error, original data now in message field {:message=>"Unrecognized token 'hello': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')/n at [Source: (String)/"hello,python/"; line: 1, column: 6]", :exception=>LogStash::Json::ParserError, :data=>"hello,python"}
 {
     "@timestamp" => 2025-01-28T11:37:16.626204699Z,
          "event" => {
-        "original" => "hello,python\n"
+        "original" => "hello,python/n"
     },
       "@version" => "1",
        "message" => "hello,python",
@@ -4054,7 +4054,7 @@ hello,python
     "@timestamp" => 2025-01-28T11:40:08.725851262Z,
       "@version" => "1",
          "event" => {
-        "original" => "{ \"name\":\"mystical\", \"age\":\"18\",\"position\":\"sg\"}\n"
+        "original" => "{ /"name/":/"mystical/", /"age/":/"18/",/"position/":/"sg/"}/n"
     },
           "type" => "stdin_type",
            "age" => "18",
@@ -4093,7 +4093,7 @@ output {
           "name" => "mystical",
       "@version" => "1",
          "event" => {
-        "original" => "{\"name\":\"mystical\", \"age\":\"18\"}\n"
+        "original" => "{/"name/":/"mystical/", /"age/":/"18/"}/n"
     },
     "@timestamp" => 2025-01-28T12:05:22.790372226Z,
           "type" => "stdin_type",
@@ -4229,7 +4229,7 @@ ok
     "@timestamp" => 2025-01-28T13:14:24.742440563Z,
           "name" => "mystcal",
          "event" => {
-        "original" => "{\"name\":\"mystcal\", \"age\":\"18\"}"
+        "original" => "{/"name/":/"mystcal/", /"age/":/"18/"}"
     },
           "http" => {
         "version" => "HTTP/1.1",
@@ -4451,7 +4451,7 @@ output {
         [0] "nginx-access"
     ],
               "event" => {
-        "original" => "{\"@timestamp\":\"2025-01-28T14:47:32.000Z\",\"@metadata\":{\"beat\":\"filebeat\",\"type\":\"_doc\",\"version\":\"8.15.0\"},\"upstreamtime\":\"-\",\"xff\":\"-\",\"host\":{\"name\":\"web01\"},\"http_host\":\"10.0.0.104\",\"input\":{\"type\":\"log\"},\"status\":\"200\",\"responsetime\":0,\"upstreamhost\":\"-\",\"tags\":[\"nginx-access\"],\"log\":{\"offset\":966,\"file\":{\"path\":\"/var/log/nginx/access_json.log\"}},\"domain\":\"10.0.0.104\",\"tcp_xff\":\"-\",\"size\":612,\"uri\":\"/index.nginx-debian.html\",\"referer\":\"-\",\"clientip\":\"10.0.0.100\",\"http_user_agent\":\"curl/7.81.0\",\"ecs\":{\"version\":\"8.0.0\"},\"agent\":{\"ephemeral_id\":\"9afd9c68-255e-4e55-b734-8a78298a26e2\",\"id\":\"52dc5551-3312-4428-9923-914dfa240323\",\"name\":\"web01\",\"type\":\"filebeat\",\"version\":\"8.15.0\"}}"
+        "original" => "{/"@timestamp/":/"2025-01-28T14:47:32.000Z/",/"@metadata/":{/"beat/":/"filebeat/",/"type/":/"_doc/",/"version/":/"8.15.0/"},/"upstreamtime/":/"-/",/"xff/":/"-/",/"host/":{/"name/":/"web01/"},/"http_host/":/"10.0.0.104/",/"input/":{/"type/":/"log/"},/"status/":/"200/",/"responsetime/":0,/"upstreamhost/":/"-/",/"tags/":[/"nginx-access/"],/"log/":{/"offset/":966,/"file/":{/"path/":/"/var/log/nginx/access_json.log/"}},/"domain/":/"10.0.0.104/",/"tcp_xff/":/"-/",/"size/":612,/"uri/":/"/index.nginx-debian.html/",/"referer/":/"-/",/"clientip/":/"10.0.0.100/",/"http_user_agent/":/"curl/7.81.0/",/"ecs/":{/"version/":/"8.0.0/"},/"agent/":{/"ephemeral_id/":/"9afd9c68-255e-4e55-b734-8a78298a26e2/",/"id/":/"52dc5551-3312-4428-9923-914dfa240323/",/"name/":/"web01/",/"type/":/"filebeat/",/"version/":/"8.15.0/"}}"
     },
           "http_host" => "10.0.0.104",
            "@version" => "1",
@@ -4694,7 +4694,7 @@ Grok 非常适合将syslog 日志、apache 和其他 web 服务器日志、MySQL
 使用  Grok 插件可以基于正则表达式技术利用其内置的正则表达式的别名来表示和匹配上面的日志,如下效果
 
 ```bash
-%{TIMESTAMP_ISO8601:timestamp} \[%{IPV4:ip};%{WORD:environment}\] %{LOGLEVEL:log_level} %{GREEDYDATA:message}
+%{TIMESTAMP_ISO8601:timestamp} /[%{IPV4:ip};%{WORD:environment}/] %{LOGLEVEL:log_level} %{GREEDYDATA:message}
 ```
 
 最终转换为以下格式
@@ -4735,7 +4735,7 @@ filter {
     grok {
         match => {
             # TIME匹配的值，作为timestamp这个健的值，WORD的值，作为log_level这个健的值...
-            "message" => "%{YEAR}/%{MONTHNUM}/%{MONTHDAY} %{TIME:timestamp} \[%{WORD:log_level}\] %{NUMBER:pid1}#%{NUMBER:pid2}: %{GREEDYDATA:message}"
+            "message" => "%{YEAR}/%{MONTHNUM}/%{MONTHDAY} %{TIME:timestamp} /[%{WORD:log_level}/] %{NUMBER:pid1}#%{NUMBER:pid2}: %{GREEDYDATA:message}"
         }
     }
 }
@@ -4761,8 +4761,8 @@ output {
      "timestamp" => "15:03:26",
      "log_level" => "notice",
        "message" => [
-        [0] "2025/01/28 15:03:26 [notice] 2299#2299: using inherited sockets from \"6;7;\"",
-        [1] "using inherited sockets from \"6;7;\""
+        [0] "2025/01/28 15:03:26 [notice] 2299#2299: using inherited sockets from /"6;7;/"",
+        [1] "using inherited sockets from /"6;7;/""
     ],
       "@version" => "1",
     "@timestamp" => 2025-01-29T10:28:23.098915063Z,
@@ -4787,7 +4787,7 @@ Grok 允许你用 `(?<字段名>正则表达式)` 的形式定义自定义字段
 
 ```bash
 # 这里 (?<request>.*?) 中.*? 表示非贪婪匹配
-(?<client_ip>\d+\.\d+\.\d+\.\d+) - - \[(?<timestamp>\d{2}/[A-Za-z]+/\d{4}:\d{2}:\d{2}:\d{2} [+\-]\d{4})\] "(?<method>\w+) (?<request>.*?) HTTP/(?<http_version>\d+\.\d+)" (?<status>\d{3}) (?<bytes>\d+)
+(?<client_ip>/d+/./d+/./d+/./d+) - - /[(?<timestamp>/d{2}/[A-Za-z]+//d{4}:/d{2}:/d{2}:/d{2} [+/-]/d{4})/] "(?<method>/w+) (?<request>.*?) HTTP/(?<http_version>/d+/./d+)" (?<status>/d{3}) (?<bytes>/d+)
 ```
 
 解析结果
@@ -4822,7 +4822,7 @@ logstash Grok配置
 filter {
   grok {
     match => {
-      "message" => "(?<year>\d{4})/(?<month>\d{2})/(?<day>\d{2}) (?<time>\d{2}:\d{2}:\d{2}) \[(?<log_level>\w+)\] (?<pid1>\d+)#(?<pid2>\d+): (?<message>.*)"
+      "message" => "(?<year>/d{4})/(?<month>/d{2})/(?<day>/d{2}) (?<time>/d{2}:/d{2}:/d{2}) /[(?<log_level>/w+)/] (?<pid1>/d+)#(?<pid2>/d+): (?<message>.*)"
     }
   }
   
@@ -4848,7 +4848,7 @@ filter {
   "log_level": "error",
   "pid1": "2299",
   "pid2": "2299",
-  "message": "failed to open file \"/var/log/nginx/access.log\""
+  "message": "failed to open file /"/var/log/nginx/access.log/""
 }
 ```
 
@@ -4860,7 +4860,7 @@ filter {
 
 ```bash
 grok {
-  match => { "message" => "%{YEAR}/%{MONTHNUM}/%{MONTHDAY} (?<time>\d{2}:\d{2}:\d{2}) \[%{WORD:log_level}\] (?<pid1>\d+)#(?<pid2>\d+): (?<message>.*)" }
+  match => { "message" => "%{YEAR}/%{MONTHNUM}/%{MONTHDAY} (?<time>/d{2}:/d{2}:/d{2}) /[%{WORD:log_level}/] (?<pid1>/d+)#(?<pid2>/d+): (?<message>.*)" }
 }
 ```
 
@@ -4880,7 +4880,7 @@ vi /etc/logstash/patterns/nginx
 - 在 `nginx` 文件中定义模式
 
 ```bash
-NGINX_ERROR_LOG %{YEAR}/%{MONTHNUM}/%{MONTHDAY} %{TIME} \[%{WORD:log_level}\] %{NUMBER:pid1}#%{NUMBER:pid2}: %{GREEDYDATA:message}
+NGINX_ERROR_LOG %{YEAR}/%{MONTHNUM}/%{MONTHDAY} %{TIME} /[%{WORD:log_level}/] %{NUMBER:pid1}#%{NUMBER:pid2}: %{GREEDYDATA:message}
 ```
 
 - 在 `logstash.conf` 中引用模式
@@ -4925,7 +4925,7 @@ input {
 filter {
     grok {
         match => {
-            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} /[%{HTTPDATE:timestamp}/] /"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}/" %{NUMBER:status} %{NUMBER:bytes}" }
         }
     
     date {
@@ -4967,7 +4967,7 @@ output {
         [0] "_jsonparsefailure"
     ],
           "method" => "GET",
-         "message" => "162.142.125.221 - - [15/Mar/2024:15:49:41 +0800] \"GET / HTTP/1.1\" 403 146 \"-\" \"Mozilla/5.0 (compatible; CensysInspect/1.1; +https://about.censys.io/)\"",
+         "message" => "162.142.125.221 - - [15/Mar/2024:15:49:41 +0800] /"GET / HTTP/1.1/" 403 146 /"-/" /"Mozilla/5.0 (compatible; CensysInspect/1.1; +https://about.censys.io/)/"",
        "useragent" => {
             "os" => {
             "name" => "Other",
@@ -5026,7 +5026,7 @@ input {
 filter {
     grok {
         match => {
-            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} /[%{HTTPDATE:timestamp}/] /"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}/" %{NUMBER:status} %{NUMBER:bytes}" }
         }
     
     date {
@@ -5070,7 +5070,7 @@ output {
        "timestamp" => "15/Mar/2024:11:33:18 +0800",
        "client_ip" => "118.123.105.92",
           "method" => "GET",
-         "message" => "118.123.105.92 - - [15/Mar/2024:11:33:18 +0800] \"GET /favicon.ico HTTP/1.1\" 404 548 \"-\" \"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4 240.111 Safari/537.36\"",
+         "message" => "118.123.105.92 - - [15/Mar/2024:11:33:18 +0800] /"GET /favicon.ico HTTP/1.1/" 404 548 /"-/" /"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/86.0.4 240.111 Safari/537.36/"",
     "http_version" => "1.1",
            "ident" => "-",
        "useragent" => {
@@ -5121,19 +5121,19 @@ output {
 https://www.maxmind.com/en/home
 ```
 
-![image-20250131145820821](..\markdown_img\image-20250131145820821.png)
+![image-20250131145820821](../markdown_img/image-20250131145820821.png)
 
 注册账号
 
-![image-20250131145932129](..\markdown_img\image-20250131145932129.png)
+![image-20250131145932129](../markdown_img/image-20250131145932129.png)
 
 注册成功后，登录账户即可下载最新的数据
 
-![image-20250131150023119](..\markdown_img\image-20250131150023119.png)
+![image-20250131150023119](../markdown_img/image-20250131150023119.png)
 
 
 
-![image-20250131150053981](..\markdown_img\image-20250131150053981.png)
+![image-20250131150053981](../markdown_img/image-20250131150053981.png)
 
 
 
@@ -5179,7 +5179,7 @@ input {
 filter {
     grok {
         match => {
-            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} /[%{HTTPDATE:timestamp}/] /"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}/" %{NUMBER:status} %{NUMBER:bytes}" }
         }
         
     #解析源字段timestamp的date日期格式: 14/Jul/2020:15:07:27 +0800
@@ -5209,7 +5209,7 @@ output {
         [0] "_jsonparsefailure"
     ],
           "method" => "GET",
-         "message" => "10.0.0.102 - - [29/Jan/2025:22:55:08 +0800] \"GET / HTTP/1.1\" 200 612 \"-\" \"curl/7.81.0\"",
+         "message" => "10.0.0.102 - - [29/Jan/2025:22:55:08 +0800] /"GET / HTTP/1.1/" 200 612 /"-/" /"curl/7.81.0/"",
        "timestamp" => "29/Jan/2025:22:55:08 +0800",
        "client_ip" => "10.0.0.102",
      "access_time" => 2025-01-29T14:55:08.000Z,          # 会将时间写入指定字段
@@ -5230,7 +5230,7 @@ output {
         [0] "_jsonparsefailure"
     ],
           "method" => "GET",
-         "message" => "10.0.0.102 - - [29/Jan/2025:22:55:08 +0800] \"GET / HTTP/1.1\" 200 612 \"-\" \"curl/7.81.0\"",
+         "message" => "10.0.0.102 - - [29/Jan/2025:22:55:08 +0800] /"GET / HTTP/1.1/" 200 612 /"-/" /"curl/7.81.0/"",
        "timestamp" => "29/Jan/2025:22:55:08 +0800",
        "client_ip" => "10.0.0.102",
       "@timestamp" => 2025-01-29T14:55:08.000Z,        # @timestamp和timestamp相同
@@ -5261,7 +5261,7 @@ filter {
     #将nginx日志格式化为json格式
     grok {
         match => {
-            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} /[%{HTTPDATE:timestamp}/] /"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}/" %{NUMBER:status} %{NUMBER:bytes}" }
         }
     }
     #解析date日期如: 10/Dec/2020:10:40:10 +0800
@@ -5295,7 +5295,7 @@ output {
         [0] "_jsonparsefailure"
     ],
           "method" => "GET",
-         "message" => "10.0.0.1 - - [29/Jan/2025:23:43:47 +0800] \"GET / HTTP/1.1\" 200 396 \"-\" \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0\"",
+         "message" => "10.0.0.1 - - [29/Jan/2025:23:43:47 +0800] /"GET / HTTP/1.1/" 200 396 /"-/" /"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0/"",
        "useragent" => {
         "version" => "132.0.0.0",
              "os" => {
@@ -5362,7 +5362,7 @@ input {
 filter {
     grok {
         match => {
-            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] \"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}\" %{NUMBER:status} %{NUMBER:bytes}" }
+            "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} /[%{HTTPDATE:timestamp}/] /"%{WORD:method} %{URIPATHPARAM:request} HTTP/%{NUMBER:http_version}/" %{NUMBER:status} %{NUMBER:bytes}" }
         }
     
     date {
@@ -5606,7 +5606,7 @@ gsub 实现字符串的替换
 ```bash
 filter {
     mutate {
-        gsub=>["message","\n", " "] #将message字段中的换行替换为空格
+        gsub=>["message","/n", " "] #将message字段中的换行替换为空格
     }
 }
 ```
@@ -5903,7 +5903,7 @@ output {
 
 #### 收集应用特定格式的日志输出至 Elasticsearch 并利用 Kibana 展示
 
-![image-20250130105839369](..\markdown_img\image-20250130105839369.png)
+![image-20250130105839369](../markdown_img/image-20250130105839369.png)
 
 ##### 应用日志收集项目说明
 
@@ -6031,51 +6031,51 @@ output {
 
  **插件查看索引**
 
-![image-20250130112114322](..\markdown_img\image-20250130112114322.png)
+![image-20250130112114322](../markdown_img/image-20250130112114322.png)
 
 注意：因为是历史数据，所以需要选择正确的时间段
 
-![image-20250130112234029](..\markdown_img\image-20250130112234029.png)
+![image-20250130112234029](../markdown_img/image-20250130112234029.png)
 
 
 
 ##### Kibana 展示
 
-![image-20250130112342396](..\markdown_img\image-20250130112342396.png)
+![image-20250130112342396](../markdown_img/image-20250130112342396.png)
 
-![image-20250130112412257](..\markdown_img\image-20250130112412257.png)
+![image-20250130112412257](../markdown_img/image-20250130112412257.png)
 
-![image-20250130112438271](..\markdown_img\image-20250130112438271.png)
+![image-20250130112438271](../markdown_img/image-20250130112438271.png)
 
-![image-20250130112459217](..\markdown_img\image-20250130112459217.png)
+![image-20250130112459217](../markdown_img/image-20250130112459217.png)
 
-![image-20250130112521022](..\markdown_img\image-20250130112521022.png)
+![image-20250130112521022](../markdown_img/image-20250130112521022.png)
 
-![image-20250130112535573](..\markdown_img\image-20250130112535573.png)
+![image-20250130112535573](../markdown_img/image-20250130112535573.png)
 
-![image-20250130112557741](..\markdown_img\image-20250130112557741.png)
+![image-20250130112557741](../markdown_img/image-20250130112557741.png)
 
-![image-20250130112631559](..\markdown_img\image-20250130112631559.png)
+![image-20250130112631559](../markdown_img/image-20250130112631559.png)
 
-![image-20250130112652545](..\markdown_img\image-20250130112652545.png)
+![image-20250130112652545](../markdown_img/image-20250130112652545.png)
 
-![image-20250130112720311](..\markdown_img\image-20250130112720311.png)
+![image-20250130112720311](../markdown_img/image-20250130112720311.png)
 
 
 
-![image-20250130112804067](..\markdown_img\image-20250130112804067.png)
+![image-20250130112804067](../markdown_img/image-20250130112804067.png)
 
-![image-20250130112821255](..\markdown_img\image-20250130112821255.png)
+![image-20250130112821255](../markdown_img/image-20250130112821255.png)
 
-![image-20250130112919146](..\markdown_img\image-20250130112919146.png)
+![image-20250130112919146](../markdown_img/image-20250130112919146.png)
 
 后续根据上述方法，创建云图
 
-![image-20250130113028284](..\markdown_img\image-20250130113028284.png)
+![image-20250130113028284](../markdown_img/image-20250130113028284.png)
 
 点击共享，可以将大屏共享到指定链接或者自己的html网站中
 
-![image-20250130113117733](..\markdown_img\image-20250130113117733.png)
+![image-20250130113117733](../markdown_img/image-20250130113117733.png)
 
 
 
@@ -6116,7 +6116,7 @@ https://mirrors.tuna.tsinghua.edu.cn/elasticstack/
 https://github.com/elastic/kibana
 ```
 
-![image-20250121160534071](..\markdown_img\image-20250121160534071.png)
+![image-20250121160534071](../markdown_img/image-20250121160534071.png)
 
 
 
@@ -6192,21 +6192,21 @@ LISTEN      0           511                     0.0.0.0:5601                  0.
 # 在宿主机上添加hosts文件信息，然后浏览器登录：http://kibana.mystical.org:5601/
 ```
 
-![image-20250121163026440](..\markdown_img\image-20250121163026440.png)
+![image-20250121163026440](../markdown_img/image-20250121163026440.png)
 
 **点击自己浏览**
 
-![image-20250121163437711](..\markdown_img\image-20250121163437711.png)
+![image-20250121163437711](../markdown_img/image-20250121163437711.png)
 
-![image-20250121163608191](..\markdown_img\image-20250121163608191.png)
+![image-20250121163608191](../markdown_img/image-20250121163608191.png)
 
-![image-20250121163643228](..\markdown_img\image-20250121163643228.png)
+![image-20250121163643228](../markdown_img/image-20250121163643228.png)
 
-![image-20250121163717772](..\markdown_img\image-20250121163717772.png)
+![image-20250121163717772](../markdown_img/image-20250121163717772.png)
 
 **安装并连接Kibana后，Kibana会自动生成很多元数据索引，可以使用cerebro进行观看**
 
-![image-20250121163907063](..\markdown_img\image-20250121163907063.png)
+![image-20250121163907063](../markdown_img/image-20250121163907063.png)
 
 
 
@@ -6218,7 +6218,7 @@ LISTEN      0           511                     0.0.0.0:5601                  0.
 
 ### 环境准备
 
-![image-20250130215315585](..\markdown_img\image-20250130215315585.png)
+![image-20250130215315585](../markdown_img/image-20250130215315585.png)
 
 
 ```bash
@@ -6240,7 +6240,7 @@ LISTEN      0           511                     0.0.0.0:5601                  0.
 10.0.0.104
 ```
 
-![image-20250131144641023](..\markdown_img\image-20250131144641023.png)
+![image-20250131144641023](../markdown_img/image-20250131144641023.png)
 
 ### Filebeat 收集 Nginx 的访问和错误日志并发送至 kafka
 
@@ -6274,7 +6274,7 @@ output.kafka:
 
 查看kafka中的数据
 
-![image-20250131103038074](..\markdown_img\image-20250131103038074.png)
+![image-20250131103038074](../markdown_img/image-20250131103038074.png)
 
 
 
@@ -6295,7 +6295,7 @@ filter {
     if "nginx-access" in [tags] {
             grok {
                 match => {
-                    "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] (?:%{QS:request}|%{DATA:raw_request}) %{NUMBER:status} %{NUMBER:bytes} %{QS:referer} %{QS:user_agent}"
+                    "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} /[%{HTTPDATE:timestamp}/] (?:%{QS:request}|%{DATA:raw_request}) %{NUMBER:status} %{NUMBER:bytes} %{QS:referer} %{QS:user_agent}"
 
                 }
             }
@@ -6328,7 +6328,7 @@ filter {
     } else if "nginx-error" in [tags] {
             grok {
                 match => { 
-                    "message" => "%{YEAR:year}/%{MONTHNUM:month}/%{MONTHDAY:day} %{TIME:time} \[%{WORD:log_level}\] %{NUMBER:pid}#%{NUMBER:worker_id}: \*%{NUMBER:request_id} %{WORD:action}\(\) \"%{DATA:file_path}\" %{WORD:status} \(%{NUMBER:error_code}: %{DATA:error_message}\), client: %{IP:client_ip}, server: %{DATA:server_name}, request: \"%{WORD:method} %{DATA:request_uri} HTTP/%{NUMBER:http_version}\", host: \"%{DATA:host}\""
+                    "message" => "%{YEAR:year}/%{MONTHNUM:month}/%{MONTHDAY:day} %{TIME:time} /[%{WORD:log_level}/] %{NUMBER:pid}#%{NUMBER:worker_id}: /*%{NUMBER:request_id} %{WORD:action}/(/) /"%{DATA:file_path}/" %{WORD:status} /(%{NUMBER:error_code}: %{DATA:error_message}/), client: %{IP:client_ip}, server: %{DATA:server_name}, request: /"%{WORD:method} %{DATA:request_uri} HTTP/%{NUMBER:http_version}/", host: /"%{DATA:host}/""
                 }
             }
             
@@ -6384,23 +6384,23 @@ output {
 
 也可以根据Kafka的图形工具，观察消息积压状况
 
-![image-20250131144938030](..\markdown_img\image-20250131144938030.png)
+![image-20250131144938030](../markdown_img/image-20250131144938030.png)
 
 观察Kabana上的索引是否生成，如果有，说明elasticsearch成功接收数据
 
-![image-20250131145127613](..\markdown_img\image-20250131145127613.png)
+![image-20250131145127613](../markdown_img/image-20250131145127613.png)
 
 创建视图
 
-![image-20250131151836675](..\markdown_img\image-20250131151836675.png)
+![image-20250131151836675](../markdown_img/image-20250131151836675.png)
 
-![image-20250131151909764](..\markdown_img\image-20250131151909764.png)
+![image-20250131151909764](../markdown_img/image-20250131151909764.png)
 
 查看Discover，并做好调试
 
-![image-20250131152050448](..\markdown_img\image-20250131152050448.png)
+![image-20250131152050448](../markdown_img/image-20250131152050448.png)
 
-![image-20250131152200659](..\markdown_img\image-20250131152200659.png)
+![image-20250131152200659](../markdown_img/image-20250131152200659.png)
 
 ### Kibana 创建地图数据
 
@@ -6431,13 +6431,13 @@ GET /logstash-kafka-nginx-accesslog-2022.03.02
 #复制mappings开始的行到settings行之前结束,并最后再加一个 }
 ```
 
-![image-20250131152645703](..\markdown_img\image-20250131152645703.png)
+![image-20250131152645703](../markdown_img/image-20250131152645703.png)
 
-![image-20250131152816851](..\markdown_img\image-20250131152816851.png)
+![image-20250131152816851](../markdown_img/image-20250131152816851.png)
 
-![image-20250131153228759](..\markdown_img\image-20250131153228759.png)
+![image-20250131153228759](../markdown_img/image-20250131153228759.png)
 
-![image-20250131153255307](..\markdown_img\image-20250131153255307.png)
+![image-20250131153255307](../markdown_img/image-20250131153255307.png)
 
 执行下面操作生成索引模板，将上面的mappings部分内容复制到下面，只修改"coordinates": {  "type":  "geo_point" } 部分
 
@@ -6461,33 +6461,33 @@ PUT /_template/template_nginx_accesslog
 } # 最后补一个 }
 ```
 
-![image-20250131162509928](..\markdown_img\image-20250131162509928.png)
+![image-20250131162509928](../markdown_img/image-20250131162509928.png)
 
 查看生成的索引模板
 
-![image-20250131162852511](..\markdown_img\image-20250131162852511.png)
+![image-20250131162852511](../markdown_img/image-20250131162852511.png)
 
 必须先删除旧有索引重新生成数据才能生
 
-![image-20250131163151654](..\markdown_img\image-20250131163151654.png)
+![image-20250131163151654](../markdown_img/image-20250131163151654.png)
 
 重新生成数据，确认类型是否更改
 
-![image-20250131165421406](..\markdown_img\image-20250131165421406.png)
+![image-20250131165421406](../markdown_img/image-20250131165421406.png)
 
 修改好数据类型后，重新导入数据，生成地图
 
-![image-20250131165537145](..\markdown_img\image-20250131165537145.png)
+![image-20250131165537145](../markdown_img/image-20250131165537145.png)
 
-![image-20250131165644298](..\markdown_img\image-20250131165644298.png)
+![image-20250131165644298](../markdown_img/image-20250131165644298.png)
 
-![image-20250131165708987](..\markdown_img\image-20250131165708987.png)
+![image-20250131165708987](../markdown_img/image-20250131165708987.png)
 
-![image-20250131165838774](..\markdown_img\image-20250131165838774.png)
+![image-20250131165838774](../markdown_img/image-20250131165838774.png)
 
-![image-20250131165907568](..\markdown_img\image-20250131165907568.png)
+![image-20250131165907568](../markdown_img/image-20250131165907568.png)
 
-![image-20250131170134325](..\markdown_img\image-20250131170134325.png)
+![image-20250131170134325](../markdown_img/image-20250131170134325.png)
 
 
 
@@ -6499,7 +6499,7 @@ ES中的日志后续会被删除,但有些重要数据,比如状态码、客户�
 
 可以将重要数据写入数据库达到持久保存目的
 
-![image-20250131205922262](..\markdown_img\image-20250131205922262.png)
+![image-20250131205922262](../markdown_img/image-20250131205922262.png)
 
 
 
@@ -6587,13 +6587,13 @@ MySQL Connector/J是MySQL官方JDBC驱动程序，JDBC（Java Data Base Connecti
 https://dev.mysql.com/downloads/connector/
 ```
 
-![image-20250131220452111](..\markdown_img\image-20250131220452111.png)
+![image-20250131220452111](../markdown_img/image-20250131220452111.png)
 
 选择合适的版本
 
-![image-20250131221154737](..\markdown_img\image-20250131221154737.png)
+![image-20250131221154737](../markdown_img/image-20250131221154737.png)
 
-![image-20250131221312513](..\markdown_img\image-20250131221312513.png)
+![image-20250131221312513](../markdown_img/image-20250131221312513.png)
 
 Ubuntu22.04 安装 mysql-connector
 
@@ -6750,7 +6750,7 @@ filter {
 
             grok {
                 match => {
-                    "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} \[%{HTTPDATE:timestamp}\] (?:%{QS:request}|%{DATA:raw_request}) %{NUMBER:status} %{NUMBER:bytes} %{QS:referer} %{QS:user_agent}"
+                    "message" => "%{IPORHOST:client_ip} %{DATA:ident} %{DATA:user} /[%{HTTPDATE:timestamp}/] (?:%{QS:request}|%{DATA:raw_request}) %{NUMBER:status} %{NUMBER:bytes} %{QS:referer} %{QS:user_agent}"
 
                 }
             }
@@ -6783,7 +6783,7 @@ filter {
     } else if "nginx-error" in [tags] {
             grok {
                 match => { 
-                    "message" => "%{YEAR:year}/%{MONTHNUM:month}/%{MONTHDAY:day} %{TIME:time} \[%{WORD:log_level}\] %{NUMBER:pid}#%{NUMBER:worker_id}: \*%{NUMBER:request_id} %{WORD:action}\(\) \"%{DATA:file_path}\" %{WORD:status} \(%{NUMBER:error_code}: %{DATA:error_message}\), client: %{IP:client_ip}, server: %{DATA:server_name}, request: \"%{WORD:method} %{DATA:request_uri} HTTP/%{NUMBER:http_version}\", host: \"%{DATA:host}\""
+                    "message" => "%{YEAR:year}/%{MONTHNUM:month}/%{MONTHDAY:day} %{TIME:time} /[%{WORD:log_level}/] %{NUMBER:pid}#%{NUMBER:worker_id}: /*%{NUMBER:request_id} %{WORD:action}/(/) /"%{DATA:file_path}/" %{WORD:status} /(%{NUMBER:error_code}: %{DATA:error_message}/), client: %{IP:client_ip}, server: %{DATA:server_name}, request: /"%{WORD:method} %{DATA:request_uri} HTTP/%{NUMBER:http_version}/", host: /"%{DATA:host}/""
                 }
             }
             
