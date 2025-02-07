@@ -234,7 +234,401 @@ https://www.cncf.io/
 
 
 
+#### NameSpace
 
+跟真实存在的虚拟机不同，在使用Docker的时候，并没有一个真正的“Docker容器”运行在宿主机里面。Docker项目帮助用户启动的，还是原来的应用进程，只不过创建这些进程时，Docker为他们加上了各种各样的Namespace参数
+
+这时，这些进程就会觉得自己是各自PID Namespace里的第1号进程，只能看到各自Mount Namespace里挂载的目录和文件，只能访问到各自Network Namespace里的网络设备，就仿佛运行在一个个容器里面，与世隔绝。
+
+- Linux Namespace是一种Linux Kernel提供的资源隔离方案
+  - 系统可以为进程分配不同的Namespace
+  - 并保证不同的Namespace资源独立分配，进程彼此隔离，即不同的Namespace下的进程互不干扰
+
+##### Linux内核代码中Namespace的实现
+
+```C
+// 进程数据结构
+struct task_struct {
+    ...
+    /* namesapce */
+    struct nsproxy *nsproxy;
+    ...
+}
+
+// Namespace数据结构
+struct nsproxy {
+    atomic_t count;
+    struct uts_namespace *uts_ns;
+    struct ipc_namespace *ipc_ns;
+    struct mnt_namespace *mnt_ns;
+    struct pid_namespace *pid_ns_for_children;
+    struct net_namespace *net_ns;
+}
+```
+
+
+
+##### Linux对Namespace操作的方法
+
+一个进程是如何分Namespace的？
+
+- 首先第一个进程(systemd)，pid为1的进程，它会被分配一个默认的Namespace
+
+- 当init进程要起其他进程的时候，fork或者clone
+
+  - clone(在clone的时候是可以指定新的Namespace的)
+
+    - 在创建新进程的系统调用时，可以通过flags参数指定新建的Namespace类型：
+
+    ```C
+    // CLONE_NEWCGROUPS / CLONE_NEWPIC / CLONE_NEWNET / CLONE_NEWNS / CLONE_NEWPID / CLONE_NEWUSER / CLONE_NEWUTS
+    int clone(int(*fn)(void*), void*child_stack, int flags, void *arg)
+    ```
+
+  - setns
+
+    - 该系统调用可以让调用进程加入某个已经存在的Namespace中
+
+    ```C
+    int setns(int fd, int nstype)
+    ```
+
+  - unshare
+
+    - 该系统调用可以将调用进程移动到新的Namespace下：
+
+    ```C
+    int unshare(int flags)
+    ```
+
+
+
+##### PID Namespace
+
+- 不同用户的进程就是通过Pid Namespace隔离开的，且不同Namespace中可以有相同pid
+- 有了Pid Namespace，每个namespace中的Pid能相互隔离
+- pid namespace的意义
+  - 一个主机可能有上千个进程，很难管理，但是使用namespace隔离开后，管理上更清晰
+  - 进程将彼此隔离，则A进程无法杀死B进程，因为不同namespace下，进程相互看不到
+
+
+
+##### Network Namespace
+
+- 网络隔离是通过net namespace实现的，每个net namespace有独立的network devices, ip address, IP routing tables, /proc/net目录
+  - 实现了微服务中，给每个服务分配自己的IP，实现服务间通信
+- Docker默认采用veth的方式，将container中的虚拟网卡同host上的一个docker bridge：docker0连接在一起
+
+
+
+##### IPC namespace
+
+- Container中，进程交互还是采用Linux常见的进程间交互方法，包括常见的信号量，消息队列和共享内存
+- container的进程间交互实际上还是host上具有相同pid namespace中的进程间交互，因此需要在IPC资源申请时加入namespace信息-每个IPC资源有一个唯一的32位ID
+
+
+
+##### mnt namespace
+
+- mnt namespace允许不同namespace的进程看到的文件结构不同，这样每个namespace中的进程所看到的文件目录就被隔离开了
+
+
+
+##### uts namespace
+
+UTS("UNIX Time-sharing System")namespace允许每个Container拥有独立的Hostname和domain name，使其在网络上可以被视作一个独立的节点而非Host上一个进程
+
+
+
+##### user namespace
+
+每个Container可以有不同的user和group id，也就是说可以在Container内部用container内部的用户执行程序而非Host上的用户
+
+
+
+##### 关于Namespace的常用操作
+
+- 查看当前系统的namespace
+
+```shell
+# 相当于list当前主机的namespace
+lsns -t <type>
+```
+
+- 查看某进程的namespace
+
+```shell
+ls -la /用于Pod的环境准备，准备网络栈和存储卷的基础容器proc/<pid>/ns/
+
+# 示例
+[root@ubuntu2204 ~]#ls -la /proc/827/ns
+总计 0
+dr-x--x--x 2 root root 0  8月  6 10:17 .
+dr-xr-xr-x 9 root root 0  8月  6 10:16 ..
+lrwxrwxrwx 1 root root 0  8月  6 10:17 cgroup -> 'cgroup:[4026531835]'
+lrwxrwxrwx 1 root root 0  8月  6 10:17 ipc -> 'ipc:[4026531839]'
+lrwxrwxrwx 1 root root 0  8月  6 10:17 mnt -> 'mnt:[4026531841]'
+lrwxrwxrwx 1 root root 0  8月  6 10:17 net -> 'net:[4026531840]'
+lrwxrwxrwx 1 root root 0  8月  6 10:17 pid -> 'pid:[4026531836]'
+lrwxrwxrwx 1 root root 0  8月  6 10:22 pid_for_children -> 'pid:[4026531836]'
+lrwxrwxrwx 1 root root 0  8月  6 10:17 time -> 'time:[4026531834]'
+lrwxrwxrwx 1 root root 0  8月  6 10:22 time_for_children -> 'time:[4026531834]'
+lrwxrwxrwx 1 root root 0  8月  6 10:17 user -> 'user:[4026531837]'
+lrwxrwxrwx 1 root root 0  8月  6 10:17 uts -> 'uts:[4026531838]'
+```
+
+- 进入某namespace运行命令（非常常用）
+  - 当需要对docker容器进行调试，由于容器本身很小，没有调试工具，因此需要使用`nsenter`从主机进入该容器进行调试
+
+```shell
+ nsenter -t <pid> -n ip addr
+
+# 第一步先去查容器id
+docker ps|grep <container_name>
+
+# 第二步通过docker inspect 去查找该容器在宿主机的Pid
+docker inspect <docker_id> | grep -i pid
+
+# 第三步使用nsenter进入该pid的net namespace
+nsenter -t <pid> -n ip addr
+```
+
+- unshare，将进程移入新的ns
+
+```shell
+# 此时sleep 120这个进程会在新的ns中执行
+unshare -fn sleep 120
+
+# 使用ps查看sleep 120的pid
+[root@ubuntu2204 ~]#ps -ef|grep sleep
+root        3533    1024  0 10:47 pts/0    00:00:00 unshare -fn sleep 120
+root        3534    3533  0 10:47 pts/0    00:00:00 sleep 120
+root        3536    3446  0 10:47 pts/1    00:00:00 grep --color=auto sleep
+
+# 使用nsenter就可以看到这个进程的网路是独立的
+# 但是此时网络插件帮该进程去配ip
+# docker中，由网络插件，默认bridge去给docker的容器也就是进程配置一个网络ip
+[root@ubuntu2204 ~]#nsenter -t 3533 -n ip a
+1: lo: <LOOPBACK> mtu 65536 qdisc noop state DOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+
+# 文件系统也是独立的
+[root@ubuntu2204 ~]#nsenter -t 3533 -m ls
+bin   dev  home  lib32  libx32      media  opt   root  sbin  swap.img  tmp  var
+boot  etc  lib   lib64  lost+found  mnt    proc  run   srv   sys       usr# 查看sleep 120的pid
+ps aux|grep sleep    # pid为
+```
+
+
+
+#### Cgroup
+
+虽然容器内的第1号进程在“障眼法”的干扰下只能看到容器里的情况，但是宿主机上，它作为第100号进程与其他所有进程之间依然是平等竞争关系。
+
+而Linux Cgroups就是Linux内核中用来为进程设置资源限制的一个重要功能
+
+Linux Cgruops的全称是Linux Contrlo Group。它最主要的作用，就是限制一个进程组能够使用的资源上限，包括CPU，内存，磁盘，网络带宽等
+此外，Cgoups还能够对进程进行优先级设置，审计，以及将进程挂起和恢复等操作
+
+<span style="color:red;font-weight:699">在 Linux 中，Cgroups 给用户暴露出来的操作接口是文件系统，即它以文件和目录的方式组织在操作系统的 /sys/fs/cgroup 路径下</span>
+
+Ubuntu22.04采用的是cgroup v2，在cgroup v2创建一个控制组
+
+```shell
+cd /sys/fs/cgroup
+mkdir container
+# 创建的这个container的目录，就是一个控制组，操作系统会在这个新创建的container目录下，自动生成该子系统对应的资源限制文件
+cgroup.controllers      cgroup.subtree_control  cpuset.cpus.effective  cpu.weight.nice  memory.events.local  memory.stat
+cgroup.events           cgroup.threads          cpuset.cpus.partition  io.max           memory.high          memory.swap.current
+cgroup.freeze           cgroup.type             cpuset.mems            io.pressure      memory.low           memory.swap.events
+cgroup.kill             cpu.idle                cpuset.mems.effective  io.prio.class    memory.max           memory.swap.high
+cgroup.max.depth        cpu.max                 cpu.stat               io.stat          memory.min           memory.swap.max
+cgroup.max.descendants  cpu.max.burst           cpu.uclamp.max         io.weight        memory.numa_stat     pids.current
+cgroup.procs            cpu.pressure            cpu.uclamp.min         memory.current   memory.oom.group     pids.events
+cgroup.stat             cpuset.cpus             cpu.weight             memory.events    memory.pressure      pids.max
+```
+
+`cpu.max` 文件
+
+- 功能：
+  - cpu.max 文件用于设置 CPU 的最大使用时间配额和周期，类似于 cgroup v1 中的 cpu.cfs_quota_us 和 cpu.cfs_period_us。
+- 格式：cpu.max 文件的内容格式为 max_quota period，其中：
+  - max_quota 表示 CPU 时间的最大配额（以微秒为单位）。
+  - period 表示分配的周期（以微秒为单位）。
+  - 如果 max_quota 设置为 max，表示没有限制（即与 cgroup v1 中的 -1 类似）。
+
+```shell
+# 默认max
+[root@ubuntu2204 container]#cat cpu.max
+max 100000
+
+# 执行下列指令，控制每 100 ms 的时间里，被该控制组限制的进程只能使用 20 ms 的 CPU 时间，
+# 也就是说这个进程只能使用到 20% 的 CPU 带宽。
+echo 20000 100000 > cpu.max  # 单位是纳秒，1000纳秒=1毫秒
+# 运行下列指令
+# 它执行了一个死循环，可以把计算机的 CPU 吃到 100%
+# 根据它的输出，我们可以看到这个脚本在后台运行的进程号（PID）是 226
+$ while : ; do : ; done &
+[1] 226
+
+# 使用top查看可以看到进程号226的程序将CPU打满
+```
+
+`cgroup.procs`
+
+- cgroup.procs：在 cgroup v2 中，cgroup.procs 文件用于管理控制组中的进程和线程，与 cgroup v1 中的 tasks 文件功能相同
+
+```shell
+echo 226 > cgroup.procs
+
+# 将226进程加入控制组，，此时上面的限制生效，该进程的CPU使用被控制到20%
+```
+
+除CPU外，Cgroups的每个文件都有其独有的资源限制能力
+
+Linux Cgroups的设计还是比较易用的，简单粗暴地理解，就是一个子系统目录加上一组资源限制文件的组合。对于Docker等linux容器项目来说，它们只需要为每个容器创建一个控制组（即创建一个新目录），然后在启动容器进程之后，把这个进程的PID填写到对应的控制组的cgroup.procs中就可以了
+
+
+
+##### **Docker 使用 cgroups-v1 的步骤**
+
+- 创建控制组目录
+
+  - 当 Docker 启动一个新的容器时，它会在 /sys/fs/cgroup 下创建一个新的控制组目录。这可以用于 CPU、内存、设备访问等各类资源的控制。例如，为某个容器创建一个新的控制组目录
+
+  ```shell
+  sudo mkdir /sys/fs/cgroup/cpu/docker/container_id
+  sudo mkdir /sys/fs/cgroup/memory/docker/container_id
+  # 其他资源类型的控制组目录
+  ```
+
+- 配置控制组资源限制
+
+  - 在新的控制组目录中，可以配置资源限制。例如，限制 CPU 和内存使用
+
+  ```shell
+  # 设置 CPU 使用配额
+  echo "50000 100000" > /sys/fs/cgroup/cpu/docker/container_id/cpu.max
+  
+  # 设置内存限制
+  echo "500M" > /sys/fs/cgroup/memory/docker/container_id/memory.max
+  ```
+
+- 启动容器进程
+
+  - 启动容器进程。假设启动的容器进程的 PID 是 12345。
+
+- 将容器进程的 PID 添加到控制组
+
+  - 将容器进程PID写入控制组的cgroup.procs
+
+  ```shell
+  echo 12345 > /sys/fs/cgroup/cpu/docker/container_id/cgroup.procs
+  echo 12345 > /sys/fs/cgroup/memory/docker/container_id/cgroup.procs
+  # 其他资源类型的控制组
+  ```
+
+
+
+##### 在Cgroups-v2中docker路径
+
+如果 Docker 使用了 `systemd` 驱动，Cgroup 文件路径可能类似于：
+
+```ABAP
+/sys/fs/cgroup/system.slice/docker-<container-id>.scope/
+```
+
+
+
+#### Union FS
+
+- 将不同目录挂载到同一个虚拟文件系统下(unite several directories into a single virtual filesystem的文件系统)
+- 支持为每一个成员目录(类似Git Branch)设定readonly、readwrite和whiteout-able权限
+- 文件系统分层，对readonly权限的branch可以逻辑上进行修改(增量地，不影响readonly部分的)
+- 通常Union FS有两个用途，一方面可以将多个disk挂到同一个目录下，另一个更常用的就是将一个readonly的branch和一个writeable的branch联合在一起
+
+##### Docker的文件系统
+
+典型的Linux文件系统组成
+
+- Bootfs(boot file system)
+  - Bootloader - 引导加载kernel
+  - Kernel - 当kernel被加载到内存中后umount bootfs
+- rootfs(root file system)
+  - /dev, /proc, /bin, /etc等标准目录和文件
+  - 对于不同的Linux发行版，bootfs基本是一致的，但rootfs会有差别
+
+Docker没有bootfs，它复用主机的Kernel
+Docker有自己的rootfs，该rootfs有容器驱动加载出来
+
+##### Docker启动
+
+Linux
+
+- 在启动后，首先将rootfs设置为readonly，进行一系列检查，然后将其切换为"readwrite"供用户使用
+
+Docker
+
+- 初始化时也是将rootfs以readonly方式加载并检查，然后接下来利用union mount的方式将一个readwrite文件系统挂载在readonly的rootfs之上
+- 并且允许再次将下层的FS(file system)设定为readonly并向上叠加
+- 这样一组readonly和一个writeable的结构构成一个container的运行时态，每一个FS被称为FS层
+
+##### 特点1：写操作
+
+由于镜像具有共享特性，所以对容器可写层的操作需要依赖存储驱动提供的写时复制和用时分配机制，以此来支持对容器可写层的修改，进而提高对存储和内存资源的利用率
+
+- 写时复制
+  - 写时复制，即Copy-on-Write。一个镜像可以被多个容器使用，但是不需要在内存和磁盘上做多个拷贝。
+  - 在需要对镜像提供的文件进行修改时，该文件会从镜像的文件系统被复制到容器的可写层的文件系统进行修改，而镜像里面的文件不会改变。不同容器对文件的修改都相互独立，互不影响
+
+- 用时分配
+  - 按需分配空间，而非提前分配，即当一个文件被创建出来后，才会分配空间
+
+##### OverlayFS文件系统练习
+
+```shell
+mkdir upper lower merged work
+echo "from lower" > lower/in_lower.txt
+echo "from upper" > upper/in_upper.txt
+echo "from lower" > lower/in_both.txt
+echo "from upper" > upper/in_both.txt
+
+mount -t overlay overlay -o lowerdir=`pwd`/lower,upperdir=`pwd`/upper,workdir=`pwd`/work `pwd`/merged
+
+# upperdir 是最上层的可写层，而 lowerdir 是只读层。当多个层次中存在相同的文件时，优先展示 upperdir 中的版本
+cat merged/in_both.txt
+from upper
+
+# 在merged层添加一个文件
+[root@mystical ~/test/merged]# echo aaa > a.txt
+
+# 查看upper目录和lower目录
+[root@mystical ~/test/upper]# ls
+a.txt  in_both.txt  in_upper.txt
+[root@mystical ~/test/lower]# ls
+in_both.txt  in_lower.txt
+
+# 结论1：对 merged 目录的任何写入操作，都会发生在 upperdir，而 lowerdir 仍然是只读的
+# 结论2：果 merged 目录中的文件来自 lowerdir，修改它时会触发 "copy-up" 机制，将文件复制到 upperdir，然后再修改（COW 机制）
+```
+
+##### Docker文件系统的本质
+
+就是一次次的`mount -t overlay overlay -o <下层>,<上层> <合并>`
+通过这种方式，确保进程所需要的所有依赖和配置都在我的隔离环境中，这样迁移到其他环境中，才能完整的replay出来
+
+
+
+##### Union FS的优点
+
+```ABAP
+1. 多个容器共享相同的 lowerdir，这是 Docker 的层存储机制（Layered Storage）。
+2. 每个容器都有自己的 upperdir，存放容器的修改和新增文件，确保容器间互不影响。
+3. 如果容器修改 lowerdir 的文件，会触发 "copy-up" 机制，将文件复制到 upperdir，然后容器修改 upperdir 中的文件。
+4. lowerdir 仅在 docker rmi 镜像时才会真正删除，而不是删除容器时就消失。
+
+Docker 的存储机制极大地提高了存储效率，让多个容器共享基础镜像层，同时保持隔离性。
+```
 
 
 
@@ -6359,7 +6753,7 @@ Omnibus GitLab architecture and components:  https://docs.gitlab.com/omnibus/arc
 
 
 
-### GitLab 安装
+### GitLab 包安装
 
 GitLab 有两个版本：**EE商业版**和**CE社区版**，以下使用CE版
 
@@ -6500,13 +6894,140 @@ https://mirrors.tuna.tsinghua.edu.cn/gitlab-ce/
 /opt/gitlab         #安装目录
 ```
 
-范例： gitlab 初始化配置
+##### gitlab 初始化配置
 
 ```bash
+# 指定域名【必选】
 [root@ubuntu1804 ~]#vim /etc/gitlab/gitlab.rb
 [root@ubuntu1804 ~]#grep "^[a-Z]" /etc/gitlab/gitlab.rb
-external_url 'http://gitlab.wang.org'   
-#修改此行
+external_url 'http://gitlab.mystical.org'   
+
+# 邮件通知设置【可选】
+gitlab_rails['smtp_enable'] = true
+gitlab_rails['smtp_address'] = "smtp.163.com"
+gitlab_rails['smtp_port'] = 465
+gitlab_rails['smtp_user_name'] = "15104600741@163.com"
+gitlab_rails['smtp_password'] = "授权码"
+gitlab_rails['smtp_domain'] = "163.com"
+gitlab_rails['smtp_authentication'] = "login"
+#gitlab_rails['smtp_enable_starttls_auto'] = true       # 二选一：该选项端口587
+gitlab_rails['smtp_tls'] = true                         # 二选一：该选项端口465
+gitlab_rails['smtp_pool'] = false
+
+###! **Can be: 'none', 'peer', 'client_once', 'fail_if_no_peer_cert'**
+###! Docs: http://api.rubyonrails.org/classes/ActionMailer/Base.html
+gitlab_rails['smtp_openssl_verify_mode'] = 'none'
+user['git_user_email'] = "15104600741@163.com"
+
+# 修改nginx监听的端口【可选】
+nginx['listen_port']=8080
+
+# ssh协议端口，地址【可选】
+gitlab_sshd['listen_address'] = '0.0.0.0:2222'
+# 示例：ssh://git@gitlab.wang.org:2222/example/app.git
+
+# 给root用户指定初始密码【必选】
+#注意:密码至少8位并且复杂度要求才是有效密码
+gitlab_ralis['initial_root_password'] = "zyf@123456"
+
+# gitlab优化
+# 关闭可能暂时不使用的功能，比如监控(测试环境下)
+prometheus['enable'] = false
+prometheus['monitor_kubernetes']=false
+alertmanager['enable']=false
+node_exporter['enable']=false
+redis_exporter['enable']=false
+postgres_exporter['enable']=false
+gitlab_exporter['enable']= false
+prometheus_monitoring['enable']=false
+grafana['enable']=false
+
+# 名称解析
+[root@mystical ~]# vim /etc/hosts
+```
+
+
+
+#### 初始化和启动服务
+
+执行配置reconfigure并启动服务：
+
+```bash
+#每次修改完配置文件都需要执行此操作
+[root@ubuntu1804 ~]# gitlab-ctl reconfigure
+```
+
+
+
+#### 验证Gitlab启动完成
+
+```bash
+[root@mystical ~]# gitlab-ctl status
+run: gitaly: (pid 15033) 17s; run: log: (pid 14586) 144s
+run: gitlab-kas: (pid 14803) 130s; run: log: (pid 14814) 127s
+run: gitlab-workhorse: (pid 15011) 19s; run: log: (pid 14946) 49s
+run: logrotate: (pid 14502) 159s; run: log: (pid 14511) 156s
+run: nginx: (pid 15025) 18s; run: log: (pid 14966) 44s
+run: postgresql: (pid 14633) 136s; run: log: (pid 14644) 135s
+run: puma: (pid 14866) 63s; run: log: (pid 14873) 62s
+run: redis: (pid 14538) 153s; run: log: (pid 14548) 150s
+run: sidekiq: (pid 14887) 57s; run: log: (pid 14904) 55s
+```
+
+
+
+#### Gitlab的常用命令
+
+GitLab除了使用Web界面进行管理，还提供了各组件的统一命令为gitlab-ctl，此外还有一些各组件专用的命令，如gitlab-pgsql、 gitlab-rails和gitlab-rake等
+
+```bash
+#客户端命令行操作行
+gitlab-ctl  
+gitlab-ctl check-config #检查配置
+gitlab-ctl show-config  #查看配置
+gitlab-ctl reconfigure  #修改过配置后需要执行重新配置
+gitlab-ctl stop         #停止gitlab
+gitlab-ctl start        #启动gitlab
+gitlab-ctl restart      #重启gitlab
+gitlab-ctl status       #查看组件运行状态
+gitlab-ctl tail         #查看所有日志
+gitlab-ctl tail nginx   #查看某个组件的日志
+gitlab-ctl service-list #列出服务
+
+#其它命令
+gitlab-rails #用于启动控制台进行特殊操作，如修改管理员密码、打开数据库控制台( gitlab-rails dbconsole)等
+gitlab-psql #数据库命令行
+gitlab-rake #数据备份恢复等数据操作
+```
+
+示例: 查看服务列表
+
+```bash
+[root@mystical ~]# gitlab-ctl service-list
+gitaly*
+gitlab-kas*
+gitlab-workhorse*
+logrotate*
+nginx*
+postgresql*
+puma*
+redis*
+sidekiq*
+```
+
+
+
+
+
+### 基于 Kubernetes 安装 GitLab
+
+```bash
+GL_OPERATOR_VERSION=1.9.1 
+PLATFORM=kubernetes
+
+https://gitlab.com/api/v4/projects/18899486/packages/generic/gitlab-operator/1.9.1/gitlab-operator-kubernetes-1.9.1.yaml
+
+https://gitlab.com/api/v4/projects/18899486/packages/generic/gitlab-operator/1.9.1/gitlab-operator-kubernetes-1.9.1.yaml
 ```
 
 
@@ -31340,4 +31861,6 @@ current-context: admin@kubernetes
 
 
 
-​                                                                                     
+## BGP协议
+
+##                                                                                      

@@ -1,6 +1,6 @@
 # 	ELK概述
 
-![image-20250119195308988](D:\git_repository\cyber_security_learning\markdown_img\image-20250119195308988.png)
+![image-20250119195308988](..\markdown_img\image-20250119195308988.png)
 
 ## 什么是ELK
 
@@ -53,7 +53,7 @@ https://docs.fluentd.org/
 
 ### Elasticsearch 介绍
 
-![image-20250119200330753](D:\git_repository\cyber_security_learning\markdown_img\image-20250119200330753.png)
+![image-20250119200330753](..\markdown_img\image-20250119200330753.png)
 
 **官方介绍**
 
@@ -203,7 +203,7 @@ Replicas的重要性主要体现在以下两个特征：
 https://www.elastic.co/cn/what-is/elasticsearch
 ```
 
-![image-20250119215819291](D:\git_repository\cyber_security_learning\markdown_img\image-20250119215819291.png)
+![image-20250119215819291](..\markdown_img\image-20250119215819291.png)
 
 Logstash 是 Elastic Stack 的核心产品之一，可用来对数据进行聚合和处理，并将数据发送到 Elasticsearch。
 
@@ -265,7 +265,7 @@ Kibana 与 Elasticsearch 和更广意义上的 Elastic Stack 紧密的集成在�
 
 ## ELK应用架构
 
-![image-20250119195308988](D:\git_repository\cyber_security_learning\markdown_img\image-20250119195308988.png)
+![image-20250119195308988](..\markdown_img\image-20250119195308988.png)
 
 
 
@@ -287,7 +287,7 @@ ELK: Elasticsearch，Logstash，filebeat，Kibana
 https://www.fluentd.org/
 ```
 
-![image-20250119220444011](D:\git_repository\cyber_security_learning\markdown_img\image-20250119220444011.png)
+![image-20250119220444011](..\markdown_img\image-20250119220444011.png)
 
 Fluentd 是开源社区中流行的日志收集工具，td-agent是其商业化版本，由Treasure Data公司维护，是本文选用的评测版本。
 
@@ -363,7 +363,7 @@ Fluent Bit 很节省资源，因为它占用的空间很小。
 
 ### Loki
 
-![image-20250119221835644](D:\git_repository\cyber_security_learning\markdown_img\image-20250119221835644.png)
+![image-20250119221835644](..\markdown_img\image-20250119221835644.png)
 
 ```bash
 #Loki文档网址：
@@ -440,7 +440,7 @@ https://www.elastic.co/guide/en/elasticsearch/reference/master/install-elasticse
 https://www.elastic.co/cn/support/matrix
 ```
 
-![image-20250119222614301](D:\git_repository\cyber_security_learning\markdown_img\image-20250119222614301.png)
+![image-20250119222614301](..\markdown_img\image-20250119222614301.png)
 
 
 
@@ -506,7 +506,7 @@ CPU 2C
 
 使用默认系统配置，**二进制安装时会提示下面错误**，**包安装会自动修改此配置**
 
-![image-20250119223514888](D:\git_repository\cyber_security_learning\markdown_img\image-20250119223514888.png)
+![image-20250119223514888](..\markdown_img\image-20250119223514888.png)
 
 ```bash
 #查看默认值
@@ -586,7 +586,7 @@ https://mirrors.tuna.tsinghua.edu.cn/elasticstack/
 
 
 
-![image-20250119224534985](D:\git_repository\cyber_security_learning\markdown_img\image-20250119224534985.png)
+![image-20250119224534985](..\markdown_img\image-20250119224534985.png)
 
 
 
@@ -784,7 +784,7 @@ https://www.elastic.co/guide/en/elasticsearch/reference/master/targz.html
 https://www.elastic.co/cn/downloads/elasticsearch
 ```
 
-![image-20250120180545468](D:\git_repository\cyber_security_learning\markdown_img\image-20250120180545468.png)
+![image-20250120180545468](..\markdown_img\image-20250120180545468.png)
 
 
 
@@ -1208,7 +1208,7 @@ Head 是一个 ES 在生产较为常用的插件，目前此插件更新较慢�
 
 **注意：要打开开发者模式**
 
-![image-20250120175237353](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175237353.png)
+![image-20250120175237353](..\markdown_img\image-20250120175237353.png)
 
 ```bash
 # 下载Head插件安装包
@@ -1217,15 +1217,15 @@ https://www.mysticalrecluse.com/script/tools/ElasticSearch-Head-0.1.5_0.zip
 # 解压后将文件夹导入浏览器
 ```
 
-![image-20250120175807173](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175807173.png)
+![image-20250120175807173](..\markdown_img\image-20250120175807173.png)
 
-![image-20250120175837414](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175837414.png)
+![image-20250120175837414](..\markdown_img\image-20250120175837414.png)
 
-![image-20250120175856082](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175856082.png)
+![image-20250120175856082](..\markdown_img\image-20250120175856082.png)
 
 **输入地址链接**
 
-![image-20250120175956894](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175956894.png)
+![image-20250120175956894](..\markdown_img\image-20250120175956894.png)
 
 
 
@@ -1233,7 +1233,7 @@ https://www.mysticalrecluse.com/script/tools/ElasticSearch-Head-0.1.5_0.zip
 
 #### cerebro插件介绍
 
-![image-20250121152023926](D:\git_repository\cyber_security_learning\markdown_img\image-20250121152023926.png)
+![image-20250121152023926](..\markdown_img\image-20250121152023926.png)
 
 Cerebro 是开源的 elasticsearch 集群 Web 管理程序，此工具应用也很广泛，此项目升级比 Head 频繁
 
@@ -1251,7 +1251,7 @@ Cerebro v0.9.4 版本更高版本需要 Java11
 https://github.com/lmenezes/cerebro
 ```
 
-![image-20250121152207033](D:\git_repository\cyber_security_learning\markdown_img\image-20250121152207033.png)
+![image-20250121152207033](..\markdown_img\image-20250121152207033.png)
 
 
 
@@ -1289,9 +1289,9 @@ drwxr-xr-x 2 cerebro cerebro 4096  1月 21 15:52 /var/lib/cerebro/
 # 访问浏览器：10.0.0.132:9000,并输入es集群IP连接
 ```
 
-![image-20250121155806662](D:\git_repository\cyber_security_learning\markdown_img\image-20250121155806662.png)
+![image-20250121155806662](..\markdown_img\image-20250121155806662.png)
 
-![image-20250121155819105](D:\git_repository\cyber_security_learning\markdown_img\image-20250121155819105.png)
+![image-20250121155819105](..\markdown_img\image-20250121155819105.png)
 
 
 
@@ -1387,7 +1387,7 @@ zo37jquZSimiJTu7kCMjmA 10.0.0.152 10.0.0.152 es-node3
 # 根据下图显示可以看出：没有分片（因为显示0），但是有一个副本（不包括原始数据自己，只计算副本数）
 ```
 
-![image-20250121130543467](D:\git_repository\cyber_security_learning\markdown_img\image-20250121130543467.png)
+![image-20250121130543467](..\markdown_img\image-20250121130543467.png)
 
 ```bash
 # 关闭es-node1节点，再观察
@@ -1399,7 +1399,7 @@ zo37jquZSimiJTu7kCMjmA 10.0.0.152 10.0.0.152 es-node3
 1737436100 05:08:20 my-es1 yellow 2 2 1 1 0 0 1 0 - 50.0%
 ```
 
-![image-20250121130731207](D:\git_repository\cyber_security_learning\markdown_img\image-20250121130731207.png)
+![image-20250121130731207](..\markdown_img\image-20250121130731207.png)
 
 ```bash
 # 过一段时间后，会在node2上重建副本，集群变为绿色
@@ -1407,7 +1407,7 @@ zo37jquZSimiJTu7kCMjmA 10.0.0.152 10.0.0.152 es-node3
 1737436100 05:08:20 my-es1 green 2 2 2 1 0 0 0 0 - 100.0%
 ```
 
-![image-20250121130959573](D:\git_repository\cyber_security_learning\markdown_img\image-20250121130959573.png)
+![image-20250121130959573](..\markdown_img\image-20250121130959573.png)
 
 ```ABAP
 颜色含义：
@@ -1423,7 +1423,7 @@ zo37jquZSimiJTu7kCMjmA 10.0.0.152 10.0.0.152 es-node3
 # 因为少于半数以上可用，即3个节点的集群，关了两个，因此集群不可用，es无法访问
 ```
 
-![image-20250121131436529](D:\git_repository\cyber_security_learning\markdown_img\image-20250121131436529.png)
+![image-20250121131436529](..\markdown_img\image-20250121131436529.png)
 
 ```bash
 #创建索引index2,格式化输出
@@ -1482,7 +1482,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 
 ```
 
-![image-20250121132533883](D:\git_repository\cyber_security_learning\markdown_img\image-20250121132533883.png)
+![image-20250121132533883](..\markdown_img\image-20250121132533883.png)
 
 ```bash
 # 创建3分片，1副本（生产中建议分片数和节点数相同，实现负载均衡）
@@ -1500,7 +1500,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 # ES自动将分片数据均匀的放在不同节点上，实现高可用
 ```
 
-![image-20250121132811946](D:\git_repository\cyber_security_learning\markdown_img\image-20250121132811946.png)
+![image-20250121132811946](..\markdown_img\image-20250121132811946.png)
 
 ```bash
 # 关闭es-node2
@@ -1511,7 +1511,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 1737437626 05:33:46 my-es1 yellow 2 2 16 8 0 0 3 0 - 84.2%
 ```
 
-![image-20250121133408182](D:\git_repository\cyber_security_learning\markdown_img\image-20250121133408182.png)
+![image-20250121133408182](..\markdown_img\image-20250121133408182.png)
 
 ```bash
 # 创建副本index5,3分片，0副本
@@ -1527,7 +1527,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 {"acknowledged":true,"shards_acknowledged":true,"index":"index5"}
 ```
 
-![image-20250121133712189](D:\git_repository\cyber_security_learning\markdown_img\image-20250121133712189.png)
+![image-20250121133712189](..\markdown_img\image-20250121133712189.png)
 
 ```bash
 # 关闭es-node2，会造成index5的数据缺失，从而导致集群变为红色
@@ -1538,7 +1538,7 @@ green  open   index2 ThbaBIClSUazA8YQ33WqPQ   1   1          0            0     
 1737437941 05:39:01 my-es1 red 2 2 15 10 0 0 7 0 - 68.2%
 ```
 
-![image-20250121133936563](D:\git_repository\cyber_security_learning\markdown_img\image-20250121133936563.png)
+![image-20250121133936563](..\markdown_img\image-20250121133936563.png)
 
 ```bash
 # 启动es-node2
@@ -1568,7 +1568,7 @@ green open index2 ThbaBIClSUazA8YQ33WqPQ 1 1 0 0  498b 249b 249b
 0  1  2  _state
 ```
 
-![image-20250121134718614](D:\git_repository\cyber_security_learning\markdown_img\image-20250121134718614.png)
+![image-20250121134718614](..\markdown_img\image-20250121134718614.png)
 
 
 
@@ -1584,7 +1584,7 @@ green open index2 ThbaBIClSUazA8YQ33WqPQ 1 1 0 0  498b 249b 249b
 # 浏览器图形界面，可以看到刚才插入的数据，每个插入的文档都会随机分片一个编号，即id
 ```
 
-![image-20250121135527505](D:\git_repository\cyber_security_learning\markdown_img\image-20250121135527505.png)
+![image-20250121135527505](..\markdown_img\image-20250121135527505.png)
 
 ```bash
 # 指定编号，插入文档（通常是系统分配）
@@ -1607,7 +1607,7 @@ green open index2 ThbaBIClSUazA8YQ33WqPQ 1 1 0 0  498b 249b 249b
 # 查看浏览器，id为自己指定的3
 ```
 
-![image-20250121135942316](D:\git_repository\cyber_security_learning\markdown_img\image-20250121135942316.png)
+![image-20250121135942316](..\markdown_img\image-20250121135942316.png)
 
 
 
@@ -2002,7 +2002,7 @@ Elasticsearch为了提高写操作的性能，允许在主分片写入数据后�
 
 故障转移指的是，当集群中有节点发生故障时，ES集群会进行自动修复
 
-![image-20250121175601325](D:\git_repository\cyber_security_learning\markdown_img\image-20250121175601325.png)
+![image-20250121175601325](..\markdown_img\image-20250121175601325.png)
 
 如上图，假设由3个节点的ES集群组成,有一个索引index_mystical，三个主分片，三个副本分片，如果其中一个节点宕机
 
@@ -2015,7 +2015,7 @@ Elasticsearch为了提高写操作的性能，允许在主分片写入数据后�
   - 比如这次选择 node2 为 新 master 节点；此时集群状态变为yellow 状态
   - 其实无论选举出的新Master节点是哪个节点，都不影响后续的分片的重新分布结果
 
-![image-20250121175830942](D:\git_repository\cyber_security_learning\markdown_img\image-20250121175830942.png)
+![image-20250121175830942](..\markdown_img\image-20250121175830942.png)
 
 - **主分片调整**
   - 新的Master节点 node2 发现在原来在node3上的主分片 P1 丢失
@@ -2025,14 +2025,14 @@ Elasticsearch为了提高写操作的性能，允许在主分片写入数据后�
 - **副本分片调整**
   - node1 将 P1 和 node2上的P2 主分片重新生成新的副本分片 R1、R2，此时集群状态变为 Green
 
-![image-20250121175932581](D:\git_repository\cyber_security_learning\markdown_img\image-20250121175932581.png)
+![image-20250121175932581](..\markdown_img\image-20250121175932581.png)
 
 - 后续修复好node3节点后，Master 不会重新选举，但会自动将各个分片重新均匀分配
   - 保证主分片尽可能分布在每个节点上
   - 副本分片也尽可能分布不同的节点上
   - 重新分配的过程需要一段时间才能完成
 
-![image-20250121180438208](D:\git_repository\cyber_security_learning\markdown_img\image-20250121180438208.png)
+![image-20250121180438208](..\markdown_img\image-20250121180438208.png)
 
 ```ABAP
 一定是主分片将数据复制给副本分片，所以没有主分片的数据，要现将副本分片提升为主分片
@@ -2061,7 +2061,7 @@ number_of_primary_shards #主分片数
 
 
 
-![image-20250121181107339](D:\git_repository\cyber_security_learning\markdown_img\image-20250121181107339.png)
+![image-20250121181107339](..\markdown_img\image-20250121181107339.png)
 
 可以发送请求到集群中的任一节点。每个节点都知道集群中任一文档位置， 每个节点都有能力接收请求, 再接将请求转发到真正存储数据的节点上
 
@@ -2069,7 +2069,7 @@ number_of_primary_shards #主分片数
 
 #### ES 文档创建删除流程
 
-![image-20250121181541492](D:\git_repository\cyber_security_learning\markdown_img\image-20250121181541492.png)
+![image-20250121181541492](..\markdown_img\image-20250121181541492.png)
 
 - 客户端向集群中某个节点 Node1 发送**新建索引文档**或者**删除索引文档**请求
 - Node1节点使用文档的 _id 通过上面的算法确定文档属于分片 0 
@@ -2085,7 +2085,7 @@ number_of_primary_shards #主分片数
 
 可以从主分片或者从其它任意副本分片读取文档 ，读取流程如下图所示 ：
 
-![image-20250121181827402](D:\git_repository\cyber_security_learning\markdown_img\image-20250121181827402.png)
+![image-20250121181827402](..\markdown_img\image-20250121181827402.png)
 
 - 客户端向集群中某个节点 Node1 发送读取请求
 - 节点使用文档的 _id 来确定文档属于分片 0 。分片 0 的主副本分片存在于所有的三个节点上
@@ -2152,7 +2152,7 @@ fs.file-max = 1000000
 [root@mystical /es/log]# systemctl restart elasticsearch.service
 ```
 
-![image-20250121203409221](D:\git_repository\cyber_security_learning\markdown_img\image-20250121203409221.png)
+![image-20250121203409221](..\markdown_img\image-20250121203409221.png)
 
 
 
@@ -2171,7 +2171,7 @@ fs.file-max = 1000000
 [root@mystical /es/log]# systemctl stop elasticsearch.service
 ```
 
-![image-20250121204518014](D:\git_repository\cyber_security_learning\markdown_img\image-20250121204518014.png)
+![image-20250121204518014](..\markdown_img\image-20250121204518014.png)
 
 ```ABAP
 以上述图片为例，绝不能同时通知node3和node5，否则就会出现分片1丢失的问题，如果确定要将node3和node5移出集群
@@ -2194,7 +2194,7 @@ logstash运行时最少也会需要额外的500M的以上的内存，会消耗�
 
 
 
-![image-20250121205310305](D:\git_repository\cyber_security_learning\markdown_img\image-20250121205310305.png)
+![image-20250121205310305](..\markdown_img\image-20250121205310305.png)
 
 **官方链接**
 
@@ -2218,7 +2218,7 @@ https://www.elastic.co/cn/downloads/beats
 
 **Beats 是一些工具集,包括以下,其中 filebeat 应用最为广泛**
 
-![image-20250121205605253](D:\git_repository\cyber_security_learning\markdown_img\image-20250121205605253.png)
+![image-20250121205605253](..\markdown_img\image-20250121205605253.png)
 
 注意: Beats 版本要和 Elasticsearch 相同的版本，否则可能会出错
 
@@ -2298,7 +2298,7 @@ output.elasticsearch:
 
 新版`.ds-metricbeat-<时间>-<版本>`
 
-![image-20250121215017651](D:\git_repository\cyber_security_learning\markdown_img\image-20250121215017651.png)
+![image-20250121215017651](..\markdown_img\image-20250121215017651.png)
 
 
 
@@ -2306,7 +2306,7 @@ output.elasticsearch:
 
 **8.X版本界面**
 
-![image-20250121215242609](D:\git_repository\cyber_security_learning\markdown_img\image-20250121215242609.png)
+![image-20250121215242609](..\markdown_img\image-20250121215242609.png)
 
 
 
@@ -2453,7 +2453,7 @@ setup.template.settings:
 
 ### cerebro插件查看索引
 
-![image-20250121222236027](D:\git_repository\cyber_security_learning\markdown_img\image-20250121222236027.png)
+![image-20250121222236027](..\markdown_img\image-20250121222236027.png)
 
 
 
@@ -2466,14 +2466,14 @@ Observability---运行时间---监测 Uptime Monitors
 
 
 
-![image-20250121222503550](D:\git_repository\cyber_security_learning\markdown_img\image-20250121222503550.png)
+![image-20250121222503550](..\markdown_img\image-20250121222503550.png)
 
 ```bash
 # 在被观测节点安装nginx，打开80端口
 [root@web02 ~]# apt install -y nginx
 ```
 
-![image-20250121223146570](D:\git_repository\cyber_security_learning\markdown_img\image-20250121223146570.png)
+![image-20250121223146570](..\markdown_img\image-20250121223146570.png)
 
 
 
@@ -2507,7 +2507,7 @@ https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-overview.html
 https://www.elastic.co/guide/en/beats/filebeat/current/configuring-howto-filebeat.htm
 ```
 
-![image-20250122091225320](D:\git_repository\cyber_security_learning\markdown_img\image-20250122091225320.png)
+![image-20250122091225320](..\markdown_img\image-20250122091225320.png)
 
 **输入和输出官方说明**
 
@@ -3093,19 +3093,19 @@ output.elasticsearch:
 
 **通过cerebro查看收集的日志信息**
 
-![image-20250122110443183](D:\git_repository\cyber_security_learning\markdown_img\image-20250122110443183.png)
+![image-20250122110443183](..\markdown_img\image-20250122110443183.png)
 
 **通过Kibana查看收集的日志信息 (8.X版本 — 数据视图；7.X版本 — 索引模式)**
 
-![image-20250122112341415](D:\git_repository\cyber_security_learning\markdown_img\image-20250122112341415.png)
+![image-20250122112341415](..\markdown_img\image-20250122112341415.png)
 
-![image-20250122112453394](D:\git_repository\cyber_security_learning\markdown_img\image-20250122112453394.png)
+![image-20250122112453394](..\markdown_img\image-20250122112453394.png)
 
-![image-20250122112633883](D:\git_repository\cyber_security_learning\markdown_img\image-20250122112633883.png)
+![image-20250122112633883](..\markdown_img\image-20250122112633883.png)
 
-![image-20250122112751286](D:\git_repository\cyber_security_learning\markdown_img\image-20250122112751286.png)
+![image-20250122112751286](..\markdown_img\image-20250122112751286.png)
 
-![image-20250122112810615](D:\git_repository\cyber_security_learning\markdown_img\image-20250122112810615.png)
+![image-20250122112810615](..\markdown_img\image-20250122112810615.png)
 
 ```bash
 # 测试
@@ -3114,11 +3114,11 @@ output.elasticsearch:
 # 在Kibana中搜索查询
 ```
 
-![image-20250122112933908](D:\git_repository\cyber_security_learning\markdown_img\image-20250122112933908.png)
+![image-20250122112933908](..\markdown_img\image-20250122112933908.png)
 
-![image-20250122113345402](D:\git_repository\cyber_security_learning\markdown_img\image-20250122113345402.png)
+![image-20250122113345402](..\markdown_img\image-20250122113345402.png)
 
-![image-20250122113358029](D:\git_repository\cyber_security_learning\markdown_img\image-20250122113358029.png)
+![image-20250122113358029](..\markdown_img\image-20250122113358029.png)
 
 
 
@@ -3164,15 +3164,15 @@ setup.template.settings:
 
 **使用cerebro插件查看**
 
-![image-20250122115259861](D:\git_repository\cyber_security_learning\markdown_img\image-20250122115259861.png)
+![image-20250122115259861](..\markdown_img\image-20250122115259861.png)
 
 
 
 **使用Kibana数据视图查看**
 
-![image-20250122120537111](D:\git_repository\cyber_security_learning\markdown_img\image-20250122120537111.png)
+![image-20250122120537111](..\markdown_img\image-20250122120537111.png)
 
-![image-20250122120513796](D:\git_repository\cyber_security_learning\markdown_img\image-20250122120513796.png)
+![image-20250122120513796](..\markdown_img\image-20250122120513796.png)
 
 
 
@@ -3281,15 +3281,15 @@ setup.template.settings:
 
 #### **Cerebro插件查看索引**
 
-![image-20250122141031491](D:\git_repository\cyber_security_learning\markdown_img\image-20250122141031491.png)
+![image-20250122141031491](..\markdown_img\image-20250122141031491.png)
 
 
 
 #### 使用Kibana查看索引
 
-![image-20250122141316537](D:\git_repository\cyber_security_learning\markdown_img\image-20250122141316537.png)
+![image-20250122141316537](..\markdown_img\image-20250122141316537.png)
 
-![image-20250122141357867](D:\git_repository\cyber_security_learning\markdown_img\image-20250122141357867.png)
+![image-20250122141357867](..\markdown_img\image-20250122141357867.png)
 
 
 
@@ -3363,13 +3363,13 @@ setup.template.settings:
 
 #### **Cerebro插件查看索引**
 
-![image-20250122144529051](D:\git_repository\cyber_security_learning\markdown_img\image-20250122144529051.png)
+![image-20250122144529051](..\markdown_img\image-20250122144529051.png)
 
 
 
 #### 使用Kibana查看索引
 
-![image-20250122144835128](D:\git_repository\cyber_security_learning\markdown_img\image-20250122144835128.png)
+![image-20250122144835128](..\markdown_img\image-20250122144835128.png)
 
 
 
@@ -3448,13 +3448,13 @@ setup.template.pattern: "tomcat-*"
 
 #### 插件查看索引
 
-![image-20250123145535819](D:\git_repository\cyber_security_learning\markdown_img\image-20250123145535819.png)
+![image-20250123145535819](..\markdown_img\image-20250123145535819.png)
 
-![image-20250123145814580](D:\git_repository\cyber_security_learning\markdown_img\image-20250123145814580.png)
+![image-20250123145814580](..\markdown_img\image-20250123145814580.png)
 
-![image-20250123145854123](D:\git_repository\cyber_security_learning\markdown_img\image-20250123145854123.png)
+![image-20250123145854123](..\markdown_img\image-20250123145854123.png)
 
-![image-20250123150017701](D:\git_repository\cyber_security_learning\markdown_img\image-20250123150017701.png)
+![image-20250123150017701](..\markdown_img\image-20250123150017701.png)
 
 
 
@@ -3508,7 +3508,7 @@ https://www.elastic.co/guide/en/beats/filebeat/7.0/multiline-examples.html
 
 
 
-![image-20250123151144386](D:\git_repository\cyber_security_learning\markdown_img\image-20250123151144386.png)
+![image-20250123151144386](..\markdown_img\image-20250123151144386.png)
 
 #### 修改Filebeat文件
 
@@ -3713,7 +3713,7 @@ output.logstash:
 
 ## Logstash 介绍
 
-![image-20250128175852633](D:\git_repository\cyber_security_learning\markdown_img\image-20250128175852633.png)
+![image-20250128175852633](..\markdown_img\image-20250128175852633.png)
 
 Logstash 是免费且开放的**服务器端数据处理管道**，能够从多个来源采集数据，转换数据，然后将数据发送到您最喜欢的一个或多个“存储库”中
 
@@ -5121,19 +5121,19 @@ output {
 https://www.maxmind.com/en/home
 ```
 
-![image-20250131145820821](D:\git_repository\cyber_security_learning\markdown_img\image-20250131145820821.png)
+![image-20250131145820821](..\markdown_img\image-20250131145820821.png)
 
 注册账号
 
-![image-20250131145932129](D:\git_repository\cyber_security_learning\markdown_img\image-20250131145932129.png)
+![image-20250131145932129](..\markdown_img\image-20250131145932129.png)
 
 注册成功后，登录账户即可下载最新的数据
 
-![image-20250131150023119](D:\git_repository\cyber_security_learning\markdown_img\image-20250131150023119.png)
+![image-20250131150023119](..\markdown_img\image-20250131150023119.png)
 
 
 
-![image-20250131150053981](D:\git_repository\cyber_security_learning\markdown_img\image-20250131150053981.png)
+![image-20250131150053981](..\markdown_img\image-20250131150053981.png)
 
 
 
@@ -5903,7 +5903,7 @@ output {
 
 #### 收集应用特定格式的日志输出至 Elasticsearch 并利用 Kibana 展示
 
-![image-20250130105839369](D:\git_repository\cyber_security_learning\markdown_img\image-20250130105839369.png)
+![image-20250130105839369](..\markdown_img\image-20250130105839369.png)
 
 ##### 应用日志收集项目说明
 
@@ -6031,51 +6031,51 @@ output {
 
  **插件查看索引**
 
-![image-20250130112114322](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112114322.png)
+![image-20250130112114322](..\markdown_img\image-20250130112114322.png)
 
 注意：因为是历史数据，所以需要选择正确的时间段
 
-![image-20250130112234029](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112234029.png)
+![image-20250130112234029](..\markdown_img\image-20250130112234029.png)
 
 
 
 ##### Kibana 展示
 
-![image-20250130112342396](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112342396.png)
+![image-20250130112342396](..\markdown_img\image-20250130112342396.png)
 
-![image-20250130112412257](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112412257.png)
+![image-20250130112412257](..\markdown_img\image-20250130112412257.png)
 
-![image-20250130112438271](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112438271.png)
+![image-20250130112438271](..\markdown_img\image-20250130112438271.png)
 
-![image-20250130112459217](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112459217.png)
+![image-20250130112459217](..\markdown_img\image-20250130112459217.png)
 
-![image-20250130112521022](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112521022.png)
+![image-20250130112521022](..\markdown_img\image-20250130112521022.png)
 
-![image-20250130112535573](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112535573.png)
+![image-20250130112535573](..\markdown_img\image-20250130112535573.png)
 
-![image-20250130112557741](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112557741.png)
+![image-20250130112557741](..\markdown_img\image-20250130112557741.png)
 
-![image-20250130112631559](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112631559.png)
+![image-20250130112631559](..\markdown_img\image-20250130112631559.png)
 
-![image-20250130112652545](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112652545.png)
+![image-20250130112652545](..\markdown_img\image-20250130112652545.png)
 
-![image-20250130112720311](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112720311.png)
+![image-20250130112720311](..\markdown_img\image-20250130112720311.png)
 
 
 
-![image-20250130112804067](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112804067.png)
+![image-20250130112804067](..\markdown_img\image-20250130112804067.png)
 
-![image-20250130112821255](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112821255.png)
+![image-20250130112821255](..\markdown_img\image-20250130112821255.png)
 
-![image-20250130112919146](D:\git_repository\cyber_security_learning\markdown_img\image-20250130112919146.png)
+![image-20250130112919146](..\markdown_img\image-20250130112919146.png)
 
 后续根据上述方法，创建云图
 
-![image-20250130113028284](D:\git_repository\cyber_security_learning\markdown_img\image-20250130113028284.png)
+![image-20250130113028284](..\markdown_img\image-20250130113028284.png)
 
 点击共享，可以将大屏共享到指定链接或者自己的html网站中
 
-![image-20250130113117733](D:\git_repository\cyber_security_learning\markdown_img\image-20250130113117733.png)
+![image-20250130113117733](..\markdown_img\image-20250130113117733.png)
 
 
 
@@ -6116,7 +6116,7 @@ https://mirrors.tuna.tsinghua.edu.cn/elasticstack/
 https://github.com/elastic/kibana
 ```
 
-![image-20250121160534071](D:\git_repository\cyber_security_learning\markdown_img\image-20250121160534071.png)
+![image-20250121160534071](..\markdown_img\image-20250121160534071.png)
 
 
 
@@ -6192,21 +6192,21 @@ LISTEN      0           511                     0.0.0.0:5601                  0.
 # 在宿主机上添加hosts文件信息，然后浏览器登录：http://kibana.mystical.org:5601/
 ```
 
-![image-20250121163026440](D:\git_repository\cyber_security_learning\markdown_img\image-20250121163026440.png)
+![image-20250121163026440](..\markdown_img\image-20250121163026440.png)
 
 **点击自己浏览**
 
-![image-20250121163437711](D:\git_repository\cyber_security_learning\markdown_img\image-20250121163437711.png)
+![image-20250121163437711](..\markdown_img\image-20250121163437711.png)
 
-![image-20250121163608191](D:\git_repository\cyber_security_learning\markdown_img\image-20250121163608191.png)
+![image-20250121163608191](..\markdown_img\image-20250121163608191.png)
 
-![image-20250121163643228](D:\git_repository\cyber_security_learning\markdown_img\image-20250121163643228.png)
+![image-20250121163643228](..\markdown_img\image-20250121163643228.png)
 
-![image-20250121163717772](D:\git_repository\cyber_security_learning\markdown_img\image-20250121163717772.png)
+![image-20250121163717772](..\markdown_img\image-20250121163717772.png)
 
 **安装并连接Kibana后，Kibana会自动生成很多元数据索引，可以使用cerebro进行观看**
 
-![image-20250121163907063](D:\git_repository\cyber_security_learning\markdown_img\image-20250121163907063.png)
+![image-20250121163907063](..\markdown_img\image-20250121163907063.png)
 
 
 
@@ -6218,7 +6218,7 @@ LISTEN      0           511                     0.0.0.0:5601                  0.
 
 ### 环境准备
 
-![image-20250130215315585](D:\git_repository\cyber_security_learning\markdown_img\image-20250130215315585.png)
+![image-20250130215315585](..\markdown_img\image-20250130215315585.png)
 
 
 ```bash
@@ -6240,7 +6240,7 @@ LISTEN      0           511                     0.0.0.0:5601                  0.
 10.0.0.104
 ```
 
-![image-20250131144641023](D:\git_repository\cyber_security_learning\markdown_img\image-20250131144641023.png)
+![image-20250131144641023](..\markdown_img\image-20250131144641023.png)
 
 ### Filebeat 收集 Nginx 的访问和错误日志并发送至 kafka
 
@@ -6274,7 +6274,7 @@ output.kafka:
 
 查看kafka中的数据
 
-![image-20250131103038074](D:\git_repository\cyber_security_learning\markdown_img\image-20250131103038074.png)
+![image-20250131103038074](..\markdown_img\image-20250131103038074.png)
 
 
 
@@ -6384,23 +6384,23 @@ output {
 
 也可以根据Kafka的图形工具，观察消息积压状况
 
-![image-20250131144938030](D:\git_repository\cyber_security_learning\markdown_img\image-20250131144938030.png)
+![image-20250131144938030](..\markdown_img\image-20250131144938030.png)
 
 观察Kabana上的索引是否生成，如果有，说明elasticsearch成功接收数据
 
-![image-20250131145127613](D:\git_repository\cyber_security_learning\markdown_img\image-20250131145127613.png)
+![image-20250131145127613](..\markdown_img\image-20250131145127613.png)
 
 创建视图
 
-![image-20250131151836675](D:\git_repository\cyber_security_learning\markdown_img\image-20250131151836675.png)
+![image-20250131151836675](..\markdown_img\image-20250131151836675.png)
 
-![image-20250131151909764](D:\git_repository\cyber_security_learning\markdown_img\image-20250131151909764.png)
+![image-20250131151909764](..\markdown_img\image-20250131151909764.png)
 
 查看Discover，并做好调试
 
-![image-20250131152050448](D:\git_repository\cyber_security_learning\markdown_img\image-20250131152050448.png)
+![image-20250131152050448](..\markdown_img\image-20250131152050448.png)
 
-![image-20250131152200659](D:\git_repository\cyber_security_learning\markdown_img\image-20250131152200659.png)
+![image-20250131152200659](..\markdown_img\image-20250131152200659.png)
 
 ### Kibana 创建地图数据
 
@@ -6431,13 +6431,13 @@ GET /logstash-kafka-nginx-accesslog-2022.03.02
 #复制mappings开始的行到settings行之前结束,并最后再加一个 }
 ```
 
-![image-20250131152645703](D:\git_repository\cyber_security_learning\markdown_img\image-20250131152645703.png)
+![image-20250131152645703](..\markdown_img\image-20250131152645703.png)
 
-![image-20250131152816851](D:\git_repository\cyber_security_learning\markdown_img\image-20250131152816851.png)
+![image-20250131152816851](..\markdown_img\image-20250131152816851.png)
 
-![image-20250131153228759](D:\git_repository\cyber_security_learning\markdown_img\image-20250131153228759.png)
+![image-20250131153228759](..\markdown_img\image-20250131153228759.png)
 
-![image-20250131153255307](D:\git_repository\cyber_security_learning\markdown_img\image-20250131153255307.png)
+![image-20250131153255307](..\markdown_img\image-20250131153255307.png)
 
 执行下面操作生成索引模板，将上面的mappings部分内容复制到下面，只修改"coordinates": {  "type":  "geo_point" } 部分
 
@@ -6461,33 +6461,33 @@ PUT /_template/template_nginx_accesslog
 } # 最后补一个 }
 ```
 
-![image-20250131162509928](D:\git_repository\cyber_security_learning\markdown_img\image-20250131162509928.png)
+![image-20250131162509928](..\markdown_img\image-20250131162509928.png)
 
 查看生成的索引模板
 
-![image-20250131162852511](D:\git_repository\cyber_security_learning\markdown_img\image-20250131162852511.png)
+![image-20250131162852511](..\markdown_img\image-20250131162852511.png)
 
 必须先删除旧有索引重新生成数据才能生
 
-![image-20250131163151654](D:\git_repository\cyber_security_learning\markdown_img\image-20250131163151654.png)
+![image-20250131163151654](..\markdown_img\image-20250131163151654.png)
 
 重新生成数据，确认类型是否更改
 
-![image-20250131165421406](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165421406.png)
+![image-20250131165421406](..\markdown_img\image-20250131165421406.png)
 
 修改好数据类型后，重新导入数据，生成地图
 
-![image-20250131165537145](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165537145.png)
+![image-20250131165537145](..\markdown_img\image-20250131165537145.png)
 
-![image-20250131165644298](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165644298.png)
+![image-20250131165644298](..\markdown_img\image-20250131165644298.png)
 
-![image-20250131165708987](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165708987.png)
+![image-20250131165708987](..\markdown_img\image-20250131165708987.png)
 
-![image-20250131165838774](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165838774.png)
+![image-20250131165838774](..\markdown_img\image-20250131165838774.png)
 
-![image-20250131165907568](D:\git_repository\cyber_security_learning\markdown_img\image-20250131165907568.png)
+![image-20250131165907568](..\markdown_img\image-20250131165907568.png)
 
-![image-20250131170134325](D:\git_repository\cyber_security_learning\markdown_img\image-20250131170134325.png)
+![image-20250131170134325](..\markdown_img\image-20250131170134325.png)
 
 
 
@@ -6499,7 +6499,7 @@ ES中的日志后续会被删除,但有些重要数据,比如状态码、客户�
 
 可以将重要数据写入数据库达到持久保存目的
 
-![image-20250131205922262](D:\git_repository\cyber_security_learning\markdown_img\image-20250131205922262.png)
+![image-20250131205922262](..\markdown_img\image-20250131205922262.png)
 
 
 
@@ -6587,13 +6587,13 @@ MySQL Connector/J是MySQL官方JDBC驱动程序，JDBC（Java Data Base Connecti
 https://dev.mysql.com/downloads/connector/
 ```
 
-![image-20250131220452111](D:\git_repository\cyber_security_learning\markdown_img\image-20250131220452111.png)
+![image-20250131220452111](..\markdown_img\image-20250131220452111.png)
 
 选择合适的版本
 
-![image-20250131221154737](D:\git_repository\cyber_security_learning\markdown_img\image-20250131221154737.png)
+![image-20250131221154737](..\markdown_img\image-20250131221154737.png)
 
-![image-20250131221312513](D:\git_repository\cyber_security_learning\markdown_img\image-20250131221312513.png)
+![image-20250131221312513](..\markdown_img\image-20250131221312513.png)
 
 Ubuntu22.04 安装 mysql-connector
 
