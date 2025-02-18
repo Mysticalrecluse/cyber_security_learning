@@ -7017,17 +7017,2677 @@ sidekiq*
 
 
 
+#### 在浏览器访问GitLab
+
+在新版gitlab中第一次登录的界面发生变化,取消重设密码界面,需要直接输入用户和密码才能登录
+
+**默认用户为root，其密码是随机生成**
+
+![image-20250208154751291](D:\git_repository\cyber_security_learning\markdown_img\image-20250208154751291.png)
+
+```bash
+# 初始账号为root
+# 初始密码为配置文件自行指定的密码
+```
+
+![image-20250208155656668](D:\git_repository\cyber_security_learning\markdown_img\image-20250208155656668.png)
+
+
+
 
 
 ### 基于 Kubernetes 安装 GitLab
 
+```http
+https://docs.gitlab.com/operator/installation.html
+```
+
+注意：资源建议
+
+```ABAP
+master: 4核CPU + 4G内存
+node1: 4核CPU + 6G内存
+node1: 4核CPU + 6G内存
+node1: 4核CPU + 6G内存
+
+低于上述配置，可能会因为资源不足，导致服务异常
+```
+
+范例：注意相关镜像可能需要科学上网
+
 ```bash
-GL_OPERATOR_VERSION=1.9.1 
-PLATFORM=kubernetes
+# 提前安装cert-manager证书管理组件
+# 官方cert-manager.yaml文件路径：https://github.com/cert-manager/cert-manager/releases/
+# 根据需要，自行选定版本的cert-manager.yaml
+# 示例以v1.17.0为例，此为20250208最新版 
+[root@master1 ~]# wget https://www.mysticalrecluse.com/script/tools/cert-manager.yaml
+[root@master1 ~]# kubectl apply -f cert-manager.yaml 
 
-https://gitlab.com/api/v4/projects/18899486/packages/generic/gitlab-operator/1.9.1/gitlab-operator-kubernetes-1.9.1.yaml
+# 部署 GitLab Operator
+# GL_OPERATOR_VERSION=1.9.1 
+# PLATFORM=kubernetes
+# 为gitlab创建名称空间
+[root@master1 ~]# kubectl create namespace gitlab-system
 
-https://gitlab.com/api/v4/projects/18899486/packages/generic/gitlab-operator/1.9.1/gitlab-operator-kubernetes-1.9.1.yaml
+# 创建动态置备的sc，并将其设置为default，这一步必须做，否则gitlab无法自动创建pv
+# 创建sc，看Kubernetes数据存储相关教学，创建完sc后，使用下面指令，将其设置为默认
+[root@master1 ~]# kubectl patch storageclass sc-nfs -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+
+# 设置完后查看sc状态
+[root@master1 test]#kubectl get sc
+NAME               PROVISIONER                                   RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+sc-nfs (default)   k8s-sigs.io/nfs-subdir-external-provisioner   Delete          Immediate           false                  27d
+
+
+# gitlab operator的各版本yaml文件下载路径：
+# https://gitlab.com/gitlab-org/cloud-native/gitlab-operator/-/releases
+[root@master1 ~]# wget https://gitlab.com/api/v4/projects/18899486/packages/generic/gitlab-operator/1.9.1/gitlab-operator-kubernetes-1.9.1.yaml
+
+# 启用operator
+[root@master1 ~]# kubectl apply -f gitlab-operator-kubernetes-1.9.1.yaml
+
+# 创建GitLab用户资源
+[root@master1 ~]# cat mygitlab.yaml 
+apiVersion: apps.gitlab.com/v1beta1
+kind: GitLab
+metadata:
+  name: gitlab
+spec:
+  chart:
+    # 使用下面链接查看version
+    # https://gitlab.com/gitlab-org/cloud-native/gitlab-operator/-/blob/1.9.1/CHART_VERSIONS
+    version: "8.8.1" 
+    values:
+      global:
+        hosts:
+          domain: "mygitlab.mystical.org"  # use a real domain here
+        ingress:
+          configureCertmanager: true
+      certmanager-issuer:
+        email: mysticalrecluse@gmail.com   # use your real email address here
+        
+# 启用gitlab
+[root@master1 ~]# kubectl apply -f mygitlab.yaml -n gitlab-system
+
+# 如果启动成功，查看状态如下
+[root@master1 ~]#kubectl get gitlabs -n gitlab-system 
+NAME     STATUS    VERSION
+gitlab   Running   8.8.1
+
+#  访问gitlab.mygitlab.mystical.org
+```
+
+```ABAP
+注意：由于资源问题，服务可能因为就绪探针和生存探针，导致起不来，反复重启，建议将webservice和sidekiq的deployment的探针取消
+注意：在取消探针前，记得将operator的controller-manager停掉，即将副本数量设为0即可
+```
+
+
+
+![image-20250208125113586](D:\git_repository\cyber_security_learning\markdown_img\image-20250208125113586.png)
+
+```bash
+# 默认账号：root
+# 初始密码：执行下列指令
+[root@master1 ~]# kubectl get secret -n gitlab-system gitlab-gitlab-initial-root-password -o jsonpath="{.data.password}" | base64 --decode
+mKycBGLxob511Rq2VopJ51URSWdphI7qVHass9t74LoZiglxdmMKSgrCUPkIAFS2	
+```
+
+![image-20250208125336856](D:\git_repository\cyber_security_learning\markdown_img\image-20250208125336856.png)
+
+```bash
+# 查看所有的ingress
+[root@master1 ~]#kubectl get ingress -n gitlab-system 
+NAME                        CLASS          HOSTS                            ADDRESS     PORTS     AGE
+gitlab-kas                  gitlab-nginx   kas.mygitlab.mystical.org        10.0.0.10   80, 443   3h9m
+gitlab-minio                gitlab-nginx   minio.mygitlab.mystical.org      10.0.0.10   80, 443   3h26m
+gitlab-registry             gitlab-nginx   registry.mygitlab.mystical.org   10.0.0.10   80, 443   3h9m
+gitlab-webservice-default   gitlab-nginx   gitlab.mygitlab.mystical.org     10.0.0.10   80, 443   3h9m
+
+# 尝试访问 minio.mygitlab.mystical.org
+```
+
+![image-20250208125839659](D:\git_repository\cyber_security_learning\markdown_img\image-20250208125839659.png)
+
+```bash
+# 查看minio的accesskey和secretkey
+[root@master1 ~]#kubectl get secret -n gitlab-system gitlab-minio-secret -o yaml
+apiVersion: v1
+data:
+  accesskey: RnJuZkYxd3hRUGN5WWtYdmt1NW1nWkg1VzNJQlhqTWk2ZGZzSzcyaUExYlF1V1I0Z044TTlZYXRFV3B2NUlacg==
+  secretkey: T3hUZ1RJbk01UkttSWtLdzJsN25ZRjdaVjlXc3JEYVJaR1F4Y3F4UU5lMlFzWmZmY3J3eTF2N1IySHFSa2hYdw==
+kind: Secret
+metadata:
+  creationTimestamp: "2025-02-08T01:29:09Z"
+  labels:
+    app: gitlab
+    app.kubernetes.io/managed-by: gitlab-operator
+    app.kubernetes.io/name: gitlab
+    app.kubernetes.io/part-of: gitlab
+    chart: gitlab-8.8.1
+    heritage: Helm
+    release: gitlab
+  name: gitlab-minio-secret
+  namespace: gitlab-system
+  resourceVersion: "174778"
+  uid: 9113c545-8eb0-40f3-af90-69817bf61837
+type: Opaque
+
+# base64解码
+[root@master1 ~]#echo "RnJuZkYxd3hRUGN5WWtYdmt1NW1nWkg1VzNJQlhqTWk2ZGZzSzcyaUExYlF1V1I0Z044TTlZYXRFV3B2NUlacg=="|base64 -d
+FrnfF1wxQPcyYkXvku5mgZH5W3IBXjMi6dfsK72iA1bQuWR4gN8M9YatEWpv5IZr
+[root@master1 ~]#echo "T3hUZ1RJbk01UkttSWtLdzJsN25ZRjdaVjlXc3JEYVJaR1F4Y3F4UU5lMlFzWmZmY3J3eTF2N1IySHFSa2hYdw=="|base64 -d
+OxTgTInM5RKmIkKw2l7nYF7ZV9WsrDaRZGQxcqxQNe2QsZffcrwy1v7R2HqRkhXw
+
+# 使用解码后的key登录
+```
+
+![image-20250208130235955](D:\git_repository\cyber_security_learning\markdown_img\image-20250208130235955.png)
+
+
+
+**在Kubernetes部署好GitLab后，查看资源情况**
+
+![image-20250208133202056](D:\git_repository\cyber_security_learning\markdown_img\image-20250208133202056.png)
+
+
+
+#### 配置邮件通知
+
+**检查 `gitlab-rails-secret` 是否包含 SMTP 配置**
+
+```bash
+[root@master1 ~]# kubectl get secret gitlab-rails-secret -n gitlab-system -o yaml
+
+# 如果 data: 下包含 smtp_address，说明 GitLab 已配置 SMTP
+# 如果没有 smtp_address，则 GitLab 没有 SMTP 配置，需要手动添加
+```
+
+
+
+**在 `gitlab.yaml` 永久修改 `smtp_settings`**
+
+**手动获取 `gitlab.yaml`**
+
+```bash
+[root@master1 ~]# kubectl get gitlab -n gitlab-system -o yaml > gitlab-latest.yaml
+[root@master1 test]# cat gitlab-latest.yaml 
+apiVersion: v1
+items:
+- apiVersion: apps.gitlab.com/v1beta1
+  kind: GitLab
+  metadata:
+    annotations:
+      kubectl.kubernetes.io/last-applied-configuration: |
+        {"apiVersion":"apps.gitlab.com/v1beta1","kind":"GitLab","metadata":{"annotations":{},"creationTimestamp":"2025-02-08T01:28:45Z","generation":2,"name":"gitlab","namespace":"gitlab-system","resourceVersion":"243958","uid":"ac00fa8b-c9ee-4df0-a666-3263366e5025"},"spec":{"chart":{"values":{"certmanager-issuer":{"email":"mysticalrecluse@gmail.com"},"global":{"hosts":{"domain":"mygitlab.mystical.org"},"ingress":{"configureCertmanager":true},"smtp":{"address":"smtp.163.com","authentication":"login","domain":"163.com","enabled":true,"openssl_verify_mode":"peer","password":{"key":"SMTP_PASSWORD","secret":"gitlab-smtp-secret"},"port":465,"starttls_auto":false,"tls":true,"user_name":"15104600741@163.com"}}},"version":"8.8.1"}},"status":{"conditions":[{"lastTransitionTime":"2025-02-08T07:07:10Z","message":"GitLab is initialized","observedGeneration":2,"reason":"Initialized","status":"True","type":"Initialized"},{"lastTransitionTime":"2025-02-08T07:07:10Z","message":"GitLab is running and available to accept requests","observedGeneration":2,"reason":"Available","status":"True","type":"Available"},{"lastTransitionTime":"2025-02-08T01:46:37Z","message":"GitLab is not currently upgrading","observedGeneration":2,"reason":"Upgrading","status":"False","type":"Upgrading"}],"phase":"Running","version":"8.8.1"}}
+    creationTimestamp: "2025-02-08T07:13:15Z"
+    generation: 1
+    name: gitlab
+    namespace: gitlab-system
+    resourceVersion: "247693"
+    uid: 1624d7c1-3786-47d8-beb7-1ccc1479e2de
+  spec:
+    chart:
+      values:
+        certmanager-issuer:
+          email: mysticalrecluse@gmail.com
+        global:
+          hosts:
+            domain: mygitlab.mystical.org
+          ingress:
+            configureCertmanager: true
+          smtp:                                    # 从这里开始添加
+            address: smtp.163.com
+            authentication: login
+            domain: 163.com
+            enabled: true
+            openssl_verify_mode: peer
+            password:
+              key: SMTP_PASSWORD
+              secret: gitlab-smtp-secret
+            port: 465
+            starttls_auto: false
+            tls: true
+            user_name: 15104600741@163.com
+          email:
+            from: "15104600741@163.com"
+            reply_to: "15104600741@163.com"      # 添加到这里
+      version: 8.8.1
+  status:
+    conditions:
+    - lastTransitionTime: "2025-02-08T07:18:57Z"
+      message: GitLab is initialized
+      observedGeneration: 1
+      reason: Initialized
+      status: "True"
+      type: Initialized
+    - lastTransitionTime: "2025-02-08T07:18:57Z"
+      message: GitLab is running and available to accept requests
+      observedGeneration: 1
+      reason: Available
+      status: "True"
+      type: Available
+    - lastTransitionTime: "2025-02-08T07:14:56Z"
+      message: GitLab is not currently upgrading
+      observedGeneration: 1
+      reason: Upgrading
+      status: "False"
+      type: Upgrading
+    phase: Running
+    version: 8.8.1
+kind: List
+metadata:
+  resourceVersion: ""
+
+# 关键
+# email.from 为 user_name 相同的邮箱
+# reply_to 避免 Reply-To 触发 SMTP 检查
+```
+
+
+
+**创建secret存放邮箱授权码**
+
+```bash
+[root@master1 ~]# kubectl create secret generic gitlab-smtp-secret -n gitlab-system   --from-literal=SMTP_PASSWORD="<授权码>"
+```
+
+
+
+**应用新配置**
+
+```bash
+[root@master1 ~]# kubectl apply -f gitlab-latest.yaml
+[root@master1 ~]# kubectl rollout restart deployment gitlab-webservice-default -n gitlab-system
+```
+
+
+
+<span style="color:tomato;font-weight:700">注意：由于某些原因，我将gitlab-controller-manager关闭了，手动接管整个服务，所以，上述所有的操作前提是gitlab-controller-manager是正常运行的，如果和我一样将其关闭，需执行下列操作，手动将smtp服务注入到configmap中</span>
+
+```ABAP
+# 手动修改 ConfigMap 来注入 smtp 配置
+
+kubectl patch configmap -n gitlab-system gitlab-webservice-config --type='merge' -p \
+'{"data":{"smtp.yml": "production:\n  enabled: true\n  address: \"smtp.163.com\"\n  port: 465\n  user_name: \"15104600741@163.com\"\n  password: \"你的SMTP密码\"\n  domain: \"163.com\"\n  authentication: \"login\"\n  tls: true\n  starttls_auto: false\n  openssl_verify_mode: \"peer\""}}'
+
+# 让 ConfigMap 生效
+kubectl rollout restart deployment -n gitlab-system gitlab-webservice
+kubectl rollout restart deployment -n gitlab-system gitlab-sidekiq
+kubectl rollout restart deployment -n gitlab-system gitlab-toolbox
+
+# 测试是否生效
+kubectl exec -it -n gitlab-system deployment/gitlab-toolbox -- gitlab-rails runner "Notify.test_email('3140394153@qq.com', 'Test Email', 'GitLab SMTP Config Test').deliver_now"
+
+# 如果尤其开启operator的controller-manager会将上述配置覆盖掉，因此，上述方式仅适用于实验环境，在资源有限，正常gitlab无法再k8s上启动的情况下使用。
+```
+
+
+
+**测试邮件**
+
+```bash
+[root@master1 test]#kubectl exec -it -n gitlab-system deployment/gitlab-toolbox -- gitlab-rails runner "Notify.test_email('3140394153@qq.com', 'Test Email', 'GitLab SMTP Config Test').deliver_now"
+Defaulted container "toolbox" out of: toolbox, certificates (init), configure (init)
+WARNING: Active Record does not support composite primary key.
+
+security_findings has composite primary key. Composite primary key is ignored.
+
+# 成功
+```
+
+![image-20250208153458322](D:\git_repository\cyber_security_learning\markdown_img\image-20250208153458322.png)
+
+
+
+### GitLab 基本配置
+
+#### 首次登录 GitLab Web 界面修改密码
+
+新版gitlab密码初始化官方帮助链接
+
+```http
+https://docs.gitlab.com/omnibus/installation/index.html
+```
+
+新版登录后,也需再次修改密码,注意:密码至少8位
+
+![image-20250208155944241](D:\git_repository\cyber_security_learning\markdown_img\image-20250208155944241.png)
+
+![image-20250208160007293](D:\git_repository\cyber_security_learning\markdown_img\image-20250208160007293.png)
+
+![image-20250208160119946](D:\git_repository\cyber_security_learning\markdown_img\image-20250208160119946.png)
+
+
+
+
+
+####  修改头像
+
+登录gitlab后可能看到用户的头像不能正常显示,可以修改为自定义的头像
+
+Kubernetes部署的GitLab有默认头像，可以正常显示
+
+![image-20250208160335921](D:\git_repository\cyber_security_learning\markdown_img\image-20250208160335921.png)
+
+![image-20250208160403884](D:\git_repository\cyber_security_learning\markdown_img\image-20250208160403884.png)
+
+![image-20250208160416028](D:\git_repository\cyber_security_learning\markdown_img\image-20250208160416028.png)
+
+
+
+#### 关闭账号注册功能
+
+新版用户注册界面
+
+![image-20250208160730934](D:\git_repository\cyber_security_learning\markdown_img\image-20250208160730934.png)
+
+关闭注册功能,先用root用户登录
+
+![image-20250208161042568](D:\git_repository\cyber_security_learning\markdown_img\image-20250208161042568.png)
+
+![image-20250208161114717](D:\git_repository\cyber_security_learning\markdown_img\image-20250208161114717.png)
+
+![image-20250208161128553](D:\git_repository\cyber_security_learning\markdown_img\image-20250208161128553.png)
+
+在另一个浏览器登录
+
+![image-20250208161240635](D:\git_repository\cyber_security_learning\markdown_img\image-20250208161240635.png)
+
+
+
+#### 修改邮箱地址
+
+![image-20250208161910920](D:\git_repository\cyber_security_learning\markdown_img\image-20250208161910920.png)
+
+![image-20250208161934583](D:\git_repository\cyber_security_learning\markdown_img\image-20250208161934583.png)
+
+此时指定邮箱会收到一封确认邮件
+
+![image-20250208162052996](D:\git_repository\cyber_security_learning\markdown_img\image-20250208162052996.png)
+
+![image-20250208162510672](D:\git_repository\cyber_security_learning\markdown_img\image-20250208162510672.png)
+
+
+
+**修改个人资料的邮件地址**
+
+![image-20250208162634481](D:\git_repository\cyber_security_learning\markdown_img\image-20250208162634481.png)
+
+![image-20250208162749521](D:\git_repository\cyber_security_learning\markdown_img\image-20250208162749521.png)
+
+![image-20250208162805076](D:\git_repository\cyber_security_learning\markdown_img\image-20250208162805076.png)
+
+删除旧的邮箱
+
+![image-20250208163033871](D:\git_repository\cyber_security_learning\markdown_img\image-20250208163033871.png)
+
+
+
+
+
+### GitLab 用户和组管理
+
+#### 用户管理
+
+##### 创建用户
+
+创建gitlab用户账户并登录
+
+![image-20250208163328517](D:\git_repository\cyber_security_learning\markdown_img\image-20250208163328517.png)
+
+![image-20250208163440555](D:\git_repository\cyber_security_learning\markdown_img\image-20250208163440555.png)
+
+输入新的用户信息
+
+![image-20250208172632118](D:\git_repository\cyber_security_learning\markdown_img\image-20250208172632118.png)
+
+![image-20250208172650092](D:\git_repository\cyber_security_learning\markdown_img\image-20250208172650092.png)
+
+为新建的用户设置密码
+
+![image-20250208172749159](D:\git_repository\cyber_security_learning\markdown_img\image-20250208172749159.png)
+
+![image-20250208172837815](D:\git_repository\cyber_security_learning\markdown_img\image-20250208172837815.png)
+
+另找一个浏览器，以新建用户登录gitlab
+
+![image-20250208172947464](D:\git_repository\cyber_security_learning\markdown_img\image-20250208172947464.png)
+
+会提示更改密码，更改后重新登录
+
+![image-20250208173100975](D:\git_repository\cyber_security_learning\markdown_img\image-20250208173100975.png)
+
+![image-20250208173115793](D:\git_repository\cyber_security_learning\markdown_img\image-20250208173115793.png)
+
+创建成功后，会给新账户的邮箱发送提示信息
+
+![image-20250208173333212](D:\git_repository\cyber_security_learning\markdown_img\image-20250208173333212.png)
+
+
+
+#### 更改语言
+
+![image-20250208173512645](D:\git_repository\cyber_security_learning\markdown_img\image-20250208173512645.png)
+
+![image-20250208173544945](D:\git_repository\cyber_security_learning\markdown_img\image-20250208173544945.png)
+
+![image-20250208173644083](D:\git_repository\cyber_security_learning\markdown_img\image-20250208173644083.png)
+
+
+
+#### 创建组
+
+使用管理员root 或用户都可以创建group组
+
+一个group组里面可以拥有多个project项目分支，可以将开发的用户添加到组里，再进行设置权限
+
+如果gitlab使用者的组织规模较大,每一个group组可以分别对应一个组织,如:某个分公司或部门
+
+如果gitlab使用者的组织规模较小, 每一个group组也可以对应一个项目或业务,即每一个不同的group组 对应同一个组织内部的不同的项目
+
+不同的组中添加不同的开发人员帐号，即可实现对开发者实现权限的管理。
+
+![image-20250208174433922](D:\git_repository\cyber_security_learning\markdown_img\image-20250208174433922.png)
+
+![image-20250208174505641](D:\git_repository\cyber_security_learning\markdown_img\image-20250208174505641.png)
+
+![image-20250208174702480](D:\git_repository\cyber_security_learning\markdown_img\image-20250208174702480.png)
+
+- Private：只有加入组的用户能够访问
+- Internal：只有注册到GItLab的用户能够访问
+- Public：所有人都能访问
+
+![image-20250208174820378](D:\git_repository\cyber_security_learning\markdown_img\image-20250208174820378.png)
+
+
+
+
+
+### GitLab 项目管理
+
+#### 创建新项目
+
+项目project属于一个group组,即一般project对应一个项目中的功能模块或服务
+
+注意: 此处在新建项目时先不进行初始化
+
+![image-20250208175340783](D:\git_repository\cyber_security_learning\markdown_img\image-20250208175340783.png)
+
+![image-20250208175905085](D:\git_repository\cyber_security_learning\markdown_img\image-20250208175905085.png)
+
+注意: 此处在新建项目时先不进行初始化
+
+![image-20250208180050971](D:\git_repository\cyber_security_learning\markdown_img\image-20250208180050971.png)
+
+![image-20250211214500681](D:\git_repository\cyber_security_learning\markdown_img\image-20250211214500681.png)
+
+命令行指引
+
+您还可以按照以下说明从计算机中上传现有文件
+
+##### Git 全局设置
+
+```bash
+# 在一台网络连通的虚拟机做客户端
+# 如果客户端没有将ssh公钥上传到gitlab,则直接拉取仓库会报错
+[root@master2 ~/project]$ git clone git@gitlab.mygitlab.mystical.org:devops/m62-hw.git
+Cloning into 'm62-hw'...
+The authenticity of host 'gitlab.mygitlab.mystical.org (172.22.200.11)' can't be established.
+ED25519 key fingerprint is SHA256:aQ+Q4ELkyFWnqh88hcFvHIOKi4wUqsZqlyYCUhZ4kBI.
+This key is not known by any other names
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+Warning: Permanently added 'gitlab.mygitlab.mystical.org' (ED25519) to the list of known hosts.
+git@gitlab.mygitlab.mystical.org: Permission denied (publickey,keyboard-interactive).
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
+
+# 在客户端创建ssh
+[root@master2 ~]$ ssh-keygen 
+Generating public/private rsa key pair.
+Enter file in which to save the key (/root/.ssh/id_rsa): 
+Created directory '/root/.ssh'.
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /root/.ssh/id_rsa
+Your public key has been saved in /root/.ssh/id_rsa.pub
+The key fingerprint is:
+SHA256:Ji2Lu3jg32JOYaxx1qbswtyYceLwYpeHXCwTt9MvGe4 root@master2.mystical.org
+The key's randomart image is:
++---[RSA 3072]----+
+|                 |
+|                 |
+|                 |
+|   o o .         |
+|  . X B S        |
+|. +X.X B         |
+| BoO@ + +        |
+|..XO=+ + .       |
+|..o*BooE.        |
++----[SHA256]-----+
+
+# 输出公钥
+[root@master2 ~]$ cat .ssh/id_rsa.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDXFnbc/E3Hqp/slmeUIVUgkK/gyxFA0Gv5+bVa4h7qHPcYBmuR+ycza7y9Gu9KTqAWVI/1x5ihFODYmU7HxFu/L6FEbWSRidnwTChGZgfdVMR315zUmgSVahvi1QldRVZkvGe2t4p+xjkYtH78nKrd8ptkk/+FbYCTZjSN+0ThcVfSuPaY8U5xcLbPjMSYCqLuoTh3fvx/jAXDWASgohCmnmVyypdl/SHV2Wwo7bKKm17TYlviBmiZsXstAVP0kFd9t4lbAge2zGQF6rGpNTsSBORPg9JYK0J8TwKhx/3AxJUjBb5kz/IE7y72T30iyOO/J2Psy9l60eCH54xXHSDPBkZZIvR4YX6e97JE4SCglEtj7VitfWdTNV9qAL/BhbpQi5K9i34b6JjXnsbTTgiBPe+BxbjH3F29sbb0ViGNcTh/TITYshQdCy/i45SYjIF6Vs43EtEOO7DOLD1Vho74M7cvE+/o42oOmmkttqdZ19bu92ALeyEUeJQl+g6kEC0= root@master2.mystical.org
+
+# 公钥贴在gitlab上，如下图
+```
+
+![image-20250212114256453](D:\git_repository\cyber_security_learning\markdown_img\image-20250212114256453.png)
+
+![image-20250212114318304](D:\git_repository\cyber_security_learning\markdown_img\image-20250212114318304.png)
+
+![image-20250212114345172](D:\git_repository\cyber_security_learning\markdown_img\image-20250212114345172.png)
+
+![image-20250212114429246](D:\git_repository\cyber_security_learning\markdown_img\image-20250212114429246.png)
+
+上传成功后，再在客户端clone仓库
+
+```bash
+# 成功将仓库clone了下来
+[root@master2 ~/project]# git clone git@gitlab.mygitlab.mystical.org:devops/m62-hw.git
+Cloning into 'm62-hw'...
+warning: You appear to have cloned an empty repository.
+
+# 查看
+[root@master2 ~/project]# ls
+m62-hw
+
+# 配置这个项目的本地git身份
+[root@master2 ~/project]# cd m62-hw
+[root@master2 ~/project/m62-hw]# git config --local user.name Zhangyifeng
+[root@master2 ~/project/m62-hw]# git config --local user.email "15104600741@163.com"
+
+# 查看
+[root@master2 ~/project/m62-hw]# git config --local --list
+core.repositoryformatversion=0
+core.filemode=true
+core.bare=false
+core.logallrefupdates=true
+remote.origin.url=git@gitlab.mygitlab.mystical.org:devops/m62-hw.git
+remote.origin.fetch=+refs/heads/*:refs/remotes/origin/*
+branch.main.remote=origin
+branch.main.merge=refs/heads/main
+user.name=Zhangyifeng
+user.email=15104600741@163.com
+
+# 这里因为上述创建仓库，取消了仓库初始化，所以这里必须手动创建一个主分支
+# clone的是未初始化的仓库的标志：warning: You appear to have cloned an empty repository
+
+# 创建主分支
+[root@master2 ~/project/m62-hw]# git switch --create main
+Switched to a new branch 'main'
+
+# 生成一个空文件，进行一次提交，将其推送到远程仓库
+[root@master2 ~/project/m62-hw]# touch README.md
+[root@master2 ~/project/m62-hw]# git add README.md 
+[root@master2 ~/project/m62-hw]# git status
+On branch main
+
+No commits yet
+
+Changes to be committed:
+  (use "git rm --cached <file>..." to unstage)
+	new file:   README.md
+
+[root@master2 ~/project/m62-hw]# git commit -m'add README'
+[main (root-commit) 06af66e] add README
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ create mode 100644 README.md
+ 
+# 方法1：这里提交文件到远程仓库
+[root@master2 ~/project/m62-hw]# git push origin main 
+Enumerating objects: 3, done.
+Counting objects: 100% (3/3), done.
+Writing objects: 100% (3/3), 216 bytes | 216.00 KiB/s, done.
+Total 3 (delta 0), reused 0 (delta 0), pack-reused 0
+To gitlab.mygitlab.mystical.org:devops/m62-hw.git
+ * [new branch]      main -> main
+
+# 方法2：
+# 在 git push --set-upstream origin main 中，--set-upstream（简写为 -u）的作用是 将本地分支与远程分支关联，这样以后可以直接使用 git push 和 git pull，而不必每次都指定远程仓库和分支名称。
+
+[root@master2 ~/project/m62-hw]# git push --set-upstream origin main
+
+# 后续再推送，和拉取可以直接使用git push 和 git pull, 否则每次要指定上传的仓库和分支，例如：git push origin main
+
+# 刷新浏览器上的仓库，即可看到上传的文件
+```
+
+![image-20250212120213189](D:\git_repository\cyber_security_learning\markdown_img\image-20250212120213189.png)
+
+
+
+#### 导入项目
+
+新版需要开启导入旧项目到Gitlab功能才支持导入
+
+![image-20250212120859168](D:\git_repository\cyber_security_learning\markdown_img\image-20250212120859168.png)
+
+![image-20250212120912148](D:\git_repository\cyber_security_learning\markdown_img\image-20250212120912148.png)
+
+![image-20250212134808015](D:\git_repository\cyber_security_learning\markdown_img\image-20250212134808015.png)
+
+**向下拉，选择settings ---> General**
+
+![image-20250212134859628](D:\git_repository\cyber_security_learning\markdown_img\image-20250212134859628.png)
+
+![image-20250212134939323](D:\git_repository\cyber_security_learning\markdown_img\image-20250212134939323.png)
+
+![image-20250212135031102](D:\git_repository\cyber_security_learning\markdown_img\image-20250212135031102.png)
+
+
+
+**导入功能开启后，开始导入项目**
+
+![image-20250212135140410](D:\git_repository\cyber_security_learning\markdown_img\image-20250212135140410.png)![image-20250212135156796](D:\git_repository\cyber_security_learning\markdown_img\image-20250212135156796.png)
+
+![image-20250212135522664](D:\git_repository\cyber_security_learning\markdown_img\image-20250212135522664.png)
+
+**等待一小会儿，导入成功后**
+
+![image-20250212135704796](D:\git_repository\cyber_security_learning\markdown_img\image-20250212135704796.png)
+
+
+
+#### 将用户添加到组或项目并指定角色
+
+将用户添加到组或项目中,并指定不同的角色,可以获取不同的权限
+
+
+
+**Gitlab用户在组里面有5种不同权限:**
+
+- **Guest**: 可以创建issue、发表评论，不能读写版本库
+- **Reporter:** 可以克隆代码，不能提交，QA、PM可以赋予这个权限
+- **Developer**: 可以克隆代码、开发、提交、 push(非保护分支Protected branches)，普通开发可以 赋予这个权限
+- **Maintainer**: 可以创建项目、添加tag、保护分支、添加项目成员、编辑项目，核心开发人员可以赋 予这个权限
+- **Owner**: 可以设置项目访问权限Visibility Level、删除项目、迁移项目、管理组成员，开发组组长可 以赋予这个权限
+
+
+
+##### 在组中添加用户并指定角色
+
+**进入群组**
+
+![image-20250212140719073](D:\git_repository\cyber_security_learning\markdown_img\image-20250212140719073.png)
+
+![image-20250212140836588](D:\git_repository\cyber_security_learning\markdown_img\image-20250212140836588.png)
+
+**邀请成员加入组中**
+
+![image-20250212140935887](D:\git_repository\cyber_security_learning\markdown_img\image-20250212140935887.png)
+
+![image-20250212141015706](D:\git_repository\cyber_security_learning\markdown_img\image-20250212141015706.png)
+
+![image-20250212143102248](D:\git_repository\cyber_security_learning\markdown_img\image-20250212143102248.png)
+
+
+
+#### 保护分支
+
+默认 **master/main** 分支被保护,开发者角色无法对被保护的分支提交代码
+
+也可以将其它分支进行保护,防止指定分支被破环
+
+**进入你的 GitLab 项目**
+
+![image-20250212153000705](D:\git_repository\cyber_security_learning\markdown_img\image-20250212153000705.png)
+
+**进入 Repository 保护分支设置**
+
+![image-20250212153031716](D:\git_repository\cyber_security_learning\markdown_img\image-20250212153031716.png)
+
+![image-20250212153054048](D:\git_repository\cyber_security_learning\markdown_img\image-20250212153054048.png)
+
+
+
+#### 合并分支
+
+由于普通开发者无法直接提交代码至master分支，可以先创建其它分支如dev,再提交代码到dev分支，接下来申请将dev 分支合并至master分支。管理者收到请求,经过审核没有问题进行批准合并，最终实现 master 代码的更新。
+
+
+
+当开发人员将代码在分支更新提交后，可以向管理员提交合并申请
+
+```bash
+# 模拟开发人员创建了一条分支，并提交代码
+# 这里假设管理员创建的分支，当然开发人员在非特殊情况下，也有创建的分支的权限
+[root@mystical ~/Zhangyifeng/devops/meta]# git checkout Zhangyifeng
+[root@mystical ~/Zhangyifeng/devops/meta]# mkdir Zhangyifeng
+[root@mystical ~/Zhangyifeng/devops/meta]# cd Zhangyifeng/
+[root@mystical ~/Zhangyifeng/devops/meta/Zhangyifeng]# vim hello.sh
+
+# 提交
+[root@mystical ~/Zhangyifeng/devops/meta] $git add .
+[root@mystical ~/Zhangyifeng/devops/meta] $git commit -m'add Zhangyifeng/hello'
+[root@mystical ~/Zhangyifeng/devops/meta] $git push origin Zhangyifeng
+```
+
+![image-20250212154732613](D:\git_repository\cyber_security_learning\markdown_img\image-20250212154732613.png)
+
+**点击合并申请**
+
+![image-20250212154856668](D:\git_repository\cyber_security_learning\markdown_img\image-20250212154856668.png)
+
+**发送成功后**
+
+![image-20250212154923324](D:\git_repository\cyber_security_learning\markdown_img\image-20250212154923324.png)
+
+**此时管理员的账号内，会出现合并请求**
+
+![image-20250212155031130](D:\git_repository\cyber_security_learning\markdown_img\image-20250212155031130.png)
+
+![image-20250212155105742](D:\git_repository\cyber_security_learning\markdown_img\image-20250212155105742.png)
+
+**点击查看**
+
+![image-20250212155146105](D:\git_repository\cyber_security_learning\markdown_img\image-20250212155146105.png)
+
+**点击批准，即同意此次合并**
+
+![image-20250212155249007](D:\git_repository\cyber_security_learning\markdown_img\image-20250212155249007.png)
+
+**点击合并**
+
+![image-20250212155458961](D:\git_repository\cyber_security_learning\markdown_img\image-20250212155458961.png)
+
+**查看该项目，可以发现，代码已成功合并过来**
+
+![image-20250212155611241](D:\git_repository\cyber_security_learning\markdown_img\image-20250212155611241.png)
+
+
+
+
+
+### GitLab 的数据备份和恢复
+
+数据备份和恢复官方帮助：
+
+```http
+https://docs.gitlab.com/ee/raketasks/backup_restore.html
+```
+
+
+
+#### 备份相关配置文件
+
+```bash
+/etc/gitlab/gitlab.rb
+/etc/gitlab/gitlab-secrets.json #双因子验证等使用此文件
+```
+
+
+
+**备份配置文件命令**
+
+```bash
+gitlab-ctl backup-etc --backup-path <DIRECTORY>
+#如果不指定--backup-path <DIRECTORY>，则默认备份至/etc/gitlab/config_backup/
+```
+
+
+
+#### 手动备份数据
+
+不同版本的备份数据命令
+
+```bash
+# GitLab 12.2之后版本
+gitlab-backup create
+
+# GitLab 12.1之前版本
+gitlab-rake gitlab:backup:create
+```
+
+备份相关配置
+
+```bash
+#默认在/etc/gitlab/gitlab.rb文件中指定备份路径，如果目录空间不足，可以修改新的目录
+#注意：修改完配置需要执行gitlab-ctl reconfigure
+# gitlab_rails['backup_path'] = "/var/opt/gitlab/backups"
+
+#备份的文件权限，所有者和所属组为git
+# gitlab_rails['backup_archive_permissions'] = 0644
+
+#默认备份过期时长为7天，单位为s, 之后会被自动删除
+# gitlab_rails['backup_keep_time'] = 604800
+```
+
+
+
+#### 执行恢复
+
+恢复的前提条件
+
+```ABAP
+备份和恢复使用的版本要一致
+还原相关配置文件后，执行gitlab-ctl reconfigure 
+确保gitlab正在运行状态
+```
+
+新版恢复方法
+
+```bash
+#恢复前先停止两个服务
+[root@ubuntu1804 ~]#gitlab-ctl stop puma
+[root@ubuntu1804 ~]#gitlab-ctl stop sidekiq
+
+#恢复时指定备份文件的时间部分，不需要指定文件的全名
+[root@ubuntu1804 ~]#gitlab-backup restore BACKUP=备份文件名的时间部分_Gitlab版本
+
+#示例
+[root@ubuntu1804 ~]#gitlab-backup restore BACKUP=1583562898_2020_03_07_11.11.8
+#Next, restore /etc/gitlab/gitlab-secrets.json if necessary, as previously mentioned.Reconfigure, restart and check GitLab:
+
+[root@ubuntu1804 ~]#gitlab-ctl reconfigure
+[root@ubuntu1804 ~]#gitlab-ctl restart
+
+#后续检查可选做
+[root@ubuntu1804 ~]#gitlab-rake gitlab:check SANITIZE=true
+#In GitLab 13.1 and later, check database values can be decrypted especially if /etc/gitlab/gitlab-secrets.json was restored, or if a different server is the target for the restore.
+[root@ubuntu1804 ~]#gitlab-rake gitlab:doctor:secrets
+
+# 恢复成功后，将之前停止的两个服务启动
+[root@ubuntu1804 ~]# gitlab-ctl start sidekiq
+ok: run: sidekiq: (pid 16859) 0s
+[root@ubuntu1804 ~]# gitlab-ctl start unicorn
+ok: run: unicorn: (pid 16882) 1s
+
+#或者执行下面也可以
+[root@ubuntu1804 ~]# gitlab-ctl restart
+
+# 恢复后，项目及用户信息都已还原
+# 注意：可能需要等一段时间才能打开浏览器进行访问
+```
+
+
+
+
+
+### K8S 上 GitLab 的备份与恢复
+
+
+
+#### GitLab Operator备份方法
+
+GitLab Operator 采用 **Custom Resources (CRs)** 来管理 GitLab，而关键数据仍然存储在 **ConfigMaps、Secrets 和 Persistent Volumes (PVs)** 中。
+
+
+
+#####  1. 备份 GitLab Operator 相关的 CRD 配置
+
+GitLab Operator 主要使用 **GitLab Custom Resource（CR）** 来定义 GitLab 部署，因此备份这些 CR 是最重要的步骤之一
+
+**执行以下命令，导出 GitLab Custom Resource**
+
+```bash
+[root@master1 backup]# kubectl get gitlab -n gitlab-system -o yaml > gitlab-cr-backup.yaml
+
+# 如果你有多个 GitLab CR 实例：
+kubectl get gitlab -A  # 查看所有 GitLab 实例
+kubectl get gitlab <your-gitlab-instance-name> -n gitlab-system -o yaml > gitlab-cr-backup.yaml
+```
+
+
+
+**2. 备份 GitLab Operator 的 ConfigMaps 和 Secrets**
+
+GitLab Operator 使用 K8S **ConfigMaps 和 Secrets** 来存储部分配置，如数据库、存储、认证信息等。因此，你需要分别备份它们。
+
+**(1) 备份 ConfigMaps**
+
+```bash
+kubectl get cm -n gitlab-system -o yaml > gitlab-configmaps-backup.yaml
+```
+
+**(2) 备份 Secrets**
+
+```bash
+kubectl get secrets -n gitlab-system -o yaml > gitlab-secrets-backup.yaml
+```
+
+Secrets 里可能包含：
+
+- GitLab 初始管理员密码
+- 数据库密码
+- TLS 证书
+
+
+
+**3. 备份 GitLab 数据**
+
+GitLab 的关键数据仍然存储在 **Persistent Volumes (PVs)**，包括
+
+- Git 仓库（Gitaly）
+- 数据库（PostgreSQL）
+- Redis（缓存）
+- 对象存储（MinIO 或 S3）
+
+列出所有 GitLab 相关的 PVC：
+
+```bash
+kubectl get pvc -n gitlab-system
+```
+
+然后使用 `kubectl cp` 备份
+
+```bash
+kubectl cp gitlab-gitaly-0:/var/opt/gitlab /backup/gitlab-gitaly -n gitlab-system
+kubectl cp gitlab-postgresql-0:/var/lib/postgresql /backup/gitlab-postgresql -n gitlab-system
+kubectl cp gitlab-redis-master-0:/data /backup/gitlab-redis -n gitlab-system
+```
+
+
+
+**4. 备份 GitLab Operator 的 CRDs**
+
+GitLab Operator 本身依赖 **Custom Resource Definitions（CRDs）**，在恢复环境时，你需要先恢复这些 CRD。
+
+```bash
+kubectl get crd | grep gitlab
+kubectl get crd gitlabs.gitlab.com -o yaml > gitlab-crd-backup.yaml
+```
+
+
+
+**5. 使用 Velero 进行整站备份**
+
+如果你的 GitLab 部署在 **生产环境**，建议使用 **Velero** 进行完整的 Kubernetes 资源和数据备份：
+
+```bash
+velero backup create gitlab-backup --include-namespaces gitlab-system --wait
+```
+
+恢复 GitLab
+
+```bash
+velero restore create --from-backup gitlab-backup
+```
+
+ 🚀   **Velero 是最适合 Kubernetes 环境下 GitLab Operator 的完整备份和恢复方案**，适用于生产环境！ 🚀
+
+
+
+
+
+### GitLab 迁移和升级
+
+在生产中升级往往伴随着服务器的迁移,比如从本地机房迁移到云环境中,而实现升级
+
+#### 迁移流程
+
+- 在原 GitLab 主机上备份配置文件和数据
+- 在目标主机上安装相同的版本的 GitLab 软件
+- 还原配置和数据
+- 本质上就是备份和恢复的过程
+
+
+
+#### 升级流程
+
+- 如果新主机，需要先安装原版本，并还原配置和数据
+- 不能直接跳过中间的版本直接升级,选择最近的大版本进行升级
+  - 比如:12.1想升级到13.0,先升级到12.X最高版,再升级到13.0.
+- 下载新版本的安装包,直接安装包
+- 安装包时可能会提示出错,原因是版本升级后有些配置项会过时,根据提示修改配置即可
+- 重新配置: gitlab-ctl reconfigure
+- 重启服务: gitlab-ctl restart
+
+
+
+### 实现 Https
+
+GitLab 如果用于不安全的网络，建议使用 https
+
+```ABAP
+注意：建议使用权威CA颁发的证书，自签名的证书需要加入信任,否则会导致后续git clone等操作失败
+```
+
+官方说明
+
+```http
+https://docs.gitlab.com/omnibus/settings/nginx.html#enable-https
+```
+
+
+
+#### 创建证书
+
+```bash
+[root@gitlab ~]# mkdir -p /etc/gitlab/ssl && cd /etc/gitlab/ssl
+[root@gitlab ssl]# openssl genrsa -out gitlab.wang.org.key 2048
+[root@gitlab ssl]# openssl req -days 3650 -x509 \
+-sha256 -nodes -newkey rsa:2048 -subj "/C=CN/ST=beijing/L=beijing/O=wang/CN=gitlab.wang.org" -keyout gitlab.wang.org.key -out gitlab.wang.org.crt
+```
+
+
+
+#### 修改配置文件
+
+```bash
+[root@gitlab ~]# vim /etc/gitlab/gitlab.rb
+external_url "https://gitlab.wang.org" #此项必须修改为https，必选项
+nginx['enable'] = true  #可选
+nginx['client_max_body_size'] = '1000m' #可选
+nginx['redirect_http_to_https'] = true  #必选项，默认值为false，修改为true，实现http自动301跳转至https
+nginx['redirect_http_to_https_port'] = 80 #可选,所有请求80的都跳转到443，默认值，可不改，保持注释状态
+nginx['ssl_certificate'] ="/etc/gitlab/ssl/gitlab.wang.org.crt"   #必选项
+nginx['ssl_certificate_key'] ="/etc/gitlab/ssl/gitlab.wang.org.key"   #必选项
+nginx['ssl_ciphers'] = "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256" #可选
+nginx['ssl_prefer_server_ciphers'] = "on"  #可选
+nginx['ssl_protocols'] = "TLSv1.2"    #可选
+nginx['ssl_session_cache'] = "shared:SSL:10m"   #可选
+nginx['ssl_session_timeout'] = "1440m"    #可选
+```
+
+
+
+#### 重新初始化
+
+```bash
+[root@gitlab ~]# gitlab-ctl reconfigure
+[root@gitlab ~]# gitlab-ctl restart
+[root@gitlab ~]# gitlab-ctl status
+
+#还登录原来的URL,会自动跳转到 https
+```
+
+
+
+#### 解决自签名证书的信任问题
+
+```bash
+# 在git的客户端主机上信任该证书
+[root@ubuntu2204 ~]# scp gitlab-server:/etc/gitlab/ssl/gitlab.wang.org.crt
+
+# 将证书加入信任文件
+# Ubuntu
+[root@ubuntu2204 ~]# cat gitlab.wang.org.crt >> /etc/ssl/certs/ca-certificate.crt
+
+# Rocky
+[root@rocky8 ~]# cat gitlab.wang.org.crt >> /etc/pki/tls/certs/ca-bundle.crt
+```
+
+
+
+### GitLab 忘记密码解决方案
+
+官方说明
+
+```http
+https://docs.gitlab.com/ee/security/reset_user_password.html#reset-the-root-password
+```
+
+
+
+#### 进入数据库
+
+```bash
+[root@gitlab ~]#gitlab-rails console -e production
+
+# 此步可能比较慢,需要等一段时间
+--------------------------------------------------------------------------------
+ Ruby:         ruby 2.7.5p203 (2021-11-24 revision f69aeb8314) [x86_64-linux]
+ GitLab:       15.1.2 (ea7455c8292) FOSS
+ GitLab Shell: 14.7.4
+ PostgreSQL:   13.6
+------------------------------------------------------------[ booted in 23.59s ]
+Loading production environment (Rails 6.1.4.7)
+
+# 找到root用户
+# 方法1
+irb(main):001:0> user = User.find_by_username 'root'
+# 方法2
+irb(main):001:0> user = User.where(id: 1).first
+=> #<User id:1 @root>
+
+# 重设密码
+irb(main):002:0> user.password="wang@123"
+=> "wang@123"
+irb(main):003:0> user.password_confirmation="wang@123"
+=> "wang@123"
+
+# 保存
+irb(main):004:0> user.save
+=> true
+
+# 退出控制台
+irb(main):005:0> quit
+
+#验证用新密码登录
+```
+
+
+
+
+
+## DevOps 之 CICD 服务器 Jenkins
+
+
+
+- **Jenkins 介绍**
+- **Jenkins 部署**
+- **Jenkins 基本配置**
+- **Jenkins 实现 CICD**
+- **Jenkins 分布式**
+- **Jenkins 流水线 Pipeline**
+- **代码质量检测 SonarQube**
+
+
+
+###  Jenkins 部署与基本配置
+
+####  Jenkins 介绍
+
+![image-20250212201154944](D:\git_repository\cyber_security_learning\markdown_img\image-20250212201154944.png)
+
+官方文档
+
+```http
+https://www.jenkins.io/zh/doc/
+```
+
+Jenkins 是基于 **Java 开发**的一种开源的CI（Continuous integration持续集成）&CD (Continuous  Delivery持续交付，Continuous Deployment持续部署)工具
+
+Jenkins 用于监控持续重复的工作，旨在提供一个开放易用的软件平台，使软件的持续集成变成可能。可用于自动化各种任务，如构建，测试和部署软件。
+
+Jenkins 作为一个可扩展的自动化服务器，可以用作简单的 CI 服务器，或者变成任何项目的持续交付中 心。
+
+Jenkins 只是一个调度平台,其本身并不能完成项目的构建部署
+
+Jenkins **需要安装各种插件**,可能还需要编写Shell,python脚本等才能调用和集成众多的组件来实现复杂的构建部署功能
+
+![image-20250212201712573](D:\git_repository\cyber_security_learning\markdown_img\image-20250212201712573.png)
+
+
+
+**主要用途**
+
+- 持续、自动地构建/测试软件项目
+- 监控一些定时执行的任务
+
+**Jenkins特点**
+
+- 开源免费
+- 跨平台，支持所有的平台
+- master/slave支持分布式的build
+- web形式的可视化的管理页面
+- 安装配置简单
+- 及时快速的提示和帮助
+- 已有的1800+插件
+
+
+
+**Jenkins官方介绍视频**
+
+```http
+https://v.qq.com/x/page/m0509xul0xk.html
+```
+
+
+
+
+
+### Jenkins 安装和启动
+
+**Jenkins 的安装**
+
+Jenkins 支持多种部署和运行方式
+
+- 包安装
+- JAVA 的 WAR 文件
+- 容器运行
+
+```http
+https://www.jenkins.io/zh/doc/book/installing/
+```
+
+
+
+
+
+#### 安装前环境准备
+
+**系统要求**
+
+```http
+https://www.jenkins.io/doc/administration/requirements/java/
+```
+
+最低推荐配置
+
+- 256MB可用内存
+- 1GB可用磁盘空间(作为一个Docker容器运行jenkins的话推荐10GB)
+
+为小团队推荐的硬件配置
+
+-  1GB+可用内存
+- 50 GB+ 可用磁盘空间
+
+JAVA 软件配置
+
+- Java 8—无论是Java运行时环境（JRE）还是Java开发工具包（JDK）都可以
+- Jenkins requires Java 11 or 17 since Jenkins 2.357 and LTS 2.361.1. 
+
+
+
+**系统准备**
+
+```bash
+#关闭防火墙和SELinux
+#设置语言环境，防止后期Jenkins汉化出问题
+[root@jenkins ~]# localectl set-locale LANG=en_US.UTF-8
+```
+
+
+
+**Java 环境**
+
+```http
+https://www.jenkins.io/doc/book/platform-information/support-policy-java/
+```
+
+jenkins基于JAVA实现，安装jenkins前需要先安装 JDK
+
+```bash
+#安装openjdk
+#新版要求安装JDK-11版
+[root@ubuntu2004 ~]#apt update && apt -y install openjdk-11-jdk
+[root@rocky8 ~]#yum -y install java-11-openjdk
+
+#旧版安装JDK-8版
+[root@ubuntu1804 ~]#apt update
+[root@ubuntu1804 ~]#apt -y install openjdk-8-jdk
+```
+
+
+
+#### Jenkins 包安装
+
+注意：新版jenkins_2.401.2启动很慢，可能需要20分钟才能启动成功
+
+##### 二进制包安装 Jenkins
+
+```http
+https://mirrors.tuna.tsinghua.edu.cn/jenkins/debian-stable/
+```
+
+![image-20250216154954145](D:\git_repository\cyber_security_learning\markdown_img\image-20250216154954145.png)
+
+安装过程
+
+```bash
+# 下载java17, Jenkins 2.492.1 版本需要 Java 17 或 21
+# 选择版本下载并安装
+[root@mystical /var/lib]# apt install -y openjdk-17-jdk
+
+# 下载并安装jenkins_2.492.1_all.deb
+[root@mystical ~]# wget https://mirrors.tuna.tsinghua.edu.cn/jenkins/debian-stable/jenkins_2.492.1_all.deb
+[root@mystical ~]# dpkg -i jenkins_2.492.1_all.deb
+```
+
+
+
+#### 基于 Kubernetes 部署 Jenkins
+
+##### **基于 Storage Class 实现持久化**
+
+需要部署名称为sc-nfs的Storage class 和 提供loadBalancer的服务，如OpenELB
+
+```yaml
+[root@master1 jenkins] # cat jenkins-deployment-service-pvc-sc-rabc.yaml 
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: jenkins
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jenkins-pvc
+  namespace: jenkins
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: sc-nfs
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-master
+  namespace: jenkins
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: jenkins-master
+rules:
+  - apiGroups: ["extensions", "apps"]
+    resources: ["deployments"]
+    verbs: ["create", "delete", "get", "list", "watch", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["create", "delete", "get", "list", "watch", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create","delete","get","list","patch","update","watch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create","delete","get","list","patch","update","watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get","list","watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: jenkins-master
+roleRef:
+  kind: ClusterRole
+  name: jenkins-master
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: jenkins-master
+  namespace: jenkins
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jenkins
+  namespace: jenkins
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jenkins
+  template:
+    metadata:
+      labels:
+        app: jenkins
+    spec:
+      serviceAccountName: jenkins-master
+      containers:
+      - name: jenkins
+        image: jenkins/jenkins:lts
+        ports:
+        - containerPort: 8080
+          name: web
+          protocol: TCP
+        - containerPort: 50000
+          name: agent
+          protocol: TCP
+        volumeMounts:
+        - name: jenkins-volume
+          mountPath: /var/jenkins_home
+      volumes:
+      - name: jenkins-volume
+        persistentVolumeClaim:
+          claimName: jenkins-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jenkins
+  namespace: jenkins
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: agent
+    port: 50000
+    targetPort: 50000
+  selector:
+    app: jenkins
+```
+
+**启动应用**
+
+```bash
+[root@master1 jenkins]#kubectl apply -f jenkins-deployment-service-pvc-sc-rabc.yaml 
+namespace/jenkins unchanged
+persistentvolumeclaim/jenkins-pvc unchanged
+serviceaccount/jenkins-master unchanged
+clusterrole.rbac.authorization.k8s.io/jenkins-master unchanged
+clusterrolebinding.rbac.authorization.k8s.io/jenkins-master unchanged
+deployment.apps/jenkins created
+service/jenkins unchanged
+
+# 查看
+[root@master1 jenkins]#kubectl get all -n jenkins 
+NAME                           READY   STATUS    RESTARTS   AGE
+pod/jenkins-5dd956745f-vmdjc   1/1     Running   0          88s
+
+NAME              TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)                          AGE
+service/jenkins   LoadBalancer   10.103.70.150   172.22.200.12   8080:32367/TCP,50000:31193/TCP   2m38s
+
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/jenkins   1/1     1            1           88s
+
+NAME                                 DESIRED   CURRENT   READY   AGE
+replicaset.apps/jenkins-5dd956745f   1         1         1       88s
+
+# 访问 172.22.200.12:8080
+```
+
+
+
+#### 首次登录 Jenkins页面初始化
+
+用浏览器访问： http://jenkins.mystical.org:8080/
+
+默认内置用户admin，其密码为随机字符，可以从如下文件中查到密码
+
+![image-20250212211710297](D:\git_repository\cyber_security_learning\markdown_img\image-20250212211710297.png)
+
+```bash
+# 查看密码
+[root@master1 jenkins]#kubectl exec -it -n jenkins jenkins-5dd956745f-vmdjc -- /bin/bash
+jenkins@jenkins-5dd956745f-vmdjc:~/secrets$ cd /var/jenkins_home/secrets/
+jenkins@jenkins-5dd956745f-vmdjc:~/secrets$ cat initialAdminPassword 
+8a5e445090f1412a89f857831a2258ae
+```
+
+
+
+**离线状态**
+
+![image-20250216142300508](D:\git_repository\cyber_security_learning\markdown_img\image-20250216142300508.png)
+
+如果显示 jenkins 已离线 ，将`/var/lib/jenkins/hudson.model.UpdateCenter.xm`l文件中的更新检 查地址改成国内镜像地址,如清华大学地址，然后重启 jenkins 即可：
+
+```http
+https://mirrors.tuna.tsinghua.edu.cn/jenkins/updates/update-center.json
+https://mirrors.aliyun.com/jenkins/updates/update-center.json
+https://jenkins-zh.gitee.io/update-center-mirror/tsinghua/update-center.json
+```
+
+**示例：解决离线问题**
+
+```bash
+[root@ubuntu1804 ~]#vim /var/lib/jenkins/hudson.model.UpdateCenter.xml
+<?xml version='1.1' encoding='UTF-8'?>
+<sites>
+ <site>
+   <id>default</id>
+#修改此行为下面行 <url>https://updates.jenkins.io/update-center.json</url>
+   <url>https://mirrors.tuna.tsinghua.edu.cn/jenkins/updates/update-center.json</url>
+ </site>
+</sites>
+```
+
+**选择安装 Jenkins 插件**
+
+![image-20250212212328405](D:\git_repository\cyber_security_learning\markdown_img\image-20250212212328405.png)
+
+![image-20250212214309954](D:\git_repository\cyber_security_learning\markdown_img\image-20250212214309954.png)
+
+**建议选择无**
+
+![image-20250212214434396](D:\git_repository\cyber_security_learning\markdown_img\image-20250212214434396.png)
+
+为了解决插件安装慢的解决方式 ，利用清华的jenkins源通过 Nginx 进行 rewrite 或者反向代理，如下：
+
+```bash
+#此方式只支持http
+#在jenkins服务器上修改/etc/hosts 指向新安装的nginx服务器：10.0.0.102
+[root@jenkins-ubuntu ~]#vim /etc/hosts
+10.0.0.102 updates.jenkins-ci.org updates.jenkins.io
+
+#在另一台主机安装nginx，并修改配置
+[root@ubuntu1804 ~]#apt -y install nginx
+[root@ubuntu1804 ~]#vim /etc/nginx/sites-enabled/default
+
+#加下面行
+location /download/plugins {
+    proxy_set_header Host mirrors.tuna.tsinghua.edu.cn;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    rewrite /download/plugins(.*) /jenkins/plugins/$1 break;
+    proxy_pass http://mirrors.tuna.tsinghua.edu.cn;
+}
+[root@ubuntu1804 ~]#systemctl restart nginx
+```
+
+
+
+#### 创建 Jenkins 管理员(可选)
+
+用户信息保存在下面目录
+
+```bash
+[root@jenkins ~]#ls /var/lib/jenkins/users/
+```
+
+系统默认有一个管理员帐号admin,继续即可
+
+![image-20250216145627814](D:\git_repository\cyber_security_learning\markdown_img\image-20250216145627814.png)
+
+
+
+#### 配置 Jenkins URL
+
+保存完成即可
+
+![image-20250216145654161](D:\git_repository\cyber_security_learning\markdown_img\image-20250216145654161.png)
+
+![image-20250216145826296](D:\git_repository\cyber_security_learning\markdown_img\image-20250216145826296.png)
+
+![image-20250216145845607](D:\git_repository\cyber_security_learning\markdown_img\image-20250216145845607.png)
+
+
+
+
+
+### Jenkins 基础配置
+
+#### 修改管理员密码
+
+登录后需要立即修改密码
+
+![image-20250216165009188](D:\git_repository\cyber_security_learning\markdown_img\image-20250216165009188.png)
+
+
+
+![image-20250216165123246](D:\git_repository\cyber_security_learning\markdown_img\image-20250216165123246.png)
+
+
+
+####  Jenkins 管理工具
+
+```http
+https://www.jenkins.io/doc/book/managing/cli/
+```
+
+Jenkins 指供了Web 管理界面,也提供了命令行管理工具
+
+![image-20250216165620201](D:\git_repository\cyber_security_learning\markdown_img\image-20250216165620201.png)
+
+![image-20250216165930874](D:\git_repository\cyber_security_learning\markdown_img\image-20250216165930874.png)
+
+![image-20250216170009582](D:\git_repository\cyber_security_learning\markdown_img\image-20250216170009582.png)
+
+
+
+```bash
+[root@mystical ~]# wget http://10.0.0.222:8080/jnlpJars/jenkins-cli.jar
+--2025-02-16 08:55:05--  http://10.0.0.222:8080/jnlpJars/jenkins-cli.jar
+Connecting to 10.0.0.222:8080... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 3712826 (3.5M) [application/java-archive]
+Saving to: ‘jenkins-cli.jar’
+
+jenkins-cli.jar            100%[=======================================>]   3.54M  --.-KB/s    in 0.02s   
+
+2025-02-16 08:55:05 (171 MB/s) - ‘jenkins-cli.jar’ saved [3712826/3712826]
+
+# 查看用法和命令
+[root@mystical ~]# java -jar jenkins-cli.jar -s http://admin:123456@10.0.0.222:8080/ -webSocket help
+
+# 列出任务
+[root@mystical ~]# java -jar jenkins-cli.jar -s http://admin:123456@10.0.0.222:8080/ -webSocket list-jobs
+
+# 重启jenkins
+[root@mystical ~]# java -jar jenkins-cli.jar -s http://admin:123456@10.0.0.222:8080/ -webSocket restart
+
+# 列出插件
+[root@mystical ~]# java -jar jenkins-cli.jar -s http://admin:Zyf646130..@10.0.0.222:8080/ -webSocket list-plugins
+```
+
+
+
+#### Jenkins 插件管理及安装
+
+jenkins 本身的功能有限,但是插件丰富,大大扩展了jenkins的功能,当前已有1800+的插件.
+
+要想使用jenkins实现生产需求,就必须安装相应的插件才能实现特定的功能
+
+```http
+https://plugins.jenkins.io/
+```
+
+![image-20250216173831151](D:\git_repository\cyber_security_learning\markdown_img\image-20250216173831151.png)
+
+
+
+##### 插件安装目录
+
+```bash
+[root@mystical ~]# ls /var/lib/jenkins/plugins/
+bouncycastle-api      instance-identity.jpi     javax-mail-api        localization-support.jpi
+bouncycastle-api.jpi  javax-activation-api      javax-mail-api.jpi    localization-zh-cn
+instance-identity     javax-activation-api.jpi  localization-support  localization-zh-cn.jpi
+......
+```
+
+
+
+##### 插件管理
+
+插件安装过程中，如果因为某种原因导致有安装失败的插件，没有关系，可以后期再单独安装
+
+
+
+##### 安装中文插件
+
+![image-20250216174401400](D:\git_repository\cyber_security_learning\markdown_img\image-20250216174401400.png)
+
+![image-20250216174436831](D:\git_repository\cyber_security_learning\markdown_img\image-20250216174436831.png)
+
+![image-20250216174522245](D:\git_repository\cyber_security_learning\markdown_img\image-20250216174522245.png)
+
+![image-20250216174550469](D:\git_repository\cyber_security_learning\markdown_img\image-20250216174550469.png)
+
+
+
+中文插件安装完后，重启服务
+
+![image-20250216175013165](D:\git_repository\cyber_security_learning\markdown_img\image-20250216175013165.png)
+
+![image-20250216174752117](D:\git_repository\cyber_security_learning\markdown_img\image-20250216174752117.png)
+
+
+
+
+
+#### Jenkins 优化配置
+
+通过优化配置,可以提高后续的效率,此为可选内容
+
+
+
+##### ssh 优化
+
+Jenkins 服务器做为一个CICD工具,后续会经常使用 ssh 协议连接远程主机,为方便连接,建议修改自动信 任远程主机,避免首次连接的人为输入yes的确认过程
+
+**方法1**：注意:需要安装Git或者Gitlab插件才能配置
+
+![image-20250216180547019](D:\git_repository\cyber_security_learning\markdown_img\image-20250216180547019.png)
+
+![image-20250216175858108](D:\git_repository\cyber_security_learning\markdown_img\image-20250216175858108.png)
+
+![image-20250216175929485](D:\git_repository\cyber_security_learning\markdown_img\image-20250216175929485.png)
+
+![image-20250216180705878](D:\git_repository\cyber_security_learning\markdown_img\image-20250216180705878.png)
+
+**方法2**：在 Jenkins 服务器修改 ssh的客户端配置文件
+
+```bash
+[root@jenkins ~]#vi /etc/ssh/ssh_config
+ # StrictHostKeyChecking ask #修改此行如下面
+   StrictHostKeyChecking no
+ #修改客户端配置无需重启ssh服务
+```
+
+
+
+##### 性能优化
+
+默认只能并行2个任务,建议根据CPU核心数,将执行器数量修改为CPU的核数
+
+![image-20250216180950089](D:\git_repository\cyber_security_learning\markdown_img\image-20250216180950089.png)
+
+![image-20250216181152343](D:\git_repository\cyber_security_learning\markdown_img\image-20250216181152343.png)
+
+![image-20250216181230865](D:\git_repository\cyber_security_learning\markdown_img\image-20250216181230865.png)
+
+
+
+
+
+#### Jenkins 的备份还原
+
+Jenkins的相关数据都是放在主目录中, 将主目录备份即可实现Jenkins的备份,必要时用于还原
+
+另外如果有相关脚本等,也需要进行备份
+
+可以如下查看目录位置
+
+![image-20250216181459569](D:\git_repository\cyber_security_learning\markdown_img\image-20250216181459569.png)
+
+![image-20250216181524386](D:\git_repository\cyber_security_learning\markdown_img\image-20250216181524386.png)
+
+jenkins 主目录包含以下文件和目录
+
+```bash
+*.xml                     # 需要备份
+config-history            # 需要备份
+fingerprints              # 需要备份
+global-build-stats        # 需要备份
+*.key*                    # 需要备份
+jobs                      # jobs配置需要备份（config.xml, nextBuildNumber）, builds目录, builds目录（build logs                               等）根据需求而定
+nodes                     # 需要备份
+plugins                   # 需要备份 *.jpi及 *.hpi，可以不备份每个插件子目录，jenkins启动后会更新插件子目录
+secrets                   # 需要备份
+updates                   # 需要备份
+userContent               # 用户上传内容，可以根据需要备份
+users                     # 用户缓存信息，最好备份
+logs                      # 插件logs，根据需要而定，可以不备份
+monitoring                # 可以不备份，插件会实时生成监控数据
+```
+
+
+
+#### 找回忘记的密码
+
+```bash
+# 停止服务
+[root@mystical ~]# systemctl stop jenkins
+
+# 删除jenkins主目录中config.xml的如下内容
+###########################################################
+
+<useSecurity>true</useSecurity>
+  <authorizationStrategy class="hudson.security.FullControlOnceLoggedInAuthorizationStrategy">
+    <denyAnonymousReadAccess>true</denyAnonymousReadAccess>
+  </authorizationStrategy>
+  <securityRealm class="hudson.security.HudsonPrivateSecurityRealm">
+    <disableSignup>true</disableSignup>
+    <enableCaptcha>false</enableCaptcha>
+  </securityRealm>
+
+#################################################################
+...
+
+# 重启Jenkins
+ systemctl start jenkins
+
+#重新无需验证即可登录，修改安全配置为Jenkins's own user database(Jenkins专有用户数据库),保存后
+```
+
+![image-20250216182639752](D:\git_repository\cyber_security_learning\markdown_img\image-20250216182639752.png)
+
+![image-20250216182713874](D:\git_repository\cyber_security_learning\markdown_img\image-20250216182713874.png)
+
+![image-20250216182729955](D:\git_repository\cyber_security_learning\markdown_img\image-20250216182729955.png)
+
+![image-20250216182817594](D:\git_repository\cyber_security_learning\markdown_img\image-20250216182817594.png)
+
+系统管理”,发现此时出现“管理用户”
+
+![image-20250216182946287](D:\git_repository\cyber_security_learning\markdown_img\image-20250216182946287.png)
+
+![image-20250216183028939](D:\git_repository\cyber_security_learning\markdown_img\image-20250216183028939.png)
+
+![image-20250216183059288](D:\git_repository\cyber_security_learning\markdown_img\image-20250216183059288.png)
+
+![image-20250216183117733](D:\git_repository\cyber_security_learning\markdown_img\image-20250216183117733.png)
+
+系统管理--- 全局安全配置 --- 授权策略 
+
+将任何用户可以做任何事(没有任何限制) 修改为登录用户可以做任何事
+
+![image-20250216183255050](D:\git_repository\cyber_security_learning\markdown_img\image-20250216183255050.png)
+
+
+
+
+
+### Jenkins 实现 CICD
+
+
+
+#### Jenkins 实现 CICD 说明
+
+任务中构建将程序源码转换成一个可用的目标Target的过程，该过程可能会包括获取下载源码、解决依赖、编译和打包等环节
+
+目标可以包括库、可执行文件及生成的脚本等，该类文件即是所谓的“制品”,它们通常应该存储于制品库,**Nexus就是著名的制品库服务**
+
+程序员可以在本地进行构建，但基于有标准、统一构建环境的构建系统完成应用程序的构建，能有效确保制品质量
+
+Jenkins虽然可以为构建服务器，但自身并未提供构建工具
+
+Jenkins可以集成用户所需要的大部分主流构建工具来实现完整的构建过程
+
+构建工具与源程序的编程语言及工程工具有密切关系,因而,在Jenkins服务器中具体需要安装和集成的构 建工具,取决于用户的实际需要
+
+- Maven: Java
+- Go:  Golang
+- Gradle:  Java,Groovey和Kotlin等
+- SBT: Scala
+- Babel、Browserify、Weboack、Grunt及Gulp等: javascript
+
+
+
+**Jenkins 架构**
+
+![image-20250217104707079](D:\git_repository\cyber_security_learning\markdown_img\image-20250217104707079.png)
+
+Jenkins根据业务场景的不同,提供了多种风格的任务，默认是自由风格任务，通过安装插件，还可以支持其它风格的插件
+
+
+
+**Job 的风格分类**
+
+- **自由风格freestyle**：支持实现各种开发语言的不同场景的风格，以Shell为主要技术，内部有各种灵活的配置属性，默认只有此类型
+
+- **流水线 pipeline**：重点掌握的风格，使用专用语法
+- **Maven 项目**：仅适用于 JAVA 项目
+
+
+
+
+
+#### 创建 Freestyle 风格的任务 Job
+
+##### Freestyle 风格任务说明
+
+![image-20250217104958777](D:\git_repository\cyber_security_learning\markdown_img\image-20250217104958777.png)
+
+
+
+自由风格的任务提供了下面的组成
+
+- **通用配置**：当前任务的基本配置，历史记录、存储数据、认证、存储目录等
+
+- **源码管理**：指定当前任务依赖的代码仓库地址(仓库的分支)
+- **构建触发器**：在什么情况下，才会自动执行当前的任务
+- **构建环境**：构建过程中，依赖的环境变量等
+- **构建**：当前的代码构建操作，实现CICD核心步骤
+- **构建后动作**：构建任务成功后，我们可以做的事情，发送邮件、提交代码标签、触发其他任务、等等
+
+
+
+**构建状态**
+
+```http
+晴雨表主要是针对一个任务的整体执行成功比例来算的。80%成功表示太阳。
+```
+
+![image-20250217105645560](D:\git_repository\cyber_security_learning\markdown_img\image-20250217105645560.png)
+
+
+
+##### 实现一个简单的 Freestyle 任务
+
+注意：默认使用sh 的shell类型，可以使用#!/bin/bash 声明使用bash 的shell
+
+![image-20250217110008874](D:\git_repository\cyber_security_learning\markdown_img\image-20250217110008874.png)
+
+
+
+![image-20250217110057327](D:\git_repository\cyber_security_learning\markdown_img\image-20250217110057327.png)
+
+![image-20250217110203690](D:\git_repository\cyber_security_learning\markdown_img\image-20250217110203690.png)
+
+注意：默认 Freestyle 任务的Shell 使用 /bin/sh ，如果想使用 /bin/bash ，需要在最前面加shebang 机制
+
+![image-20250217110438438](D:\git_repository\cyber_security_learning\markdown_img\image-20250217110438438.png)
+
+保存后，立即构建
+
+![image-20250217110509855](D:\git_repository\cyber_security_learning\markdown_img\image-20250217110509855.png)
+
+查看控制台输出
+
+![image-20250217110547061](D:\git_repository\cyber_security_learning\markdown_img\image-20250217110547061.png)
+
+![返回首页](D:\git_repository\cyber_security_learning\markdown_img\image-20250217110620009.png)
+
+返回首页，可以看到构建任务的晴雨表
+
+![image-20250217110734652](D:\git_repository\cyber_security_learning\markdown_img\image-20250217110734652.png)
+
+```bash
+# 查看上述任务构建的文件
+[root@master1 ~]#kubectl exec -n jenkins jenkins-58df579f8c-gq72v -- cat /var/jenkins_home/workspace/freestyle-demo1/test1.txt
+demo1-test
+```
+
+
+
+为方便调试，在生产环境中更多的是在服务器上创建一个指定的Jenkins脚本的文件夹，使用 `bash -x XXX.sh` 来执行脚本
+
+```bash
+# /data目录以hostPath的方式挂载到pod上
+[root@node1 jenkins]#mkdir -p /data/jenkins/
+
+[root@node1 jenkins]#cat /data/jenkins/hello.sh 
+#!/bin/bash
+echo "Hello, World"
+```
+
+![image-20250217121026616](D:\git_repository\cyber_security_learning\markdown_img\image-20250217121026616.png)
+
+构建后，查看控制台输出
+
+![image-20250217121056528](D:\git_repository\cyber_security_learning\markdown_img\image-20250217121056528.png)
+
+
+
+#####  Jenkins 构建的环境变量
+
+ **Jenkins 环境变量说明**
+
+构建时，Jenkins 支持使用变量,从而增强了任务的灵活性
+
+环境变量有**内置**和**自定义**两种
+
+在自由风格的的shell中可以使用`${VAR_NAME}`引用变量
+
+
+
+**Pipeline 中引用全局环境**
+
+- Jenkins内置的全局环境变量可被所有的pipeline引用，它们以“env.”为前缀
+- 在pipeline中引用全局环境变量格式有三种：
+  - `${env.<ENV_VAR_NAME>} `不支持在shell 中引用
+  - `$env.<ENV_VAR_NAME> `不支持在shell 中引用
+  - `${ENV_VAR_NAME}`     支持在shell 中引用
+
+
+
+**Jenkins 内置环境变量**
+
+```ABAP
+注意：Jenkins的环境变量和root用户看到环境变量不完全相同
+```
+
+
+
+**查看Jenkins内置环境变量**
+
+```http
+http://172.22.200.12:8080/env-vars.html/
+```
+
+![image-20250217112015151](D:\git_repository\cyber_security_learning\markdown_img\image-20250217112015151.png)
+
+```http
+http://172.22.200.12:8080/manage/systemInfo
+```
+
+![image-20250217112105065](D:\git_repository\cyber_security_learning\markdown_img\image-20250217112105065.png)
+
+
+
+**自定义环境变量**
+
+变量的优先级顺序：
+
+```ABAP
+任务中的自定义的变量 > Jenkins 的自定义环境量 > Jenkins 内置的环境变量
+```
+
+**创建环境变量**
+
+自定义变量可以在系统管理--配置系统--全局属性-- 环境变量 定义
+
+注意：如果自定义环境变量与内置全局环境变量同名时，内置全局环境变量将被自定义环境变量覆盖
+
+这可能会引起错误，必要时，可为自定义环境变量使用固定的前缀，例如“_ _”等
+
+![image-20250217113700661](D:\git_repository\cyber_security_learning\markdown_img\image-20250217113700661.png)
+
+![image-20250217113836606](D:\git_repository\cyber_security_learning\markdown_img\image-20250217113836606.png)
+
+在作业中使用自定义的环境变量
+
+![image-20250217113938728](D:\git_repository\cyber_security_learning\markdown_img\image-20250217113938728.png)
+
+构建后查看
+
+![image-20250217114012533](D:\git_repository\cyber_security_learning\markdown_img\image-20250217114012533.png)
+
+####  Jenkins 结合 GitLab 实现代码下载
+
+```HTTP
+https://docs.gitlab.com/ee/integration/jenkins.html
+```
+
+##### GitLab 创建项目
+
+```http
+https://gitee.com/lbtooth/wheel_of_fortune.git
+```
+
+**导入项目**
+
+![image-20250217114404742](D:\git_repository\cyber_security_learning\markdown_img\image-20250217114404742.png)
+
+![image-20250217140837184](D:\git_repository\cyber_security_learning\markdown_img\image-20250217140837184.png)
+
+![image-20250217140905835](D:\git_repository\cyber_security_learning\markdown_img\image-20250217140905835.png)
+
+![image-20250217140934187](D:\git_repository\cyber_security_learning\markdown_img\image-20250217140934187.png)
+
+
+
+##### Jenkins 安装和 Gitlab 相关的插件
+
+只有安装GitLab插件,才能让Jenkins和GitLab相连
+
+在管理插件中搜索需要插件 gitlab，其它依赖的插件会自动安装
+
+![image-20250217150558897](D:\git_repository\cyber_security_learning\markdown_img\image-20250217150558897.png)
+
+
+
+##### Jenkins 服务器创建访问GitLab的凭据
+
+**Jenkins 凭证概述**
+
+凭证就是认证到某个系统中的认证信息，用于提供对受限资源的访问; 
+
+Jenkins所支持的凭证类型如下
+
+- 用户名和密码(Username with password)
+- SSH用户名和私钥对(SSH Username with private key)
+- Github App
+- Secret file: 需要保密的文本文件，保存有Token等信息
+- Secret text:Token,串需要保密的文本，例如Github的API Token等
+- Certificate
+- 其它凭证类型还有二进制数据，或者更复杂形式的项目，例如OAuth凭证等;
+
+
+
+**凭证的作用域**决定了它可用的目标范围
+
+- **系统**:作用于Jenkins系统自身，仅可用于系统和后台任务，且一般用于连接到agent节点之上
+- **全局**:作用于Jenkins上的所有任务，以确保任务的正常执行
+- **用户**:作用于用户级别，仅生效于Jenkins中的线程代表该用户进行身份验证之时
+
+```ABAP
+注意: 在Jenkins内部，凭证被存放在JENKINS_ HOME目录下的secrets目录中，请务必确保该目录的访问权限进行了正确的设置
+```
+
+
+
+**添加基于用户名和密码类型的凭据**
+
+如果基于http协议则无需实现ssh key 凭证,而选择添加gitlab用户名和密码的形式
+
+如下图，表示对该连接没有连接权限，因为该仓库是私有仓库，因此需要账号密码或者ssh验证才能登录
+
+![image-20250217152720707](D:\git_repository\cyber_security_learning\markdown_img\image-20250217152720707.png)
+
+
+
+添加用户凭证，即访问gitlab的用户密码
+
+![image-20250217152829054](D:\git_repository\cyber_security_learning\markdown_img\image-20250217152829054.png)
+
+![image-20250217152845398](D:\git_repository\cyber_security_learning\markdown_img\image-20250217152845398.png)
+
+![image-20250217153045186](D:\git_repository\cyber_security_learning\markdown_img\image-20250217153045186.png)
+
+```http
+服务器如果使用http连接，一旦gitlab上配置了https，则Jenkins上需要考虑服务器证书问题，因此建议用ssh连接
+```
+
+
+
+**关于 Git 的 SSL 证书验证解决方案**
+
+```ABAP
+详情见：知识扩展 -> Git相关用法补充 -> 绕过Git的SSL证书验证方法
+```
+
+
+
+**创建基于 ssh key 的凭据**
+
+实现jenkins服务器到gitlab服务器的基于密钥的验证，可以让jenkins连接到gitlab执行操作，比如拉取代码
+
+```ABAP
+注意：ssh key的凭据可以基于jenkins用户或任意主机的其它任何用户的公钥私钥对都可以，但都需要在gitlab将此用户的公钥public key 和在gitlab主机上与gitlab的用户进行关联，并将私钥private key在jenkins创建为SSH Username with private key类型的凭据
+
+总结：gitlab上指定用户上传的公钥和jenkins上的凭据（私钥）匹配即可
+```
+
+
+
+ **在 Jenkins 服务器上生成 ssh key**
+
+```bash
+# 在jenkins的主机上创建公私钥对
+# [root@node1 data]# ssh-keygen
+
+# 生成公私钥对后，将公钥上传gitlab
+```
+
+![image-20250217161748213](D:\git_repository\cyber_security_learning\markdown_img\image-20250217161748213.png)
+
+然后将私钥上传到jenkins的凭据中
+
+**注意**：此处的 username 只是注释性功能，理论上可以随便填写，只要确保此处private key和在 gitlab上关联的公钥是一对即可
+
+![image-20250217161823375](D:\git_repository\cyber_security_learning\markdown_img\image-20250217161823375.png)
+
+![image-20250217162058432](D:\git_repository\cyber_security_learning\markdown_img\image-20250217162058432.png)
+
+保存后，没有报错，即表示jenkins有权限拉去gitlab的代码
+
+![image-20250217162144524](D:\git_repository\cyber_security_learning\markdown_img\image-20250217162144524.png)
+
+
+
+```ABAP
+如果ssh连接方法出现下面报错，是因为Jenkins以Jenkins用户身份运行，首次连接Gitlab服务器会弹出未知主机的 警告，需要添加信任
+```
+
+![image-20250217163035747](D:\git_repository\cyber_security_learning\markdown_img\image-20250217163035747.png)
+
+**解决方法**
+
+```ABAP
+参考：DevOps之CICD服务器Jenkins -> Jenkins基础配置 -> Jenmins优化配置 -> ssh优化
+```
+
+
+
+git仓库连接成功后选择要拉取的分支
+
+![image-20250217163550403](D:\git_repository\cyber_security_learning\markdown_img\image-20250217163550403.png)
+
+直接保存构建，代码即可拉取到 Jenkins 服务器上
+
+![image-20250217163705311](D:\git_repository\cyber_security_learning\markdown_img\image-20250217163705311.png)
+
+![image-20250217163826379](D:\git_repository\cyber_security_learning\markdown_img\image-20250217163826379.png)
+
+查看Jenkins工作目录下代码是否拉取成功
+
+```bash
+jenkins@jenkins-578dc9ccf4-nk8g4:~/workspace/freestyle-wheel-demo1# ls
+images	index.html  js
+```
+
+
+
+
+
+#### 配置 Jenkins 结合 GitLab 实现自动化前端项目的部署和回滚
+
+
+
+#####  Jenkins 创建任务
+
+![image-20250217164331078](D:\git_repository\cyber_security_learning\markdown_img\image-20250217164331078.png)
+
+
+
+##### 配置 Git 项目地址和凭证
+
+![image-20250217164408642](D:\git_repository\cyber_security_learning\markdown_img\image-20250217164408642.png)
+
+##### 准备脚本并加入构建任务
+
+```bash
+[root@node1 jenkins]#cat wheel-html-gitlab-deploy-rollback.sh 
+#!/bin/bash
+#
+#********************************************************************
+#Author:            mystical
+#QQ:                29308620
+#Date:              2025-02-17
+#FileName:          wheel-html-gitlab-deploy-rollback.sh
+#URL:               http://www.mysticalrecluse.com
+#Description:       The test script
+#Copyright (C):     2025 All rights reserved
+#********************************************************************
+
+HOST_LIST="
+172.22.200.101
+172.22.200.102
+"
+
+APP=wheel
+APP_PATH=/var/www/html
+DATA_PATH=/opt
+DATE=$(date +%F_%H-%M-%S)
+
+deploy() {
+    for i in ${HOST_LIST}; do
+        ssh root@$i "rm -rf ${APP_PATH} && mkdir -pv ${DATA_PATH}/${APP}-${DATE}"
+        scp -r * root@$i:${DATA_PATH}/${APP}-${DATE}
+        ssh root@$i "ln -sv ${DATA_PATH}/${APP}-${DATE} ${APP_PATH}"
+    done
+}
+
+rollback() {
+    for i in ${HOST_LIST}; do
+        CURRENT_VERSION=$(ssh root@$i "readlink $APP_PATH")
+        CURRENT_VERSION=$(basename ${CURRENT_VERSION})
+        echo ${CURRENT_VERSION}
+        PRE_VERSION=$(ssh root@$i "ls -l ${DATA_PATH} | grep -B1 ${CURRENT_VERSION}|head -n1")
+        echo $PRE_VERSION
+        PRE_VERSION=$(echo $PRE_VERSION|awk '{print $NF}')
+        ssh root@$i "rm -rf ${APP_PATH} && ln -sv ${DATA_PATH}/${PRE_VERSION} ${APP_PATH}"
+    done
+}
+
+case $1 in
+deploy)
+    deploy
+    ;;
+rollback)
+    rollback
+    ;;
+*)
+    exit
+    ;;
+esac
+```
+
+![image-20250218091936057](D:\git_repository\cyber_security_learning\markdown_img\image-20250218091936057.png)
+
+![image-20250218091957718](D:\git_repository\cyber_security_learning\markdown_img\image-20250218091957718.png)
+
+查看控制台输出
+
+![image-20250218092020644](D:\git_repository\cyber_security_learning\markdown_img\image-20250218092020644.png)
+
+##### 服务器验证数据
+
+```bash
+[root@mystical /opt]# ll
+total 28
+drwxr-xr-x  7 root root 4096 Feb 17 14:41 ./
+drwxr-xr-x 19 root root 4096 Apr 17  2024 ../
+drwxr-xr-x  2 root root 4096 Feb 17 06:48 wheel/
+drwxr-xr-x  4 root root 4096 Feb 17 11:01 wheel-2025-02-17_11-01-21/
+drwxr-xr-x  4 root root 4096 Feb 17 14:29 wheel-2025-02-17_14-29-20/
+drwxr-xr-x  4 root root 4096 Feb 17 14:30 wheel-2025-02-17_14-30-50/
+drwxr-xr-x  4 root root 4096 Feb 17 14:41 wheel-2025-02-17_14-41-47/
+
+[root@mystical /opt] $ll /var/www/html
+lrwxrwxrwx 1 root root 30 Feb 17 14:41 /var/www/html -> /opt/wheel-2025-02-17_14-41-47/
+```
+
+**访问`172.22.200.101`和`172.22.200.102`**
+
+![image-20250218093456929](D:\git_repository\cyber_security_learning\markdown_img\image-20250218093456929.png)
+
+
+
+##### 修改代码再上传重新构建
+
+```bash
+# 取消ssl验证
+[root@mystical ~]# git config --global http.sslVerify false
+
+# 拉取代码
+[root@mystical ~]# git clone http://gitlab.mygitlab.mystical.org/devops/wheel_of_fortune.git
+
+# 修改代码后重新上传
+[root@mystical ~]# vim index.html
+[root@mystical ~]# git add .
+[root@mystical ~]# git commit -m'change 500w'
+[root@mystical ~]# git push origin master 
+```
+
+重新执行任务，可以看到如下修改
+
+![image-20250218100753510](D:\git_repository\cyber_security_learning\markdown_img\image-20250218100753510.png)
+
+
+
+##### 实现版本回滚任务
+
+新建任务如下,实现回滚功能
+
+![image-20250218101055995](D:\git_repository\cyber_security_learning\markdown_img\image-20250218101055995.png)
+
+只修改构建的shell部分,其它不变
+
+![image-20250218101215004](D:\git_repository\cyber_security_learning\markdown_img\image-20250218101215004.png)
+
+![image-20250218101232842](D:\git_repository\cyber_security_learning\markdown_img\image-20250218101232842.png)
+
+执行任务后,可以查看到 Web页面是否还原为上一个版本
+
+![image-20250218102553543](D:\git_repository\cyber_security_learning\markdown_img\image-20250218102553543.png)
+
+
+
+#### 参数化构建
+
+jenkins支持参数化构建，类似于脚本中的参数，可以实现灵活的构建任务
+
+Jenkins 支持多种参数类型,比如:Boolean,Choice选项,字符串,Multi_line字符串,文件类型等
+
+
+
+##### 参数类型说明
+
+参数化构建的目标在于为流水线提供基于参数值的灵活构建机制，从而让一个流水线的定义可以适用于多种需求情形
+
+- 其功能与引用方式与环境变量类似
+- 在触发作业运行之时，需要向各参数赋值
+- 参数在使用时实际上也表现为变量，可以通过变量的调用方式使用参数
+- 注意: 参数化功能无需安装插件即可支持
+
+**常用的参数类型**
+
+![image-20250218103626204](D:\git_repository\cyber_security_learning\markdown_img\image-20250218103626204.png)
+
+
+
+##### 创建包含各种类型参数的任务
+
+###### 布尔值参数Boolean  Parameter
+
+![image-20250218104051835](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104051835.png)
+
+![image-20250218104102212](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104102212.png)
+
+![image-20250218104113979](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104113979.png)
+
+![image-20250218104124076](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104124076.png)
+
+构建后，查看控制台输出
+
+![image-20250218104159641](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104159641.png)
+
+
+
+###### 选项参数Choice  Parameter
+
+![image-20250218104646702](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104646702.png)
+
+![image-20250218104700098](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104700098.png)
+
+![image-20250218104712039](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104712039.png)
+
+可以选择指定的参数值
+
+![image-20250218104750056](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104750056.png)
+
+点击Build构建后，查看控制台输出
+
+![image-20250218104847954](D:\git_repository\cyber_security_learning\markdown_img\image-20250218104847954.png)
+
+###### 字符参数 String Parameter
+
+![image-20250218105208649](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105208649.png)
+
+![image-20250218105224135](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105224135.png)
+
+
+
+![image-20250218105244529](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105244529.png)
+
+![image-20250218105255321](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105255321.png)
+
+可以更改后，提交构建，查看控制台效果
+
+![image-20250218105344473](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105344473.png)
+
+![image-20250218105402461](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105402461.png)
+
+###### 文本参数Multi-line String  Parameter
+
+![image-20250218105601062](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105601062.png)
+
+![image-20250218105615340](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105615340.png)
+
+![image-20250218105627520](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105627520.png)
+
+更改后，提交构建，查看控制台输出（**换行被空格替代，所有文本在一行输出**）
+
+![image-20250218105743516](D:\git_repository\cyber_security_learning\markdown_img\image-20250218105743516.png)
+
+**如果想要保留多行，需要将变量用双引号引起来**
+
+![image-20250218110358635](D:\git_repository\cyber_security_learning\markdown_img\image-20250218110358635.png)
+
+![image-20250218110419179](D:\git_repository\cyber_security_learning\markdown_img\image-20250218110419179.png)
+
+
+
+#####  选项参数实现不同分支的部署
+
+###### 查看当前分支
+
+```bash
+# 查看当前分支
+[root@mystical ~/project/testproject]# git branch -v
+  devel ef9119b add v2 devel
+* main  2b25da9 create index v1
+
+# 查看main分支日志
+[root@mystical ~/project/testproject]# git log
+commit 2b25da926eaaac186a7c2dbdfa339fb02cacc36d (HEAD -> main, origin/main)
+Author: mystical <mysticalrecluse@gmail.com>
+Date:   Tue Feb 18 05:05:16 2025 +0000
+
+    create index v1
+
+commit e092f325efc674a587453905234dd6095cc3fd88
+Author: mystical <mysticalrecluse@gmail.com>
+Date:   Tue Feb 18 03:25:56 2025 +0000
+
+    add README
+
+# 查看devel分支日志
+[root@mystical ~/project/testproject]# git checkout devel 
+Switched to branch 'devel'
+[root@mystical ~/project/testproject]# git log
+commit ef9119b63d267ddd0b4e2cbd4b3f92e557e9d759 (HEAD -> devel, origin/devel)
+Author: mystical <mysticalrecluse@gmail.com>
+Date:   Tue Feb 18 05:07:14 2025 +0000
+
+    add v2 devel
+
+commit 2b25da926eaaac186a7c2dbdfa339fb02cacc36d (origin/main, main)
+Author: mystical <mysticalrecluse@gmail.com>
+Date:   Tue Feb 18 05:05:16 2025 +0000
+
+    create index v1
+
+commit e092f325efc674a587453905234dd6095cc3fd88
+Author: mystical <mysticalrecluse@gmail.com>
+Date:   Tue Feb 18 03:25:56 2025 +0000
+
+    add README
+```
+
+###### 准备构建脚本
+
+```bash
+[root@node1 jenkins]#cat deploy.sh 
+#!/bin/bash
+#
+#********************************************************************
+#Author:            mystical
+#QQ:                29308620
+#Date:              2025-02-18
+#FileName:          deploy.sh
+#URL:               http://www.mysticalrecluse.com
+#Description:       The test script
+#Copyright (C):     2025 All rights reserved
+#********************************************************************
+
+BRANCH=$1
+
+ls /data/git &> /dev/null || mkdir -pv /data/git
+cd /data/git && rm -rf testproject
+git clone -b $BRANCH git@gitlab.mygitlab.mystical.org:devops/testproject.git
+cd testproject
+
+case $BRANCH in
+main)
+    scp -r * root@172.22.200.101:/var/www/html/
+    ;;
+devel)
+    scp -r * root@172.22.200.102:/var/www/html/
+    ;;
+*)
+    echo $BRANCH is error
+    ;;
+esac
+```
+
+###### 新建任务，并配置参数化构建
+
+![image-20250218135016459](D:\git_repository\cyber_security_learning\markdown_img\image-20250218135016459.png)
+
+![image-20250218135044179](D:\git_repository\cyber_security_learning\markdown_img\image-20250218135044179.png)
+
+分别执行main分支和devel分支
+
+![image-20250218135122352](D:\git_repository\cyber_security_learning\markdown_img\image-20250218135122352.png)
+
+###### 查看效果
+
+![image-20250218135820662](D:\git_repository\cyber_security_learning\markdown_img\image-20250218135820662.png)
+
+![image-20250218135735134](D:\git_repository\cyber_security_learning\markdown_img\image-20250218135735134.png)
+
+![image-20250218135754886](D:\git_repository\cyber_security_learning\markdown_img\image-20250218135754886.png)
+
+
+
+![image-20250218135829123](D:\git_repository\cyber_security_learning\markdown_img\image-20250218135829123.png)
+
+
+
+![image-20250218135856630](D:\git_repository\cyber_security_learning\markdown_img\image-20250218135856630.png)
+
+#### 利用 Git Parameter 插件实现拉取指定版本
+
+##### 创建多个tag，并同步到仓库
+
+```bash
+# 查看当前git日志
+[root@mystical ~/project/wheel_of_fortune]# git log
+commit a03647ff47edf0b0ca1289473ff013b057ddeeee
+Author: mystical <mysticalrecluse@gmail.com>
+Date:   Tue Feb 18 02:21:48 2025 +0000
+
+    change 3002
+
+commit 26551d643447ebebf0eab4a5a40905e9bab82ebc
+Author: mystical <mysticalrecluse@gmail.com>
+Date:   Tue Feb 18 02:04:56 2025 +0000
+
+    change 500w
+
+commit 46b0c7a08624cae2d1f96fdbf20434b1b68362cf
+Author: mystical <mysticalrecluse@gmail.com>
+Date:   Mon Feb 17 14:41:13 2025 +0000
+
+    change 100w
+
+commit 730984d25d3b79610f7cc113c5c9d1c2b340cdbb
+Author: yangchao <chao.yang@bridgetek.cn>
+Date:   Wed Aug 8 19:48:30 2018 +0800
+
+# 给每个阶段打上标签
+[root@mystical ~/project/wheel_of_fortune]# git tag v1.0 730984d25d3b79610
+[root@mystical ~/project/wheel_of_fortune]# git tag v2.0 46b0c7a08624cae2
+[root@mystical ~/project/wheel_of_fortune]# git tag v3.0 26551d643447ebeb
+[root@mystical ~/project/wheel_of_fortune]# git tag v4.0 a03647ff47edf0b0c
+
+# 同步tags到仓库
+git push origin --tags
+```
+
+
+
+##### 安装 Git Parameter 插件
+
+![image-20250218141614844](D:\git_repository\cyber_security_learning\markdown_img\image-20250218141614844.png)
+
+
+
+##### 创建任务
+
+![image-20250218141824687](D:\git_repository\cyber_security_learning\markdown_img\image-20250218141824687.png)
+
+![image-20250218142143511](D:\git_repository\cyber_security_learning\markdown_img\image-20250218142143511.png)
+
+![image-20250218142309665](D:\git_repository\cyber_security_learning\markdown_img\image-20250218142309665.png)
+
+![image-20250218142644353](D:\git_repository\cyber_security_learning\markdown_img\image-20250218142644353.png)
+
+![image-20250218142715442](D:\git_repository\cyber_security_learning\markdown_img\image-20250218142715442.png)
+
+##### 选择指定tag，构建测试后观察效果
+
+![image-20250218142804116](D:\git_repository\cyber_security_learning\markdown_img\image-20250218142804116.png)
+
+![image-20250218142856390](D:\git_repository\cyber_security_learning\markdown_img\image-20250218142856390.png)
+
+![image-20250218143043448](D:\git_repository\cyber_security_learning\markdown_img\image-20250218143043448.png)
+
+![](D:\git_repository\cyber_security_learning\markdown_img\image-20250218142952407.png)
+
+
+
+
+
+#### 实现 Java 应用源码编译并部署
+
+java 程序需要使用构建工具,如: maven,ant,gradle等进行构建打包才能部署,其中**maven**比较流行
+
+以下以 maven 为例实现 Java 应用部署
+
+
+
+##### 自由风格的任务构建基于 Spring Boot 的 JAR 包部署 JAVA 项目
+
+###### Gitlab导入项目
+
+项目链接
+
+```http
+https://gitee.com/lbtooth/helloworld-spring-boot
+```
+
+![image-20250218144012874](D:\git_repository\cyber_security_learning\markdown_img\image-20250218144012874.png)
+
+
+
+###### Jenkins 服务器上安装 maven 和配置镜像加速
+
+```bash
+[root@jenkins ~]#apt update && apt  -y install maven
+
+# 配置镜像加速，全局配置
+[root@mystical ~]# vim /etc/maven/settings.xml
+......
+    <mirror>
+         <id>nexus-aliyun</id>
+         <mirrorOf>*</mirrorOf>
+         <name>Nexus aliyun</name>
+         <url>http://maven.aliyun.com/nexus/content/groups/public</url>
+    </mirror>
+</mirrors>
+
+# 也可以配置项目级别的加速
+[root@mystical ~/project/helloworld-spring-boot]# vim pom.xml
+##############################################
+......
+    <!-- 配置阿里云仓库 -->
+    <repositories>
+        <repository>
+            <id>aliyun-repos</id>
+            <url>https://maven.aliyun.com/repository/public</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+......
+###########################################
+
+
 ```
 
 
@@ -10805,7 +13465,7 @@ bash install_docker_offline.sh
 ####  所有主机安装 cri-dockerd(v1.24以后版本)
 
 ```````bash
-wget https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.14/cri-dockerd_0.3.14.3-0.ubuntu-jammy_amd64.deb
+wget https://mirror.ghproxy.com/https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.14/cri-dockerd_0.3.14.3-0.ubuntu-jammy_amd64.deb
 
 # 如果出现依赖问题，使用该命令修复
 apt --fix-broken install -y
@@ -30591,9 +33251,9 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: kuboard-data-pvc
-  namespace: kuborad   # 这里官方没有加名称空间，但是PVC是名称空间资源，这里需要加上
+  namespace: kuboard   # 这里官方没有加名称空间，但是PVC是名称空间资源，这里需要加上
 spec:
-  kjjjj# 请填写一个有效的 StorageClass name
+  # 请填写一个有效的 StorageClass name
   storageClassName:  please-provide-a-valid-StorageClass-name-here
   #storageClassName: sc-nfs
   accessModes:
@@ -30612,7 +33272,7 @@ service/kuboard-v3 created
 
 
 # 添加ingress，要提前部署ingress-nginx
-[root@ubuntu2204 ~]# kubectl create ingress kuboard-ingress --rule=kuboard.mystical.org/*=kuboard-v3:80 --class ngixn -n kuboard -o yaml --dry-run=client > kuboard-ingress.yaml
+[root@ubuntu2204 ~]# kubectl create ingress kuboard-ingress --rule=kuboard.mystical.org/*=kuboard-v3:80 --class nginx -n kuboard -o yaml --dry-run=client > kuboard-ingress.yaml
 
 [root@ubuntu2204 ~]#kubectl apply -f kuboard-ingress.yaml 
 ingress.networking.k8s.io/kuboard-ingress created
@@ -30644,7 +33304,66 @@ kuboard-ingress   nginx   kuboard.mystical.org   10.0.0.10   80      21s
 
 
 
+确保您的机器满足安装的前提条件之后，可以按照以下步骤安装 KubeSphere。
 
+```bash
+kubectl apply -f https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/kubesphere-installer.yaml
+
+# 在该文件指定存储，或者配置好默认存储
+kubectl apply -f https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/cluster-configuration.yaml
+```
+
+检查安装日志：
+
+```bash
+kubectl logs -n kubesphere-system $(kubectl get pod -n kubesphere-system -l 'app in (ks-install, ks-installer)' -o jsonpath='{.items[0].metadata.name}') -f
+```
+
+使用 `kubectl get pod --all-namespaces` 查看所有 Pod 是否在 KubeSphere 的相关命名空间中正常运行。如果是，请通过以下命令检查控制台的端口（默认为 `30880`）：
+
+```bash
+kubectl get svc/ks-console -n kubesphere-system
+```
+
+确保在安全组中打开了端口 `30880`，并通过 NodePort `(IP:30880)` 使用默认帐户和密码 `(admin/P@88w0rd)` 访问 Web 控制台
+
+
+
+执行下列命令
+
+```bash
+[root@master1 kubesphere]#kubectl logs -n kubesphere-system $(kubectl get pod -n kubesphere-system -l 'app in (ks-install, ks-installer)' -o jsonpath='{.items[0].metadata.name}') -f
+
+# 显示下方
+......
+**************************************************
+Collecting installation results ...
+#####################################################
+###              Welcome to KubeSphere!           ###
+#####################################################
+
+Console: http://172.22.201.124:30880
+Account: admin
+Password: P@88w0rd
+NOTES：
+  1. After you log into the console, please check the
+     monitoring status of service components in
+     "Cluster Management". If any service is not
+     ready, please wait patiently until all components 
+     are up and running.
+  2. Please change the default password after login.
+
+#####################################################
+https://kubesphere.io             2025-02-11 13:35:25
+#####################################################
+
+```
+
+访问http://172.22.201.124:30880
+
+![image-20250211135114480](D:\git_repository\cyber_security_learning\markdown_img\image-20250211135114480.png)
+
+![image-20250211135302152](D:\git_repository\cyber_security_learning\markdown_img\image-20250211135302152.png)
 
 
 
@@ -30963,6 +33682,14 @@ VXLAN，即 Virtual Extensible LAN（虚拟可扩展局域网），是 Linux 内
 
 
 ## Kubernetes调度框架
+
+
+
+
+
+
+
+
 
 
 
@@ -31863,4 +34590,89 @@ current-context: admin@kubernetes
 
 ## BGP协议
 
-##                                                                                      
+
+
+
+
+## Git 相关用法补充
+
+### 绕过 Git 的 SSL 证书验证方法
+
+
+
+#### 临时禁用 SSL 验证（仅当前命令）
+
+```bash
+# 这个方法 仅对当前命令生效，不会影响其他 Git 操作
+GIT_SSL_NO_VERIFY=true git clone http://gitlab.mygitlab.mystical.org/devops/meta.git
+```
+
+
+
+#### 全局禁用 Git SSL 证书验证
+
+```bash
+# 这会对 所有 Git 操作 关闭 SSL 验证，但并不推荐，因为可能会让你对 MITM（中间人攻击）更脆弱
+git config --global http.sslVerify false
+```
+
+
+
+#### 仅对特定 GitLab 域名禁用 SSL 验证
+
+```bash
+# 只想对 gitlab.mygitlab.mystical.org 禁用 SSL 验证
+git config --global http."http://gitlab.mygitlab.mystical.org".sslVerify false
+```
+
+
+
+#### 为 GitLab 添加自签证书
+
+如果你的 GitLab 使用了自签名证书，推荐把它的 CA 证书添加到系统或 Git 的 CA 证书列表，而不是禁用 SSL 验证
+
+**获取 GitLab 证书**
+
+```bash
+openssl s_client -showcerts -connect gitlab.mygitlab.mystical.org:443 < /dev/null | openssl x509 -outform PEM > gitlab-cert.pem
+```
+
+**把证书加入 Git 信任**
+
+```bash
+git config --global http.sslCAInfo ~/gitlab-cert.pem
+```
+
+
+
+
+
+
+
+## Kubernetes GPU 集群部署
+
+### **最小部署方案**
+
+| 角色                      | 机器数量 | 规格建议                                       | 说明                                |
+| ------------------------- | -------- | ---------------------------------------------- | ----------------------------------- |
+| **Master 节点（控制面）** | 1 台     | `ecs.c6.large`（2 vCPU 4 GiB RAM）             | 运行 K8s 控制面，不需要 GPU         |
+| **GPU Worker 节点**       | 2 台     | `ecs.sgn7i-vws-m2s.xlarge`（4 vCPU 8 GiB RAM） | 运行 AI 计算任务，支持 K8s GPU 调度 |
+
+------
+
+
+
+### **更推荐的生产模拟方案**
+
+如果你想要 **更接近生产环境**，建议：
+
+- 选择 **独占型 GPU 实例**，如 `ecs.gn6e-c12g1.2xlarge`（Tesla T4 GPU）
+- 增加 **多 GPU Worker 节点**，模拟实际 K8s GPU 负载均衡调度
+- 使用 **阿里云 ACK（托管 K8s）**，简化管理
+
+
+
+
+
+
+
