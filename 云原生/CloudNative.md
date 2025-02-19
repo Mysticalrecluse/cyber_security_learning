@@ -9686,11 +9686,60 @@ https://gitee.com/lbtooth/helloworld-spring-boot
     </repositories>
 ......
 ###########################################
-
-
 ```
 
 
+
+###### 准备相关脚本
+
+```bash
+#!/bin/bash
+
+APP_PATH=/data/spring-boot-helloworld
+
+HOST_LIST="
+172.22.200.101
+172.22.200.102
+"
+
+mvn clean package -Dmaven.test.skip=true
+
+for host in $HOST_LIST; do
+	ssh root@$host killall -9 java &> /dev/null
+	scp target/helloworld-spring-boot-*-SNAPSHOT.jar root@$host:${APP_PATH}/spring-boot-helloworld.jar
+	ssh root@$host "nohup java -jar ${APP_PATH}/spring-boot-helloworld.jar --server.port=8888 &>/dev/null &"&
+done
+```
+
+
+
+###### 创建 Jenkins 任务
+
+![image-20250219154044944](D:\git_repository\cyber_security_learning\markdown_img\image-20250219154044944.png)
+
+![image-20250219154128825](D:\git_repository\cyber_security_learning\markdown_img\image-20250219154128825.png)
+
+
+
+###### 构建并检查结果
+
+![image-20250219160350420](D:\git_repository\cyber_security_learning\markdown_img\image-20250219160350420.png)
+
+![image-20250219160416294](D:\git_repository\cyber_security_learning\markdown_img\image-20250219160416294.png)
+
+![image-20250219160521103](D:\git_repository\cyber_security_learning\markdown_img\image-20250219160521103.png)
+
+![image-20250219160540684](D:\git_repository\cyber_security_learning\markdown_img\image-20250219160540684.png)
+
+
+
+
+
+##### Maven 风格的任务构建基于WAR包运行 Tomcat服务器 JAVA
+
+```ABAP
+注意：此项目使用JDK-11，不支持JDK-8
+```
 
 
 
