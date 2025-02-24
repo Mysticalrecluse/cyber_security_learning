@@ -472,7 +472,7 @@ SEND_RESPONSE --(ResponseSent)--> DONE
 以下是一个用伪代码实现的状态机示例：
 
 ```
-pythonCopy codeclass HTTPStateMachine:
+class HTTPStateMachine:
     def __init__(self):
         self.state = "WAIT_REQUEST"
 
@@ -677,7 +677,7 @@ quit: QUIT
 
 ## 热升级的完整流程
 
-##  
+
 
 - 将旧nginx文件换成新nginx文件（binary文件）--- （注意备份）
   - 新编译的nginx文件所指定的响应的配置选项，比如配置文件的目录在哪里，log的所在目录等等必须和老的nginx保持一致，否则无法复用nginx.conf文件
@@ -1272,8 +1272,8 @@ Nginx 连接池的作用在于高效地管理网络连接资源，提升服务�
 
 - 示例：
 
-  ```
-  nginxCopy codeupstream backend {
+  ```nginx
+  upstream backend {
       server backend1.example.com;
       server backend2.example.com;
       keepalive 32; # 配置连接池最大空闲连接数
@@ -1288,11 +1288,7 @@ Nginx 连接池的作用在于高效地管理网络连接资源，提升服务�
 
 - 示例：
 
-  ```
-  nginx
-  
-  
-  Copy code
+  ```nginx
   keepalive_timeout 65s;
   ```
 
@@ -1302,8 +1298,8 @@ Nginx 连接池的作用在于高效地管理网络连接资源，提升服务�
 
 - 示例：
 
-  ```
-  nginxCopy codeevents {
+  ```nginx
+  events {
       worker_connections 1024;
   }
   ```
@@ -1333,8 +1329,8 @@ Nginx 连接池的作用在于高效地管理网络连接资源，提升服务�
 
 - 示例
 
-  ```
-  nginxCopy codeevents {
+  ```nginx
+  events {
       worker_connections 1024;  # 每个 worker 最多可以有 1024 个并发连接
   }
   ```
@@ -1382,12 +1378,10 @@ nginxCopy codeupstream backend {
 
 #### 哪些连接会进入连接池？
 
-- 仅限上游服务器的连接
-
-  ：
+- 仅限上游服务器的连接w
 
   - Nginx 支持将与上游服务器的连接存入连接池复用，避免每次请求都重新建立 TCP 连接。
-  - 这些长连接由 `keepalive` 指令管理。
+- 这些长连接由 `keepalive` 指令管理。
 
 示例：
 
@@ -4782,5 +4776,348 @@ upstram_connection_time  # 与上游服务器建立连接消耗的时间，单�
 upstream_header_time     # 接收上游服务器回响应头部所消耗的时间，单位为秒，精确到毫秒
 upstream_response_time   # 接收完整的上游响应所消耗的时间，单位为秒，精确到毫秒
 upstream_http_名称        # 从上游服务器返回的响应头部的值
+upstream_bytes_received   # 从上游服务接收到的响应长度，单位为字节
+upstream_response_length  # 从上游服务返回的响应包体长度，单位为字节
+upstream_status           # 上游服务返回的HTTP响应中的状态码。如果未连接上，该变量值为502
+upstream_cookie_名称       # 从上游服务发回的响应头set-Cookie中取出的Cookie值
+upstream_trailer_名称      # 从上游服务的响应尾部取到的值
 ``````
+
+示例
+
+```nginx
+log_format varups '$upstream_addr $upstream_connect_time $upstream_header_time $upstream_response_time --- $upstream_response_length $upstream_bytes_received $upstream_status $upstream_http_server $upstream_cache_status';
+
+upstream iphashups {
+    hash user_$arg_username;
+    server 10.0.0.108:8011 weight=2 max_conns=2 max_fails=2 fail_timeout=5;
+    server 10.0.0.108:8012 weight=1;
+}
+
+server {
+    server_name www.magedu.org;
+    access_log /apps/nginx/logs/upstream_access.log varups;
+
+    location / {
+        proxy_pass http://iphashups;
+        proxy_http_version 1.1;
+    }
+}
+```
+
+#### 补充
+
+✅ **请求头和请求体是分开发送的，但通常是连续的**。
+✅ **默认情况下**（`**proxy_request_buffering on**`），Nginx **先完整接收** 请求体，然后 **一次性转发** 给上游。
+✅ **如果 `proxy_request_buffering off`**，Nginx **会先发送请求头，再逐块发送请求体**（chunked）。
+✅ **大文件上传、WebSocket 适合 `proxy_request_buffering off` + HTTP/1.1**。
+
+**🚀 选择正确的 `proxy_request_buffering` 方式，才能提升 Nginx 代理性能！**
+
+
+
+
+
+### proxy模块处理请求的流程
+
+- 在content阶段进行处理：proxy_pass指令
+- 如果cache命中，则直接向客户端发送响应头部
+- 如果cache未命中或未开启cache，根据指令生成发往上游的http头部及包体
+  - 如果设置为**proxy_request_buffering on**（默认），读取请求完整包体，即Nginx **先完整接收** 请求体，然后 **一次性转发** 给上游
+  - 如果设置为**proxy_request_buffering off**，Nginx **会先发送请求头，再逐块发送请求体**（chunked）。
+- 上游服务器收到响应头部后，对响应头部进行处理
+  - 如果设置为**proxy_buffering on**，则接收完整的响应包体，然后发送给nginx响应头部
+  - 如果设置为**proxy_buffering off**，发送响应包体，边读包体边发
+- 如果打开cache，则包体会加入缓存，然后发给nginx向客户端发送响应，关闭或复用连接。
+
+
+
+### proxy模块用法
+
+**功能**：对上游服务使用http/https协议进行反向代理
+
+```
+nginx_http_proxy_module，默认编译进nginx
+通过--without-http_proxy_module在编译时禁用该模块
+```
+
+```nginx
+syntax: proxy_pass URL;
+Default: -
+Context: location, if in location, limit_except
+```
+
+
+
+#### **URL参数规则**
+
+- URL必须以http://或者https://开头，接下来是域名，IP，unix socket地址或者upstream的名字，前两者可以在域名或者IP后加端口。最后是可选的URI
+- 当URL参数中携带URI与否，会导致发向上游请求的URL不同：
+  - 不携带URL，则将客户端请求中的URL直接转发给上游
+    - location后使用正则表达式，@名字时，应采用这种方式
+  - 携带URL，则对用户请求中的URL作如下操作
+    - 将location参数中匹配上的一段替换为该URL
+
+示例1
+
+```nginx
+# nginx服务
+server {
+    server_name proxy.mystical.tech;
+    error_log myerror.log info;
+    access_log logs/upstream_access.log varups;
+    
+    location /a {
+        proxy_pass http://proxyups;
+        proxy_set_body 'hello world';
+    }
+}
+
+# curl proxy.mystical.tech/a/b/c
+# 因为proxy_pass后面跟的URL没有跟url，所以上游服务器接收到的uri是/a/b/c
+
+# nginx服务
+server {
+    server_name proxy.mystical.tech;
+    error_log myerror.log info;
+    access_log logs/upstream_access.log varups;
+    
+    location /a {
+        proxy_pass http://proxyups/www;
+        proxy_set_body 'hello world';
+    }
+}
+
+# curl proxy.mystical.tech/a/b/c
+# 因为proxy_pass后面跟的URL接了/www，所以上游服务器接收到的uri是/www/b/c
+```
+
+
+
+- 该URI参数中可以携带变量
+- 更复杂的URL替换，可以在location内的配置添加rewrite break语句
+
+
+
+#### 根据指令生成发往上游的请求行
+
+```nginx
+Syntax: proxy_method method;
+Default: -
+Context: http, server, location
+
+Syntax: proxy_http_version 1.0|1.1; # 如果后端连接需要使用keepalived的时候，需要使用1.1,因为1.0不支持
+Default: proxy_http_version 1.0;
+Context: http, server, location
+```
+
+
+
+#### 生成发往上游的请求头部
+
+```nginx
+Syntax: proxy_set_header field value;
+Default: proxy_set_header Host $proxy_host;
+         proxy_set header Connection close;
+Context: http, server, location
+# 注意：若value的值为空字符串，则整个header都不会向上游发送
+
+Syntax: proxy_pass_request_headers on|off;
+Default: proxy_pass_request_headers on; 
+Context: http, server, location
+```
+
+
+
+#### 生成发往上游的包体
+
+```nginx
+Syntax: proxy_pass_request_body on|off;  # 如果设置为off，则不会向后端发送包体
+Default: proxy_pass_request_body on;
+Context: http, server, location
+
+Syntax: proxy_set_body value;           # 自己构造发往后端的包体
+Default: -
+Context: http, server, location
+```
+
+
+
+#### 接收用户请求包体的方式
+
+```nginx
+Syntax: proxy_request_buffering on|off; # 这里绝对是先收完包再转发，还是边收边转发
+Default: proxy_request_buffering on;    # 这里默认开启，主要是为了减轻后端压力，但是如果是大文件，会造成磁盘IO开销
+Context: http, server, location
+```
+
+- on: 
+  - 适用于客户端网速较慢
+  - 上游服务并发处理能力低
+  - 适应高吞吐量场景
+- off:
+  - 更及时的响应
+  - 降低nginx读写磁盘的消耗
+
+```nginx
+Syntax: client_body_buffer_size size;
+Default: client_body_buffer_size 8k|16k;
+Context: http, server,location
+
+# 存在包体时，接收包体所分配的内存
+# 若接收头部时，已经接收完全部包体，则不分配
+# content_length中明确表示有部分包体内容没有接收到
+# 如果剩余待接收包体的长度，小于client_body_buffer_size，则仅分配所需大小
+# 如果超过client_body_buffer_size，则根据proxy_request_buffering的值判断
+# 如果是，on则该段大小内存写完时，写入临时文件，释放内存，如果是off，则发给上游
+```
+
+##### 最大包体的长度限制
+
+```nginx
+Syntax: client_max_body_size size;
+Default: client_max_body_size 1m;   # 建议放大，否则很容易出现413,比如wordpress上传插件
+Context: http, server, location
+# 仅对请求头部含有Content_length有效超出最大长度后，返回413错误
+```
+
+##### 临时文件路径格式
+
+```nginx
+Syntax: client_body_temp_path path [level1][level2][level3]
+Default: client_body_temp_path client_body_temp;
+Context: http, server, location;
+
+Syntax: client_body_in_file_only on|clean|off; # 主要用于定位问题，on的话将所有包体存到文件中
+                                               # clean,用户上传body，写入文件，但是请求处理完成后，再删掉
+                                               # off 是当我的包体很小，小于client_body_buffer_size，则不写磁盘
+Default: client_body_in_file_only off;
+Context: http, server, location;
+```
+
+##### 读取包体时的超时
+
+```nginx
+Syntax: client_body_timeout time;
+Default: client_body_timeout 60s;
+Context: http, server, location;
+# 读取包体超时，则返回408错误
+```
+
+nginx如何处理请求的包体，处理请求包体关系到我们怎样看待下游的网速和上游的网速以及上游的服务器的处理性能，它是我们优化提高nginx吞吐量的重要手段
+
+
+
+##### **实际案例分析**
+
+**🚀 案例 1：优化小 API 请求**
+
+**🔹 场景**
+
+- API 服务器需要处理 **小 JSON 请求**（每个请求体 < 10KB）。
+- 上游 API **需要完整请求体** 处理（不能逐步解析）。
+- **客户端网速快，但后端 API 负载较高**。
+
+**🔹 方案**
+
+```nginx
+location /api {
+    proxy_pass http://backend;
+    proxy_request_buffering on;
+    client_body_buffer_size 32k;
+}
+```
+
+✅ **Nginx 先缓存请求体**，减少后端负担。
+✅ **上游服务器压力低**，能高效处理 API 请求。
+
+
+
+**🚀 案例 2：优化大文件上传**
+
+**🔹 场景**
+
+- 用户上传 **500MB 视频文件**。
+- 后端服务器 **实时处理上传内容**（如云存储）。
+- **客户端网速慢，避免 Nginx 阻塞其他请求**。
+
+**🔹 方案**
+
+```nginx
+location /upload {
+    proxy_pass http://backend;
+    proxy_request_buffering off;
+}
+```
+
+✅ **Nginx 直接流式传输数据**，不会缓存大文件。
+✅ **客户端网速慢不会影响 Nginx 并发能力**。
+✅ **减少 Nginx 磁盘 IO**，提升吞吐量。
+
+
+
+#### 反向代理中的常用透传
+
+##### 域名透传
+
+```nginx
+location /api/ {
+    proxy_pass http://backend;
+    proxy_set_header Host $host;
+}
+```
+
+##### 透传 `Authorization` 头（身份认证）
+
+某些 API 需要认证，默认 Nginx **不会转发 `Authorization` 头**，需要手动配置
+
+```nginx
+location /api {
+    proxy_pass http://backend;
+    proxy_pass_request_headers on;
+    proxy_set_header Authorization $http_authorization;
+}
+```
+
+##### 透传 HTTP/2
+
+如果上游支持 HTTP/2，可以启用
+
+```nginx
+location /api {
+    proxy_pass http://backend;
+    proxy_http_version 2;
+}
+```
+
+##### 透传所有 Headers（完全代理模式）
+
+如果你想**透传所有请求头**，可以这样
+
+```nginx
+location /api {
+    proxy_pass http://backend;
+    proxy_pass_request_headers on;
+}
+# 适用于全透明代理场景
+```
+
+
+
+#### 向上游服务建立连接
+
+```nginx
+Syntax: proxy_connect_timeout time;
+Default: proxy_connect_timeout 60s;
+Context: http, server, location;
+# 超时后，会向客户端生成http响应，响应码502，通常502就是因为nginx没有和上游服务器建立成功连接
+```
+
+```nginx
+Syntax: proxy_next_upstream http_502... # 后面可以跟多个状态码
+Default: proxy_next_upstream error timeout;  # 如果出现问题，则换一台上游服务器
+Context: http, server,location;
+```
+
+
 

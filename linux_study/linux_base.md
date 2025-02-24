@@ -16473,8 +16473,65 @@ proxy_cache_valid 状态码|any time
 
 ```
 
+#### 后端异步更新缓存（background update）
+
+**当 Nginx 发现缓存过期时，不会立刻等待后端返回新的数据，而是先返回旧缓存给客户端，同时在后台向后端发起请求更新缓存**。这样可以**减少对后端服务器的压力，提高 Nginx 吞吐量**。
+
+**`proxy_cache_use_stale` + `proxy_cache_background_update` 机制**
+
+**🔹 普通缓存过期行为**
+
+默认情况下，如果 `proxy_cache_valid` 设定的缓存时间已过：
+
+1. 客户端请求到达。
+2. Nginx 发现缓存过期。
+3. Nginx **等待后端返回新数据**，然后再响应给客户端。
+4. **如果后端慢，客户端就会卡住，增加请求延迟**。
+
+**🔹 启用 `proxy_cache_use_stale` + `proxy_cache_background_update`**
+
+```nginx
+proxy_cache my_cache;
+proxy_cache_valid 200 10s;
+proxy_cache_use_stale updating error timeout http_500 http_502 http_503 http_504;
+proxy_cache_background_update on;
+```
+
+📌 **优化行为**
+
+1. 客户端请求到达。
+2. **Nginx 发现缓存过期**，但**仍然返回旧的缓存数据**（减少客户端延迟）。
+3. **同时在后台向后端请求最新数据**，更新缓存。
+4. **下次有新的客户端请求时，Nginx 直接使用最新缓存**。
+
+
+
+**`proxy_cache_use_stale` 参数详解**
+
+| 参数                        | 作用                                   |
+| --------------------------- | -------------------------------------- |
+| **`updating`**              | 旧缓存过期时，仍然返回它，后台异步更新 |
+| **`error`**                 | 如果后端请求失败，仍然返回旧缓存       |
+| **`timeout`**               | 如果后端超时，仍然返回旧缓存           |
+| **`http_500` ~ `http_504`** | 如果后端返回 5xx 错误，仍然返回旧缓存  |
+
+✅ **适用场景**
+
+- **后端负载较高时，避免流量高峰期大量请求打爆数据库或应用服务器**。
+- **API 请求、CDN 静态资源缓存，提高响应速度**。
+
+
+
+
+
+
+
+
+
+
 
 #### 实现客户端IP地址透传 
+
 - 修改代理服务器配置，透传真实客户端IP
 ```shell
 server {
