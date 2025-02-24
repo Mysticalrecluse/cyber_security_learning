@@ -9735,11 +9735,1279 @@ done
 
 
 
-##### Maven 风格的任务构建基于WAR包运行 Tomcat服务器 JAVA
+##### 自由风格的任务构建单体的 Java 应用到Tomcat服务
 
 ```ABAP
-注意：此项目使用JDK-11，不支持JDK-8
+注意：此项目使用JDK-11，不支持JDK-17
 ```
+
+###### Gitlab仓库中准备 Java 代码
+
+**在gitlab新建 java 项目**
+
+```http
+https://gitee.com/lbtooth/hello-world-war.git
+```
+
+**导入项目**
+
+![image-20250221160046639](D:\git_repository\cyber_security_learning\markdown_img\image-20250221160046639.png)
+
+![image-20250221160205323](D:\git_repository\cyber_security_learning\markdown_img\image-20250221160205323.png)
+
+
+
+
+
+###### 临时切换 java11 版本
+
+```bash
+[root@mystical /data/jenkins/script]# export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+[root@mystical /data/jenkins/script]# export PATH=$JAVA_HOME/bin:$PATH
+```
+
+###### Server服务器上，安装tomcat
+
+```bash
+[root@mystical ~]# apt install -y tomcat9
+```
+
+###### 准备相关脚本
+
+```bash
+[root@mystical /data/jenkins/script]# cat hello-world-war.sh 
+#!/bin/bash
+
+APP_PATH=/var/lib/tomcat9/webapps
+
+HOST_LIST="
+    172.22.200.101
+    172.22.200.102
+"
+mvn clean package -Dmaven.test.skip=true
+
+for host in $HOST_LIST; do
+	ssh root@$host systemctl stop tomcat9
+	scp target/hello-world-war-*.war root@$host:${APP_PATH}/hello.war
+	ssh root@$host systemctl start tomcat9
+done
+```
+
+![image-20250221180800840](D:\git_repository\cyber_security_learning\markdown_img\image-20250221180800840.png)
+
+
+
+![image-20250221180822036](D:\git_repository\cyber_security_learning\markdown_img\image-20250221180822036.png)
+
+
+
+###### 执行构建后查看效果
+
+![](D:\git_repository\cyber_security_learning\markdown_img\image-20250221180910711.png)
+
+![image-20250221180923368](D:\git_repository\cyber_security_learning\markdown_img\image-20250221180923368.png)
+
+#### 实现 Golang 应用源码编译并部署
+
+##### 在Jenkins 安装 Golang 环境
+
+```bash
+#基于仓库安装
+[root@ubuntu2004 ~]#apt update && apt -y install golang
+[root@ubuntu2004 ~]#go version
+go version go1.18.1 linux/amd64	
+
+#或者从官网下载指定版本自行安装
+```
+
+
+
+##### 准备 Golang 源代码和数据库环境
+
+###### 项目1：ginweb 项目
+
+```http
+https://gitee.com/lbtooth/ginweb.git
+```
+
+范例：准备数据库环境
+````bash
+# 下载源码进行修改
+[root@ubuntu2204 ~]#git clone https://gitee.com/lbtooth/ginweb.git
+[root@ubuntu2204 ~]#cd  ginweb
+
+# 查看构建说明
+[root@mystical ~/project/ginweb] $cat README.md 
+# Golang 的 Web 测试项目
+```
+https://gitee.com/lbtooth/ginweb
+```
+
+## 1. 安装前环境准备
+### 参看和修改文件 conf/ginweb.ini
+### 安装 MySQL和Redis,按如下配置用户和密码
+```sh
+[mysql]
+host = "127.0.0.1"
+port = 3306
+databases = "ginweb"
+user = "ginweb"
+passwd = "123456"
+
+[redis]
+host = "127.0.0.1"
+port = 6379
+passwd = "123456"
+```
+
+## 2. 链接访问
+## http://localhost:8888
+
+## 3. 默认登录用户/密码
+## admin/123456
+
+# 基于上述构架说明，对ginweb.ini文件进行修改
+[root@mystical ~/project/ginweb] $cat conf/ginweb.ini 
+
+[mysql]
+host = "172.22.200.111"
+port = 3306
+databases = "ginweb"
+user = "ginweb"
+passwd = "123456"
+
+[redis]
+host = "172.22.200.111"
+port = 6379
+passwd = "123456"
+
+# 准备MySQL和Redis
+[root@ubuntu2204 ~]# apt update && apt -y install mysql-server redis 
+
+# 修改MySQL配置
+[root@mystical ~]# vim /etc/mysql/mysql.conf.d/mysqld.cnf
+#bind-address           = 127.0.0.1
+#mysqlx-bind-address    = 127.0.0.1
+[root@mystical ~]# systemctl restart mysql
+
+# 配置MySQL环境
+[root@mystical ~]# mysql
+mysql> create database ginweb;
+Query OK, 1 row affected (0.01 sec)
+
+mysql> create user ginweb@'172.22.200.%' identified by '123456';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> grant all on ginweb.* to ginweb@'172.22.200.%';
+Query OK, 0 rows affected (0.00 sec)
+
+# 导入表结构
+[root@mystical ~/project/ginweb]# mysql -uginweb -p123456 -h 172.22.200.111 ginweb < ginweb.sql 
+mysql: [Warning] Using a password on the command line interface can be insecure.
+
+# 准备redis
+[root@mystical ~]# vim /etc/redis/redis.conf
+bind 0.0.0.0
+requirepass 123456
+[root@mystical ~]# systemctl restart redis
+````
+
+
+
+##### Gitlab创建项目
+
+创建空白项目，并将之前的更改后的ginweb项目上传至创建好的项目中
+
+![image-20250222095526522](D:\git_repository\cyber_security_learning\markdown_img\image-20250222095526522.png)
+
+![image-20250222095606814](D:\git_repository\cyber_security_learning\markdown_img\image-20250222095606814.png)
+
+```bash
+# 删除之前的remote的地址，将之前拉下来的项目的remote值改为刚创建的gitlab仓库的地址
+[root@mystical ~/project/ginweb]# git remote remove origin
+[root@mystical ~/project/ginweb]# git remote add origin https://gitlab.mygitlab.mystical.org/devops/ginweb.git
+[root@mystical ~/project/ginweb]# git push origin master
+
+# 将更改后的记录上传
+[root@mystical ~/project/ginweb]# git add .
+[root@mystical ~/project/ginweb]# git commit -m'update'
+[master ab22ba5] update
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+```
+
+![image-20250222100121501](D:\git_repository\cyber_security_learning\markdown_img\image-20250222100121501.png)
+
+##### 相关脚本
+
+```bash
+[root@mystical /data/jenkins/script]# cat ginweb.sh 
+#!/bin/bash
+
+APP=ginweb
+APP_PATH=/data
+DATE=`date +%F_%H-%M-%S`
+HOST_LIST="
+172.22.200.101
+172.22.200.102
+"
+
+build() {
+    export GOCACHE="/var/lib/jenkins/.cache/go-build"
+    export GOPATH="/var/lib/jenkins/go"
+    export GOPROXY="https://goproxy.cn,direct"
+    CGO_ENABLED=0 go build -o ${APP}
+}
+
+deploy() {
+    for host in $HOST_LIST;do
+	    ssh root@$host "mkdir -p $APP_PATH/${APP}-${DATE}"
+	    scp -r * root@$host:$APP_PATH/${APP}-${DATE}/
+	    ssh root@$host "killall -0 ${APP} &> /dev/null && killall -9 ${APP}; rm -rf ${APP_PATH}/${APP} && \
+		ln -s ${APP_PATH}/${APP}-${DATE} ${APP_PATH}/${APP}; \
+		cd ${APP_PATH}/${APP}/ && nohup ./${APP}&>/dev/null" &
+    done
+}
+
+build
+deploy
+```
+
+
+
+##### 创建 Jenkins 自由风格的任务
+
+![image-20250222101223993](D:\git_repository\cyber_security_learning\markdown_img\image-20250222101223993.png)
+
+![image-20250222101342798](D:\git_repository\cyber_security_learning\markdown_img\image-20250222101342798.png)
+
+![image-20250222101352413](D:\git_repository\cyber_security_learning\markdown_img\image-20250222101352413.png)
+
+![image-20250222101411136](D:\git_repository\cyber_security_learning\markdown_img\image-20250222101411136.png)
+
+
+
+![image-20250222102425510](D:\git_repository\cyber_security_learning\markdown_img\image-20250222102425510.png)
+
+![image-20250222103225178](D:\git_repository\cyber_security_learning\markdown_img\image-20250222103225178.png)
+
+
+
+
+
+#### 集成 Ansible 的任务构建
+
+![image-20250222103330422](D:\git_repository\cyber_security_learning\markdown_img\image-20250222103330422.png)
+
+
+
+##### 安装 Ansible 环境
+
+```bash
+[root@mystical ~]# wget https://www.mysticalrecluse.com/script/Shell/install_ansible.sh
+[root@mystical ~]# bash install_ansible.sh 
+
+# 准备主机清单文件
+[root@mystical ~]# cat /etc/ansible/hosts
+[webservers]
+172.22.200.101 ansible_ssh_user=root
+
+[appservers]
+172.22.200.102 ansible_ssh_user=root
+
+# 因为Jenkins服务是以jenkins用户身份运行，所以需要实现Jenkins用户到被控制端的免密码验证
+[root@jenkins ~]#su - jenkins
+jenkins@jenkins:~$ ssh-keygen
+jenkins@jenkins:~$ ssh-copy-id root@10.0.0.202
+jenkins@jenkins:~$ ssh-copy-id root@10.0.0.203
+
+# 连接测试
+[root@mystical ~]# su - jenkins
+jenkins@mystical:~$ ansible all -u root -m ping
+172.22.200.102 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+172.22.200.101 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+```
+
+
+
+##### 安装 Ansible 插件（可能需要科学）
+
+![image-20250222104213568](D:\git_repository\cyber_security_learning\markdown_img\image-20250222104213568.png)
+
+安装插件后，添加了ansible的构建步骤
+
+![image-20250222104602641](D:\git_repository\cyber_security_learning\markdown_img\image-20250222104602641.png)
+
+##### 使用 Ansible Ad-Hoc 实现任务
+
+![image-20250222105143430](D:\git_repository\cyber_security_learning\markdown_img\image-20250222105143430.png)
+
+
+
+**查看结果**
+
+```bash
+# 在172.22.200.101上查看结果
+[root@mystical /tmp] $cat /tmp/hello.txt 
+hello
+```
+
+
+
+##### 使用 Ansible Playbook 实现任务
+
+###### **准备 Playbook文件**
+
+```bash
+[root@mystical /data/jenkins/ansible]# cat test.yaml 
+- hosts: webservers
+  remote_user: root
+
+  tasks:
+  - name: excute cmd
+    shell:
+      cmd: hostname -I
+    register: result
+
+  - name: show result
+    debug:
+      msg: "{{ result }}"
+```
+
+
+
+###### 创建任务
+
+![image-20250222112353806](D:\git_repository\cyber_security_learning\markdown_img\image-20250222112353806.png)
+
+
+
+**保存构建后**
+
+![image-20250222112422185](D:\git_repository\cyber_security_learning\markdown_img\image-20250222112422185.png)
+
+
+
+#####  使用 Ansible Playbook 基于参数化实现任务测试和生产多套 不同环境的部署
+
+上面的任务是固定的,不灵活,利用参数在同一个任务就可以灵活实现测试和生产多套不同环境的部署
+
+
+
+###### 准备playbook文件
+
+```bash
+[root@mystical /data/jenkins/ansible]# cat test.yaml 
+- hosts: webservers
+  remote_user: root
+
+  tasks:
+  - name: excute cmd
+    shell:
+      cmd: hostname -I
+    register: result
+
+  - name: show result
+    debug:
+      msg: "{{ result }}"
+```
+
+###### 准备两个不同环境的主机清单文件
+
+```bash
+[root@mystical /etc/ansible]# cat hosts_test 
+[webservers]
+172.22.200.101
+[root@mystical /etc/ansible]# cat hosts_product 
+[webservers]
+172.22.200.102
+```
+
+###### 创建参数化任务
+
+![image-20250222130005269](D:\git_repository\cyber_security_learning\markdown_img\image-20250222130005269.png)
+
+![image-20250222130242957](D:\git_repository\cyber_security_learning\markdown_img\image-20250222130242957.png)
+
+![image-20250222130030705](D:\git_repository\cyber_security_learning\markdown_img\image-20250222130030705.png)
+
+![image-20250222130816616](D:\git_repository\cyber_security_learning\markdown_img\image-20250222130816616.png)
+
+
+
+##### 使用 Ansible Playbook 实现向 Playbook 中传参功能
+
+###### 编写Playbook文件
+
+```bash
+[root@mystical /data/jenkins/ansible]# cat test-vars.yaml 
+- hosts: "{{ ansible_hosts }}"
+  remote_user: root
+
+  tasks:
+  - name: excute cmd
+    shell:
+      cmd: hostname -I
+    register: result
+
+  - name: show result
+    debug:
+      msg: "{{ result }}"
+```
+
+###### 创建主机清单文件
+
+```bash
+[root@mystical /data/jenkins/ansible]# cat /etc/ansible/hosts_test 
+[webservers]
+172.22.200.101
+
+[appservers]
+172.22.200.102
+
+[root@mystical /data/jenkins/ansible]# cat /etc/ansible/hosts_product 
+[webservers]
+172.22.200.222
+
+[webservers]
+172.22.200.111
+```
+
+###### 创建 Ansible Playbook 的任务
+
+**创建任务,添加第一个选项参数**
+
+![image-20250222133953392](D:\git_repository\cyber_security_learning\markdown_img\image-20250222133953392.png)
+
+**添加第二个选项参数**
+
+![image-20250222134023497](D:\git_repository\cyber_security_learning\markdown_img\image-20250222134023497.png)
+
+![image-20250222134253048](D:\git_repository\cyber_security_learning\markdown_img\image-20250222134253048.png)
+
+**点"高级"添加ansible的变量,添加Ansible Playbook的变量**
+
+![image-20250222134411643](D:\git_repository\cyber_security_learning\markdown_img\image-20250222134411643.png)
+
+![image-20250222134558674](D:\git_repository\cyber_security_learning\markdown_img\image-20250222134558674.png)
+
+- key 是 ansible里定义的变量名
+- Value 是 Jenkins 里的变量名
+- 然后通过选项可以指定value的值
+
+![image-20250222135414424](D:\git_repository\cyber_security_learning\markdown_img\image-20250222135414424.png)
+
+![image-20250222135350536](D:\git_repository\cyber_security_learning\markdown_img\image-20250222135350536.png)
+
+
+
+
+
+#### 构建后通知
+
+Jenkins通知可以将任务的执行状态、事件或信息推送给相关用户，这些通常发生在pipeline的“构建后处理(post-processing)”时期
+
+Email是 Jenkins 内置支持的通知方式，它也能够通过 webhook 扩展支持其它的即时通信媒介，例如:钉钉,Slack等
+
+
+
+##### 使用 mailer 实现邮件通知
+
+Mailer 和 Email Extension 插件都可以实现邮件通知功能
+
+###### 准备告警邮箱配置
+
+生成邮箱登录授权码，可以使用QQ或163邮箱等
+
+###### mailer 插件实现邮件告警
+
+**安装mailer插件**
+
+先安装mailer插件后才可以显示和配置发件配置信息
+
+注意: 安装 Gitlab插件会因为依赖关系自动安装mailer插件
+
+![image-20250222141016139](D:\git_repository\cyber_security_learning\markdown_img\image-20250222141016139.png)
+
+**配置 Jenkins管理员邮箱**
+
+```ABAP
+注意:必须指定系统管理员邮件地址才能实现邮件通知
+```
+
+Jenkins—系统管理—系统设置
+
+```ABAP
+注意：系统管理员邮件地址，必须和下面SMTP的用户名相同
+注意:必须安装插件才能出现下面的SMTP配置
+```
+
+配置邮件通知信息如下:
+
+- 用户名必须要和上面的系统管理员邮件地址相同
+- 用户默认邮件后缀，可为空
+- 启用"使用SSL协议"
+- SMTP 端口可以为空,默认为465
+- Reply-To Address 可以为空
+
+![image-20250222141544314](D:\git_repository\cyber_security_learning\markdown_img\image-20250222141544314.png)
+
+![image-20250222141959867](D:\git_repository\cyber_security_learning\markdown_img\image-20250222141959867.png)
+
+
+
+###### 配置任务的构建后通知
+
+```ABAP
+注意:Jenkins-2.426.2选中和不选中效果一样
+```
+
+选中“每次不稳定的构建都发送邮件通知”，表示只有失败构建时才会发邮件通知
+
+如果不选中，表示当失败或者从失败变为成功切换时都会通知，但总是成功不会通知
+
+Recipients 支持多个收信人的邮件地址，空格隔开即可
+
+![image-20250222142436740](D:\git_repository\cyber_security_learning\markdown_img\image-20250222142436740.png)
+
+![image-20250222142405512](D:\git_repository\cyber_security_learning\markdown_img\image-20250222142405512.png)
+
+###### 执行任务验证结果
+
+默认“每次不稳定的构建都发送邮件通知”选中，表示当任务执行失败时才会收邮件
+
+不选中”每次不稳定的构建都发送邮件通知“，表示当失败或者从失败变为成功切换时都会通知，但总是 成功不会通知
+
+![image-20250222142609139](D:\git_repository\cyber_security_learning\markdown_img\image-20250222142609139.png)
+
+![image-20250222142745234](D:\git_repository\cyber_security_learning\markdown_img\image-20250222142745234.png)
+
+
+
+
+
+##### 使用 Email Extension 插件实现邮件通知
+
+Email Extension 插件比Mailer插件的功能更加丰富
+
+说明
+
+```http
+https://www.jenkins.io/doc/pipeline/steps/email-ext/#emailext-extended-email
+https://plugins.jenkins.io/email-ext
+```
+
+######  安装插件 Email Extension
+
+![image-20250222143038988](D:\git_repository\cyber_security_learning\markdown_img\image-20250222143038988.png)
+
+###### 配置 Email Extension
+
+系统管理-- 系统配置 -- Jenkins Location -- 系统管理员邮件地址
+
+```ABAP
+注意：此处必须配置发件人邮箱和下面Extended E-mail Notification 的一致
+```
+
+![image-20250222143959169](D:\git_repository\cyber_security_learning\markdown_img\image-20250222143959169.png)
+
+**添加认证**
+
+![image-20250222144241480](D:\git_repository\cyber_security_learning\markdown_img\image-20250222144241480.png)
+
+
+
+![image-20250222144355710](D:\git_repository\cyber_security_learning\markdown_img\image-20250222144355710.png)
+
+**设置各种邮件通知的触发器条件**
+
+![image-20250222144551934](D:\git_repository\cyber_security_learning\markdown_img\image-20250222144551934.png)
+
+![image-20250222144632526](D:\git_repository\cyber_security_learning\markdown_img\image-20250222144632526.png)
+
+###### 在任务中使用邮件通知
+
+**在构建后操作选择**
+
+![image-20250222144807957](D:\git_repository\cyber_security_learning\markdown_img\image-20250222144807957.png)
+
+**![image-20250222144952098](D:\git_repository\cyber_security_learning\markdown_img\image-20250222144952098.png)**
+
+**默认只有失败才会发送通知，修改为总是发送给收件人Always**
+
+![image-20250222145209521](D:\git_repository\cyber_security_learning\markdown_img\image-20250222145209521.png)
+
+![image-20250222145257796](D:\git_repository\cyber_security_learning\markdown_img\image-20250222145257796.png)
+
+**执行构建后，收到邮件**
+
+![image-20250222145338071](D:\git_repository\cyber_security_learning\markdown_img\image-20250222145338071.png)
+
+
+
+
+
+#### 自动化构建
+
+- **周期性定时构建**
+- **Webhook 触发构建**
+
+
+
+##### 定时和 SCM 构建
+
+周期性构建这是—-种基于 cron 类型的构建机制．按照预定义的时间周期性启动作务
+
+对于期望能够基于代码变更进行触的CI场景来说，周期性构建并非其最佳选项，但对于有些类型的住务,它却也能够**通过精心编排的周期性构建来避免资源冲突**;
+
+
+
+周期性构建分为**定时构建**和**轮询构建**
+
+- **定时构建**: 按时间周期性的触发构建
+- **轮询SCM(Source Code Management):**  指的是定期到代码仓库检查代码是否有变更，存在代码变更时就运行pipeline;为了能够从CI中得到更多的收益，轮询操作越频繁越好;显然，这会给SCM带去无谓的压力,所以构建的触发由SCM负责通知Jenkins最为理想;但在外部的SCM无法通知到局域网中的Jenkins时，可以采轮询SCM方式倒也不失为一种选择
+
+
+
+**Jenkins cron语法遵循Unix cron语法的定义,但在细节上略有差别**
+
+一项cron的定义包含由空白字符或Tab分隔的5个字段，用于定义周期性的时间点
+
+H 符号可用于任何字段,且它能够在一个时间范围内对项目名称进行散列值计算出一个唯一的偏移量，以避免所有配置相同cron值的项目在同一时间启动;比如:**triggers { cron(H(0,30)) }**，表示每小时的前半小 时的某一分钟进行构建
+
+
+
+###### 关于Jenkins Cron 语法中 H 用法详解
+
+在 **Jenkins 的 Pipeline 或定时任务** (**Build periodically** or **Poll SCM**) 里，**H** 代表 **哈希散列（Hash-based）** 时间调度，而 **不是固定的数字**。
+
+它的作用是**自动计算一个分布均匀的时间点**，以 **避免多个任务同时触发，导致服务器高负载**。
+
+
+
+**H 的作用**
+
+- 让 Jenkins 自动计算一个任务执行时间
+- 基于 Job 名称的 Hash 值生成随机时间
+- 避免所有任务在同一时间点执行
+
+
+
+**H 的用法示例**
+
+**✅ 1. `H * * * *`（每小时执行一次，但具体时间随机）**
+
+```bash
+H * * * *   # Jenkins 会在 0-59 之间随机选择一个固定的分钟数，每次触发都在相同的分钟数执行（对同一任务而言）。
+
+# Jenkins 自动分配一个分钟数（0-59 之间），确保任务不会集中在同一时刻执行。
+```
+
+例如：某个 Job 可能被分配到 `23` 分钟，则它每小时执行一次，时间可能是：
+
+```bash
+10:23, 11:23, 12:23, 13:23, 14:23 ...
+```
+
+✅ **2. `H H(0-7) * * *`（每天凌晨 0-7 点某个时间运行一次）**
+
+```bash
+H H(0-7) * * *  # 例如可能是 02:34、05:21、06:45
+
+# Jenkins 会在 0-7 小时之间选择一个固定时间，保证不同任务不会全部集中在 00:00。
+```
+
+✅ **3. `H/15 * * * *`（每 15 分钟执行一次）**
+
+```bash
+H/15 * * * *  # 例如可能是 07,22,37,52 分钟执行
+
+# 避免所有任务固定在 00,15,30,45 分钟执行，减少服务器负载高峰
+```
+
+✅ **4. `H(0-30) 12 * * *`（每天 12:00-12:30 之间执行）**
+
+```bash
+H(0-30) 12 * * *  # 例如可能是 12:07、12:19、12:26
+
+# 确保任务在 12:00-12:30 之间随机选择一个时间点
+```
+
+
+
+###### 定时构建示例
+
+![image-20250222151941655](D:\git_repository\cyber_security_learning\markdown_img\image-20250222151941655.png)
+
+
+
+![image-20250222152043085](D:\git_repository\cyber_security_learning\markdown_img\image-20250222152043085.png)
+
+```ABAP
+注意：SCM任务会在左侧多出一个“Git 轮询日志”，可以看到轮询的记录信息
+观察Git 轮询日志可以看到当有变化时才会构建,否则不会执行构建
+```
+
+![image-20250222152228871](D:\git_repository\cyber_security_learning\markdown_img\image-20250222152228871.png)
+
+
+
+
+
+##### 构建 Webhook 触发器
+
+构建触发器(webhook)，也称为钩子，**实际上是一个HTTP回调**，其用于在开发人员向gitlab提交代码后 能够触发jenkins自动执行代码构建操作。
+
+**常见场景:**
+
+只有在开发人员向develop分支提交代码的时候会自动触发代码构建和部署至测试环境，而向主分支提 交的代码不会自动构建，需要运维人员手动部署代码到生产环境。
+
+![image-20250222152502473](D:\git_repository\cyber_security_learning\markdown_img\image-20250222152502473.png)
+
+**多种方式实现 Webhook 触发构建**
+
+- 触发远程构建: 此方式无需安装插件
+- Build when a change is pushed to GitLab. GitLab webhook URL: 需要安装Gitlab插件
+- Generic Webhook Trigger : 需要安装 Generic Webhook Trigger Plugin 插件
+
+
+
+###### **触发远程构建**
+
+Jenkins配置构建 Webhook 触发器
+
+![image-20250222155325828](D:\git_repository\cyber_security_learning\markdown_img\image-20250222155325828.png)
+
+这里的触发路径为
+
+```bash
+JENKINS_URL/job/trigger1-demo1/build?token=TOKEN_NAME 或者 /buildWithParameters?token=TOKEN_NAME
+
+# 其中JENKINS_URL的值为http://172.22.200.222:8080/
+# 所以拼出来的最终URL为
+
+http://172.22.200.222:8080/job/trigger1-demo1/build?token=123456
+```
+
+![image-20250222155601674](D:\git_repository\cyber_security_learning\markdown_img\image-20250222155601674.png)
+
+![image-20250222155348764](D:\git_repository\cyber_security_learning\markdown_img\image-20250222155348764.png)
+
+保存后，访问`http://172.22.200.222:8080/job/trigger1-demo1/build?token=123456`
+
+```bash
+#如果执行正常，则无任何显示
+[root@mystical /tmp]# curl http://172.22.200.222:8080/job/trigger1-demo1/build?token=12345
+
+# 触发构建
+```
+
+```ABAP
+注意：这里之所以直接成功，是因为测试的服务器和Jenkins所在服务器，打通了ssh验证
+```
+
+
+
+![image-20250222160244159](D:\git_repository\cyber_security_learning\markdown_img\image-20250222160244159.png)
+
+  ```ABAP
+  如果在没有和Jenkins进行任何验证的机器上执行curl http://172.22.200.222:8080/job/trigger1-demo1/build?token=12345
+  则会报如下错误
+  ```
+
+```bash
+[root@master1 ~]#curl http://172.22.200.222:8080/job/trigger1-demo1/build?token=12345
+<html><head><meta http-equiv='refresh' content='1;url=/login?from=%2Fjob%2Ftrigger1-demo1%2Fbuild%3Ftoken%3D12345'/><script id='redirect' data-redirect-url='/login?from=%2Fjob%2Ftrigger1-demo1%2Fbuild%3Ftoken%3D12345' src='/static/44b48e24/scripts/redirect.js'></script></head><body style='background-color:white; color:white;'>
+Authentication required
+<!--
+-->
+</body></html> 
+
+# 请求返回的 HTML 提示 Authentication required，说明 Jenkins 要求身份验证
+```
+
+**解决方案**
+
+**方法1：使用 API Token 进行认证**
+
+Jenkins **默认不允许匿名构建**，需要 **API Token** 进行身份认证。
+
+1️⃣ 获取 API Token
+
+创建一个自定义用户
+
+![image-20250222161429574](D:\git_repository\cyber_security_learning\markdown_img\image-20250222161429574.png)
+
+
+
+![image-20250222161444100](D:\git_repository\cyber_security_learning\markdown_img\image-20250222161444100.png)
+
+![image-20250222161526818](D:\git_repository\cyber_security_learning\markdown_img\image-20250222161526818.png)
+
+```bash
+# 此时直接使用新创建的用户名密码，就能触发
+[root@master1 ~]#curl http://mystical:123456@172.22.200.222:8080/job/trigger1-demo1/build?token=123456
+
+# 但是账号密码直接触发并不安全，因此建议使用API token
+```
+
+
+
+**创建 API Token**
+
+使用刚刚创建的新用户登录Jenkins
+
+![image-20250222162230718](D:\git_repository\cyber_security_learning\markdown_img\image-20250222162230718.png)
+
+![image-20250222162332664](D:\git_repository\cyber_security_learning\markdown_img\image-20250222162332664.png)
+
+![image-20250222162345984](D:\git_repository\cyber_security_learning\markdown_img\image-20250222162345984.png)
+
+![image-20250222162441576](D:\git_repository\cyber_security_learning\markdown_img\image-20250222162441576.png)
+
+点击生成，得到一串随机的令牌
+
+![image-20250222162529528](D:\git_repository\cyber_security_learning\markdown_img\image-20250222162529528.png)
+
+后续即可使用该API Token进行访问
+
+```bash
+[root@master1 ~]#curl http://mystical:1128f339f008e400621c665a474c529973@172.22.200.222:8080/job/trigger1-demo1/build?token=123456
+```
+
+
+
+**GitLab 配置 Webhook**
+
+以幸运大转盘的前端项目为准备环境，在上面配置远程构建
+
+![image-20250222163707479](D:\git_repository\cyber_security_learning\markdown_img\image-20250222163707479.png)
+
+在 GitLab 上配置 Webhook
+
+![image-20250222163804202](D:\git_repository\cyber_security_learning\markdown_img\image-20250222163804202.png)
+
+![image-20250222171422210](D:\git_repository\cyber_security_learning\markdown_img\image-20250222171422210.png)
+
+**执行测试**
+
+![image-20250222171457017](D:\git_repository\cyber_security_learning\markdown_img\image-20250222171457017.png)
+
+```ABAP
+添加webhook后，执行测试，会显示报错：Hook execution failed: URL is blocked: Requests to the local network are not allowed 
+
+原因：Gitlab 需要打开外发请求，而默认是关闭的
+```
+
+![image-20250222171306327](D:\git_repository\cyber_security_learning\markdown_img\image-20250222171306327.png)
+
+**手动打开外发请求**
+
+![image-20250222170843855](D:\git_repository\cyber_security_learning\markdown_img\image-20250222170843855.png)
+
+![image-20250222170947507](D:\git_repository\cyber_security_learning\markdown_img\image-20250222170947507.png)
+
+**打开外发请求后，再执行测试**
+
+![image-20250222171659375](D:\git_repository\cyber_security_learning\markdown_img\image-20250222171659375.png)
+
+```bash
+# 修改git仓库的代码，上传，并提交tag
+[root@mystical ~/project/wheel_of_fortune] $vim index.html 
+[root@mystical ~/project/wheel_of_fortune] $git add .
+[root@mystical ~/project/wheel_of_fortune] $git commit -m'5w -> 8w'
+[root@mystical ~/project/wheel_of_fortune] $git push origin master
+[root@mystical ~/project/wheel_of_fortune] $git log --oneline 
+50250e0 (HEAD -> master, origin/master, origin/HEAD) 5w -> 8w
+865e96c (tag: v8.0) +5w
+3880368 (tag: v7.0) 50w
+1bd276e (tag: v6.0) +200w
+75cbf7a (tag: v5.0) + 400w
+39cc771 500w
+5fdc3cd -300w,-500w
+a03647f (tag: v4.0) change 3002
+26551d6 (tag: v3.0) change 500w
+46b0c7a (tag: v2.0) change 100w
+730984d (tag: v1.0) 幸运大转盘演示demo
+[root@mystical ~/project/wheel_of_fortune] $git tag v9.0 50250e0
+[root@mystical ~/project/wheel_of_fortune] $git push --tags
+
+# 提交tags即可触发构建
+```
+
+![image-20250222174525613](D:\git_repository\cyber_security_learning\markdown_img\image-20250222174525613.png)
+
+![image-20250222174550740](D:\git_repository\cyber_security_learning\markdown_img\image-20250222174550740.png)
+
+
+
+
+
+#### 构建前后多个项目关联自动触发任务执行
+
+用于多个 Job 相互关联，需要同行执行多个job的场景,比如:如果job1后希望自动构建job2
+
+**可以用两种方法实现**
+
+- 在前面任务中利用构建后操作关联后续任务
+- 在后面任务中利用构建触发器关联前面任务
+
+```ABAP
+注意：
+上面两种方法,都需要在前面任务执行后才能自动关联执行后续任务
+不要实现任务的环路，会导致死循环
+```
+
+
+
+##### 在前面任务里配置构建后操作
+
+在先执行的任务中配置构建后操作实现
+
+###### 创建构建后操作
+
+在第一个要执行的任务,指定构建后操作,添加第二个任务
+
+要构建的项目可以填写多个项目名，之间用逗号分隔即可
+
+
+
+**创建3个job**
+
+![image-20250222180103160](D:\git_repository\cyber_security_learning\markdown_img\image-20250222180103160.png)
+
+![image-20250222180137405](D:\git_repository\cyber_security_learning\markdown_img\image-20250222180137405.png)
+
+![image-20250222180157020](D:\git_repository\cyber_security_learning\markdown_img\image-20250222180157020.png)
+
+
+
+**在 job1 配置构建后操作**
+
+![image-20250222223134385](D:\git_repository\cyber_security_learning\markdown_img\image-20250222223134385.png)![image-20250222223205571](D:\git_repository\cyber_security_learning\markdown_img\image-20250222223205571.png)
+
+![image-20250222223233455](D:\git_repository\cyber_security_learning\markdown_img\image-20250222223233455.png)
+
+
+
+##### **在后面构建的任务里创建**
+
+###### 在后续构建的任务里利用构建触发器实现
+
+在后面的 job 配置如下
+
+在构建触发器---Build after other project are built --- 关注的项目 --- 输入前面的 job,如果有多个job 用 逗号分隔
+
+![image-20250222224326137](D:\git_repository\cyber_security_learning\markdown_img\image-20250222224326137.png)                                                                                                                                                                                                                                                                                                
+
+![image-20250222224423262](D:\git_repository\cyber_security_learning\markdown_img\image-20250222224423262.png)
+
+![image-20250222224657104](D:\git_repository\cyber_security_learning\markdown_img\image-20250222224657104.png)
+
+
+
+#### Blue Ocean 插件实现可视化
+
+![image-20250222224922418](D:\git_repository\cyber_security_learning\markdown_img\image-20250222224922418.png)
+
+Blue Ocean 插件可以实现更加漂亮的可视化界面,并且可以对指定的步骤进行重启等操作
+
+
+
+##### 安装 Blue Ocean 插件
+
+注意: 安装完插件,需要重启Jenkins才能生效
+
+![image-20250223132907470](D:\git_repository\cyber_security_learning\markdown_img\image-20250223132907470.png)
+
+![image-20250223133616278](D:\git_repository\cyber_security_learning\markdown_img\image-20250223133616278.png)
+
+
+
+![image-20250223133645332](D:\git_repository\cyber_security_learning\markdown_img\image-20250223133645332.png)
+
+![image-20250223133711823](D:\git_repository\cyber_security_learning\markdown_img\image-20250223133711823.png)
+
+![image-20250223133735240](D:\git_repository\cyber_security_learning\markdown_img\image-20250223133735240.png)
+
+
+
+
+
+#### 实现容器化的 Docker 任务
+
+##### Jenkins 支持 Docker 说明
+
+![image-20250223133933079](D:\git_repository\cyber_security_learning\markdown_img\image-20250223133933079.png)
+
+
+
+当前越来越多的组织以容器形式运行应用, 应用交付形式统一为**Container Image**
+
+交付的Container Image由Registry存储和分发,应用以容器化形式由Docker，Kubernetes进行编排运行
+
+jenkins的多款插件都能实现容器镜像Image构建和推送
+
+- docker-build-step
+- Docker
+- CloudBees Docker Build and Publish
+- **Docker Pipeline Plugin**：这个插件允许在Jenkins Pipeline中使用Docker来构建、发布和管理容 器。它提供了一组用于在Pipeline脚本中执行Docker相关操作的步骤。
+- **Docker Slaves Plugin**：这个插件允许Jenkins使用Docker容器作为构建代理（agent）。它可以动态地启动和停止Docker容器来扩展Jenkins的构建能力
+
+
+
+##### 案例： 实现自由风格任务实现 Docker 镜像制作并运行
+
+###### 在harbor.mystical.org主机上安装Harbor
+
+```ABAP
+略
+```
+
+###### 在目标主机安装 Docker，并且信任harbor
+
+```bash
+# 在Jenkins主机及应用主机上安装Docker
+[root@mystical ~]# apt update && apt -y install docker.io
+
+# 配置docker/daemon.json
+[root@mystical ~]# cat /etc/docker/daemon.json 
+{
+  "registry-mirrors": ["https://si7y70hh.mirror.aliyuncs.com"],
+  "insecure-registries": ["harbor.mystical.org"]
+}
+
+# 重启docker
+[root@mystical ~]# systemctl restart docker
+
+# 在Jenkins主机上，将jenkins用户加入docker组
+# 如果不加的话，默认使用jenkins的身份，访问socket文件，但是docker.sock的其它没有读写权限，所以权限不足
+[root@mystical ~]# ll /var/run/docker.sock 
+srw-rw---- 1 root docker 0 Feb 23 08:13 /var/run/docker.sock=
+
+[root@mystical ~]# usermod -aG docker jenkins
+[root@mystical ~]# id jenkins
+uid=114(jenkins) gid=119(jenkins) groups=119(jenkins),120(docker)
+
+# 需要重启Jenkins，上面的权限才能生效
+[root@mystical ~]# systemctl restart jenkins
+
+#在Jenkins主机用jenkins用户登录harbor
+# Jenkins和应用服务器都要先登录Harbor
+[root@mystical ~]# su - jenkins
+jenkins@mystical:~$ docker login harbor.mystical.org -u admin -p 123456
+WARNING! Using --password via the CLI is insecure. Use --password-stdin.
+WARNING! Your password will be stored unencrypted in /var/lib/jenkins/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+jenkins@mystical:~$ cat .docker/config.json 
+{
+	"auths": {
+		"harbor.mystical.org": {
+			"auth": "YWRtaW46MTIzNDU2"
+		}
+	}
+}
+```
+
+###### 在 Gitlab 准备项目
+
+![image-20250223163022686](D:\git_repository\cyber_security_learning\markdown_img\image-20250223163022686.png)
+
+###### 在 Jenkins 创建自由风格任务
+
+![image-20250223173110146](D:\git_repository\cyber_security_learning\markdown_img\image-20250223173110146.png)
+
+![image-20250223163303219](D:\git_repository\cyber_security_learning\markdown_img\image-20250223163303219.png)
+
+![image-20250223173127646](D:\git_repository\cyber_security_learning\markdown_img\image-20250223173127646.png)
+
+
+
+###### 脚本示例
+
+```bash
+[root@mystical /data/jenkins/script]# cat spring-boot-hello-docker.sh 
+#!/bin/bash
+
+REGISTRY=172.22.200.223
+PORT=8888
+
+HOSTS="
+172.22.200.101
+172.22.200.102
+"
+
+mvn clean package -Dmaven.test.skip=true
+
+docker build -t ${REGISTRY}/myk8s/myapp:$TAG .
+docker push ${REGISTRY}/myk8s/myapp:$TAG
+
+for i in $HOSTS; do
+	ssh root@$i docker rm -f myapp
+	ssh root@$i docker run -d -p ${PORT}:8888 --restart always --name myapp ${REGISTRY}/myk8s/myapp:$TAG
+done
+```
+
+###### 执行任务
+
+![image-20250223173254371](D:\git_repository\cyber_security_learning\markdown_img\image-20250223173254371.png)
+
+![image-20250223173307915](D:\git_repository\cyber_security_learning\markdown_img\image-20250223173307915.png)
+
+![image-20250223173322383](D:\git_repository\cyber_security_learning\markdown_img\image-20250223173322383.png)
+
+
+
+##### 案例: 基于 Docker 插件实现自由风格任务实现 Docker 镜像 制作
+
+![image-20250223173417986](D:\git_repository\cyber_security_learning\markdown_img\image-20250223173417986.png)
+
+###### 安装插件 docker-build-step
+
+![image-20250223174752040](D:\git_repository\cyber_security_learning\markdown_img\image-20250223174752040.png)
+
+###### 在Jenkins 安装Docker并配置 Docker 插件
+
+```bash
+# 在Jenkins主机及应用主机上安装Docker
+[root@mystical ~]# apt update && apt -y install docker.io
+
+# 配置docker/daemon.json
+[root@mystical ~]# cat /etc/docker/daemon.json 
+{
+  "registry-mirrors": ["https://si7y70hh.mirror.aliyuncs.com"],
+  "insecure-registries": ["harbor.mystical.org"]
+}
+
+# 重启docker
+[root@mystical ~]# systemctl restart docker
+
+# 在Jenkins主机上，将jenkins用户加入docker组
+# 如果不加的话，默认使用jenkins的身份，访问socket文件，但是docker.sock的其它没有读写权限，所以权限不足
+[root@mystical ~]# ll /var/run/docker.sock 
+srw-rw---- 1 root docker 0 Feb 23 08:13 /var/run/docker.sock=
+
+[root@mystical ~]# usermod -aG docker jenkins
+[root@mystical ~]# id jenkins
+uid=114(jenkins) gid=119(jenkins) groups=119(jenkins),120(docker)
+
+# 需要重启Jenkins，上面的权限才能生效
+[root@mystical ~]# systemctl restart jenkins
+
+#在Jenkins主机用jenkins用户登录harbor
+# Jenkins和应用服务器都要先登录Harbor
+[root@mystical ~]# su - jenkins
+jenkins@mystical:~$ docker login harbor.mystical.org -u admin -p 123456
+WARNING! Using --password via the CLI is insecure. Use --password-stdin.
+WARNING! Your password will be stored unencrypted in /var/lib/jenkins/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+jenkins@mystical:~$ cat .docker/config.json 
+{
+	"auths": {
+		"harbor.mystical.org": {
+			"auth": "YWRtaW46MTIzNDU2"
+		}
+	}
+}
+```
+
+######  本地 Docker Engine
+
+```ABAP
+系统管理-- 系统配置 -- Docker Builder -- Docker URL (支持本地和远程)
+```
+
+```bash
+#本地Docker Engine
+unix:///var/run/docker.sock
+
+# 注意：Jenkins-2.246.2 版本不支持sock文件，会出现下面错误提示，只支持：unix://localhost:2375 形式
+unix://localhost:2375   
+
+#远程Docker Engine
+tcp://10.0.0.101:2375
+```
+
+![image-20250223175454021](D:\git_repository\cyber_security_learning\markdown_img\image-20250223175454021.png)
+
+###### 在 Jenkins 创建连接 Harbor 的凭证
+
+![image-20250223175853800](D:\git_repository\cyber_security_learning\markdown_img\image-20250223175853800.png)
+
+
+
+![image-20250223175930893](D:\git_repository\cyber_security_learning\markdown_img\image-20250223175930893.png)
+
+![image-20250223175940433](D:\git_repository\cyber_security_learning\markdown_img\image-20250223175940433.png)
+
+![image-20250223180125307](D:\git_repository\cyber_security_learning\markdown_img\image-20250223180125307.png)
+
+###### 创建自由风格的 spring-boot-helloworld 项目的任务
+
+![image-20250223180245096](D:\git_repository\cyber_security_learning\markdown_img\image-20250223180245096.png)
+
+![image-20250223180429539](D:\git_repository\cyber_security_learning\markdown_img\image-20250223180429539.png)
+
+
+
+![image-20250223180635122](D:\git_repository\cyber_security_learning\markdown_img\image-20250223180635122.png)
+
+![image-20250223180645491](D:\git_repository\cyber_security_learning\markdown_img\image-20250223180645491.png)
+
+
+
+![image-20250223180906669](D:\git_repository\cyber_security_learning\markdown_img\image-20250223180906669.png)
+
+
+
+![image-20250223181140733](D:\git_repository\cyber_security_learning\markdown_img\image-20250223181140733.png)
+
+![image-20250223181559168](D:\git_repository\cyber_security_learning\markdown_img\image-20250223181559168.png)
+
+![image-20250223205825975](D:\git_repository\cyber_security_learning\markdown_img\image-20250223205825975.png)
+
+
+
+
+
+#### 集成 Kubernetes
+
+```http
+https://www.jenkins.io/doc/book/scaling/scaling-jenkins-on-kubernetes/
+```
+
+在部署在Kubernetes集群外的Jenkins中执行Kubernetes集群的管理任务有以下两种方式
+
+
+
+##### 方法1: 基于 kubeconfig 实现
+
+流程说明
+
+- 在Jenkins服务器安装kubectl工具，可以通过复制kubectl 二进制程序文件到Jenkins服务器 的/usr/local/bin下实现
+
+- 将Kubernetes集群中的master节点的上的/etc/kubernetes/admin.conf 复制到Jenkins服务器 ~jenkins/.kube/config
+- 修改权限： chmod 644 ~jenkins/.kube/config
+- 编写shell,调用kubectl apply -f 执行集群管理操作
+
+
+
+
+
+
+
+
 
 
 
@@ -26916,6 +28184,69 @@ myapp-7b94444f8d-dh7jd                                     1/1     Running   4 (
 
 
 
+##### 不同名称空间 Pod 使用 Secret 拉取私有镜像解决方案
+
+在 Kubernetes 中，**不同命名空间的 Pod 不能直接使用其他命名空间下的 Secret**。默认情况下，Secret 的作用范围**仅限于其所在的命名空间**，也就是说，你不能在 `my-namespace` 下的 Pod 直接使用 `default` 命名空间的 Secret 来拉取 Harbor 镜像。
+
+
+
+1️⃣ **复制 Secret 到目标命名空间（推荐）**
+
+最简单的方法是**复制 `default` 命名空间的 Secret 到其他命名空间**：
+
+```bash
+kubectl get secret my-secret -n default -o yaml | sed 's/namespace: default/namespace: my-namespace/g' | kubectl apply -f -
+```
+
+然后在 Pod 配置：
+
+```yaml
+spec:
+  imagePullSecrets:
+    - name: my-secret
+```
+
+✅ **适用于多个命名空间需要共用 Secret 的情况**。
+
+
+
+2️⃣ **使用 Mutating Admission Webhook 自动注入 Secret**
+
+如果你不想手动复制 Secret，可以使用 Kubernetes **Mutating Admission Webhook**，自动在创建 Pod 时**注入 `imagePullSecrets`**。
+
+```ABAP
+详细解决方案：查看知识扩展，关于Mutating Admission Webhook的完整教学
+```
+
+
+
+3️⃣ **使用 `kubelet` 的 `dockercfg` 共享**
+
+如果集群规模较大，**可以将 Harbor 认证信息放入 `/var/lib/kubelet/config.json`**，这样所有 `namespace` 的 Pod 都可以拉取私有镜像：
+
+```bash
+cp ~/.docker/config.json /var/lib/kubelet/
+systemctl restart kubelet
+```
+
+但这种方式适用于 **无 RBAC 限制的环境**
+
+
+
+**✅ 最佳实践**
+
+| 方案                        | 适用场景               | 复杂度 | 适配性         |
+| --------------------------- | ---------------------- | ------ | -------------- |
+| **复制 Secret**             | 适合少量命名空间       | 低     | 推荐           |
+| **Webhook 自动注入 Secret** | 适合大规模集群         | 高     | 适合企业       |
+| **共享 `dockercfg`**        | 适合无 RBAC 限制的集群 | 中     | 适用于部分环境 |
+
+如果你的需求是 **Pod 跨命名空间共用 Secret**，推荐 **直接复制 Secret**（方案 1），或者**使用 Admission Webhook** 进行自动注入（方案 2）。
+
+
+
+
+
 
 
 ### downwardAPI
@@ -34694,6 +36025,39 @@ git config --global http.sslCAInfo ~/gitlab-cert.pem
 
 
 
+### 解决 GitHub 上传大文件问题
+
+GItHub 不允许单个文件超过 100MB
+
+#### 方法：使用 Git LFS (推荐)
+
+GitHub 提供了 **Git LFS（Large File Storage）**，专门用于管理超过 100MB 的大文件。
+
+**1️⃣ 安装 Git LFS**
+
+如果你尚未安装 Git LFS，可以运行
+
+```bash
+git lfs install
+```
+
+**2️⃣ 让 Git 追踪大文件**
+
+```bash
+git lfs track "*.pdf"
+```
+
+**3️⃣ 重新添加并提交**
+
+```bash
+git add .gitattributes
+git add "AI/NVIDIA GPU 概论.pdf"
+git commit -m "Track large PDF file with Git LFS"
+git push origin master
+```
+
+这样 GitHub 就不会因为文件大小拒绝你的 push 了。
+
 
 
 
@@ -35174,3 +36538,685 @@ K8s 本身不提供存储，而是依赖 **CSI（Container Storage Interface）*
 
 💡 **你们的业务更倾向哪种方案？是否有数据库存储优化的需求？** 🚀
 
+
+
+
+
+## 生产环境下，多项目构建 CI/CD 体系
+
+如果你的公司有 **80个项目**，在 **Jenkins** 上进行 CI/CD，必须考虑 **高效管理、资源优化、可维护性和自动化**。下面提供 **最佳实践**，帮助你构建一个可扩展、稳定的 **Jenkins CI/CD 体系**。
+
+
+
+### Jenkins CI/CD 设计架构
+
+对于 **80个项目**，应采用 **多层次的 Jenkins 结构**：
+
+```lua
+                         +---------------------+
+                         |   GitLab / GitHub   |
+                         +---------------------+
+                                   │
+                    GitLab Webhook │
+                    +--------------+-------------+
+                    | Jenkins 主控服务器（Master）|
+                    +--------------+-------------+
+                    |         |         |       |
+            +----------------+--------------------+
+            |     Jenkins Agent Nodes（Slave）    |
+            |  - 运行构建任务                      |
+            |  - 运行容器（Docker）                |
+            +------------------------------------+
+                     │        │        │
+              +-----------------------------+
+              |  部署到测试 / 生产环境 (K8s)  |
+              +-----------------------------+
+```
+
+**核心原则**
+
+✅ **主从架构（Master-Slave）**
+✅ **流水线管理（Pipeline as Code）**
+✅ **共享 Agent 资源，动态分配任务**
+✅ **自动触发 CI/CD（Webhook）**
+✅ **统一日志 & 监控**
+
+
+
+### Jenkins 服务器架构
+
+**1️⃣ Jenkins Master（管理中心）**
+
+- 主要负责：
+  - 触发构建任务（Job）
+  - 任务调度（分配到不同的 Jenkins Agent）
+  - 监控 CI/CD 运行状态
+- 适用于：管理 **80个项目**，但不执行具体构建任务。
+
+💡 **优化建议**：
+
+- **分离 Master & Agent**（避免 Master 过载）
+- **Jenkins 持久化存储**（如 NFS、S3 备份）
+
+------
+
+**2️⃣ Jenkins Agent（执行任务）**
+
+- 适用于：运行 **构建任务**，避免 Master 过载
+- **可以部署在 Kubernetes / Docker / 物理机**
+- **按语言和技术栈划分（Node.js、Python、Java等）**
+- **支持动态扩展**
+
+💡 **优化建议**：
+
+- 使用 **Kubernetes 作为 Jenkins Agent**（动态伸缩）
+- 使用 **Docker + Jenkins Agent**（构建环境隔离）
+- 采用 **Label 标签** 分配不同任务（Java、Python）
+
+
+
+### 多项目管理策略
+
+如果你有 **80个项目**，你可以用以下方法高效管理：
+
+#### 方案 1：使用多级文件夹组织项目（推荐）
+
+在 Jenkins **使用文件夹（Folder）分类管理**：
+
+```scss
+Jenkins
+ ├── Backend Projects
+ │   ├── project-a (Pipeline)
+ │   ├── project-b (Pipeline)
+ │   ├── project-c (Pipeline)
+ ├── Frontend Projects
+ │   ├── project-d (Pipeline)
+ │   ├── project-e (Pipeline)
+ ├── Mobile Projects
+ │   ├── project-f (Pipeline)
+ ├── DevOps Tools
+ │   ├── Infrastructure (Terraform)
+ │   ├── Monitoring (Prometheus)
+```
+
+**✅ 好处**：
+
+- **管理更清晰**（不同类型的项目分层）
+- **权限管理更方便**（不同团队管理自己的 Pipeline）
+
+💡 **如何创建文件夹**
+
+```bash
+Jenkins -> New Item -> Folder
+```
+
+
+
+#### 方案 2：使用共享 Pipeline 模板
+
+如果 **80个项目有相似的 CI/CD 逻辑**，你可以用 **共享 Pipeline 模板** 避免重复写流水线代码。
+
+💡 **使用 `Jenkins Shared Library`**
+
+1. **创建一个 Git 仓库，存放 Jenkins 通用 Pipeline**
+2. **在 `Jenkinsfile` 里调用它**
+
+**示例：`Jenkinsfile`**
+
+```groovy
+@Library('cicd-shared-library') _
+pipeline {
+    agent any
+    stages {
+        stage('Build') {
+            steps {
+                buildApp()
+            }
+        }
+        stage('Test') {
+            steps {
+                runTests()
+            }
+        }
+        stage('Deploy') {
+            steps {
+                deployToK8s()
+            }
+        }
+    }
+}
+```
+
+✅ **好处**：
+
+- 只需要维护 **一个 CI/CD 逻辑**，每个项目都可以复用！
+- **适合管理多个项目**，减少重复代码。
+
+
+
+#### 方案 3：使用 Jenkins Job DSL 自动创建 80 个 Job
+
+如果你有 **80个项目**，可以用 **Jenkins Job DSL** 自动创建所有 Job，而不需要手动配置。
+
+**示例：Job DSL**
+
+```groovy
+pipelineJob('my-app') {
+    definition {
+        cps {
+            script(readFileFromWorkspace('Jenkinsfile'))
+            sandbox()
+        }
+    }
+}
+```
+
+然后 **批量创建 80 个 Job**，所有项目都可以自动配置。
+
+✅ **好处**：
+
+- **所有项目配置一致**，方便批量管理。
+- **自动化创建**，避免手动操作。
+
+
+
+### 如何优化 CI/CD 构建效率
+
+当你有 **80个项目** 时，需要优化 **CI/CD 执行速度**。
+
+#### 1️⃣ 使用 Jenkins Agent 并行构建
+
+- **每个 Job 运行在不同的 Jenkins Agent**
+- **避免 Master 过载**
+- **提高并发处理能力**
+
+💡 **使用 Label 绑定特定 Agent**
+
+```groovy
+pipeline {
+    agent {
+        label 'java-agent'
+    }
+    stages {
+        stage('Build') {
+            steps {
+                sh './gradlew build'
+            }
+        }
+    }
+}
+```
+
+
+
+#### 2️⃣ 使用 Docker 加速构建
+
+使用 **Docker 构建环境** 避免 Jenkins 安装过多依赖：
+
+```groovy
+pipeline {
+    agent {
+        docker {
+            image 'maven:3.8.1-jdk-11'
+        }
+    }
+    stages {
+        stage('Build') {
+            steps {
+                sh 'mvn clean install'
+            }
+        }
+    }
+}
+```
+
+✅ **好处**：
+
+- **构建环境隔离**，防止依赖冲突。
+- **支持多语言**（Node.js, Java, Python）。
+- **动态拉取最新环境**。
+
+
+
+#### 3️⃣ 代码变更最小化触发
+
+避免 **每次推送全量构建**，只构建 **变更的部分**
+
+```groovy
+pipeline {
+    triggers {
+        pollSCM('* * * * *') // 仅拉取有变更的代码
+    }
+}
+```
+
+
+
+### 生产环境的 CI/CD 流程
+
+你的 80 个项目可以遵循以下 **CI/CD 流程**
+
+#### **✅ 1. CI（持续集成）**
+
+1. **开发者提交代码（GitLab）**
+2. **GitLab Webhook 触发 Jenkins**
+3. **代码检查（SonarQube）**
+4. **单元测试（JUnit, PyTest）**
+5. **构建 Docker 镜像**
+6. **推送到 Harbor / Docker Hub**
+
+#### **✅ 2. CD（持续部署）**
+
+1. **部署到 Kubernetes / 物理机**
+2. **自动化测试（Selenium, API Test）**
+3. **人工审批**
+4. **发布到生产**
+5. **监控 & 回滚（Prometheus, ArgoCD）**
+
+
+
+### 进阶模拟生产架构
+
+**三种架构模式**
+
+- **Jenkins + 传统CICD**
+- **Jenkins + docker + K8S**
+- **Tekton + docker + K8S**
+
+
+
+
+
+## Java 版本管理方案
+
+
+
+### 使用 update-alternatives
+
+如果你使用的是 **Ubuntu / Debian / Rocky Linux / CentOS**，可以使用 `update-alternatives` **管理多个 Java 版本**。
+
+
+
+#### 1️⃣ 查看已安装的 Java 版本
+
+```bash
+update-alternatives --list java
+```
+
+**输出示例**
+
+```bash
+/usr/lib/jvm/java-8-openjdk-amd64/bin/java
+/usr/lib/jvm/java-11-openjdk-amd64/bin/java
+/usr/lib/jvm/java-17-openjdk-amd64/bin/java
+```
+
+#### 2️⃣ 设置默认 Java 版本
+
+```bash
+sudo update-alternatives --config java
+```
+
+**终端会显示**
+
+```bash
+There are 3 choices for the alternative java (providing /usr/bin/java).
+
+  Selection    Path                                     Priority   Status
+------------------------------------------------------------
+  0            /usr/lib/jvm/java-17-openjdk-amd64/bin/java   200       auto mode
+  1            /usr/lib/jvm/java-8-openjdk-amd64/bin/java    100       manual mode
+  2            /usr/lib/jvm/java-11-openjdk-amd64/bin/java   150       manual mode
+  3            /usr/lib/jvm/java-17-openjdk-amd64/bin/java   200       manual mode
+
+Press <enter> to keep the current choice[*], or type selection number:
+```
+
+**输入 `1` 选择 Java 8，或者输入 `2` 选择 Java 11**
+
+#### 3️⃣ 确保 `javac` 也切换
+
+```bash
+sudo update-alternatives --config javac
+```
+
+#### 4️⃣ 验证 Java 版本
+
+```bash
+java -version
+```
+
+**适用于全局 Java 版本切换！**
+
+
+
+### 使用环境变量  JAVA_HOME（适用于特定用户）
+
+如果你想让**不同项目或用户使用不同的 Java 版本**，可以使用 `JAVA_HOME` 变量。
+
+#### 1️⃣ 找到 JDK 目录
+
+```bash
+ls /usr/lib/jvm/
+```
+
+**可能的输出**
+
+```bash
+java-8-openjdk-amd64
+java-11-openjdk-amd64
+java-17-openjdk-amd64
+```
+
+#### 2️⃣ 设置 Java 版本
+
+**临时切换**
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+```
+
+**验证**
+
+```bash
+java -version
+```
+
+**让设置永久生效（针对当前用户）**
+
+```bash
+echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> ~/.bashrc
+echo "export PATH=\$JAVA_HOME/bin:\$PATH" >> ~/.bashrc
+source ~/.bashrc
+```
+
+✅ **适用于不同 Java 程序使用不同的 JDK 版本。**
+
+
+
+### 使用 sdkman（推荐用于开发环境）
+
+如果你频繁切换 JDK，`sdkman` 是一个 **更便捷的工具**。
+
+#### 1️⃣ 安装 `sdkman`
+
+```bash
+curl -s "https://get.sdkman.io" | bash
+source "$HOME/.sdkman/bin/sdkman-init.sh"
+```
+
+#### 2️⃣ 安装不同版本的 Java
+
+```bash
+sdk install java 8.0.292-open
+sdk install java 11.0.16-open
+sdk install java 17.0.5-open
+```
+
+#### 3️⃣ 切换 Java 版本
+
+```bash
+sdk use java 11.0.16-open
+```
+
+**或者设置默认 JDK**
+
+```baash
+sdk default java 11.0.16-open
+```
+
+#### 4️⃣ 验证 Java 版本
+
+```bash
+java -version
+```
+
+✅ **适用于开发环境，快速切换 JDK 版本！**
+
+
+
+## Mutating Admission Webhook 教程（自动注入 `imagePullSecrets`）
+
+**🧐 为什么使用 Mutating Admission Webhook？**
+
+Kubernetes **不允许跨命名空间直接使用 Secret**，所以 `imagePullSecrets` 不能引用 `default` 命名空间的 Secret。但如果你的 **多个命名空间都要拉取 Harbor 镜像**，手动复制 Secret 不是最佳方案。
+
+**✅ Mutating Admission Webhook 可以在 Pod 创建时自动注入 `imagePullSecrets`，避免手动管理 Secret！**
+
+
+
+### 📌 Step 1: 编写 Webhook 服务器
+
+Webhook 需要接收 Kubernetes 发送的 `AdmissionReview` 请求，并返回修改后的 `imagePullSecrets`
+
+#### 1️⃣ 编写 Webhook 代码
+
+📂 **创建 `mutating-webhook.go`**
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+
+	admissionv1 "k8s.io/api/admission/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const imagePullSecret = "my-secret" // 需要自动注入的 Secret 名称
+
+func mutatePods(w http.ResponseWriter, r *http.Request) {
+	// 解析 AdmissionReview 请求
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request", http.StatusBadRequest)
+		return
+	}
+
+	var admissionReviewReq admissionv1.AdmissionReview
+	if err := json.Unmarshal(body, &admissionReviewReq); err != nil {
+		http.Error(w, "Failed to unmarshal request", http.StatusBadRequest)
+		return
+	}
+
+	// 确保是 Pod 资源
+	if admissionReviewReq.Request.Kind.Kind != "Pod" {
+		http.Error(w, "This webhook only handles Pod resources", http.StatusBadRequest)
+		return
+	}
+
+	// 解析 Pod
+	var pod v1.Pod
+	if err := json.Unmarshal(admissionReviewReq.Request.Object.Raw, &pod); err != nil {
+		http.Error(w, "Failed to unmarshal Pod", http.StatusBadRequest)
+		return
+	}
+
+	// 检查是否已有 imagePullSecrets
+	for _, secret := range pod.Spec.ImagePullSecrets {
+		if secret.Name == imagePullSecret {
+			// 如果 Secret 已经存在，则不修改
+			sendAdmissionResponse(w, admissionReviewReq, nil)
+			return
+		}
+	}
+
+	// 创建 Patch 以添加 imagePullSecrets
+	patch := `[{"op":"add","path":"/spec/imagePullSecrets","value":[{"name":"` + imagePullSecret + `"}]}]`
+	sendAdmissionResponse(w, admissionReviewReq, &patch)
+}
+
+func sendAdmissionResponse(w http.ResponseWriter, req admissionv1.AdmissionReview, patch *string) {
+	resp := admissionv1.AdmissionReview{
+		TypeMeta: req.TypeMeta,
+		Response: &admissionv1.AdmissionResponse{
+			UID:     req.Request.UID,
+			Allowed: true,
+		},
+	}
+
+	if patch != nil {
+		patchType := admissionv1.PatchTypeJSONPatch
+		resp.Response.PatchType = &patchType
+		resp.Response.Patch = []byte(*patch)
+	}
+
+	respBytes, _ := json.Marshal(resp)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(respBytes)
+}
+
+func main() {
+	http.HandleFunc("/mutate", mutatePods)
+	fmt.Println("Webhook server started on :8443")
+	http.ListenAndServeTLS(":8443", "/etc/webhook/certs/tls.crt", "/etc/webhook/certs/tls.key", nil)
+}
+```
+
+
+
+### 📌 Step 2: 生成 Webhook 证书
+
+Kubernetes Webhook 需要 **TLS 证书**，你可以使用 `openssl` 生成自签名证书：
+
+```bash
+mkdir certs && cd certs
+
+# 生成 CA 证书
+openssl genrsa -out ca.key 2048
+openssl req -x509 -new -nodes -key ca.key -subj "/CN=webhook-ca" -days 365 -out ca.crt
+
+# 生成 Webhook 服务器证书
+openssl genrsa -out webhook.key 2048
+openssl req -new -key webhook.key -subj "/CN=mutating-webhook.default.svc" -out webhook.csr
+
+# 签发 Webhook 证书
+openssl x509 -req -in webhook.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out webhook.crt -days 365
+```
+
+然后创建 Kubernetes Secret 存放证书：
+
+```bash
+kubectl create secret tls webhook-secret --cert=webhook.crt --key=webhook.key -n default
+```
+
+
+
+### 📌 Step 3: 部署 Webhook 服务器
+
+📂 **创建 `webhook-deployment.yaml`**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-server
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook
+  template:
+    metadata:
+      labels:
+        app: webhook
+    spec:
+      containers:
+        - name: webhook
+          image: my-webhook:latest  # 你需要构建这个 Go Webhook 镜像
+          ports:
+            - containerPort: 8443
+          volumeMounts:
+            - name: tls-certs
+              mountPath: "/etc/webhook/certs"
+              readOnly: true
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: webhook-secret
+```
+
+
+
+### 📌 Step 4: 配置 MutatingWebhookConfiguration
+
+📂 **创建 `mutating-webhook.yaml`**
+
+```yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: pod-mutating-webhook
+webhooks:
+  - name: pod-imagepullsecrets.my-webhook.com
+    admissionReviewVersions: ["v1"]
+    sideEffects: None
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+    clientConfig:
+      service:
+        name: webhook-server
+        namespace: default
+        path: "/mutate"
+      caBundle: $(cat certs/ca.crt | base64 | tr -d '\n')
+    failurePolicy: Ignore
+
+```
+
+
+
+### 📌 Step 5: 测试 Webhook
+
+创建 Pod **不指定 `imagePullSecrets`**，然后看看 Webhook 是否自动注入
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  namespace: my-namespace
+spec:
+  containers:
+    - name: test
+      image: harbor.mystical.org/my-image:latest
+```
+
+应用
+
+```bash
+kubectl apply -f test-pod.yaml
+```
+
+然后检查
+
+```bash
+kubectl get pod test-pod -o yaml | grep imagePullSecrets -A 2
+```
+
+如果成功，会看到
+
+```yaml
+imagePullSecrets:
+  - name: my-secret
+```
+
+
+
+### **📌 总结**
+
+✅ **Pod 自动注入 `imagePullSecrets`**，无需手动管理 Secret。
+✅ **Webhook 适用于所有新创建的 Pod**，不需要修改 Deployment。
+✅ **可以扩展为其他用途**，如自动设置 `labels`、`annotations` 等。
+
+这就是 **Kubernetes Mutating Admission Webhook** **自动注入 `imagePullSecrets`** 的完整教程！🚀
+
+如果有问题，欢迎讨论！🔥
