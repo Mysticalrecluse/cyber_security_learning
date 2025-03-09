@@ -2002,7 +2002,7 @@ ADD email VARCHAR(50) AFTER emp_name;
 
 # 修改一个字段
 ALTER TABLE mytest
-MODIFY emp_name VARCHAR(25);
+/
 
 # 重命名一个字段
 ALTER TABLE mytest

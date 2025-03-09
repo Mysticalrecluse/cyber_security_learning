@@ -17975,6 +17975,4748 @@ Jenkins借助于SonarQube Scanner插件将SonarQube提供的代码质量检查�
 
 
 
+- **Prometheus 介绍**
+- **Prometheus 部署和配置**
+- **Node Exporter 采集数据**
+- **Pushgateway 采集数据**
+- **PromQL 查询语言**
+- **Grafana 图形化展示**
+- **Prometheus 标签管理**
+- **Prometheus 告警机制**
+- **Prometheus 服务发现**
+- **各种 Exporter 高级功能**
+- **Prometheus 实现容器监控**
+- **Prometheus 联邦 Federation**
+- **Prometheus 远程存储 VictoriaMetrics**
+- **Kubernetes 集成 Prometheus**
+
+
+
+## Prometheus 介绍
+
+监控是运维的第一道防线，业务系统可以不做运维自动化，可以不做 DevOps，但一定不能不做监控。 监控是业务的"眼睛"，能在第一时间发现对应的异常问题，只有这样才能第一时间去解决问题。
+
+"无监控、不运维"，没了监控，什么基础运维，业务运维都是"瞎子"。监控是运维岗位的基本要求。运维 工作做的好不好，更多的是看监控有没有做好。
+
+一个完整的监控系统需要包括如下功能：数据产生、数据采集、数据存储、数据处理、数据展示分析、 告警
+
+
+
+### 监控系统组成
+
+#### 数据来源
+
+我们如果要监控数据，首先得有数据，也就是说，这些数据应该可以被记录下来，或者被暴露出来，数据常见的产生、直接或间接暴露方式的方式如下
+
+- 硬件本身的记录信息 - 以文件或者以内存属性的方式存在
+- 应用业务的接口 - 主动暴露软件本身的运行状态，比如 redis info、各种status等
+- 相关的信息采集工具 - 方便收集数据或者采集数据的系统级别的命令等
+
+
+
+注意：这些数据在长时间的运行过程中，都是以固定的"属性指标"来描述他们，我们把这些称为 **metric**。
+
+监控系统就需要对每个环境的每一个指标都要进行数据的获取，并且按照用户需要的方式提供给用户来使用。
+
+
+
+#### 数据采集
+
+对于上面所说的Metric指标数据，我们通常不会只获取一次，而是需要持续性、周期性的方式来采集。 根据数据采集方式的不同划分为了两个分类：
+
+- **软件方式**
+
+  **agent**: 专用的软件的一种应用机制。
+
+  **http**:  基于http 协议实现数据采集
+
+  **ssh**: 系统常见的一种应用通信机制，但是并非所有系统都支持。
+
+  **SNMP**: 简单网络管理协议(Simple Network Management Protocol),是工作在各种网络设备中的一 种机制。
+
+- **硬件方式**
+
+  **IPMI**: 智慧平台管理接口(Intelligent Platform Management Interface)是一种工业标准用于采集硬 件设备的各种物理健康状态数据，如温度、电压、风扇工作状态、电源状态等。
+
+注意：由于每个业务场景，需要采集的指标数量是不确定的，有时只是一个业务场景，就需要采集数百 个指标，如果按照上述所说的周期性采集的方式来说，数据的采集量是相当大的
+
+
+
+#### 数据存储
+
+由于我们采集到的"样本数据"，不是一次性使用的，尤其是单个数据是没有意义的，我们需要将这些数据存储下来，在后续的工作场景中进行聚合操作，从而来满足我们的需求。所以这些数据的存储也是一个非常重要的点。同时，我们在后续使用这些数据的时候，不仅仅要知道这些数据，还要知道这些数据的**时间属性**--什么时候的数据。所以这些数据在存储的时候，必须有一个重要的**时间维度**。
+
+所以我们一般将这种用于监控场景的数据，称为**时间序列数据 - TS(Time series data)**,专门用于存储这些 数据的数据库，称其为**时序数据库(TSDB Time series database）**
+
+
+
+**时序列数据库**是用来存储时序列（time-series）数据并以时间（点或区间）建立索引的软件
+
+一般**时序列数据**都具备以下特点
+
+- 数据结构简单：某一度量指标在某一时间点只会有一个值，没有复杂的结构（嵌套、层次等）和关 系（关联、主外键等）
+- 数据量大：由于时序列数据由所监控的大量数据源来产生、收集和发送，比如主机、IoT设备、终端或App等
+
+
+
+#### 数据处理
+
+如果仅仅采集到的是原始的数据，本身往往没有太大的意义，通常还需要对数据进行各种聚合和处理操作才可以正常的用于工作分析场景。
+
+
+
+#### 数据分析展示
+
+对于各种聚合操作之后的数据，我们也需要进行分析和展示
+
+无论是采集到的时序数据，还是经过聚合分析之后的统计数据，由于数据量巨大,用肉眼观察很难能够看得情楚，尤其是通过表格来查看成千上万条数据，来分析其内在的逻辑趋势关系更是如此。
+
+所以，对于监控系统来说，其本身的数据可视化功能是非常重要的，以各种图形演示的方式展示数据的 发展趋势，方便进行分析。
+
+
+
+#### 告警
+
+需要在某些特殊情况下，提醒我们去看相关的数据，所以我们就需要根据日常工作中采集到的数据，来分析出正常的状态值，然后将其作为一个阈值指标。
+
+接下来在后续数据采集的时候，让实时的数据，与阈值进行比较，一旦超出阈值判断机制，就通过告警机制通知给我们,从而及进行处理, 
+
+采集到的数据达到一定的条件,比如磁盘空间满等,应该自动触发告警提示,比如:微信,邮件,短信等,方便及时发现问题并解决
+
+
+
+
+
+### 监控内容和方法
+
+
+
+#### 监控内容
+
+##### 资源数据
+
+**硬件设备**：服务器、路由器、交换机、IO系统等
+
+**系统资源**：OS、网络、容器、VM实例
+
+**应用软件**：Nginx、MySQL、Java应用等
+
+
+
+##### 业务服务
+
+**业务状态**：服务通信、服务运行、服务下线、性能指标、QPS、DAU(Daily Active User )日活、转化率、业务接口(登陆，注册，聊天，留⾔)、产品转化率、充值额度、⽤户投诉等
+
+**一般故障**：访问缓慢、存储空间不足，数据同步延迟，主机宕机、主机不可达
+
+**严重故障**：服务不可用、集群故障
+
+
+
+##### 趋势分析
+
+**数据统计**：时间序列数据展示历史数据等
+
+**数据预测**：事件什么时候发生、持续时间、发生概率是多大等,比如:电商大促时间
+
+
+
+
+
+#### 监控方法
+
+Google的四个黄金指标
+
+常用于在服务级别帮助衡量**终端用户体验**、**服务中断**、**业务影响**等层面的问题，适用于应用及服务监控
+
+- **延迟(Latency)**
+
+  服务请求所需要的时长，例如HTTP请求平均延迟
+
+  应用程序响应时间会受到所有核心系统资源（包括网络、存储、CPU和内存）延迟的影响
+
+  需要区分失败请求和成功请求
+
+- **流量(Traffic)，也称为吞吐量**
+
+  衡量服务的容量需求，例如每秒处理的**HTTP请求数QPS**或者数据库系统的**事务数量TPS**
+
+  吞吐量指标包括每秒Web请求、API调用等示例，并且被描述为通常表示为每秒请求数的需求
+
+- **错误(Errors)**
+
+  失败的请求（流量)的数量，通常以绝对数量或错误请求占请求总数的百分比表示，请求失败的速率，用于衡量错误发生的情况
+
+  例如：HTTP 500错误数等显式失败，返回错误内容或无效内容等隐式失败，以及由策略原因导致的失败(例如强制要求响应时间超过30毫秒的请求视为错误)
+
+- **饱和度(Saturation)**
+
+  衡量资源的使用情况,用于表达应用程序有多"满"
+
+  资源的整体利用率，包括CPU（容量、配额、节流)、内存(容量、分配)、存储（容量、分配和 I/O 吞吐量)和网络
+
+  例如：内存、CPU、I/O、磁盘等资源的使用量
+
+
+
+#### 监控设施实现方式
+
+对于Linux系统来说，它的系统监控的实现方式很多，主要有系统命令、开源软件、监控平台等
+
+##### 系统命令
+
+![img](https://static001.geekbang.org/resource/image/9e/7a/9ee6c1c5d88b0468af1a3280865a6b7a.png?wh=3000*2100)
+
+
+
+##### 开源软件
+
+![image-20250305163648202](../markdown_img/image-20250305163648202.png)
+
+对于传统的业务数据监控来说，Zabbix 监控软件是优秀的，由于 Zabbix 诞生的时代业务数据量相对不是太多，所以它默认采取的是关系型数据库作为后端存储。
+
+所以随着业务场景的发展，尤其是微服务、云原生场景的发展，大量数据的存储和动态容器的监控缺失 成为了 Zabbix 本身的限制。所以就出现了另外一种监控软件 Prometheus。
+
+
+
+##### 监控平台
+
+![image-20250305163846652](../markdown_img/image-20250305163846652.png)
+
+
+
+
+
+
+
+### 时序数据库
+
+#### 什么是序列数据
+
+参考资料： https://db-engines.com/en/ranking/time+series+dbms
+
+![image-20250305164017692](../markdown_img/image-20250305164017692.png)
+
+**时间序列数据(TimeSeries Data)** : 按照时间顺序记录系统、设备状态变化的数据被称为时序数据。
+
+时序数据库记录的数据以时间为横座标,纵坐标为数据
+
+**时间序列数据库 (Time Series Database , 简称 TSDB)** 是一种高性能、低成本、稳定可靠的在线时间序 列数据库服务，提供高效读写、高压缩比存储、时序数据插值及聚合计算等服务，广泛应用于物联网 （IoT）设备监控系统、企业能源管理系统（EMS）、生产安全监控系统和电力检测系统等行业场景；除 此以外，还提供时空场景的查询和分析的能力。
+
+**TSDB 具备秒级写入百万级时序数据的性能**，提供高压缩比低成本存储、预降采样、插值、多维聚合计算、可视化查询结果等功能，解决由设备采集点数量巨大、数据采集频率高造成的存储成本高、写入和 查询分析效率低的问题。
+
+**TSDB是一个分布式时间序列数据库，具备多副本高可用能力**。同时在高负载大规模数据量的情况下可以方便地进行弹性扩容，方便用户结合业务流量特点进行动态规划与调整。
+
+
+
+**应用的场景：**
+
+- 物联网设备无时无刻不在产生海量的设备状态数据和业务消息数据，这些数据有助于进行设备监控、业务分析预测和故障诊断。
+- 传统电力化工以及工业制造行业需要通过实时的监控系统进行设备状态检测，故障发现以及业务趋势分析
+- 系统运维和业务实时监控,通过对大规模应用集群和机房设备的监控，实时关注设备运行状态、资源 利用率和业务趋势，实现数据化运营和自动化开发运维。
+
+
+
+#### 时间序列数据特点
+
+- 大部分时间都是**顺序写入**操作，**很少涉及修改数据**
+
+  删除操作都是删除一段时间的数据，而不涉及到删除无规律数据
+
+  读操作一般都是升序或者降序
+
+- **高效的压缩算法**，节省存储空间，有效降低 IO**,存储成本低**
+
+  TSDB 使用高效的数据压缩技术，将单个数据点的平均使用存储空间降为1~2个字节，可以降低
+
+  90%存储使用空间，同时加快数据写入的速度。
+
+- **高性能读写**, 每秒百万级数据点写入，亿级数据点聚合结果秒级返回
+
+
+
+### Prometheus 简介
+
+#### Prometheus 简介
+
+![image-20250305164954777](../markdown_img/image-20250305164954777.png)
+
+Prometheus 普罗米修斯是希腊神话中的一个人物，他从太阳神阿波罗那里盗走火种送给人类，给人类 带来了光明，是一位让人敬仰的神
+
+**Prometheus 是一款时序(time series）数据库TSDB**，也是一款设计用于实现基于目标(Target)的监控系 统的关键组件，结合其它组件，例如Pushgateway、Altermanager和Grafana等，可构成一个完整的监控系统
+
+Prometheus 启发于 Google 的 borgmon 监控系统，在一定程度上可以理解为，是Google BorgMon监 控系统的开源版本。
+
+该软件由工作在 SoundCloud 的 google 前员工在 2012 年创建，作为社区开源项目进行开发，并于  2015 年正式发布。2016 年，Prometheus 正式加入 CNCF(Cloud Native Computing Foundation)，成 为继 Kubernetes之后第二个在CNCF托管的项目, 现已广泛用于在容器和微服务领域中得到了广泛的应 用，当然不仅限于此
+
+云原生:  https://landscape.cncf.io/
+
+![image-20250305165624473](../markdown_img/image-20250305165624473.png)
+
+Prometheus 本身**基于Go语言开发**的一套开源的系统监控报警框架和**时序列数据库(TSDB)**。
+
+Prometheus 的监控功能很完善和全面，性能也足够支撑上万台规模的集群。
+
+**网站**： https://prometheus.io/
+
+**github**： https://github.com/prometheus
+
+
+
+**其特点主要如下**
+
+- 支持多维数据模型：由度量名和键值对组成的时间序列数据
+- 内置时间序列数据库TSDB(Time Series Database )
+- 支持PromQL(Prometheus Query Language)查询语言，可以完成非常复杂的查询和分析，对图表 展示和告警非常有意义
+- 支持 HTTP 的 Pull 方式采集时间序列数据
+- 支持 PushGateway 采集瞬时任务的数据
+- 支持静态配置和服务发现两种方式发现目标
+- 多种可视化和仪表盘,支持第三方 Dashboard,比如:Grafana
+
+
+
+**数据特点**
+
+- **监控指标**，采用独创的指标格式，我们称之为Prometheus格式，这个格式在监控场景中很常见。
+- **数据标签**，支持多维度标签，每个独立的标签组合都代表一个独立的时间序列
+- **数据处理**，Prometheus内部支持多种数据的聚合、切割、切片等功能。
+- **数据存储**，Prometheus支持双精度浮点型数据存储和字符串
+
+
+
+**适用场景**
+
+Prometheus 非常适合记录任何纯数字时间序列。它既适合以机器为中心的监控场景，也适合于高度动态的面向服务的体系结构的监控场景。尤其是在微服务世界中，它对多维数据收集和查询的支持是一种特别的优势。
+
+Prometheus的设计旨在提高可靠性，使其成为中断期间要使用的系统，以使您能够快速诊断问题。每个Prometheus服务器都是独立的，而不依赖于网络存储或其他远程服务。当基础结构的其他部分故障时，您可以依靠它，并且无需设置广泛的基础结构即可使用它。
+
+由于Prometheus重视可靠性。在故障情况下，我们可以查看有关系统的可用统计信息。但是如果**您需要100％的准确性，则Prometheus并不是一个不错的选择，因为所收集的数据可能不会足够详细和完整**。在这种情况下，最好使用其他系统来收集和分析数据以进行计费，并使用Prometheus进行其余的监视。
+
+
+
+**Prometheus 不足**
+
+- 不支持集群化
+- 被监控集群规模过大后本身性能有一定瓶颈
+- 中文支持不好
+- 功能不完整，需要结合其它组件实现监控的全部功能
+
+
+
+#### Prometheus 架构
+
+官方文档
+
+```http
+https://prometheus.io/docs/ 
+https://prometheus.io/docs/introduction/overview/
+```
+
+
+
+##### 数据获取逻辑
+
+Prometheus 同其它TSDB相比有一个非常典型的特性：它主动从各Target上"**拉取（pull)**"数据，相当于 Zabbix里的被动模式,而非等待被监控端的"推送（push）"
+
+两个方式各有优劣，其中，Pull模型的优势在于：集中控制：有利于将配置集在 Prometheus Server上 完成，包括指标及采取速率等,Prometheus的根本目标在于收集在Target上预先完成聚合的聚合型数 据，而非一款由事件驱动的存储系统
+
+![image-20250305171215600](../markdown_img/image-20250305171215600.png)
+
+
+
+#####  Prometheus 架构
+
+```http
+https://github.com/prometheus/prometheus
+```
+
+
+
+![img](https://raw.githubusercontent.com/prometheus/prometheus/70aea5dd8dda059f86996c51a4a79c29b35edba3/documentation/images/architecture.svg)
+
+
+
+**Prometheus 的主要模块包括：**
+
+- **prometheus** 
+  - 时序数据存储、监控指标管理
+- **可视化**
+  - **Prometheus web UI** : 集群状态管理、promQL
+  - **Grafana**:非常全面的可视化套件
+- **数据采集**
+  - **Exporter**: 为当前的客户端暴露出符合 Prometheus 规格的数据指标,Exporter 以守护进程的模式 运行井开始采集数据,Exporter 本身也是一个http_server 可以对http请求作出响应返回数据 (K/V形 式的metrics)
+  - **Pushgateway** : 拉模式下数据的采集工具
+- **监控目标**
+  - **服务发现** :文件方式、dns方式、console方式、k8s方式 
+- **告警**
+  - **alertmanager**
+
+
+
+**Prometheus 由几个主要的软件组件组成，其职责概述如下**
+
+| 组件               | 解析                                                         |
+| ------------------ | ------------------------------------------------------------ |
+| Prometheus Server  | 彼此独立运行，仅依靠其本地存储来实现其核心功能：抓取时序数据，规则处理 和警报等。 |
+| Client Library     | 客户端库，为需要监控的服务生成相应的 metrics 并暴露给 Prometheus server。当 Prometheus server 来 pull 时，直接返回实时状态的 metrics。 |
+| Push Gateway       | exporter采集类型已经很丰富，但是依然需要很多自定义的监控数据,用 pushgateway可以实现自定义的监控数据,任意灵活想做什么都可以做到 exporter的开发需要使用真正的编程语言，不支持shell这种快速脚本,而 pushgateway开发去容易的多<br />pushgateway主要用于短期的 jobs。由于这类 jobs 存在时间较短，可能在 Prometheus 来 pull 之前就消失了。为此，这次 jobs 可以直接向 Prometheus server 端推送它们的 metrics。这种方式主要用于服务层面的 metrics，对于机 器层面的metrices，需要使用 node exporter |
+| Exporters          | 部署到第三方软件主机上，用于暴露已有的第三方服务的 metrics 给 Prometheus。 |
+| Alertmanager       | 从 Prometheus server 端接收到 alerts 后，会进行去除重复数据，分组，并路 由到对应的接受方式，以高效向用户完成告警信息发送。常见的接收方式有：电 子邮件，pagerduty，OpsGenie, webhook 等,一些其他的工具。 |
+| Data Visualization | Prometheus Web UI （Prometheus Server内建），及Grafana等     |
+| Service Discovery  | 动态发现待监控的Target，从而完成监控配置的重要组件，在容器化环境中尤为 有用；该组件目前由Prometheus Server内建支持； |
+
+在上诉的组件中，大多数都是用Go编写的，因此易于构建和部署为静态二进制文件。
+
+
+
+##### 工作流程
+
+- Prometheus server 定期从配置好的 jobs 或者 exporters 中拉 metrics，或者拉取  Pushgateway 采集的 metrics，或者从其他的 Prometheus server 中拉 metrics。（**Pushgateway** **不会主动向 Prometheus 推送数据**，而是 **等待 Prometheus 来拉取（pull）数据**。）
+- Prometheus server 在本地存储收集到的 metrics，并运行已定义好的 alert.rules，记录新的时间序列或者向 Alertmanager 推送警报，实现一定程度上的完全冗余功能。
+- Alertmanager 根据配置文件，对接收到的警报进行去重分组，根据路由配置，向对应主机发出告警。
+- 集成Grafana或其他API作为图形界面，用于可视化收集的数据。
+
+
+
+##### 生态组件
+
+Prometheus 只负责时序型指标数据的采集及存储
+
+其它的功能,如: 数据的分析、聚合及直观展示以及告警等功能并非由Prometheus Server所负责,需要配 合其它组件实现
+
+支持丰富的 Exporter 实现各种应用的监控
+
+```http
+https://prometheus.io/docs/instrumenting/exporters/
+```
+
+![image-20250305174729835](../markdown_img/image-20250305174729835.png)
+
+
+
+#### Prometheus 数据模型
+
+Prometheus中存储的数据为时间序列，即基于同一度量标准或者同一时间维度的数据流。
+
+除了时间序列数据的正常存储之外，Prometheus还会基于原始数据临时生成新的时间序列数据，用于后续查询的依据或结果。
+
+每个时间序列都由metric名称(表示某项指标或者度量)和标签(键值对形式,表示属性,其为可选项)组合成 唯一标识
+
+```ABAP
+metric {<label_name>=<label_value>,...} <---- 标签
+```
+
+
+
+##### Metric 名字
+
+- 该指标Metric名字应该有意义，用于表示 metric 的一般性功能，例如：http_requests_total  表示  http 请求的总数。
+- metric 名字由 ASCII 字符，数字，下划线，以及冒号组成，且必须满足正则表达式 `[a-zA-Z_:][a-zA-Z0-9_:]*` 的查询需求。
+- 注意：冒号是为用户定义的记录规则保留的。
+
+
+
+##### 标签
+
+- 标签是以键值对的样式而存在，不同的标签用于表示时间序列的不同维度标识
+
+- 基本格式
+
+  ```bash
+  <metric name>{<label name>=<label value>, …}
+  
+  #示例样式：
+  http_requests_total{method="POST",endpoint="/api/tracks"}
+  解析： http_requests_total{method="POST"} 表示所有 http 请求中的 POST 请求，
+  endpoint="/api/tracks"表示请求的url地址是/api/tracks。当 method="GET" 时，则为新的一个 metric
+  ```
+
+  
+
+- 标签中的键名由 ASCII 字符，数字，以及下划线组成，且必须满足正则表达式`[a-zA-Z_:][a-zA-Z0-9_:]*`。以__开头的标签名称保留供内部使用
+
+- 标签值可以包含任何Unicode字符，标签值为空的标签被认为等同于不存在的标签
+
+查询语言允许基于这些维度进行过滤和聚合。更改任何标签值，包括添加或删除标签，都会创建一个新的时间序列。
+
+![image-20250305180151826](../markdown_img/image-20250305180151826.png)
+
+##### 数据格式
+
+Prometheus 对收集的数据有一定的格式要求，本质上就是将收集的数据转化为对应的文本格式，并提供响应给Prometheus Server的 http 请求。
+
+Exporter 收集的数据转化的文本内容以行 (\n) 为单位，空行将被忽略, 文本内容最后一行为空行
+
+文本内容，如果以 # 开头通常表示注释。
+
+以 # HELP 开头表示 metric 帮助说明
+
+以 # TYPE 开头表示定义 metric 类型，包含 **counter**, **gauge**, **histogram**, **summary**, 和 **untyped** 类型。
+
+其他表示一般注释，供阅读使用，将被 Prometheus 忽略
+
+
+
+##### 任务 Job 和实例 Instance
+
+一个单独 `scrape(<host>:<port>)`的目标 Target 也称为一个实例 instance，通常为IP:PORT形式,对应于单个应用的进程
+
+一组同种类型的 instances集合称为一个 job，主要用于保证可扩展性和可靠性。
+
+![image-20250305181006757](../markdown_img/image-20250305181006757.png)
+
+
+
+例如：一个 API 服务 job 包含四个 instances
+
+```bash
+job: api-server
+instance 1: 1.2.3.4:5670
+instance 2: 1.2.3.4:5671
+instance 3: 5.6.7.8:5670
+instance 4: 5.6.7.8:5671
+```
+
+对于任务实例来说，还可以借助于特殊的字符串来表示通用的功能，常见的使用样式如下：
+
+```bash
+#判断任务是否健康，1代表正常，0代表不正常
+up{job="<job-name>", instance="<instance-id>"}
+
+#获取任务的持续时间
+scrape_duration_seconds{job="<job-name>", instance="<instance-id>"}
+
+#任务执行后剩余的样本数
+scrape_samples_post_metric_relabeling{job="<job-name>", instance="<instanceid>"}
+
+#暴露的样本数量
+scrape_samples_scraped{job="<job-name>", instance="<instance-id>"}
+
+#样本的大概数量
+scrape_series_added{job="<job-name>", instance="<instance-id>"}
+```
+
+**总结**
+
+- 数据模型：metric名称+标签
+- 数据类型：Counter+Gauge+Histogram+Summary
+- 任务：多个instances组成一个jobs
+
+
+
+#### Prometheus 数据处理
+
+##### 数据获取
+
+这些metric数据，是基于HTTP call方式来进行获取的，从对方的配置文件中指定的网络端点(endpoint, 即IP:Port,表示一个应用)上周期性获取指标数据。每一个端点上几乎不可能只有一个数据指标。
+
+![image-20250305192953500](../markdown_img/image-20250305192953500.png)
+
+
+
+Prometheus的Metric 指标都必须以**http**的方式暴露出来，**因此 prometheus无法直接获取内核等相关数据**的原因，只能借助于其他的机制才可以。
+
+prometheus默认支持通过三种类型的途径从目标上"抓取（Scrape）"指标数据
+
+![image-20250305171215600](../markdown_img/image-20250305171215600.png)
+
+| 方式            | 解析                                                         |
+| --------------- | ------------------------------------------------------------ |
+| Instrumentation | 指附加到应用程序中形成内置的检测系统，采集数据并暴露出来的客户端库，暴露的方式也是http方式，**常用于较新出现的自身天然就支持Prometheus的应用** |
+| Exporters       | 部署到对应节点上，负责从目标应用程序上采集和聚合原始格式的数据，并转换或聚合为Prometheus格式的指标，以http方式向外暴露本地节点数据 后，**常用于较早期出现的原本并不支持Prometheus的应用** |
+| Pushgateway     | 执行被监控节点的作业任务（通常不是持续执行的守护进程，而是周期性的 作业）主动Push数据到 Pushgateway,并转换成 Prometheus 格式数据，然后Prometheus再pull 此数据 |
+
+
+
+##### 数据存储
+
+Prometheus 采用的是time-series(时间序列)的方式以一种自定义的格式**存储在本地硬盘**上
+
+Prometheus的本地T-S(time-series)数据库以每两小时为间隔, 分成Block为单位存储，每一个Block中又分为多个Chunk文件
+
+Chunk是作为存储的基本单位,用来存放采集过来的数据的T-S数据,包括metadata和索引文件(index)。
+
+Index文件是对metrics(对应一次KV采集数据)和 labels(标签)进行索引之后存储在chunk文件中
+
+Prometheus平时是将采集过来的数据先都存放在内存之中, 以类似缓存的方式用于加快搜索和访问。
+
+rometheus提供一种保护机制叫做WAL( **Write-Ahead Logging 预写日志**)可以将数据存入硬盘中的chunk文件， 当出现宕机时，重新启动时利用此日志系统来恢复加载至内存
+
+
+
+##### 数据分析
+
+Prometheus提供了数据查询语言 PromQL（全称为Prometheus Query Language），支持用户进行实时的数据查询及聚合操作；
+
+PromQL支持处理两种向量，并内置提供了一组用于数据处理的函数
+
+- **即时向量**：在最近一次的单个时间戳上采集和跟踪的数据指标,即时间点数据
+- **时间范围向量**：指定时间范围内的所有时间戳上的数据指标,即时间段数据
+
+![image-20250305194609398](D:\git_repository\cyber_security_learning\markdown_img\image-20250305194609398.png)
+
+##### 数据告警
+
+抓取到异常值后，Prometheus支持通过告警（Alert）机制向用户发送反馈或警示，以触发用户能够及时采取应对措施；但是**Prometheus Server仅负责生成告警指示**，具体的告警行为由另一个独立的应用程序 AlertManager 负责
+
+- 告警指示由Prometheus Server基于用户提供的告警规则周期性计算生
+- Alertmanager接收到Prometheus Server 发来的告警指示后，基于用户定义的告警路由(route)向 告警接收人发送告警信息；
+
+![image-20250305194913933](../markdown_img/image-20250305194913933.png)
+
+## Prometheus 部署和监控
+
+Prometheus部署相关软件版本
+
+为了更好的更全面的演示 Prometheus 功能，我们将相关的组件也安装起来，以实现业务环境的全监 控，相关软件版本信息如下
+
+| 软件            | 地址                                                         |
+| --------------- | ------------------------------------------------------------ |
+| prometheus      | https://github.com/prometheus/prometheus/releases/download/v2.30.3/prometheus-2.30.3.linux-amd64.tar.gz |
+| Alertmanager    | https://github.com/prometheus/alertmanager/releases/download/v0.23.0/alertmanager-0.23.0.linux-amd64.tar.gz |
+| node_exporter   | https://github.com/prometheus/node_exporter/releases/download/v1.2.2/node_exporter-1.2.2.linux-amd64.tar.gz |
+| mysqld_exporter | https://github.com/prometheus/mysqld_exporter/releases/download/v0.13.0/mysqld_exporter-0.13.0.linux-amd64.tar.gz |
+| grafana         | https://dl.grafana.com/enterprise/release/grafana-enterprise_8.2.1_amd64.deb |
+
+
+
+### Prometheus 部署和配置
+
+#### 常见部署方式
+
+```http
+https://prometheus.io/docs/prometheus/latest/installation/
+```
+
+- **包安装**
+
+  - **RHEL系统**
+
+    ```http
+    https://packagecloud.io/app/prometheus-rpm/release/search
+    ```
+
+  - **Ubuntu和Debian**：可直接使用apt命令使用内置仓库直接安装
+
+- **二进制安装**
+
+  ```http
+  https://prometheus.io/download/
+  ```
+
+- **基于Docker运行**
+
+  ```http
+  https://prometheus.io/docs/prometheus/latest/installation/
+  ```
+
+- **基于Docker Compose安装**
+
+  ```http
+  https://github.com/mohamadhoseinmoradi/Docker-Compose-Prometheus-and-Grafana/blob/master/docker-compose.yml
+  ```
+
+- **基于Kubernetes Operator安装**
+
+  ```http
+  https://github.com/coreos/kube-prometheus
+  https://github.com/prometheus-operator/kube-prometheus
+  ```
+
+
+
+#### 包安装
+
+##### Ubuntn 包安装
+
+```bash
+# Ubuntu22.04
+[root@ubuntu2204 ~]#apt list prometheus
+正在列表... 完成
+prometheus/jammy-security,jammy-updates 2.31.2+ds1-1ubuntu1.22.04.3 amd64
+
+# 安装
+[root@ubuntu2204 ~]#apt install -y prometheus
+
+# 查看端口
+[root@ubuntu2204 ~]#ss -nlt
+State       Recv-Q      Send-Q           Local Address:Port           Peer Address:Port     Process     
+LISTEN      0           4096             127.0.0.53%lo:53                  0.0.0.0:*                    
+LISTEN      0           128                    0.0.0.0:22                  0.0.0.0:*                    
+LISTEN      0           128                  127.0.0.1:6010                0.0.0.0:*                    
+LISTEN      0           128                       [::]:22                     [::]:*                    
+LISTEN      0           128                      [::1]:6010                   [::]:*                    
+LISTEN      0           4096                         *:9090                      *:*                    
+LISTEN      0           4096                         *:9100                      *:* 
+
+# 包安装内置了node exporter，端口9100
+[root@ubuntu2204 ~]#systemctl status prometheus-node-exporter
+● prometheus-node-exporter.service - Prometheus exporter for machine metrics
+     Loaded: loaded (/lib/systemd/system/prometheus-node-exporter.service; enabled; vendor preset: enab>
+     Active: active (running) since Wed 2025-03-05 20:12:55 CST; 2min 6s ago
+       Docs: https://github.com/prometheus/node_exporter
+   Main PID: 142344 (prometheus-node)
+      Tasks: 6 (limit: 4534)
+     Memory: 8.4M
+        CPU: 355ms
+     CGroup: /system.slice/prometheus-node-exporter.service
+             └─142344 /usr/bin/prometheus-node-exporter
+             
+# 查看apt包安装prometheus版本
+[root@ubuntu2204 ~]#prometheus --version
+prometheus, version 2.31.2+ds1 (branch: debian/sid, revision: 2.31.2+ds1-1ubuntu1.22.04.3)
+  build user:       team+pkg-go@tracker.debian.org
+  build date:       20241115-22:48:14
+  go version:       go1.18.1
+  platform:         linux/amd64
+
+             
+# 访问IP:9090
+```
+
+![image-20250305201614980](../markdown_img/image-20250305201614980.png)
+
+
+
+##### RHEL/Rocky/CentOS
+
+RHEL/Rocky/CentOS上默认没有Prometheus的仓库，可自行配置基于yum repository安装 Prometheus-Serve
+
+```http
+https://packagecloud.io/app/prometheus-rpm/release/search
+```
+
+范例：Repo配置
+
+```bash
+[root@localhost ~]# cd /etc/yum.repos.d/
+[root@localhost /etc/yum.repos.d]# vim Prometheus.repo
+[root@localhost /etc/yum.repos.d]# yum makecache
+[prometheus]
+name=prometheus
+baseurl=https://packagecloud.io/prometheus-rpm/release/el/$releasever/$basearch
+repo_gpgcheck=1
+enabled=1
+gpgkey=https://packagecloud.io/prometheus-rpm/release/gpgkey
+       https://raw.githubusercontent.com/lest/prometheus-rpm/master/RPM-GPG-KEY-prometheus-rpm
+gpgcheck=1
+metadata_expire=300
+
+# 查看
+[root@localhost /etc/yum.repos.d] $yum search prometheus
+Last metadata expiration check: 0:00:34 ago on Wed 05 Mar 2025 08:24:17 PM CST.
+=========================== Name & Summary Matched: prometheus ============================
+prometheus-jmx-exporter.noarch : Prometheus JMX Exporter
+prometheus-jmx-exporter-openjdk11.noarch : OpenJDK 11 binding for prometheus-jmx-exporter
+prometheus-jmx-exporter-openjdk17.noarch : OpenJDK 17 binding for prometheus-jmx-exporter
+prometheus-jmx-exporter-openjdk8.noarch : OpenJDK 1.8.0 binding for prometheus-jmx-exporter
+prometheus2.x86_64 : The Prometheus monitoring system and time series database.
+
+# 启动prometheus服务
+[root@localhost ~]# systemctl start prometheus.service
+
+# 查看服务
+[root@localhost ~]# systemctl status prometheus.service
+● prometheus.service - The Prometheus monitoring system and time series database.
+   Loaded: loaded (/usr/lib/systemd/system/prometheus.service; disabled; vendor preset: di>
+   Active: active (running) since Wed 2025-03-05 20:31:15 CST; 1min 24s ago
+     Docs: https://prometheus.io
+ Main PID: 1994 (prometheus)
+    Tasks: 7 (limit: 22924)
+   Memory: 24.5M
+   CGroup: /system.slice/prometheus.service
+           └─1994 /usr/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --stora>
+
+
+# 安装后查看版本
+[root@localhost ~] $prometheus --version
+prometheus, version 2.55.1 (branch: HEAD, revision: 6d7569113f1ca814f1e149f74176656540043b8d)
+  build user:       root@194e0f5dd5e8
+  build date:       20241106-10:08:33
+  go version:       go1.23.2
+  platform:         linux/amd64
+  tags:             netgo,builtinassets,stringlabels
+```
+
+![image-20250305203425811](../markdown_img/image-20250305203425811.png)
+
+#### 二进制安装 Prometheus
+
+##### 下载二进制包并解压
+
+官方下载
+
+```http
+https://prometheus.io/download/
+https://github.com/prometheus/prometheus/releases
+```
+
+**版本选择**
+
+生产建议安装LTS版本
+
+![image-20250305205058695](../markdown_img/image-20250305205058695.png)
+
+```bash
+[root@ubuntu2204 src]#pwd
+/usr/local/src
+
+# 下载 TLS 版本的 prometheus 的二进制压缩包
+[root@ubuntu2204 src]#wget https://github.com/prometheus/prometheus/releases/download/v2.53.3/prometheus-2.53.3.linux-amd64.tar.gz
+
+# 解压
+[root@ubuntu2204 src]# tar xf prometheus-2.53.3.linux-amd64.tar.gz -C /usr/local
+
+# 创建软链接
+[root@ubuntu2204 src]# ln -s prometheus-2.53.3.linux-amd64 prometheus
+
+# 查看
+[root@ubuntu2204 local]#ls /usr/local/prometheus
+console_libraries  consoles  LICENSE  NOTICE  prometheus  prometheus.yml  promtool
+
+# 创建相关目录,data目录是默认的存放数据目录,可以不创建,系统会自动创建
+# 可以通过选项 --storage.tsdb.path="data/"修改
+
+[root@ubuntu2204 prometheus]# mkdir bin conf data
+
+# 将各类文件分类放到对应的目录中
+[root@ubuntu2204 prometheus]#mv promtool prometheus bin/
+[root@ubuntu2204 prometheus]#mv prometheus.yml conf/
+[root@ubuntu2204 prometheus]#useradd -r -s /sbin/nologin prometheus
+[root@ubuntu2204 prometheus]#chown -R prometheus. /usr/local/prometheus/
+
+ #修改环境变量
+[root@prometheus ~]#vim /etc/profile
+export PROMETHEUS_HOME=/usr/local/prometheus
+export PATH=${PROMETHEUS_HOME}/bin:$PATH
+
+[root@ubuntu2204 prometheus]#source /etc/profile
+```
+
+
+
+##### 创建 Service 文件
+
+```bash
+[root@ubuntu2204 prometheus]#cat /lib/systemd/system/prometheus.service
+[Unit]
+Description=Prometheus Server
+Documentation=https://prometheus.io/docs/introduction/overview/
+After=network.target
+[Service]
+Restart=on-failure
+User=prometheus
+Group=prometheus
+WorkingDirectory=/usr/local/prometheus/
+ExecStart=/usr/local/prometheus/bin/prometheus --config.file=/usr/local/prometheus/conf/prometheus.yml --web.enable-lifecycle --storage.tsdb.path="data/"
+ExecReload=/bin/kill -HUP \$MAINPID
+LimitNOFILE=65535
+[Install]
+WantedBy=multi-user.target
+
+# 启用服务
+[root@ubuntu2204 prometheus]#systemctl daemon-reload 
+[root@ubuntu2204 prometheus]#systemctl enable --now prometheus.service
+
+#选项--web.enable-lifecycle支持reload加载修改过的配置
+[root@prometheus ~]#curl -X POST http://prometheus.wang.org:9090/-/reload
+
+# 查看端口
+[root@ubuntu2204 prometheus]#ss -nlt
+State       Recv-Q      Send-Q           Local Address:Port           Peer Address:Port     Process     
+LISTEN      0           4096             127.0.0.53%lo:53                  0.0.0.0:*                    
+LISTEN      0           128                    0.0.0.0:22                  0.0.0.0:*                    
+LISTEN      0           128                  127.0.0.1:6010                0.0.0.0:*                    
+LISTEN      0           4096                         *:9090                      *:*
+```
+
+
+
+##### 测试访问
+
+```bash
+# 访问：IP:9090
+```
+
+![image-20250305211857489](../markdown_img/image-20250305211857489.png)
+
+![image-20250305211939701](../markdown_img/image-20250305211939701.png)
+
+![image-20250305212001778](../markdown_img/image-20250305212001778.png)
+
+```bash
+# 浏览器访问：
+IP:9090/metrics
+```
+
+![image-20250305212123188](../markdown_img/image-20250305212123188.png)
+
+
+
+##### Dashboard 菜单说明
+
+```bash
+#一级目录解析
+Alerts  # Prometheus的告警信息菜单
+Graph   # Prometheus的图形展示界面，这是prometheus默认访问的界面
+Status  # Prometheus的状态数据界面
+Help    # Prometheus的帮助信息界面
+
+#Status子菜单,在Status菜单下存在很多的子选项，其名称和功能效果如下
+Runtime & Build Information       # 服务主机的运行状态信息及内部的监控项基本信息
+Command-Line Flags                # 启动时候从配置文件中加载的属性信息
+Configuration                     # 配置文件的具体内容(yaml格式)
+Rules                             # 查询、告警、可视化等数据分析动作的规则记录
+Targets                           # 监控的目标对象，包括主机、服务等以endpoint形式存在
+Service Discovery                 # 自动发现的各种Targets对象列表
+```
+
+点击一级菜单Graph，该界面的基本功能分区样式如下
+
+![image-20250305212956522](../markdown_img/image-20250305212956522.png)
+
+
+
+注意：
+
+我们选择监控项的作用就是生成规则表达式，当然，规则表达式的功能远远超过选择监控项的功能。
+
+但是这些定制采集数据的表达式，在刷新的时候，就没有了，这也是我们需要可视化插件的原因
+
+我们选择一个监控项"scrape_duration_seconds"，然后点击"Execute"，查看效果
+
+![image-20250305213302126](../markdown_img/image-20250305213302126.png)
+
+
+
+##### 常用命令选项
+
+```bash
+[root@ubuntu2204 prometheus]#prometheus --help
+usage: prometheus [<flags>]
+
+The Prometheus monitoring server
+
+
+Flags:
+--config.file="prometheus.yml"       # Prometheus configuration file path.
+--web.listen-address="0.0.0.0:9090"  # Address to listen on for UI, API, and telemetry.
+--storage.tsdb.path="data/"          # Base path for metrics storage. Use with server mode only.
+```
+
+
+
+##### API 访问
+
+Prometheus提供了一组管理API，以简化自动化和集成。
+
+注意：{ip:port} 是Prometheus所在的IP和端口
+
+- **健康性检查**
+
+  ```bash
+  # GET {ip:Port}/-/healthy -> 该端点始终返回200，应用于检查Prometheus的运行状况。
+  # 示例
+  [root@ubuntu2204 prometheus]# curl 10.0.0.201:9090/-/healthy
+  Prometheus Server is Healthy
+  ```
+
+- **准备检查**
+
+  ```bash
+  # GET {IP:Port}/-/ready -> 当Prometheus准备服务流量（即响应查询）时，此端点返回200。
+  # 示例
+  [root@ubuntu2204 prometheus]#curl 10.0.0.201:9090/-/ready
+  Prometheus Server is Ready.
+  ```
+
+- **加载配置**
+
+  ```bash
+  PUT  {ip:port}/-/reload
+  POST {ip:port}/-/reload
+  
+  #修改配置后可以加载服务而无需重启服务
+  [root@ubuntu2204 ~]# curl -X POST http://10.0.0.201:9090/-/reload
+  ```
+
+- **关闭服务**
+
+  ```bash
+  PUT  {ip:port}/-/quit
+  POST {ip:port}/-/quit
+  
+  # 示例
+  [root@ubuntu2204 ~]# curl -X POST http://10.0.0.201:9090/-/quit
+  Requesting termination... Goodbye!
+  
+  #取消--web.enable-lifecycle选项，关闭API中的Load和quit功能，仍然支持healthy和ready
+  [root@ubuntu2204 ~]# vim /lib/systemd/system/prometheus.service
+  ......
+  [Service]
+  ExecStart=/usr/local/prometheus/bin/prometheus -
+  config.file=/usr/local/prometheus/conf/prometheus.yml
+  ......
+  [root@ubuntu2204 ~]# systemctl daemon-reload && systemctl restart prometheus
+  [root@ubuntu2204 prometheus]# curl -X POST http://10.0.0.201:9090/-/quit
+  Lifecycle API is not enabled.
+  ```
+
+  
+
+##### 优化配置
+
+```bash
+--web.read-timeout=5m          # 请求连接的最大等待时间，可以防止太多的空闲连接占用资源
+--storage.tsdb.retention=15d   # 开始采集监控数据后，会存在内存中和硬盘中对于保留期限的设置，太长硬盘和内存都吃不消，太短要								 查历史数据就没有了，企业中设置15天为宜，默认为0
+--storage.tsdb.path="data/"    # 存储数据路径，建议独立分区，防止把根目录塞满，默认data/目录
+--web.max-connection=512       # 限制prometheus最多能连接多少用户，多少监控主机
+--query.max-concurrency=20     # 并发最大查询次数 默认20
+```
+
+查看当前命令行参数
+
+![image-20250305220755123](../markdown_img/image-20250305220755123.png)
+
+
+
+
+
+#### 容器化启动
+
+```http
+https://prometheus.io/docs/prometheus/latest/installation/
+```
+
+##### 范例: Docker 启动
+
+```bash
+#简单启动
+[root@prometheus ~]# docker run -d --name prometheus -p 9090:9090 prom/prometheus
+
+#定制配置文件启动，默认容器的配置文件路径/etc/prometheus/prometheus.yml,数据目录在/prometheus
+# 注意数据目录的挂载
+[root@ubuntu2204 ~]#docker run -d --name=prometheus -p 9090:9090 -v /root/prometheus.yml:/etc/prometheus/prometheus.yml -v /data/prometheus:/prometheus prom/prometheus
+
+[root@ubuntu2204 ~]#docker ps
+CONTAINER ID   IMAGE             COMMAND                   CREATED         STATUS              PORTS                                       NAMES
+6d498591afcb   prom/prometheus   "/bin/prometheus --c…"   2 minutes ago   Up About a minute   0.0.0.0:9090->9090/tcp, :::9090->9090/tcp   prometheus
+
+# 浏览器访问
+```
+
+![image-20250305224017092](../markdown_img/image-20250305224017092.png)
+
+##### 范例：Docker compose
+
+```yaml
+version: '3.6'
+
+volumes:
+  prometheus_data: {}
+    
+networks:
+  monitoring:
+    driver: bridge
+
+services:
+  prometheus:
+    images: prom/prometheus:v2.40.2
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+    ports:
+      - 9090:9090
+    restart: always
+```
+
+
+
+#### 配置文件解析
+
+```bash
+[root@ubuntu2204 prometheus]# cat conf/prometheus.yml 
+# my global config
+global:
+  # 刮擦间隔，即数据采集的时间间隔，每个15s，采集一次数据
+  scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  
+  # 评估间隔，Prometheus 每 15 秒评估一次所有的 recording rules 和 alerting rules。
+  # 一般来说，evaluation_interval 设置为 scrape_interval 的 一半或更小
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  
+  # 刮如果 Prometheus 连续 10 秒请求目标（如 node_exporter）但都失败，会发生以下情况：
+  # 当前采集周期数据丢失：Prometheus 不会存储失败的采集数据，时间序列会出现空洞（gaps）。
+  # 目标状态变为 DOWN：在 Prometheus UI 中，目标的状态可能会从 UP 变为 DOWN。
+  # scrape_timeout is set to the global default (10s).
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["localhost:9090"]
+```
+
+```bash
+#核心配置：
+global          #全局配置内容        
+alerting        #触发告警相关的配置，主要是与Alertmanager相关的设置。      
+rule_files      #各种各样的外置规则文件配置，包含了各种告警表达式、数据查询表达式等
+scrape_configs  #监控项的配置列表，这是最核心的配置
+
+#除了默认的四项配置之外，prometheus还有另外可选的其它配置如下
+#扩展配置(8项)
+tls_config、static_config、relabel_config、metric_relabel_configs、
+alert_relabel_configs、alertmanager_config、remote_write、remote_read
+
+#平台集成配置(12项)
+azure_sd_config、consul_sd_config、dns_sd_config、ec2_sd_config、
+openstack_sd_config、file_sd_config、gce_sd_config、kubernetes_sd_config、
+marathon_sd_config、nerve_sd_config、serverset_sd_config、triton_sd_config
+```
+
+**scrape_configs 管理**
+
+scrape_configs 是操作最多的一个配置段，它指定了一组监控目标及其细节配置参数，这些目标和参数 描述了如何获取指定主机上的时序数据。配置样例如下：
+
+```bash
+scrape_configs:
+  - job_name: '<job_name>'
+    static_configs:
+      - targets: [ '<host_ip:host_port>', ... ]
+        labels: { <labelname>: <labelvalue> ... }
+        
+#配置解析：
+#在一般情况下，一个scrape_configs配置需要指定一个或者多个job，根据我们之前对基本概念的了解，每一个job都是一系列的instance集合，借助job我们可以将目标主机进行分组管理。
+#对于job内部的每一个instance的配置，都需要借助于static_configs参数获取目标列表，只要在该列表位置的目标，都可以被Prometheus动态服务自动发现。
+#static_configs可以借助于 targets 以ip+port 方式发现目标，也可以使用labels以标签方式发现目标。
+```
+
+
+
+**浏览器看全部配置**
+
+![image-20250305222039936](../markdown_img/image-20250305222039936.png)
+
+
+
+### Node Exporter安装
+
+安装 Node Exporter 用于收集各 node **主机节点**上**的监控指标数据**，监听端口为**9100**
+
+ **github 链接** 
+
+```http
+https://github.com/prometheus/node_exporter
+```
+
+![image-20250306092730141](../markdown_img/image-20250306092730141.png)
+
+
+
+**官方下载**
+
+```http
+https://prometheus.io/download/
+```
+
+![image-20250306092634415](../markdown_img/image-20250306092634415.png)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
+
+
+
+#### 下载并解压
+
+在需要监控的所有节点主机上进行安装
+
+```bash
+[root@ubuntu2204 src]# wget -P /usr/local/src https://github.com/prometheus/node_exporter/releases/download/v1.9.0/node_exporter-1.9.0.linux-amd64.tar.gz
+
+# 解压
+[root@ubuntu2204 src]# tar xf node_exporter-1.9.0.linux-amd64.tar.gz -C /usr/local
+
+# 创建软链接
+[root@ubuntu2204 local]# ln -s node_exporter-1.9.0.linux-amd64 node_exporter
+[root@ubuntu2204 local]# cd node_exporter
+[root@ubuntu2204 node_exporter]# mkdir bin
+[root@ubuntu2204 node_exporter]# mv node_exporter bin/
+[root@ubuntu2204 node_exporter]# useradd -r -s /sbin/nologin prometheus
+[root@ubuntu2204 node_exporter]# chown -R prometheus. /usr/local/node_exporter/
+```
+
+
+
+#### 准备Service文件
+
+node_exporter 通过Collecters 采集各种系统信息，默认采集如下信息
+
+```http
+https://github.com/prometheus/node_exporter
+```
+
+![image-20250306093823355](../markdown_img/image-20250306093823355.png)
+
+
+
+范例：
+
+```bash
+[root@ubuntu2204 node_exporter]#cat /lib/systemd/system/node_exporter.service
+[Unit]
+Description=Prometheus Node Exporter
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/node_exporter/bin/node_exporter --collector.zoneinfo
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+User=prometheus
+Group=prometheus
+
+[Install]
+WantedBy=multi-user.target
+```
+
+
+
+#### 启动 Node Exporter服务
+
+```bash
+[root@ubuntu2204 node_exporter]# systemctl daemon-reload 
+[root@ubuntu2204 node_exporter]# systemctl enable --now node_exporter.service 
+Created symlink /etc/systemd/system/multi-user.target.wants/node_exporter.service → /lib/systemd/system/node_exporter.service.
+[root@ubuntu2204 node_exporter]# systemctl is-active node_exporter.service 
+active
+
+# 默认监听9100/tcp端口
+[root@ubuntu2204 node_exporter]#ss -nlt
+State       Recv-Q      Send-Q           Local Address:Port           Peer Address:Port     Process     
+LISTEN      0           4096                         *:9100                      *:*
+```
+
+
+
+#### 访问 Node Exporter Web 界面
+
+浏览器访问
+
+```http
+http://IP|domain:9100/
+```
+
+![image-20250306094538664](../markdown_img/image-20250306094538664.png)
+
+![image-20250306094645308](../markdown_img/image-20250306094645308.png)
+
+
+
+#### 容器化启动
+
+```http	
+https://hub.docker.com/r/prom/node-exporter
+https://github.com/prometheus/node_exporter
+```
+
+范例：
+```bash
+docker run -d --net="host" --pid="host" -v "/:/host:ro,rslave"  quay.io/prometheus/node-exporter:latest --path.rootfs=/host
+```
+
+**指令解析**
+
+**`-v "/:/host:ro,rslave"` 的作用**
+
+这个 `-v` 选项是 Docker 的 **绑定挂载（Bind Mount）**，它将**宿主机的根目录 `/` 挂载到容器的 `/host` 目录下**
+
+```bash
+-v "/:/host:ro,rslave"
+```
+
+📌 **分解解释**：
+
+- `/` 👉 **宿主机的根目录**（表示整个系统文件结构）。
+- `/host` 👉 **容器内部的 `/host` 目录**（用来访问宿主机文件）。
+- `ro` 👉 **只读模式（read-only）**，防止容器修改宿主机文件。
+- `rslave` 👉 **挂载传播模式（Mount Propagation Mode）**，用于处理宿主机动态挂载的存储设备。
+
+📌 **为什么要这么做？**
+
+- Node Exporter 需要访问 **宿主机的 `/proc`、`/sys`、`/dev` 等系统文件** 来收集 CPU、内存、磁盘等指标。
+- 但**容器是隔离的**，默认无法访问宿主机的完整文件系统，因此需要**手动挂载 `/`**。
+- `ro`（只读）确保容器不能修改宿主机数据，提高安全性。
+
+
+
+**`--path.rootfs=/host` 的作用**
+
+📌 **解释**：
+
+- **Node Exporter 默认从 `/proc` 和 `/sys` 读取系统信息**，但在容器环境中，`/proc` 和 `/sys` **是容器自身的，而不是宿主机的**。
+
+- `--path.rootfs=/host` **告诉 Node Exporter，在 `/host` 目录下查找宿主机的 `/proc` 和 `/sys`**。
+
+- 由于 
+
+  ```
+  -v "/:/host:ro,rslave"
+  ```
+
+   绑定了宿主机的 
+
+  ```
+  /
+  ```
+
+  ，所以：
+
+  - 容器内部的 `/host/proc` 👉 实际上是宿主机的 `/proc`
+  - 容器内部的 `/host/sys` 👉 实际上是宿主机的 `/sys`
+  - 容器内部的 `/host/dev` 👉 实际上是宿主机的 `/dev`
+
+- 这样，**Node Exporter 就可以正确读取宿主机的指标**，而不会误采集容器本身的数据。zqs
+
+
+
+**范例：docker compose 方式**
+
+```yaml
+---
+version: '3.8'
+
+services:
+  node_exporter:
+    image: quay.io/prometheus/node-exporter:latest
+    container_name: node_exporter
+    command:
+    - '--path.rootfs=/host'
+    network_mode: host
+    pid: host
+    restart: unless-stopped
+    volumes:
+    - '/:/host:ro,rslave'
+```
+
+
+
+#### Node Exporter 常见的指标
+
+```bash
+node_boot_time：            # 系统自启动以后的总计时间
+node_cpu：                  # 系统CPU使用量
+node_disk*：                # 磁盘IO
+ node_filesystem*：         # 系统文件系统用量
+node_load1：                # 系统CPU负载
+node_memeory*：             # 内存使用量
+node_network*：             # 网络带宽指标
+node_time：                 # 当前系统时间
+go_*：                      # node exporter中go相关指标
+process_*：                 # node exporter自身进程相关运行指标
+```
+
+
+
+### Prometheus 采集 Node Exporter 数据
+
+配置 prometheus 通过 node exporter 组件采集node节点的监控指标数据
+
+
+
+#### 修改 Prometheus 配置文件
+
+```http
+https://prometheus.io/docs/prometheus/latest/configuration/configuration
+```
+
+范例
+
+```bash
+[root@ubuntu2204 local]#cat /usr/local/prometheus/conf/prometheus.yml 
+# my global config
+global:
+  ......
+
+# Alertmanager configuration
+alerting:
+  ......
+# Load rules once and periodically evaluate them according to the global 'evaluation_interval'.
+rule_files:
+  ......
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: 'node_exporter'            # 添加以下行，指定监控的node_exporter节点
+    metrics_path: /metricsd              # 指定路径，此为默认值，可省略
+    scheme: http                         # 指定路径，此为默认值，可省略
+    static_configs:
+      - targets: ['10.0.0.201:9100', '10.0.0.203:9100']
+
+# 检查语法
+[root@ubuntu2204 local]# promtool check config /usr/local/prometheus/conf/prometheus.yml 
+Checking /usr/local/prometheus/conf/prometheus.yml
+SUCCESS: /usr/local/prometheus/conf/prometheus.yml is valid prometheus config file syntax
+
+# 重启服务使其生效
+[root@ubuntu2204 local]# systemctl restart prometheus.service 
+```
+
+
+
+#### Prometheus 验证 Node 节点状态
+
+浏览器访问如下地址
+
+![image-20250306101936679](../markdown_img/image-20250306101936679.png)
+
+
+
+#### Prometheus 验证 Node 节点监控数据
+
+点上面页面的主机链接,可以直接跳转至对应节点的页面
+
+![image-20250306102045221](../markdown_img/image-20250306102045221.png)
+
+查看具体指标
+
+![image-20250306102420458](../markdown_img/image-20250306102420458.png)
+
+
+
+
+
+### Grafana 展示 Prometheus 数据
+
+#### Grafana 简介
+
+Grafana是一个开源的度量分析与可视化套件，它基于go语言开发。经常被用作基础设施的时间序列数 据和应用程序分析的可视化，应用场景非常多。
+
+Grafana不仅仅支持很多类型的时序数据库数据源，比如Graphite、InfluxDB、Prometheus、 Elasticsearch等，虽然每种数据源都有独立的查询语言和能力，但是Grafana的查询编辑器支持所有的数据源，而且能很好的支持每种数据源的特性。
+
+通过该查询编辑器可以对所有数据进行整合，而且还可以在同一个dashboard上进行综合展示
+
+Grafana最具特色的就是各种各样漂亮的可视化界面，在Grafana提供了各种定制好的，可以直接给各种 软件直接使用的展示界面模板
+
+Grafana 默认监听于**TCP协议的3000端口**，支持集成其他认证服务，且能够**通过/metrics输出内建指标**
+
+可以在  https://grafana.com/dashboards/ 页面查询到我们想要的各种dashboard模板。
+
+![image-20250306102815615](../markdown_img/image-20250306102815615.png)
+
+
+
+#### Grafana 部署
+
+Grafana官方下载链接
+
+```http
+https://grafana.com/grafana/download
+```
+
+在 prometheus 服务器同时也安装 grafana
+
+##### 基于包安装
+
+```bash
+# 安装软件
+[root@grafana ~]#wget https://dl.grafana.com/enterprise/release/grafana-h enterprise_8.2.1_amd64.deb
+
+#从国内镜站下载
+[root@ubuntu2204 src]#wget https://mirrors.tuna.tsinghua.edu.cn/grafana/apt/pool/main/g/grafana/grafana_10.0.13_amd64.deb
+
+#注意：安装的是本地文件，所以要加文件路径
+[root@ubuntu2204 src]#apt update && apt install -y ./grafana_10.0.13_amd64.deb
+
+#如果安装失败,解决依赖关系
+[root@grafana ~]#apt -y --fix-broken install
+
+#安装饼状图的插件,如果安装失败,多试几次(此步可选)
+[root@ubuntu2204 src]# grafana-cli plugins install grafana-piechart-panel
+✔ Downloaded and extracted grafana-piechart-panel v1.6.4 zip successfully to /var/lib/grafana/plugins/grafana-piechart-panel
+
+Please restart Grafana after installing or removing plugins. Refer to Grafana documentation for instructions if necessary.
+
+# 查看下载的插件
+[root@ubuntu2204 src]#grafana-cli plugins ls
+installed plugins:
+grafana-piechart-panel @ 1.6.4
+
+# 安装的插件存放在如下目录中
+[root@ubuntu2204 src]#ls /var/lib/grafana/plugins/
+grafana-piechart-panel
+
+ #启动服务
+[root@ubuntu2204 src]#systemctl daemon-reload 
+[root@ubuntu2204 src]#systemctl enable --now grafana-server.service 
+
+# 查看端口，3000端口开放
+[root@ubuntu2204 src]#ss -nlt
+State       Recv-Q      Send-Q           Local Address:Port           Peer Address:Port     Process     
+LISTEN      0           4096             127.0.0.53%lo:53                  0.0.0.0:*                    
+LISTEN      0           128                    0.0.0.0:22                  0.0.0.0:*                    
+LISTEN      0           128                  127.0.0.1:6010                0.0.0.0:*                    
+LISTEN      0           4096                         *:9100                      *:*                    
+LISTEN      0           128                       [::]:22                     [::]:*                    
+LISTEN      0           4096                         *:3000                      *:*                    
+LISTEN      0           128                      [::1]:6010                   [::]:*                    
+LISTEN      0           4096                         *:9090                      *:* 
+```
+
+
+
+##### 基于docker 安装
+
+```http
+https://hub.docker.com/r/grafana/grafana
+```
+
+范例
+
+```bash
+docker run -d --name=grafana -p 3000:3000 grafana/grafana
+```
+
+
+
+#### 配置 Prometheus 数据源
+
+##### 登录 Grafana Web
+
+```bash
+#浏览器访问 http://IP|domain:3000/，查看效果
+#输入用户名和密码：admin/admin，就会进入到更改密码的页面，查看效果
+```
+
+![image-20250306104342552](../markdown_img/image-20250306104342552.png)
+
+**更改密码**
+
+![image-20250306104415116](../markdown_img/image-20250306104415116.png)
+
+![image-20250306104510233](../markdown_img/image-20250306104510233.png)
+
+
+
+##### 添加 Prometheus 的数据源
+
+添加数据源: 点击 "Add your first data source"
+
+![image-20250306104755723](../markdown_img/image-20250306104755723.png)
+
+选择 "Prometheus" 出现添加界面
+
+![image-20250306104838500](../markdown_img/image-20250306104838500.png)
+
+按照如下配置信息，在Settings界面对Prometheus进行配置 ，效果如下
+
+![image-20250306104955219](D:\git_repository\cyber_security_learning\markdown_img\image-20250306104955219.png)
+
+```bash
+#输入Prometheus的地址(10.0.0.101:9090或者localhost:9090)，其它没有做任何变动。
+```
+
+其它信息不用设置，点击最下面的"Save & Test" 查看效果
+
+![image-20250306105100837](../markdown_img/image-20250306105100837.png)
+
+
+
+##### 使用数据源插件中内置的Dashboard
+
+点 Dashboards 页签内的import,导入内置的三个模板
+
+![image-20250306105402233](../markdown_img/image-20250306105402233.png)
+
+查看默认的三个模板
+
+![image-20250306105557111](../markdown_img/image-20250306105557111.png)
+
+![image-20250306105623477](../markdown_img/image-20250306105623477.png)
+
+注意: 由于没有将grafana纳入到prometheus监控的target,所以以下没有数据
+
+![image-20250306105709785](../markdown_img/image-20250306105709785.png)
+
+只要将grafana:3000/metrics加入prometheus的配置文件即可实现下图的正常显示
+
+```bash
+[root@ubuntu2204 local]# cat prometheus/conf/prometheus.yml 
+......
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['10.0.0.201:9100', '10.0.0.203:9100']
+  - job_name: 'grafana'              # 添加grafana
+    static_configs:
+      - targets: ['10.0.0.201:3000']
+      
+# 重启服务
+[root@ubuntu2204 local]#systemctl restart prometheus.service 
+
+# 浏览器查看
+```
+
+![image-20250306110055200](../markdown_img/image-20250306110055200.png)
+
+再次查看Grafana metrics的面板，出现数据
+
+![image-20250306110241753](../markdown_img/image-20250306110241753.png)
+
+
+
+#### 导入指定模板展示 Node Exporter 数据
+
+上面内置的模板不太理想,导入指定的网络上比较合适的 Dashboard 模板
+
+##### 登录 Grafana 官网查找模板
+
+```http
+https://grafana.com/grafana/dashboards/
+```
+
+![image-20250306110829978](../markdown_img/image-20250306110829978.png)
+
+点击喜欢的模版，比如：Node Exporter Full
+
+![image-20250306110935313](../markdown_img/image-20250306110935313.png)
+
+复制ID
+
+![image-20250306111015196](../markdown_img/image-20250306111015196.png)
+
+
+
+##### 导入指定模板
+
+导入8919（中文）,1860,11074,13978模板
+
+![image-20250306111151244](../markdown_img/image-20250306111151244.png)
+
+![image-20250306111338555](../markdown_img/image-20250306111338555.png)
+
+选择数据源，然后 import 导入
+
+![image-20250306111442389](../markdown_img/image-20250306111442389.png)
+
+![image-20250306111520472](../markdown_img/image-20250306111520472.png)
+
+
+
+### 监控 Zookeeper
+
+监控的指标可以通过下面方式提供
+
+- Prometheus 内置
+- instrumentation 程序仪表: 应用内置的指标功能,比如: Zookeeper,Gitlab,Grafana等
+- 额外的exporter,使用第三方开发的功能
+- Pushgateway 提供
+- 通过自行编程实现的功能代码,需要开发能力
+
+
+
+#### 安装和配置 Zookeeper
+
+```bash
+# 安装java环境
+apt install -y openjdk-11-jdk
+# 下载zookeeper
+wget https://mirrors.tuna.tsinghua.edu.cn/apache/zookeeper/current/apache-zookeeper-3.9.3-bin.tar.gz
+
+# 解压并放入指定目录
+tar xf apache-zookeeper-3.9.2-bin.tar.gz -C /usr/local/
+
+# 将其放入PATH目录中
+# vim /etc/profile
+PATH=$PATH:/usr/local/zookeeper/bin/
+
+# 加载
+. /etc/profile
+
+# 创建配置文件zoo.cfg
+cd /usr/local/zookeeper/conf
+cp zoo_sample.cfg zoo.cfg
+
+# 启动zookeeper并查看状态
+[root@ubuntu2204 conf]#zkServer.sh start
+/usr/bin/java
+ZooKeeper JMX enabled by default
+Using config: /usr/local/zookeeper/bin/../conf/zoo.cfg
+Starting zookeeper ... STARTED
+[root@ubuntu2204 conf]#zkServer.sh status
+/usr/bin/java
+ZooKeeper JMX enabled by default
+Using config: /usr/local/zookeeper/bin/../conf/zoo.cfg
+Client port found: 2181. Client address: localhost. Client SSL: false.
+Mode: standalone  # 表示是单机模式，不是集群
+```
+
+
+
+#### Zookeeper配置文件
+
+```bash
+# 可以更改配置使其暴露端口被Prometheus监控
+cat /usr/local/zookeeper/conf/zoo.cfg
+# The number of milliseconds of each tick
+tickTime=2000  # 滴答时间，是后续时间的基本单位
+# The number of ticks that the initial 
+# synchronization phase can take
+initLimit=10   # 因为滴答时间是2000毫秒，也就是2秒，因此这里initlimit的时间是20s
+# The number of ticks that can pass between 
+# sending a request and getting an acknowledgement
+syncLimit=5
+# the directory where the snapshot is stored.
+# do not use /tmp for storage, /tmp here is just 
+# example sakes.
+dataDir=/tmp/zookeeper        # 指定数据目录，这里不建议使用tmp目录，因为tmp目录下的数据无法持久化
+# the port at which the clients will connect
+clientPort=2181
+# the maximum number of client connections.
+# increase this if you need to handle more clients
+#maxClientCnxns=60
+#
+# Be sure to read the maintenance section of the 
+# administrator guide before turning on autopurge.
+#
+# https://zookeeper.apache.org/doc/current/zookeeperAdmin.html#sc_maintenance
+#
+# The number of snapshots to retain in dataDir
+#autopurge.snapRetainCount=3    # 只保留最近的3个版本的镜像文件
+# Purge task interval in hours
+# Set to "0" to disable auto purge feature
+#autopurge.purgeInterval=1    # 自动数据清理
+
+## Metrics Providers
+#
+# https://prometheus.io Metrics Exporter
+metricsProvider.className=org.apache.zookeeper.metrics.prometheus.PrometheusMetricsProvider
+metricsProvider.httpHost=0.0.0.0
+metricsProvider.httpPort=7000    # 打开7000端口
+metricsProvider.exportJvmInfo=true
+```
+
+
+
+#### Service文件
+
+```bash
+[root@ubuntu2204 conf]# cat > /lib/systemd/system/zookeeper.service <<EOF
+[Unit]
+Description=zookeeper.service
+After=network.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/zookeeper/bin/zkServer.sh start
+ExecStop=/usr/local/zookeeper/bin/zkServer.sh stop
+ExecReload=/usr/local/zookeeper/bin/zkServer.sh restart
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+[root@ubuntu2204 conf]# systemctl daemon-reload
+
+[root@ubuntu2204 conf]# systemctl enable --now zookeeper.service
+
+# 重启服务后，浏览器访问：http://ip|domain:7000/metrics
+```
+
+![image-20250306115337767](../markdown_img/image-20250306115337767.png)
+
+
+
+#### 修改 Prometheus 配置
+
+```bash
+[root@ubuntu2204 local]#cat prometheus/conf/prometheus.yml 
+......
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: "prometheus"
+
+    # metrics_path defaults to '/metrics'
+    # scheme defaults to 'http'.
+
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['10.0.0.201:9100', '10.0.0.203:9100']
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['10.0.0.201:3000']
+  - job_name: 'zookeeper'               # 添加zookeeper的target
+    static_configs:
+      - targets: ['10.0.0.203:7000']
+
+[root@ubuntu2204 local]# systemctl restart prometheus.service
+```
+
+
+
+查看 Prometheus 的监控数据
+
+![image-20250306115731339](../markdown_img/image-20250306115731339.png)
+
+
+
+#### 查看 Grafana 监控数据
+
+访问下面地址,搜索zookeeper
+
+```http
+https://grafana.com/grafana/dashboards/
+```
+
+![image-20250306115910819](../markdown_img/image-20250306115910819.png)
+
+选择一个模版，复制id
+
+![image-20250306115957598](../markdown_img/image-20250306115957598.png)
+
+访问grafana管理页面
+
+```http
+http://ip|domain:3000/
+```
+
+![image-20250306120121721](../markdown_img/image-20250306120121721.png)
+
+![image-20250306120238885](../markdown_img/image-20250306120238885.png)
+
+![image-20250306120313496](../markdown_img/image-20250306120313496.png)
+
+![image-20250306120335722](../markdown_img/image-20250306120335722.png)
+
+![image-20250306120359538](../markdown_img/image-20250306120359538.png)
+
+![image-20250306120425017](../markdown_img/image-20250306120425017.png)
+
+
+
+### Pushgateway 采集自定义数据
+
+#### Pushgateway 介绍
+
+![image-20250306141415941](../markdown_img/image-20250306141415941.png)
+
+官方连接
+
+```http
+https://prometheus.io/docs/practices/pushing/
+```
+
+Pushgateway 是一项中介服务，允许您从无法抓取的作业中推送指标
+
+虽然有很多的Exporter提供了丰富的数据,但生产环境中仍需要采集用户自定义的数据,可以利用 Pushgateway 实现
+
+Pushgateway 是另⼀种采⽤客户端主动推送数据的⽅式,也可以获取监控数据的prometheus 插件
+
+**Pushgateway**与exporter 不同, Exporter 是被**动采集数据**
+
+Pushgateway是可以单独运⾏在任何节点上的插件，并不⼀定要在被监控客户端
+
+**用户自定义的脚本或程序将需要监控的数据推送给 Pushgateway ,然后prometheus server再向 pushgateway拉取数据**
+
+**Pushgateway 缺点**
+
+- Pushgateway 会形成⼀个单点瓶颈，假如好多个应用同时发送给⼀个pushgateway的进程,如果这 个进程有故障，那么监控数据也就无法获取了
+- 将失去 Prometheus 通过 up 指标（每次抓取时生成）的自动实例运行状况监控。
+- Pushgateway 永远不会忘记推送给它的数据，并将它们永远暴露给 Prometheus，除非这些数据通过 Pushgateway 的 API 手动删除。
+- Pushgateway 并不能对发送过来的数据进⾏更智能的判断,假如脚本中间采集出问题,那么有问题的数据 pushgateway⼀样照单全收发送给prometheus
+
+
+
+#### 安装 Pushgateway
+
+```http
+https://prometheus.io/download/
+https://github.com/prometheus/pushgateway/releases
+```
+
+![image-20250306142222193](../markdown_img/image-20250306142222193.png)
+
+范例：
+
+```bash
+[root@ubuntu2204 src]# wget -P /usr/local/src https://github.com/prometheus/pushgateway/releases/download/v1.11.0/pushgateway-1.11.0.linux-amd64.tar.gz
+
+[root@ubuntu2204 src]# tar xf pushgateway-1.11.0.linux-amd64.tar.gz -C /usr/local
+[root@ubuntu2204 local]# ln -s pushgateway-1.11.0.linux-amd64/ pushgateway
+[root@ubuntu2204 pushgateway]# mkdir /usr/local/pushgateway/bin
+[root@ubuntu2204 pushgateway]# mv /usr/local/pushgateway/pushgateway /usr/local/pushgateway/bin
+[root@prometheus ~]# useradd -r -s /sbin/nologin prometheus
+[root@ubuntu2204 pushgateway]#ln -s /usr/local/pushgateway/bin/pushgateway /usr/local/bin/
+
+# 准备service文件
+[root@ubuntu2204 pushgateway]#cat /lib/systemd/system/pushgateway.service
+[Unit]
+Description=Prometheus Pushgateway
+After=network.target
+[Service]
+Type=simple
+ExecStart=/usr/local/pushgateway/bin/pushgateway
+#ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+User=prometheus
+Group=prometheus
+[Install]
+WantedBy=multi-user.target
+
+# 启动服务
+[root@ubuntu2204 pushgateway]#systemctl daemon-reload 
+[root@ubuntu2204 pushgateway]#systemctl enable --now pushgateway.service
+
+# 访问ip|domain:9091
+```
+
+![image-20250306143441026](../markdown_img/image-20250306143441026.png)
+
+![image-20250306143531381](../markdown_img/image-20250306143531381.png)
+
+![image-20250306143611847](../markdown_img/image-20250306143611847.png)
+
+
+
+范例：docker安装
+
+```bash
+docker pull prom/pushgateway
+
+docker run -d -p 9091:9091 prom/pushgateway
+```
+
+
+
+
+
+#### 配置 Prometheus 收集 Pushgateway 数据
+
+范例：静态发现
+
+```bash
+[root@ubuntu2204 local]#cat /usr/local/prometheus/conf/prometheus.yml 
+......
+  - job_name: 'pushgateway'
+    # 可选项，设置为true，那么Prometheus将使用Pushgateway上的job和instance标签。如果设置为false那么它将重命名这些值，在它们前面加上exported_前缀，并在服务器上为这些标签附加新值。,默认值为false,后面有详细解释
+    honor_labels: true  
+    scrape_interval: 10s  #可选项
+    static_configs:
+      - targets: ['10.0.0.203:9091']
+      
+# 重启服务
+[root@ubuntu2204 local]#systemctl restart prometheus.service
+```
+
+范例：支持文件形式的自动发现格式
+
+```bash
+[root@ubuntu2204 local]#cat /usr/local/prometheus/conf/prometheus.yml 
+......
+  - job_name: 'pushgateway'
+    honor_labels: true
+    file_sd_configs:
+    - files:
+      - targets/pushgateway/*.json
+      refresh_interval: 5m
+      
+# pushgateway目标:
+[root@prometheus ~]#vim /usr/local/prometheus/conf/targets/pushgateway/test.json
+[{"targets": ["pushgateway1.wang.org：9091"]}]
+
+# 重启服务
+[root@ubuntu2204 local]#systemctl restart prometheus.service
+```
+
+
+
+##### `honor_labels` 在 Prometheus 中的作用
+
+`honor_labels` 选项用于**控制 Prometheus 在拉取（scrape）Pushgateway 或其他目标的指标时，是否保留已有的 `labels`，还是用 `scrape_configs` 里定义的 `labels` 覆盖它们**。
+
+
+
+**`1. honor_labels: true` vs. `honor_labels: false`**
+
+| **配置**              | **行为**                                                     | **适用场景**                                                 |
+| --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| `honor_labels: true`  | **保留** Pushgateway 指标里已有的 `labels`                   | **避免 Pushgateway 数据被 Prometheus 采集时的 `labels` 覆盖** |
+| `honor_labels: false` | **覆盖** Pushgateway 指标里的 `labels`，使用 Prometheus `scrape_configs` 里定义的 `labels` | **防止不同 Pushgateway 实例上报相同的 label 导致冲突**       |
+
+
+
+**`2. honor_labels` 的作用示例**
+
+**(1) `honor_labels: false`（默认）**
+
+假设 **Pushgateway 里的指标有 `instance="pushgateway:9091"`**：
+
+```bash
+my_metric{instance="pushgateway:9091", job="my_job"}  42
+```
+
+如果 Prometheus `scrape_configs` 配置：
+
+```yaml
+scrape_configs:
+  - job_name: "pushgateway"
+    honor_labels: false
+    static_configs:
+      - targets: ["pushgateway:9091"]
+        labels:
+          instance: "prometheus-instance"
+```
+
+🔹 **最终 Prometheus 采集的结果是：**
+
+```bash
+my_metric{instance="prometheus-instance", job="pushgateway"}  42
+```
+
+📌 **`instance="pushgateway:9091"` 被 `instance="prometheus-instance"` 覆盖了！**
+
+
+
+**(2) `honor_labels: true`**
+
+如果修改 `prometheus.yml` 配置
+
+```yaml
+scrape_configs:
+  - job_name: "pushgateway"
+    honor_labels: true
+    static_configs:
+      - targets: ["pushgateway:9091"]
+        labels:
+          instance: "prometheus-instance"
+```
+
+🔹 **最终 Prometheus 采集的结果是**
+
+```bash
+my_metric{instance="pushgateway:9091", job="my_job"}  42
+```
+
+📌 **Pushgateway 指标的 `instance="pushgateway:9091"` **不会被 `prometheus.yml` 里的 `instance="prometheus-instance"` 覆盖
+
+
+
+**`3. honor_labels` 适用场景**
+
+**✅ 适用 `honor_labels: true` 的情况**
+
+1. **避免 Prometheus 采集的 labels 覆盖 Pushgateway 的 labels**。
+2. **多个 Prometheus 实例同时拉取 Pushgateway**，确保 Pushgateway 指标的 `job` 和 `instance` label 不被覆盖。
+3. **需要保留推送到 Pushgateway 的 `job` 和 `instance`，以便在 Grafana 中区分不同的指标来源**。
+
+**✅ 适用 `honor_labels: false`（默认） 的情况**
+
+1. **统一 Prometheus 采集的数据**，确保所有实例的 `instance` label 都被标准化，防止不同的 Pushgateway 上报相同的 `instance` 导致冲突。
+2. **Prometheus 需要强制使用 `scrape_configs` 里定义的 labels**，防止 Pushgateway 的 `job` 或 `instance` 影响数据一致性。
+3. **适用于非 Pushgateway 目标（如 Node Exporter），避免不同实例的 `instance` label 冲突**。
+
+
+
+**4. 结论**
+
+| **问题**                            | **答案**                                                     |
+| ----------------------------------- | ------------------------------------------------------------ |
+| `honor_labels` 作用是什么？         | **控制 Prometheus 是否保留 Pushgateway 指标里的 labels，还是用 `scrape_configs` 的 labels 覆盖它们。** |
+| `honor_labels: true` 行为？         | **Prometheus 采集时，保留 Pushgateway 指标已有的 labels，不覆盖。** |
+| `honor_labels: false`（默认）行为？ | **Prometheus 采集时，覆盖 Pushgateway 指标的 labels，使用 `scrape_configs` 里的 labels。** |
+| 什么时候用 `true`？                 | **需要保留 Pushgateway 指标的 `instance` 和 `job`，防止数据被 Prometheus 配置覆盖时。** |
+| 什么时候用 `false`？                | **Prometheus 需要标准化所有实例的 `instance`，防止 label 冲突。** |
+
+🚀 **推荐：**
+
+- **如果你使用 Pushgateway，并希望保留它的 `instance` 和 `job`，建议 `honor_labels: true`。**
+- **如果你想让 Prometheus 统一管理 labels，建议 `honor_labels: false`（默认）。**
+
+
+
+#### 配置客户端发送数据给 Pushgateway
+
+```http
+https://github.com/prometheus/pushgateway/blob/master/README.md
+```
+
+
+
+推送 Metric 格式
+
+```http
+http://<pushgateway_address>:<push_port>/metrics/job/<job_name>/[<label_name1>/<label_value1>]/[<label_nameN> /<label_valueN>
+```
+
+示例
+
+```bash
+[root@ubuntu2204 local]#echo "age 18" | curl --data-binary @- http://10.0.0.203:9091/metrics/job/pushgateway/instance/`hostname -I`
+
+# 浏览器查看pushgateway
+# pushgateway中的job和instance，在被prometheus采集后，标签名会变为exported_instance和exported_job
+# Prometheus 在抓取 Pushgateway 的数据时，如果 honor_labels: false（默认），会将 Pushgateway 中的标签名加上 exported_ 前缀。
+```
+
+![image-20250306152059913](../markdown_img/image-20250306152059913.png)
+
+![image-20250306152715392](../markdown_img/image-20250306152715392.png)
+
+
+
+**上述发生了两件事**
+
+- Prometheus 的 `scrape_configs` 里的 `instance="prometheus-instance"` 和 `job="pushgateway"` 覆盖了 Pushgateway 里的 `instance` 和 `job`。
+- 原本的 `instance="pushgateway:9091"` 和 `job="my_push_job"` 没有被丢弃，而是被改成 `exported_instance` 和 `exported_job`。
+
+
+
+**如何避免 `exported_*`？**
+
+如果你**不希望 Prometheus 改变 Pushgateway 的标签**，可以显式配置：
+
+```yaml
+scrape_configs:
+  - job_name: "pushgateway"
+    honor_labels: true  # 保留 Pushgateway 原始 labels
+    static_configs:
+      - targets: ["pushgateway:9091"]
+```
+
+📌 **这样 Prometheus 采集后，标签不会变成 `exported_\*`，而是直接保留原始的 `instance` 和 `job` 标签**：
+
+```bash
+my_metric{instance="pushgateway:9091", job="my_push_job"}  42
+```
+
+
+
+示例：当把honor_labels改为true后，观察
+
+```bash
+[root@ubuntu2204 local]#cat prometheus/conf/prometheus.yml
+......
+  - job_name: 'pushgateway'
+    honor_labels: true       # 改为true
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['10.0.0.203:9091']
+      
+# 向pushgateway传入数据
+[root@ubuntu2204 local]#echo "age 18" | curl --data-binary @- http://10.0.0.203:9091/metrics/job/pushgateway/instance/`hostname -I`
+
+# 浏览器上观察
+```
+
+![image-20250306153236670](../markdown_img/image-20250306153236670.png)
+
+![image-20250306153323057](../markdown_img/image-20250306153323057.png)
+
+删除 Metric 命令格式，或者通过Pushgateway 图形删除
+
+```bash
+#删除指定job_name中的所有metric
+curl -X DELETE http://<pushgateway_address>:<push_port>/metrics/job/<job_name>
+
+#删除指定实例的metric
+curl -X DELETE http://<pushgateway_address>:<push_port/metrics/job/<job_name>/instance/<instance_name>
+```
+
+
+
+范例：命令
+
+```bash
+#下面为发送一次数据,如果想周期性发送,可以通过cron或脚本循环实现
+[root@ubuntu2004 ~]#echo "age 18" | curl --data-binary @- http://10.0.0.203:9091/metrics/job/pushgateway/instance/`hostname -I`
+
+#说明
+10.0.0.203:9091    # 安装为Pushgateway主机的IP和端口
+pushgateway        # 指定jobname,会自动添加一个新标签名称为exported_pushgateway 
+`hostname -I`      # 取当前主机的IP为instance名称
+@file              # 表示从file中读取数据
+@-                 # 表示从标准输入读取数据
+```
+
+
+
+**通用脚本**
+
+```bash
+[root@ubuntu2204 pushgateway]#cat pushgateway_metric.sh 
+#!/bin/bash
+#
+#********************************************************************
+#Author:            mystical
+#Email:             mysticalrecluse@gmail.com
+#Date:              2025-03-06
+#FileName:          pushgateway_metric.sh
+#URL:               http://www.mysticalrecluse.com
+#Description:       The test script
+#Copyright (C):     2025 All rights reserved
+#********************************************************************
+
+METRIC_NAME=login_number
+METRIC_VALUE_CMD="who | wc -l"
+METRIC_TYPE=gauge
+METRIC_HELP="login user number"
+#METRIC_NAME=mem_free
+#METRIC_VALUE_CMD="free -b  | awk 'NR==2{print \$4}'"
+#METRIC_TYPE=gauge
+#METRIC_HELP="free memory"
+
+PUSHGATEWAY_HOST=10.0.0.203:9091
+EXPORTED_JOB=pushgateway_job
+# INSTANCE=`hostname -I|awk '{print $1}'`
+# 上面的命令有问题，前面会多出一个\n，导致出现标签为instance=""的错误指标
+# 使用下面的命令，删除所有空白符
+INSTANCE=$(hostname -I | awk '{print $1}' | tr -d '[:space:]')
+SLEEP_TIME=1
+
+CURL_URL="curl --data-binary @- http://${PUSHGATEWAY_HOST}/metrics/job/${EXPORTED_JOB}/instance/${INSTANCE}"
+
+push_metric() {
+    while true; do
+        VALUE=`eval "$METRIC_VALUE_CMD"`
+        cat <<EOF | $CURL_URL
+# HELP ${METRIC_NAME} ${METRIC_HELP}
+# TYPE ${METRIC_NAME} ${METRIC_TYPE}
+${METRIC_NAME} ${VALUE}
+EOF
+        sleep $SLEEP_TIME
+    done
+}
+
+push_metric
+
+# 后台执行
+[root@ubuntu2204 pushgateway]#nohup bash pushgateway_metric.sh &> /dev/null &
+```
+
+
+
+#### 验证数据
+
+![](../markdown_img/image-20250306173515631.png)
+
+![image-20250306173626363](../markdown_img/image-20250306173626363.png)
+
+
+
+
+
+## PromQL
+
+### 指标数据
+
+#### 数据基础
+
+**时间序列数据：**
+
+- 按照时间顺序记录系统、设备状态变化的数据，每个数据称为一个样本
+- 数据采集以特定的时间周期进行，随着时间将这些样本数据记录下来，将生成一个离散的样本数据序列,该序列也称为向量（Vector）
+- 将多个序列放在同一个坐标系内（以时间为横轴，以序列为纵轴），将形成一个由数据点组成的矩阵
+
+![image-20250306174838865](../markdown_img/image-20250306174838865.png)
+
+```ABAP
+向量（也称为欧几里得向量、几何向量、矢量），指具有大小（magnitude）和方向的量。它可以形象化地表示为带箭头的线段。箭头所指：代表向量的方向；线段长度：代表向量的大小。与向量对应的量叫做数量（物理学中称标量），数量（或标量）只有大小，没有方向。
+```
+
+
+
+Prometheus基于指标名称（metrics name）以及附属的标签集（labelset）唯一定义一条时间序列
+
+- **指标名称（Metrics）**代表着监控目标上某类可测量属性的基本特征标识
+- **标签（Labels）**则是这个基本特征上再次细分的多个可测量维度
+
+
+
+#### 数据模型
+
+Prometheus中，每个时间序列都由指标名称（Metric Name）和标签（Label）来唯一标识
+
+Metric Name的表示方式有下面两种
+
+```ABAP
+<metric name>{<label name>=<label value>, …}"
+{__name__="metric name",<label name>=<label value>, …} #通常用于Prometheus内部
+```
+
+![image-20250306182509727](../markdown_img/image-20250306182509727.png)
+
+- **指标名称**
+  - 通常用于描述系统上要测定的某个特征
+  - 支持使用字母、数字、下划线和冒号，且必须能匹配RE2规范的正则表达式
+  - 例如：http_requests_total表示接收到的HTTP请求总数
+- **标签**
+  - 键值型数据，附加在指标名称之上，从而让指标能够支持更多细化的多纬度特征；此为可选项
+  - 标签名称可使用字母、数字和下划线，且必须能匹配RE2规范的正则表达式
+  - 注意：**以两个下划线 "__" 为前缀的名称为Prometheus系统预留使用**
+
+例如: 下面代表着两个不同的时间序列
+
+```ABAP
+http_requests_total{method=GET}
+http_requests_total{method=POST} 
+```
+
+
+
+#### 样本数据
+
+Prometheus的每个数据样本由两部分组成
+
+- key: 包括三部分**Metric** 名称,**Label**, **Timestamp**(毫秒精度的时间戳)
+- value: float64格式的数据
+
+
+
+![image-20250306190639797](../markdown_img/image-20250306190639797.png)
+
+PromQL支持基于定义的指标维度进行过滤，统计和聚合
+
+- 指标名称和标签的特定组合代表着一个时间序列
+- 不同的指标名称代表着不同的时间序列
+- 指标名称相同，但标签不同的组合分别代表着不同的时间序列
+- 更改任何标签值，包括添加或删除标签，都会创建一个新的时间序列
+- 应该**尽可能地保持标签的稳定性**，否则，则很可能创建新的时间序列，更甚者会生成一个动态的数据环境，并使得监控的数据源难以跟踪，从而导致建立在该指标之上的图形、告警及记录规则变得无效
+
+
+
+### PromQL 基础
+
+#### PromQL简介
+
+Prometheus 提供一个内置的函数式的表达式语言PromQL(Prometheus Query Language)，可以帮助用户实现实时地查找和聚合时间序列数据。
+
+PromQL表达式计算结果可以在图表中展示，也可以在Prometheus表达式浏览器中以表格形式展示，或 作为数据源, 以HTTP API的方式提供给外部系统使用。
+
+注意：默认情况下，是以当前时间为基准点，来进行数据的获取操作
+
+
+
+#### 表达式形式
+
+官方文档
+
+```http
+https://prometheus.io/docs/prometheus/latest/querying/basics/
+```
+
+每一个PromQL其实都是一个表达式，这些语句表达式或子表达式的计算结果可以为以下四种类型：
+
+- **instant vector** 即时向量,瞬时数据
+
+  具有相同时间戳的一组样本值的集合
+
+  在某一时刻，抓取的所有监控项数据。这些度量指标数据放在同一个key中。
+
+  一组时间序列，包含每个时间序列的单个样本，所有时间序列共享相同的时间戳
+
+- **range vector** 范围向量
+
+  指定时间范围内的所有时间戳上的数据指标，即在一个时间段内，抓取的所有监控项数据。
+
+  一组时间序列，其中包含每个时间序列随时间变化的一系列数据点
+
+- **scalar** 标量
+
+  一个简单的浮点类型数值
+
+- **string** 字符串
+
+  一个简单字符串类型, 当前并没有使用, a simple string value; currently unused
+
+
+
+PromQL的查询操需要针对有限个时间序列上的样本数据进行，**挑选出目标时间序列**是构建表达式时最为关键的一步,然后根据挑选出给定指标名称下的所有时间序列或部分时间序列的即时（当前）样本值或 至过去某个时间范围内的样本值。
+
+范例: 利用API查询数据
+
+```bash
+#即时数据,指定时间点的数据
+[root@ubuntu2204 pushgateway]#curl --data 'query=prometheus_http_requests_total' --data time=1741260000 'http://10.0.0.201:9090/api/v1/query'
+
+# 结果如下
+{"status":"success","data":{"resultType":"vector","result":[{"metric":{"__name__":"prometheus_http_requests_total","code":"200","handler":"/","instance":"localhost:9090","job":"prometheus"},"value":[1741260000,"0"]},{"metric":{"__name__":"prometheus_http_requests_total","code":"200","handler":"/-/healthy","instance":"localhost:9090","job":"prometheus"},"value":[1741260000,"0"]},{"metric":{"__name__":"prometheus_http_requests_total","code":"200","handler":"/-/quit","instance":"localhost:9090","job":"prometheus"},"value":[1741260000,"0"]},{"metric":{"__name__":"prometheus_http_requests_total","code":"200","handler":"/-/ready","instance":"localhost:9090","job":"prometheus"},"value":[1741260000,"10"]},{"metric":{"__name__":"prometheus_http_requests_total","code":"200","handler":"/-/reload","instance":"localhost:9090","job":"prometheus"},"value":[1741260000,"0"]}......
+# 在某一个时间戳下，一系列相同指标，不同标签的数据集合
+
+ #范围数据,指定时间前1分钟的数据
+[root@ubuntu2204 pushgateway]#curl --data 'query=node_memory_MemFree_bytes{instance=~"10.0.0.(201|203):9100"}[1m]' --data time=1741260000 'http://10.0.0.201:9090/api/v1/query'
+ 
+# 结果如下
+{"status":"success","data":{"resultType":"matrix","result":[{"metric":{"__name__":"node_memory_MemFree_bytes","instance":"10.0.0.201:9100","job":"node_exporter"},"values":[[1741259942.052,"1084055552"],[1741259957.052,"1084055552"],[1741259972.052,"1084055552"],[1741259987.052,"1084055552"]]},
+{"metric":{"__name__":"node_memory_MemFree_bytes","instance":"10.0.0.203:9100","job":"node_exporter"},"values":[[1741259941.594,"1527631872"],[1741259956.594,"1526349824"],[1741259971.594,"1527918592"],[1741259986.594,"1528098816"]]}]}}
+
+# 这里之所以每个序列4个数据点的原因
+# Prometheus 采集频率由 scrape_interval 决定，假设 scrape_interval=15s
+# 1 分钟采集的次数 = 60s / 15s = 4 次
+
+#标量数据,利用scalar()函数将即时数据转换为标量
+[root@ubuntu2204 pushgateway]#curl --data 'query=scalar(sum(node_memory_MemTotal_bytes{instance=~"10.0.0.(201|203):9100"}))' --data time=1741260000 'http://10.0.0.201:9090/api/v1/query'
+
+# 结果如下
+{"status":"success","data":{"resultType":"scalar","result":[1741260000,"8142884864"]}}
+```
+
+
+
+
+
+**基本语法**
+
+**数值：**对于数值来说，主要记住两种类型的数值：**字符串** 和 **数字**。
+
+**字符串**
+
+```bash
+#字符串可以用单引号，双引号或反引号指定为文字，如果字符串内的特殊符号想要生效，可以使用反引号。
+"this is a string"
+'these are unescaped: n  t'
+`these are not unescaped: n ' " t`
+```
+
+**数字**
+
+```bash
+#对于数据值的表示，可以使用我们平常时候的书写方法 "[-](digits)[.(digits)]"
+2、2.43、-2.43等
+```
+
+
+
+#### 表达式使用要点
+
+表达式的返回值类型是即时向量、范围向量、标量或字符串4种数据类型其中之一，但是，有些使用场景要求表达式返回值必须满足特定的条件，例如
+
+- 需要将返回值绘制成图形时,**仅支持即时向量类型**的数据
+
+- 对于诸如rate一类的速率函数来说，其要求使用的却又必须是**范围向量型**的数据
+
+由于范围向量选择器的返回的是范围向量型数据，它不能用于表达式浏览器中图形绘制功能，否则，表达式浏览器会返回"`Error executing query: invalid expressiontype "range vector" for range query,  must be Scalar or instant Vector`"一类的错误
+
+**范围向量**选择几乎总是结合速率类的**函数rate**一同使用
+
+
+
+#### 数据选择器
+
+所谓的数据选择器，其实指的是获取实时数据或者历史数据的一种方法
+
+样式：
+
+```bash
+metrics_name{筛选label=值,...}[<时间范围>] offset <偏移>
+```
+
+**数据选择器主要以下几种分类：**
+
+![image-20250306201905820](D:\git_repository\cyber_security_learning\markdown_img\image-20250306201905820.png)
+
+
+
+##### 即时向量选择器 Instant Vector Selector
+
+Instant Vector Selector 获取0个，1个或多个时间序列的即时样本值
+
+```ABAP
+"0 个"：查询条件不匹配，返回空结果
+如果查询的时间点 没有匹配的时间序列，或者数据已被删除，Prometheus 不会返回任何结果。
+
+"1 个"：匹配到单个时间序列
+如果查询的筛选条件（label 选择器） 只匹配到一个时间序列，则返回 该时间点的单个值。
+
+"多个"：匹配到多个时间序列
+如果查询条件匹配到了 多个不同 instance 或 job 的时间序列，Prometheus 会返回 所有匹配的时间序列的最新样本值。
+```
+
+
+
+即时向量选择器由两部分组成
+
+- **指标名称**: 用于限定特定指标下的时间序列，即负责过滤指标;可选
+- **匹配器(Matcher)** :或称为标签选择器，用于过滤时间序列上的标签;定义在{}之中;可选
+- 定义即时向量选择器时，以上两个部分应该至少给出一个
+
+
+
+根据数据的精确度，可以有以下几种使用方法：
+
+- 根据监控项名称获取最新值
+
+  **仅给定指标名称**，或在标签名称上使用了空值的匹配器
+
+  返回给定的指标下的所有时间序列各自的即时样本
+
+  例如：`http_requests_total`和`http_requests_total{}`的功能相同，都是用于返回 `http_requests_total`指标下各时间序列的即时样本
+
+  ```ABAP
+  node_filefd_allocated
+  prometheus_http_requests_total
+  ```
+
+- 通过`__name__`匹配多个监控项的名称
+
+  ```ABAP
+  {__name__="prometheus_http_requests_total"}
+  {__name__=~"^prometheus_http_.*"}
+  ```
+
+- **仅给定匹配器**
+
+  返回所有符合给定的匹配器的所有时间序列上的即时样本 
+
+  注意:这些时间序列可能会有很多的不同的指标名称
+
+  ```ABAP
+  {job=".*", method="get"}
+
+- **指标名称和匹配器的组合**
+
+  通过 `name{key=value,...}`样式获取符合条件的数据值
+
+  返回给定的指定下的，且符合给定的标签过滤器的所有时间序列上的即时样本
+
+  ```ABAP
+  http_requests_total{method="get"}
+  {__name__="prometheus_http_requests_total",handler="/-/reload"}
+  prometheus_http_requests_total{handler="/-/reload"}
+  ```
+
+![image-20250306203637143](../markdown_img/image-20250306203637143.png)
+
+![image-20250306203806763](../markdown_img/image-20250306203806763.png)
+
+
+
+**匹配器 Matcher 使用规则**
+
+匹配器用于定义标签过滤条件，目前支持如下4种匹配操作符
+
+```bash
+=     #精确匹配
+!=    #不匹配
+=~    #正则匹配,全部匹配，而非包含 
+!~    #正则不匹配
+```
+
+```ABAP
+匹配到空标签值的匹配器时，所有未定义该标签的时间序列同样符合条件
+```
+
+
+
+**规则1**：匹配到空标签值的匹配器时，所有未定义该标签的时间序列同样符合条件
+
+```bash
+http_requests_total (env="")  #该指标名称上所有未使用该标签env的时间序列或者env的值为空的都符合条件
+
+# 该指标未使用env标签，因此也能匹配上述的规则
+http_requests_total {method ="get"} 
+```
+
+**规则2**：正则表达式将执行完全锚定机制，它需要匹配指定的标签的整个值
+
+```bash
+# 错误，因为仅部分匹配
+http_requests_total {method =~"^ge"} 
+
+# 正确，整个值匹配
+http_requests_total {method =~"^ge.*"}  
+```
+
+**规则3**：多个条件（标签）间可以使用逗号","隔开，每个条件内部可以通过多种符号，表示不同含义
+
+```bash
+{instance="10.0.0.201:9100", job="node_exporter"}
+```
+
+**规则4**：如果条件中存在多值，可以使用"|"表示或
+
+```bash
+env=~"staging|testing|development"
+```
+
+**规则5**：向量选择器至少要包含一个指标名称,或者条件中至少包含一个非空标签值的选择器
+
+```bash
+# 不能写成{job=~".*"}和{job=""}
+```
+
+**规则6**：使用__name__做为标签名称，能够对指标名称进行过滤
+
+```bash
+#示例：
+{__name__=~"http_requests_.*"}
+#能够匹配所有以"http_requests_"为前缀的所有指标
+```
+
+
+
+##### 范围选择器 Range Vector Selector
+
+Range Vector Selector 工作方式与瞬时向量选择器一样，区别在于时间范围长一些
+
+返回0个、1个或多个时间序列上在给定时间范围内的各自的一组样本值（这句话不理解的，参考瞬时选择器）
+
+主要是在瞬时选择器多了一个**`[]格式`**的时间范围后缀
+
+在`[]`内部可以采用多个单位表示不同的时间范围，比如s(秒)、m(分)、h(时)、d(日)、w(周)、y(年)
+
+必须使用整数时间单位，且能够将多个不同级别的单位进行串联组合，以时间单位由大到小为顺序
+
+```ABAP
+例如：1h30m，但不能使用1.5h
+```
+
+```bash
+prometheus_http_requests_total{job="prometheus"}[5m]
+#属性解析：这表示过去5分钟内的监控数据值，这些数据一般以表格方式展示，而不是列表方式展示
+```
+
+![image-20250306205814353](../markdown_img/image-20250306205814353.png)
+
+**注意：**
+
+- 范围向量选择器返回的是一定时间范围内的数据样本，虽然不同时间序列的数据抓取时间点相同， 但它们的**时间戳并不会严格对齐**
+
+  ```json
+  {
+    "status": "success",
+    "data": {
+      "resultType": "matrix",
+      "result": [
+        {
+          "metric": { "__name__": "node_memory_MemFree_bytes", "instance": "10.0.0.201:9100", "job": "node_exporter" },
+          "values": [
+            [1741259942.052, "1084055552"],
+            [1741259957.052, "1084055552"],
+            [1741259972.052, "1084055552"],
+            [1741259987.052, "1084055552"]
+          ]
+        },
+        {
+          "metric": { "__name__": "node_memory_MemFree_bytes", "instance": "10.0.0.203:9100", "job": "node_exporter" },
+          "values": [
+            [1741259941.594, "1527631872"],
+            [1741259956.594, "1526349824"],
+            [1741259971.594, "1527918592"],
+            [1741259986.594, "1528098816"]
+          ]
+        }
+      ]
+    }
+  }
+  // 虽然 scrape_interval=15s，但每个 instance 的数据采样时间略有偏差（如 201 采样在 42.052s，203 采样在 41.594s）。
+  // 这就叫“时间戳并不会严格对齐” —— 不同 instance 采集的时间点虽然接近，但不完全相同。
+  ```
+
+- 多个Target上的数据抓取需要分散在抓取时间点前后一定的时间范围内，以均衡Prometheus  Server的负载
+
+  | **问题**                   | **解释**                                                     |
+  | -------------------------- | ------------------------------------------------------------ |
+  | **为什么抓取时间要分散？** | 避免 Prometheus 在同一时间点采集所有 Target，防止 CPU、I/O 负载过高。 |
+  | **Prometheus 如何做到？**  | 1. `scrape_interval` 自动分布采集时间点。 2. `scrape_timeout` 影响时间偏移。 3. `relabel_configs` 让不同 Target 采集频率不同。 |
+  | **如何手动优化？**         | 1. 调整 `scrape_interval` 让不同 Target 采集频率不同。 2. 使用 `scrape_timeout` 限制长时间采集的 Target。 |
+
+  🚀 **如果你的 Prometheus 负载高，查询慢，可以调整 `scrape_interval` 或 `scrape_timeout`，让 Target 采集时间更均衡！😃**
+
+- 因而，Prometheus在趋势上准确，但并非绝对精准
+
+
+
+**Instant Vector Selector vs. Range Vector**
+
+| **类型**           | **作用**                                  | **查询方式**                                            | **返回数据格式**                    |
+| ------------------ | ----------------------------------------- | ------------------------------------------------------- | ----------------------------------- |
+| **Instant Vector** | 获取 **当前时间点**（t=now）的 **最新值** | `node_memory_MemFree_bytes{instance="10.0.0.201:9100"}` | **单个或多个时间序列的最新值**      |
+| **Range Vector**   | 获取 **过去一段时间内的数据**             | `node_memory_MemFree_bytes[5m]`                         | **多个时间点的值**（`matrix` 结果） |
+
+
+
+##### 偏移修饰符 offset
+
+默认情况下，即时向量选择器和范围向量选择器都以当前时间为基准时间点，而偏移量修改器能够修改该基准
+
+**对于某个历史时间段中的数据，需要通过offset时间偏移的方式来进行获取**
+
+偏移量修改器的使用方法是紧跟在选择器表达式之后使用"offset"关键字指定
+
+注意：offset与数据选择器是一个整体，不能分割，offset 偏移的是时间基点
+
+```bash
+prometheus_http_requests_total offset 5m #表示获取以prometheus_http_requests_total为指标名称的所有时间序列在过去5分钟之时的即时样本
+prometheus_http_requests_total{code="200"} offset 5m
+
+#如果既有偏移又有范围,先偏移后再取范围,如[5m] offset 3m 表示取当前时间的3分钟前的5m范围的值
+http_requests_total[5m] offset 1d #表示获取距此刻1天时间之前的5分钟之内的所有样本
+http_requests_total{handler="/metrics"}[5m] offset 3m
+```
+
+
+
+#### 指标类型
+
+Prometheus客户端库提供了四种核心度量标准类型。
+
+官方说明
+
+```http
+https://prometheus.io/docs/concepts/metric_types/
+https://prometheus.io/docs/practices/histograms/
+```
+
+```bash
+[root@ubuntu2204 local]#curl  -s http://10.0.0.201:9090/metrics |awk '$2=="TYPE"{type[$NF]++}END{for(i in type){print type[i],i}}'
+87 gauge
+15 histogram
+12 summary
+102 counter
+```
+
+**说明**
+
+![image-20250306222633369](../markdown_img/image-20250306222633369.png)
+
+| 类型              | 解析                                                         |
+| ----------------- | ------------------------------------------------------------ |
+| Counter - 计数器  | counter是一个累加的计数器，代表一个**从0开始累积单调递增**的计数器，其值只能在重新启动时增加或重置为零。典型的应用如：用户的访问量,请求的总个数，任务的完成数量或错误的总数量等。不能使用Counter来表示递减值。但可以重置为0， 即重新计数 |
+| Gauge -计 量器    | Gauge是一种度量标准，只有一个简单的返回值，或者叫瞬时状态，可以代表可以**任意metric的上下波动的数值**。通常用于指定时间的测量值，例如，**硬盘剩余空间**, **当前的内存使用量**,**一个待处理队列中任务的个数**等，还用于可能上升和下降的“计 数”，例如, 并发请求数。 |
+| Histogram- 直方图 | Histogram统计数据的分布情况。比如最小值，最大值，中间值，还有中位数，75 百分位,90百分位, 95百分位.98百分位,99百分位,和9.9百分位的值(percenties ,代表着近似的百分比估算数值<br />比如: 每天1000万请中,统计http_response_time不同响应时间的分布情况,响应时间在0-0.05s有多少,0.05s到2s有多少,10s以上有多少 每个存储桶都以"_BucketFuncName{...}" 样式来命名.例如 hist_sum、hist_count 等<br />可以基于histogram_quantile()函数对直方图甚至是直方图的聚合来进行各种分析计算。<br />比如: 统计考试成绩在0-60分之间有多少,60-80之间有多少个,80-100分之间有多少 个<br />示例:prometheus_tsdb_compaction_chunk_range_seconds_bucket histogram中位数由服务端计算完成，对于分位数的计算而言，Histogram则会消 耗更多的资源 |
+| Summary- 摘要     | 和Histogram类似，用于表示一段时间内的数据采样结果,典型的应用如：请求持续 时间，响应大小。它直接存储了分位数(将一个随机变量的概率分布范围分为几个等 份的数值点，常用的有中位数即二分位数、四分位数、百分位数等)，而不是通过区 间来计算。类似于直方图，摘要会基于阶段性的采样观察结果进行信息描述。它还 提供了观测值的累计计算、百分位计算等功能，每个摘要的命名与Histogram 类 似，例如：summary_sum、summary_count等<br />示例: go_gc_duration_seconds<br />Sumamry的分位数则是直接在客户端计算完成，对于分位数的计算而言， Summary在通过PromQL进行查询时有更好的性能表现 |
+
+ 
+
+##### Counter和Gauge
+
+通常情况不会直接使用Counter总数，而是需要借助于rate、topk、incrcase和irate等函数来生成样本数据的变化状况(增长率)
+
+```bash
+topk(3, http_requests_total)， #获取该指标下http请求总数排名前3的时间序列
+rate(http_requests_total[2h])，#获取2小时内，各时间序列上的http总请求数的增长速率，此为平均值，无法反映近期的精确情况
+irate(http_requests_total[2h]) #高灵敏度函数，用于计算指标的瞬时速率，基于样本范围内的最后两个样本进行计算，相较于rate函数来说，irate更适用于精准反映出短期时间范围内的变化速率
+```
+
+
+
+###### `rate()`和`irate()`详解
+
+**`rate()` 和 `irate()` 的基本定义**
+
+| **函数**      | **作用**                              | **计算方式**                             | **适用场景**                                           |
+| ------------- | ------------------------------------- | ---------------------------------------- | ------------------------------------------------------ |
+| **`rate()`**  | 计算 **一定时间窗口内的平均速率**     | 使用 **窗口内所有数据点** 计算增量的均值 | **适用于长时间趋势分析，如 CPU 使用率、请求速率等**    |
+| **`irate()`** | 计算 **最近两个数据点之间的瞬时速率** | 只考虑**最新的两个数据点**               | **适用于短时间内变化剧烈的指标，如流量突增、峰值监测** |
+
+
+
+**🔍 `rate()` 详解**
+
+**`rate()` 的定义**
+
+```bash
+rate(<counter_metric>[时间范围])
+# rate() 计算的是 Counter 指标（单调递增）的平均增长速率
+# 它会在指定时间范围内取多个数据点，然后计算这些点之间的增量的平均速率
+```
+
+**示例**：**计算 HTTP 请求的平均速率**
+
+```bash
+rate(http_requests_total[1m])
+```
+
+**解释**：
+
+- `http_requests_total` 是一个 **Counter（累积计数器）**，用于记录 **HTTP 请求的总数**。
+- `rate(http_requests_total[1m])` 计算的是 **过去 1 分钟内 HTTP 请求的平均速率（请求数/秒）**
+
+**假设 `http_requests_total` 采集数据**
+
+```ABAP
+时间点     值
+-----------------
+10:00:00   100
+10:00:15   120
+10:00:30   140
+10:00:45   160
+10:01:00   180
+```
+
+**计算方式：**
+
+1. 计算时间范围 `[1m]` 内的增量
+   - `180 - 100 = 80`（1分钟内增长了 80 个请求）
+2. 计算平均速率（单位：请求数/秒）
+   - `80 / 60 = 1.33 req/sec`
+
+**最终** `rate(http_requests_total[1m]) = 1.33 req/sec`
+
+**它表示：过去 1 分钟内，HTTP 请求的平均速率是 1.33 次/秒**
+
+
+
+🔍**`irate()` 详解**
+
+**`irate()` 的定义**
+
+```bash
+irate(<counter_metric>[时间范围])
+```
+
+- `irate()` 计算的是 **最近两个数据点之间的速率**，忽略更早的数据点
+- 适用于 **需要检测瞬时变化情况的场景**
+
+**示例 2：计算 HTTP 请求的瞬时速率**
+
+```bash
+irate(http_requests_total[5m])
+```
+
+**解释**：
+
+- `irate(http_requests_total[5m])` 只计算**最近两个数据点之间的速率**，而不是整个 5 分钟窗口内的均值。
+
+**假设** `http_requests_total` **采集数据**
+
+```ABAP
+时间点     值
+-----------------
+10:00:00   100
+10:00:15   120
+10:00:30   140
+10:00:45   160
+10:01:00   180
+```
+
+**计算方式：**
+
+1. `irate()` 只考虑最近两个数据点：
+   - `180 - 160 = 20`（最近 15 秒内增长 20 个请求）
+2. 计算瞬时速率（单位：请求数/秒）：
+   - `20 / 15 = 1.33 req/sec`
+
+📌 **最终 `irate(http_requests_total[5m]) = 1.33 req/sec`**
+**它表示：最近一次采集周期内（15 秒内），HTTP 请求的瞬时速率是 1.33 次/秒**
+
+```ABAP
+注意：irate(http_requests_total[1m]) 和 irate(http_requests_total[5m]) 在你的例子中返回的数值是相同的，因为 irate() 只使用最近两个数据点，无论 [1m] 还是 [5m]，它们都只考虑 最近的两个采样点，而不会看整个窗口的数据。
+```
+
+
+
+**Gauge**用于存储其值可增可减的指标的样本数据，常用于进行求和、取平均值、最小值、最大值等聚合计算
+
+也会经常结合PromQL的predict_linear和delta函数使用
+
+predict_linear(v range-vector, t, scalar)函数可以预测时间序列v在t秒后的值，它通过线性回归的方式来预测样本数据的Gauge变化趋势
+
+delta(v range-vector)函数计算范围向量中每个时间序列元素的第一个值与最后一个值之差，从而展示不同时间点上的样本值的差值
+
+```bash
+delta(cpu_temp_celsius {host="prometheus.wang.org"[2h]) #返回该服务器上的CPU温度与2小时之前的差异
+```
+
+
+
+##### Histogram
+
+###### 为什么需要 Histogram
+
+在 Prometheus 里，普通的 Counter 和 Gauge **只能记录单个数值**，比如：
+
+- **Counter**（计数器）：记录 **某个 API 调用的总次数**。
+- **Gauge**（仪表盘）：记录 **当前 CPU 使用率**。
+
+但如果你想分析：
+
+- **某个 API 的响应时间分布**（多少请求在 1ms 以内？多少请求超过 5ms？）。
+- **文件上传大小的分布**（多少个文件小于 10MB？多少个文件大于 100MB？）。
+- **测量数据库查询时间（DB query time）** 
+
+这种时候，**你需要 Histogram！**
+
+
+
+###### Histogram 是如何工作的？
+
+Histogram **会把数据划分成多个桶（buckets）**，然后统计**落入不同区间的数据点数量**。
+
+举个例子：API 响应时间
+
+假设你在监控 **HTTP 请求的响应时间**，你可以定义一个 Histogram
+
+```yaml
+http_request_duration_seconds_bucket{le="0.1"}  5
+http_request_duration_seconds_bucket{le="0.5"}  15
+http_request_duration_seconds_bucket{le="1"}    25
+http_request_duration_seconds_bucket{le="5"}    40
+http_request_duration_seconds_bucket{le="+Inf"} 50
+```
+
+这里的 `le`（less than or equal to）表示桶的上限
+
+- **`le="0.1"`：有 5 个请求响应时间 ≤ 0.1 秒。**
+- **`le="0.5"`：有 15 个请求响应时间 ≤ 0.5 秒。（包含 `0.1s` 内的 5 个）**
+- **`le="1"`：有 25 个请求响应时间 ≤ 1 秒。**
+- **`le="5"`：有 40 个请求响应时间 ≤ 5 秒。**
+- **`le="+Inf"`：总共有 50 个请求。**
+
+👉 **这种方式让 Prometheus 知道，多少请求是“快”的，多少请求是“慢”的，帮助你分析性能瓶颈！**
+
+```ABAP
+💡你可以这样记住 Histogram
+🎯 Counter 记录“多少次？” 🎯 Gauge 记录“现在是多少？” 🎯 Histogram 记录“数据的分布是什么样的？
+```
+
+
+
+###### Histogram 在 Prometheus 中的表现形式
+
+在 Prometheus 中，**Histogram 主要由 3 种指标组成**，分别用于存储数据的 **分布情况、总数、总和**。你可以通过 PromQL 查询它们。
+
+假设我们有一个 **监控 HTTP 请求响应时间** 的 Histogram 指标
+
+```bash
+# Histogram 的基本结构
+http_request_duration_seconds_bucket{le="0.1"}  5
+http_request_duration_seconds_bucket{le="0.5"}  15
+http_request_duration_seconds_bucket{le="1"}    25
+http_request_duration_seconds_bucket{le="5"}    40
+http_request_duration_seconds_bucket{le="+Inf"} 50
+http_request_duration_seconds_count 50
+http_request_duration_seconds_sum 75
+```
+
+**Histogram 由 3 类指标组成**：
+
+| **指标名称**  | **作用**                     | **示例数据**                                      |
+| ------------- | ---------------------------- | ------------------------------------------------- |
+| **`_bucket`** | 记录**落入不同区间的数据量** | `http_request_duration_seconds_bucket{le="1"} 25` |
+| **`_count`**  | 记录**总请求数**             | `http_request_duration_seconds_count 50`          |
+| **`_sum`**    | 记录**所有请求的总响应时间** | `http_request_duration_seconds_sum 75`            |
+
+
+
+###### 如何计算 Histogram 指标
+
+**计算某个时间窗口内的平均请求时间**
+
+```bash
+rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])
+# rate(http_request_duration_seconds_sum[5m]) 是5分钟内的响应时间差/300 = 每秒的响应时间总和
+# rate(http_request_duration_seconds_count[5m]) 是5分钟内响应数量差/300 = 每秒的响应数量
+# 相除即为每个请求的平均响应时间
+```
+
+计算逻辑
+
+![image-20250307092425042](../markdown_img/image-20250307092425042.png)
+
+用于监控 API 的平均响应时间趋势
+
+
+
+**计算 P95 响应时间**
+
+```sql
+histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+```
+
+**计算逻辑：**
+
+- **P95（95% 响应时间）**：表示 **95% 的请求比这个时间更快，5% 的请求比这个时间更慢**。
+- `histogram_quantile(0.95, rate(...))` 让 Prometheus 根据 `bucket` 数据，估算 P95 响应时间。
+
+ **用于查看 API 的 95% 响应时间，发现慢请求。**
+
+
+
+##### summary
+
+在 Prometheus 中，`Summary` 和 `Histogram` 都是用于**统计数据的分布情况**，但是它们的存储方式和计算方式不同。
+
+**`Summary` 主要用于计算：**
+
+1. **请求的总数量**（类似 Counter）。
+2. **请求的总响应时间**（类似 Counter）。
+3. **指定分位数（quantiles）的统计数据**（例如 P50、P90、P99 响应时间）。
+
+
+
+###### Summary 在 Prometheus 的表现形式
+
+```yaml
+http_request_duration_seconds{quantile="0.5"}  0.3
+http_request_duration_seconds{quantile="0.9"}  0.7
+http_request_duration_seconds{quantile="0.99"} 1.2
+http_request_duration_seconds_sum 75
+http_request_duration_seconds_count 50
+```
+
+**Summary 由 3 类指标组成：**
+
+| **指标名称**   | **作用**                        | **示例数据**                                         |
+| -------------- | ------------------------------- | ---------------------------------------------------- |
+| **`_sum`**     | 记录所有请求的响应时间总和      | `http_request_duration_seconds_sum 75`               |
+| **`_count`**   | 记录总请求数                    | `http_request_duration_seconds_count 50`             |
+| **`quantile`** | 预计算的分位数（P50, P90, P99） | `http_request_duration_seconds{quantile="0.99"} 1.2` |
+
+
+
+###### Summary 各部分的含义
+
+**`quantile` 指标**
+
+- **`quantile="0.5"`（P50）**   👉 50% 的请求比这个时间更快，50% 的请求比这个时间更慢。
+
+- **`quantile="0.9"`（P90）**   👉 90% 的请求比这个时间更快，10% 的请求比这个时间更慢。
+
+- **`quantile="0.99"`（P99）** 👉 99% 的请求比这个时间更快，1% 的请求比这个时间更慢。
+
+这些值是 Exporter（应用程序）预先计算好的，并直接暴露出来，Prometheus 只负责存储。
+
+**`_sum` 和 `_count`**
+
+- `_sum` 记录了所有请求的总响应时间（单位：秒）
+
+- `_count` 记录了所有请求的总数量
+
+- 可以计算平均响应时间
+
+  ```bash
+  rate(http_request_duration_seconds_sum[5m]) / rate(http_request_duration_seconds_count[5m])
+  ```
+
+  **这个计算方式等于**
+
+![image-20250307115154512](../markdown_img/image-20250307115154512.png)
+
+###### 示例数据
+
+**HTTP 请求响应时间**
+
+假设 Prometheus 采集到如下 Summary 数据
+
+```bash
+http_request_duration_seconds{quantile="0.5"}  0.3
+http_request_duration_seconds{quantile="0.9"}  0.7
+http_request_duration_seconds{quantile="0.99"} 1.2
+http_request_duration_seconds_sum 75
+http_request_duration_seconds_count 50
+```
+
+**解读**
+
+- **P50（中位数）= 0.3s** 👉 一半的请求响应时间小于 0.3s。
+- **P90 = 0.7s** 👉 90% 的请求响应时间小于 0.7s。
+- **P99 = 1.2s** 👉 99% 的请求响应时间小于 1.2s。
+- **过去所有请求的总耗时 = 75s**，总共处理了 **50 个请求**。
+
+
+
+###### **Summary vs Histogram**
+
+| **比较项**                                     | **Summary**                          | **Histogram**                                     |
+| ---------------------------------------------- | ------------------------------------ | ------------------------------------------------- |
+| **是否有 `_bucket`？**                         | ❌ 没有                               | ✅ 有                                              |
+| **是否支持 `histogram_quantile()` 计算 P95？** | ❌ 不支持，只能用 `quantile` 直接查询 | ✅ 支持，`histogram_quantile()` 可以计算任意分位数 |
+| **是否可以计算 P95、P99？**                    | ✅ 但只能在 Exporter 端计算           | ✅ 可以在 Prometheus 端计算                        |
+| **是否适用于全局查询？**                       | ❌ 只能在单个实例上计算               | ✅ 适用于多个实例的全局查询                        |
+| **是否可以被 `rate()` 计算？**                 | ✅ `_sum` 和 `_count` 可用于 `rate()` | ✅ `_sum` 和 `_count` 可用于 `rate()`              |
+
+📌 **Histogram 适用于全局查询，Summary 适用于单个实例监控。**
+
+
+
+##### 补充：P95、P99在生产环境中的作用
+
+P95 和 P99 主要用于 **监控系统性能、优化应用响应速度，以及做出业务决策**，以下是几个关键场景：
+
+###### 监控 API 响应时间
+
+**场景：** Web 应用 API 需要保障低延迟，业务对用户体验要求高。
+**如何使用 P95/P99？**
+
+- 监控 API 响应时间，**确保大多数用户体验流畅**。
+- 如果 **P95 明显升高**（比如从 500ms 增加到 1s），说明长尾请求响应时间变慢，可能需要优化。
+
+**生产案例**
+
+```bash
+histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+```
+
+计算过去 5 分钟的 **P95 响应时间**，如果 P95 超过 1s，可能影响 5% 的用户体验，需要优化。
+
+
+
+###### 发现系统性能瓶颈
+
+**场景：** 监控数据库查询时间，判断查询是否变慢。
+
+**如何使用 P95/P99？**
+
+- **P50（中位数）低，但 P99 高**，说明大部分查询快，但少数查询非常慢（可能是索引问题）
+- 如果 **P99 上升到 2s+，说明数据库性能可能存在瓶颈**，需要分析慢查询 SQL
+
+**生产案例**
+
+```bash
+histogram_quantile(0.99, rate(mysql_query_duration_seconds_bucket[5m]))
+```
+
+计算数据库查询时间的 **P99，识别异常慢查询**。
+
+
+
+###### 评估负载均衡策略
+
+**场景：** 监控 Nginx 或 Kubernetes 负载均衡，分析流量分布是否均匀。
+ **如何使用 P95/P99？**
+
+- **如果 P99 远高于 P95**，说明部分服务器负载可能过高，导致长尾请求变慢。
+- **如果 P99 在不同实例间差异很大**，可能是负载均衡分配不均匀，需要调整调度策略。
+
+**生产案例**
+
+```bash
+histogram_quantile(0.99, rate(nginx_request_duration_seconds_bucket[5m])) by (instance)
+```
+
+计算每个 Nginx 实例的 **P99 响应时间，检查负载是否均匀**
+
+
+
+###### 评估扩容策略
+
+**场景：** Kubernetes 自动扩容（HPA）需要基于实际负载进行决策。
+**如何使用 P95/P99？**
+
+- 监控 P95/P99 响应时间，如果 P99 超过 1s，说明负载过高，可能需要扩容。
+- 结合 CPU、内存等指标，做出智能扩容决策。
+
+**生产案例**
+
+```bash
+histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 0.8
+```
+
+**如果 P95 响应时间超过 800ms，增加 Pod 数量**
+
+
+
+###### **P95 和 P99 代表的不同业务影响**
+
+| **指标**          | **代表含义**                             | **业务影响**                               |
+| ----------------- | ---------------------------------------- | ------------------------------------------ |
+| **P50（中位数）** | 50% 的请求比这个时间快，50% 比这个时间慢 | 影响普通用户的体验                         |
+| **P90**           | 90% 的请求比这个时间快                   | 影响大部分用户的体验                       |
+| **P95**           | 95% 的请求比这个时间快                   | **影响高级用户体验，客户可能开始抱怨**     |
+| **P99**           | 99% 的请求比这个时间快                   | **影响 VIP 用户、大客户，可能流失客户**    |
+| **P99.9**         | 99.9% 的请求比这个时间快                 | **影响极端高要求用户，比如金融、证券系统** |
+
+
+
+### PromQL 运算
+
+对于PromQL来说，它的操作符号主要有以下两类
+
+- **二元运算符**
+- **聚合运算**
+
+
+
+#### 二元运算符
+
+```http
+https://prometheus.io/docs/prometheus/latest/querying/operators/
+```
+
+二元运算符是prometheus进行数据可视化或者数据分析操作的时候，应用非常多的一种功能
+
+对于二元运算符来说，它主要包含三类：**算术**、**比较**、**逻辑**
+
+```bash
+#算术运算符：
++ (addition)- (subtraction)
+* (multiplication)
+/ (division)
+% (modulo)
+^ (power/exponentiation)
+
+ #比较运算符：
+== (equal)
+!= (not-equal)
+> (greater-than)
+< (less-than)
+>= (greater-or-equal)
+<= (less-or-equal)
+
+#逻辑运算符：
+and、or、unless 
+#目前该运算符仅允许在两个即时向量之间进行操作，不支持标量(标量只有一个数字，没有时序)参与运算
+
+#运算符从高到低的优先级
+1 ^ 
+2 *, /, %
+3 +, 
+4 ==, !=, <=, <, >=, >
+5 and, unless
+6 or
+
+#注意：
+#具有相同优先级的运算符满足结合律（左结合)，但幂运算除外，因为它是右结合机制
+#可以使用括号()改变运算次序
+```
+
+
+
+**范例：取GC平均值**
+
+```bash
+go_gc_duration_seconds_sum{instance="localhost:9090", job="prometheus"}/go_gc_duration_seconds_count{instance="localhost:9090", job="prometheus"}
+```
+
+![image-20250307122134903](../markdown_img/image-20250307122134903.png)
+
+简单示例
+
+```bash
+# 正则表达式
+node_memory_MemAvailable_bytes{instance =~ "10.0.0.20.:9100"}
+node_memory_MemAvailable_bytes{instance =~ "10.0.0.20[12]:9100"}
+node_memory_MemAvailable_bytes{instance =~ "10.0.0.20[1-3]:9100"}
+node_memory_MemAvailable_bytes{instance =~ "10.0.0.20.*:9100"}
+node_memory_MemAvailable_bytes{instance =~ "10.0.0.20[0-9]:9100"}
+node_memory_MemAvailable_bytes{instance =~ "10.0.0.20[^01]:9100"}
+node_memory_MemAvailable_bytes{instance !~ "10.0.0.20[12]:9100"}
+
+#单位换算
+node_memory_MemFree_bytes / (1024 * 1024)
+
+#可用内存占用率
+node_memory_MemAvailable_bytes/node_memory_MemTotal_bytes * 100
+
+#磁盘使用率
+(node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_free_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100
+
+#阈值判断
+(node_memory_MemTotal_bytes - node_memory_MemFree_bytes) / node_memory_MemTotal_bytes > 0.95
+
+#内存利用率是否超过80
+( 1 - node_memory_MemAvailable_bytes/node_memory_MemTotal_bytes ) * 100  > bool 80
+
+#布尔值,当超过1000为1,否则为0
+prometheus_http_requests_total > bool 1000
+```
+
+
+
+##### 补充：Prometheus 中 `bool` 运算符的用法
+
+在 **PromQL**（Prometheus 查询语言）中，**`bool` 运算符用于强制将比较运算符的结果转换为 `0` 或 `1`（布尔值）**。
+ 这在告警规则和条件判断时非常有用。
+
+###### `bool` 运算符的基本用法
+
+**语法格式**
+
+```bash
+<表达式1> <比较运算符> bool <表达式2>
+```
+
+**常见的比较运算符：**
+
+- `>`（大于）
+- `<`（小于）
+- `>=`（大于等于）
+- `<=`（小于等于）
+- `==`（等于）
+- `!=`（不等于）
+
+**默认情况下，Prometheus 仅返回满足条件的时间序列**，而 `bool` 运算符会**返回所有时间序列，并将结果转换为 `1` 或 `0`**：
+
+- **如果条件满足，返回 `1`**。
+- **如果条件不满足，返回 `0`**。
+
+
+
+###### 普通比较 vs. `bool` 运算
+
+假设 `prometheus_http_requests_total` 指标的当前数据
+
+```ABAP
+实例                 prometheus_http_requests_total
+------------------------------------------------
+instance1           1500
+instance2           900
+instance3           2000
+```
+
+**不使用 `bool`**
+
+```ABAP
+prometheus_http_requests_total > 1000
+```
+
+ **输出结果**
+
+```ABAP
+实例                 prometheus_http_requests_total
+------------------------------------------------
+instance1           1500  ✅ （满足条件，返回原值）
+instance3           2000  ✅ （满足条件，返回原值）
+```
+
+**这里 `instance2` 的值小于 `1000`，所以它不在结果中**。
+
+
+
+**使用 `bool`**
+
+```ABAP
+prometheus_http_requests_total > bool 1000
+```
+
+ **输出结果**
+
+```ABAP
+实例                 结果
+-----------------------------------
+instance1           1  ✅ （1500 > 1000）
+instance2           0  ❌ （900 <= 1000）
+instance3           1  ✅ （2000 > 1000）
+```
+
+即使 `instance2` 不满足 `> 1000`，它仍然会出现在结果中，且值为 `0`。
+
+
+
+###### `bool` 运算的实际应用
+
+**用途 1：用于告警规则**
+
+如果你想要创建一个告警规则，当请求数超过 1000 时触发
+
+```ABAP
+(prometheus_http_requests_total > bool 1000) == 1
+```
+
+- 结果为 `1`（表示超出 1000 的实例）。
+
+- 结果为 `0`（表示未超出 1000 的实例）。
+
+- 这样可以在 **Alertmanager** 里直接用 `== 1` 触发告警。
+
+**用途 2：避免数据丢失**
+
+默认的 PromQL 只会返回 **满足条件的数据点**，如果某些实例不满足条件，它们会**直接从结果集中消失**。
+ 如果你希望所有实例都显示，而不是让它们消失，你可以使用 `bool`。
+
+```ABAP
+prometheus_http_requests_total > bool 1000
+```
+
+- 这样，即使某个实例 `prometheus_http_requests_total < 1000`，它也会返回 `0` 而不是消失。
+
+
+
+##### 集合处理
+
+```bash
+#并集 or
+node_memory_MemTotal_bytes{instance="10.0.0.104:9100"} or node_memory_MemFree_bytes{instance="10.0.0.105:9100" }
+node_memory_MemTotal_bytes{instance=~"10.0.0.(103|104):9100"} 
+
+#交集 and
+node_memory_MemTotal_bytes{instance="10.0.0.101:9100"} and node_memory_MemFree_bytes{instance="10.0.0.104:9100" }
+
+#补集 unless
+node_memory_MemTotal_bytes{job_name="k8s-node"} unless node_memory_MemTotal_bytes{instance="10.0.0.104:9100"}
+
+#注意：
+and、or、unless 主要是针对获取的数据值进行条件选集合用的
+and、or、unless 针对的对象是一个完整的表达式
+```
+
+
+
+##### 向量匹配
+
+###### 向量匹配关键字
+
+```bash
+#https://prometheus.io/docs/prometheus/latest/querying/operators/#one-to-one-vector-matches
+ignoring   # 定义匹配检测时要忽略的标签
+on         # 定义匹配检测时只使用的标签
+```
+
+###### 组修饰符
+
+```bash
+#https://prometheus.io/docs/prometheus/latest/querying/operators/#group-modifiers
+group_left   #多对一
+group_right  #一对多
+
+#left和right表示哪一侧为多
+```
+
+###### 一对一向量匹配
+
+**基本语法**
+
+```bash
+<vector expr> <bin-op> ignoring(<label list>) <vector expr>
+<vector expr> <bin-op> on(<label list>) <vector expr>
+```
+
+- **`bin-op`（二元运算符）**：`+`，`-`，`*`，`/`，`>`，`<`，`>=`，`<=`，`==`，`!=` 等比较或算术运算符。
+
+- **`<label list>`（标签列表）**：指定要忽略或匹配的标签。
+
+| 关键字                       | **作用**                                         |
+| ---------------------------- | ------------------------------------------------ |
+| **`ignoring(<label list>)`** | **忽略某些标签，仅根据剩余的标签进行向量匹配**。 |
+| **`on(<label list>)`**       | **只基于指定的标签进行匹配，忽略其他标签**。     |
+
+**`on()` 与 `ignoring()` 的区别**
+
+假设 Prometheus 采集了 **两个指标**，表示 **CPU 使用率（cpu_usage）** 和 **CPU 限制（cpu_limit）**
+
+```bash
+# CPU使用率
+cpu_usage{instance="10.0.0.1", job="app1", core="0"} 40
+cpu_usage{instance="10.0.0.1", job="app1", core="1"} 50
+cpu_usage{instance="10.0.0.2", job="app1", core="0"} 30
+cpu_usage{instance="10.0.0.2", job="app1", core="1"} 60
+
+# CPU限制
+cpu_limit{instance="10.0.0.1", job="app1"} 80
+cpu_limit{instance="10.0.0.2", job="app1"} 90
+
+# cpu_usage 包含 core 这个标签（表示 CPU 核心）。
+# cpu_limit 没有 core 标签（表示整个实例的 CPU 限制）。
+
+# ignoring()：忽略标签
+# ignoring(core)
+# 忽略 core 标签，仅匹配 instance 和 job
+# 由于 cpu_limit 只有 instance 和 job，所以它与 cpu_usage 进行 一对一匹配，并忽略 core。
+cpu_usage / ignoring(core) cpu_limit
+
+# 结果
+instance="10.0.0.1", job="app1", core="0"  40 / 80 = 0.5
+instance="10.0.0.1", job="app1", core="1"  50 / 80 = 0.625
+instance="10.0.0.2", job="app1", core="0"  30 / 90 = 0.333
+instance="10.0.0.2", job="app1", core="1"  60 / 90 = 0.667
+
+# on()：仅匹配特定标签
+# on(instance, job)
+# 只基于 instance 和 job 进行匹配，完全忽略 core 以外的标签；这样 cpu_limit 只匹配相同 instance 的 cpu_usage 值
+cpu_usage / on(instance, job) cpu_limit
+
+# 结果
+instance="10.0.0.1", job="app1", core="0"  40 / 80 = 0.5
+instance="10.0.0.1", job="app1", core="1"  50 / 80 = 0.625
+instance="10.0.0.2", job="app1", core="0"  30 / 90 = 0.333
+instance="10.0.0.2", job="app1", core="1"  60 / 90 = 0.667
+```
+
+
+
+###### 多对一和一对多向量匹配
+
+默认情况下，Prometheus 采用 **一对一（1:1）匹配**，如果左右表达式的标签组合不一致，Prometheus **无法匹配它们**
+
+为了解决这种情况，我们可以使用：
+
+- **`group_left()`** 👉 **解决 "多对一"（N:1）匹配**
+- **`group_right()`** 👉 **解决 "一对多"（1:N）匹配**
+
+**示例**
+
+```bash
+# CPU使用率
+cpu_usage{instance="10.0.0.1", core="0"} 40
+cpu_usage{instance="10.0.0.1", core="1"} 50
+cpu_usage{instance="10.0.0.2", core="0"} 30
+cpu_usage{instance="10.0.0.2", core="1"} 60
+
+# CPU限制
+cpu_limit{instance="10.0.0.1"} 80
+cpu_limit{instance="10.0.0.2"} 90
+
+# group_left()
+cpu_usage / group_left() cpu_limit
+
+# 结果
+instance="10.0.0.1", core="0"  40 / 80 = 0.5
+instance="10.0.0.1", core="1"  50 / 80 = 0.625
+instance="10.0.0.2", core="0"  30 / 90 = 0.333
+instance="10.0.0.2", core="1"  60 / 90 = 0.667
+
+# group_left() 让 cpu_limit 适用于多个 core，避免匹配失败
+# cpu_limit{instance="10.0.0.1"} 匹配所有 core 值
+
+======================================================================================================
+
+# 应用版本
+app_version{app="web"} 2.1
+app_version{app="api"} 1.8
+
+# 请求统计
+app_requests{app="web", endpoint="/home"} 100
+app_requests{app="web", endpoint="/login"} 200
+app_requests{app="api", endpoint="/get"} 300
+app_requests{app="api", endpoint="/post"} 400
+
+# group_right()
+group_right() app_version * app_requests
+
+# 结果
+app="web", endpoint="/home"  2.1 * 100 = 210
+app="web", endpoint="/login" 2.1 * 200 = 420
+app="api", endpoint="/get"   1.8 * 300 = 540
+app="api", endpoint="/post"  1.8 * 400 = 720
+
+# group_right() 让 app_version 扩展到 app_requests 的每个 endpoint
+# app_version{app="web"} 适用于所有 web 请求。
+```
+
+可以借助于**without**和**by**功能获取数据集中的一部分进行分组统计
+
+
+
+#### 聚合操作
+
+官方文档
+
+```http
+https://prometheus.io/docs/prometheus/latest/querying/operators/
+```
+
+一般说来，单个指标的价值不大，监控场景中往往需要联合并可视化一组指标，这种联合机制是指"聚 合"操作，例如，将计数、求和、平均值、分位数、标准差及方差等统计函数应用于时间序列的样本之上 生成具有统计学意义的结果等
+
+对查询结果事先按照某种分类机制进行分组(groupby）并将查询结果按组进行聚合计算也是较为常见的 需求，例如分组统计、分组求平均值、分组求和等
+
+聚合操作由聚合函数也称为聚合操作符针对一组值进行计算并返回单个值或少量值作为结果
+
+**聚合操作符aggregation operators**虽然是一个个的功能，但是并不属于功能函数，仅仅代表对数据进行 简单的功能处理。
+
+##### 常见的11种聚合操作
+
+```bash
+sum、min、max、avg、count、count_values(值计数)stddev(标准差)、stdvar(标准差异)、bottomk(最小取样)、topk(最大取样，即取前几个)、quantile(分布统计)
+
+sum()             #对样本值求和
+avg()             #对样本值求平均值，这是进行指标数据分析的标准方法
+count()           #对分组内的时间序列进行数量统计
+min()             #求取样本值中的最小者
+max()             #求取样本值中的最大者
+topk()            #逆序返回分组内的样本值最大的前k个时间序列及其值
+bottomk()         #顺序返回分组内的样本值最小的前k个时间序列及其值
+quantile()        #分位数用于评估数据的分布状态，该函数会返回分组内指定的分位数的值，即数值落在小于等于指定的分位区间的比例
+count_values()    #对分组内的时间序列的样本值进行数量统计
+stddev()          #对样本值求标准差，以帮助用户了解数据的波动大小(或称之为波动程度) 
+stdvar()          #对样本值求方差，它是求取标准差过程中的中间状态
+```
+
+示例
+
+```bash
+#显示系统版本
+node_os_version
+node_os_version{id="ubuntu", id_like="debian", instance="10.0.0.200:9100", job="nodeexporter", name="Ubuntu"} 22.04
+node_os_version{id="ubuntu", id_like="debian", instance="10.0.0.201:9100", job="nodeexporter", name="Ubuntu"} 22.04
+node_os_version{id="ubuntu", id_like="debian", instance="10.0.0.202:9100", job="nodeexporter", name="Ubuntu"} 22.04
+node_os_version{id="ubuntu", id_like="debian", instance="10.0.0.203:9100", job="nodeexporter", name="Ubuntu"} 22.04
+
+#统计Ubuntu系统主机数
+count(node_os_version{id="ubuntu"})
+```
+
+```bash
+#分别统计不同OS的数量
+#按node_os_version返回值value分组统计个数,将不同value加个新标签为os_version
+count_values("os_version",node_os_version)
+{os_version="22.04"}  4
+{os_version="20.04"}  2
+```
+
+![image-20250307153335602](../markdown_img/image-20250307153335602.png)
+
+```bash
+ #内存总量
+sum(node_memory_MemTotal_bytes)
+```
+
+![image-20250307153622094](../markdown_img/image-20250307153622094.png)
+
+
+
+
+
+
+
+##### without 和 by 
+
+可以借助于without和by功能获取数据集中的一部分进行分组统计
+
+```bash
+#without 表示显示信息的时候，排除此处指定的标签列表，对以外的标签进行分组统计，即：使用除此标签之外的其它标签进行分组统计
+#by      表示显示信息的时候，仅显示指定的标签的分组统计，即针对哪些标签分组统计
+```
+
+without 和 by 格式如下
+
+```bash
+#两种格式：先从所有数据中利用数据选择表达式过滤出部分数据，进行分组后，再进行聚合运算，最终得出来结果
+
+# 格式1
+聚合操作符(数据选择表达式) without|by (<label list>)
+<aggr-op>([parameter,] <vector expression>) [without|by (<label list>)]
+
+# 示例
+#按instance分组统计内存总量
+sum(node_memory_MemTotal_bytes) by (instance)
+# 结果
+{instance="10.0.0.203:9100"}  4064149504
+
+#按handler,instance分组统计
+max(prometheus_http_requests_total) by (handler,instance)
+
+# 格式2
+聚合操作符 without|by (<label list>) (数据选择表达式) 
+<aggr-op> [without|by (<label list>)] ([parameter,] <vector expression>)
+
+# 示例
+#对除了instance和job以外的标签分组求和
+sum(prometheus_http_requests_total) without (instance,job)
+```
+
+![image-20250307153912872](../markdown_img/image-20250307153912872.png)
+
+
+
+#### 功能函数
+
+官方文档
+
+```http
+https://prometheus.io/docs/prometheus/latest/querying/functions/
+```
+
+默认prometheus官方提供功能函数有40个,主要有以下几类
+
+##### 计算相关
+
+```ABAP
+绝对值abs()、导数deriv()、指数exp()、对数ln()、二进制对数log2()、10进制对数log10()、平方根sqrt()
+向上取整ceil()、向下取整floor()、四舍五入round()
+样本差idelta()、差值delta()、递增值increase()、重置次数resets()
+递增率irate()、变化率rate()、平滑值holt_winters()、直方百分位histogram_quantile()
+预测值predict_linear()、参数vector()
+范围最小值min_over_time()、范围最大值max_over_time()、范围平均值avg_over_time()、范围求
+和值sum_over_time()、范围计数值count_over_time()、范围分位数quantile_over_time()、范围
+标准差stddev_over_time()、范围标准方差stdvar_over_time()
+```
+
+**取样相关**
+
+```ABAP
+获取样本absent()、升序sort()、降序sort_desc()、变化数changes()
+即时数据转换为标量scalar()、判断大clamp_max()、判断小clamp_min()
+范围采样值absent_over_time()，
+```
+
+**时间相关**
+
+```ABAP
+day_of_month()、day_of_week()、days_in_month()、hour()、minute()、month()、time()、timestamp()、year()
+```
+
+**标签相关**
+
+```ABAP
+标签合并label_join()、标签替换labelreplace()
+```
+
+
+
+##### [`rate()`和`irate()`详解](#`rate()`和`irate()`详解)
+
+
+
+### 定制 Exporter（待定）
+
+#### 定制 Exporter 说明
+
+Prometheus 监控的指标可以通过下面方式提供
+
+- Prometheus 内置
+- instrumentation 程序仪表: 应用内置的指标功能,比如: Zookeeper,Gitlab,Grafana等
+- 额外的exporter,使用第三方开发的功能
+- Pushgateway 提供
+- 通过自行编程实现的功能代码,需要开发能力
+
+Prometheus对于监控功能的核心要素就是metric的监控项是否正常工作
+
+Metric 本质就是对应的服务启动后自动生成的一个基于http协议URL地址，通过该地址可以获取想要的监控项。
+
+实际生产环境中，想要监控好多指标，但是prometheus 可能并没有提供相应的metric监控项条目，比如: 某业务指标、转化率等，所以就需要实现自定义的metric条目。
+
+开发应用服务的时候，就需要根据metric的数据格式，定制标准的/metric接口
+
+各种语言帮助手册
+
+```http
+https://github.com/prometheus/client_golang
+https://github.com/prometheus/client_python
+https://github.com/prometheus/client_java
+https://github.com/prometheus/client_rust
+```
+
+
+
+
+
+### 基于 PromQL 实现 Grafana 展示
+
+#### Grafana 基础
+
+Grafana是一款基于go语言开发的通用可视化工具，**支持从多种不同的数据源加载并展示数据**，可作为其数据源的部分存储系统,如下所示
+
+- TSDB: Prometheus、 InfluxDB、 OpenTSDB 和 Graphit
+- 日志和文档存储: Loki 和 ElasitchSearch
+- 分布式请求跟踪: Zipkin、 Jaeger 和 SkyWalking 等
+- SQL DB: MySQL、PostgreSQL和Microsoft SQL Server
+
+**Grafana基础**
+
+- 默认监听于TCP协议的3000端口，支持集成其他认证服务，且能够通过/metrics输出内建指标
+- 数据源(Data Source) :提供用于展示的数据的存储系统
+- 仪表盘(Dashboard) :组织和管 理数据的可视化面板 (Panel) 
+- 团队和用户:提供了面向企业组织层级的管理能力
+
+Grafana是一个可视化的集成套件，可以借助于现成的dashboard模板进行通用的界面展示，但是**对于一些特殊的监控项的展示**来说，我们还是需要实现独有的界面展示，而这就需要**借助于Grafana的图形类型来实现**特定的展示效果，对于绘图时候用到的可视化功能主要有两种方式：**默认可视化方式**和**可视化插件**
+
+
+
+**默认可视化方式**
+
+![image-20250307165636700](../markdown_img/image-20250307165636700.png)
+
+![image-20250307165712345](../markdown_img/image-20250307165712345.png)
+
+![image-20250307165743860](../markdown_img/image-20250307165743860.png)
+
+
+
+**可视化插件**
+
+对于可视化插件来说，我们就需要借助于grafana-cli plugins命令从 https://grafana.com/plugins/页面 下载我们想要的可视化插件，每种插件中都集成了一些特定的可视化样式，我们可以点击左侧变量的"齿轮"，点击"Plugins"，就可以看到我们所安装的插件样式集，效果如下
+
+![image-20250307165951976](../markdown_img/image-20250307165951976.png)
+
+
+
+**图形展示**
+
+接下来我们通过现有的模板页面来学习一下Grafana中图形的展示方式以及制作流程。点击我们之前加 载好的prometheus的模板页面，效果如下
+
+![image-20250307170928980](../markdown_img/image-20250307170928980.png)
+
+当把鼠标放在图形的标题位置，就会出现一个"△"，然后点击该三角就会出现图形的操作信息，效果如下
+
+![image-20250307171209314](../markdown_img/image-20250307171209314.png)
+
+操作属性：
+
+```bash
+View     #当前Graph的综合展示
+Edit     #Graph的属性编辑
+Share    #表示当前Graph对外分享时候的一些配置属性
+explore  #类似于view,综合展示更详细的信息
+More     #这部分包含了对当前图形的一些扩展信息，比如切割、复制、json数据展示、数据导出、触发器
+```
+
+点击View或者键盘输入缩写"x",进入到图形综合展示界面，效果如下
+
+![image-20250307171744586](../markdown_img/image-20250307171744586.png)
+
+点击Explore或者键盘输入缩写"v",进入到图形详情展示界面
+
+![image-20250307172056840](../markdown_img/image-20250307172056840.png)
+
+点击Edit或者键盘输入缩写"e",进入到图形编辑界面
+
+![image-20250307172219342](../markdown_img/image-20250307172219342.png)
+
+**实践流程**
+
+如果要制作一个Graph，需要按照如下步骤进行操作
+
+- 了解业务，分析指标
+- 创建 Dashboard
+- 创建 Graph
+- 完善 Graph
+- 其他信息,比如告警等
+
+
+
+#### 绘图案例
+
+##### 案例说明
+
+在上一节，我们通过自定义的metric的方式，做好了一个监控项，那么接下来我们就需要完成以下绘图
+
+**要求**
+
+- 绘制每分钟请求数量的曲线 QPS
+
+**需求分析如下**
+
+```bash
+#上面的三个需求基本上都是曲线图，所以我们在Graph中选择折线图就可以了，而在绘图的时候，第一步需要做的就是获取数据，所以我们现在需要做的就是在prometheus上，将这三个需求的PromQL写出来，效果如下
+
+increase(grafana_http_request_duration_seconds_count{handler="/metrics",status_code="200"}[1m])
+```
+
+##### 绘图实现
+
+详情如下：
+
+![image-20250307174417312](../markdown_img/image-20250307174417312.png)
+
+![image-20250307174443931](../markdown_img/image-20250307174443931.png)
+
+![image-20250307174759973](../markdown_img/image-20250307174759973.png)
+
+挑选合适的图例
+
+![image-20250307175009347](../markdown_img/image-20250307175009347.png)
+
+填写信息后保存
+
+![image-20250307175052828](../markdown_img/image-20250307175052828.png)
+
+![image-20250307175119569](../markdown_img/image-20250307175119569.png)
+
+![image-20250307175248087](../markdown_img/image-20250307175248087.png)
+
+
+
+
+
+## Prometheus 标签管理
+
+### 标签简介
+
+![image-20250307181725153](../markdown_img/image-20250307181725153.png)
+
+**标签功能**:  用于对数据分组和分类,利用标签可以将数据进行过滤筛选
+
+**标签管理的常见场景**
+
+- 删除不必要的指标
+- 从指标中删除敏感或不需要的标签
+- 添加、编辑或修改指标的标签值或标签格式
+
+**标签分类**
+
+- 默认标签: Prometheus 自身内置
+  - 形式:  `__keyname__`
+- 应用标签: 应用本身内置
+  - 形式:  `keyname`
+- 自定义标签: 用户定义
+  - 形式:  `keyname`
+
+
+
+范例: 添加主机标签
+
+```bash
+# 编辑prometheus.yml配置文件
+[root@ubuntu2204 conf]#vim prometheus.yml
+......
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['10.0.0.201:9100', '10.0.0.203:9100']
+        labels:
+          node: "worker node"
+          type: "test"
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['10.0.0.201:3000']
+  - job_name: 'zookeeper'
+    static_configs:
+      - targets: ['10.0.0.203:7000']
+        labels: {app: 'zookeeper', type: 'dev'}
+  - job_name: 'pushgateway'
+    honor_labels: true
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['10.0.0.203:9091']
+
+
+# 重启服务
+[root@ubuntu2204 conf]#systemctl restart prometheus.service 
+
+# 浏览器访问确认
+```
+
+![image-20250307183337617](../markdown_img/image-20250307183337617.png)
+
+
+
+### 指标的生命周期
+
+标签主要有两种表现形式
+
+**私有标签**
+
+```ABAP
+私有标签以"__*"样式存在，用于获取监控目标的默认元数据属性，比如__address__用于获取目标的地址，__scheme__用户获取目标的请求协议方法，__metrics_path__获取请求的url地址等
+```
+
+**普通标签**
+
+```ABAP
+对个监控主机节点上的监控指标进行各种灵活的管理操作，常见的操作有，删除不必要|敏感指标，添加、编辑或者修改指标的标签值或者标签格式
+```
+
+**Prometheus对数据的处理流程**：
+
+![image-20250307214647050](../markdown_img/image-20250307214647050.png)
+
+- 在每个scrape_interval期间，Prometheus都会检查执行的作业 Job
+
+- 这些作业首先会根据Job上指定的发现配置生成target列表，此即**服务发现过程**
+
+  - 服务发现会返回一个Target列表，其中包含一组称为元数据的标签，这些标签都以"`__meta__`" 为 前缀
+
+  - 服务发现还会**根据目标配置来设置其它标签**，这些标签带有`"__"`前缀和后缀，包括如下：
+
+    ```bash
+    "__scheme__"          #协议http或https，默认为http
+    "__address__"         #target的地址
+    "__metrics_path__"    #target指标的URI路径（默认为/metrics）
+    
+    #若URI路径中存在任何参数，则它们的前缀会设置为 "__param__"
+    ```
+
+    
+
+  - 这些目标列表和标签会返回给Prometheus，其中的一些标签也可以配置为被覆盖或替换为其它标签
+
+- 配置标签会在抓取的生命周期中被利用以生成其他标签
+
+  - 例如：指标上的instance标签的默认值就来自于 __address__ 标签的值
+
+- 对于发现的各个目标，Prometheus提供了可以重新标记(relabel_config) 目标的机会，它定义在 Job 配置段的 **relabel_config** 配置中，常用于实现如下功能
+
+  - 将来自服务发现的元数据标签中的信息附加到指标的标签上
+  - 过滤目标
+
+- 数据抓取、以及指标返回的过程
+
+- 抓取而来的指标在保存之前，还允许用户对指标重新打标并过滤的方式，它定义在job配置段的 **metric_relabel_configs** 配置中，常用于实现如下功能
+
+  - 删除不必要的指标
+  - 从指标中删除敏感或不需要的标签
+  - 添加、编辑或修改指标的标签值或标签格式
+
+
+
+### relabel_configs 和 metric_relabel_configs
+
+**relabel_config**、**metric_relabel_configs** 这两个配置虽然在作用上类似，但是还是有本质上的区别的， 这些区别体现在两个方面：执行顺序和数据处理上。
+
+| 区别     | 解析                                                         |
+| -------- | ------------------------------------------------------------ |
+| 执行顺序 | relabel_configs用与scrape目标上metric前的标签设置，也就是说在scrape_configs前 生效，针对的是target对象本身<br />metric_relabel_configs 作用于scrape_configs 生效后，即针对target对象上的metric监控数据 |
+| 数据处理 | metric_relabel_configs 是 prometheus 在保存数据前的最后一步标签重新编辑，针对 的是metric对象<br />默认情况下，它将监控不需要的数据，直接丢掉，不在prometheus 中保存 |
+
+**对target重新打标**
+
+对target重新打标是**在数据抓取之前**动态重写target标签的强大工具
+
+在每个数据抓取配置中，可以定义多个relabel步骤，它们将按照定义的顺序依次执行
+
+对于发现的每个target，Prometheus默认会执行如下操作
+
+```bash
+job的标签设定为配置文件中其所属的job_name的值
+__address__标签的值为该target的套接字地址"<host>:<port>"
+instance标签的值为__address__的值
+__scheme__标签的值为抓取该target上指标时使用的协议(http或https) 
+__metrics_path__标签的值为抓取该target上的指标时使用URI路径，默认为/metrics
+__param_<name>标签的值为传递的URL参数中第一个名称为<name>的参数的值，此项依赖于URL中是否存在参数
+```
+
+重新标记期间，还可以使用该target上以 "__meta_" 开头的元标签,各服务发现机制为其target添加的元标签会有所不同
+
+重新标记完成后，该target上以`"__"`开头的所有标签都会被移除,若在relabel的过程中需要临时存储标签值，则要使用 __tmp 标签名称为前缀进行保存，以避免同Prometheus的内建标签冲突
+
+
+
+**对抓取到的metric重新打标**
+
+对metric重新打标是在数据抓取之后动态重写metric标签的工具，在每个数据抓取配置中，可以定义多个metric relabel的步骤
+
+对metric重新打标的配置格式与target重新打标的格式相同，但前者要定义在专用的 metric_relabel_configs字段中
+
+它们将按照定义的顺序依次执行
+
+- 删除不必要的指标
+- 从指标中删除敏感或不需要的标签
+- 添加、编辑或修改指标的标签值或标签格式
+
+要注意的是，更改或添加标签会创建新的时间序列
+
+- 应该明确地使用各个标签，并尽可能保持不变，以避免创建出一个动态的数据环境
+- 标签是时间序列的唯一性约束，删除标签并导致时间序列重复时，可能会导致系统出现问题
+
+
+
+#### **`relabel_configs` vs `metric_relabel_configs`**细致解读
+
+##### **`relabel_configs` 是在采集数据前生效**
+
+**作用阶段**：
+
+- 在 Prometheus **从目标（target）拉取数据之前** 生效
+- 主要用于 **修改、重命名、删除采集目标的标签**
+- 也可以 **决定是否要拉取某些目标的数据**
+
+**🚀 作用范围**：
+
+- **作用于整个目标（target）**，比如 `node_exporter`
+- **不会影响具体的指标（metrics）**
+
+**🔹 示例 1：拒绝采集某些 `target`**
+
+```yaml
+relabel_configs:
+  - source_labels: ['__address__']
+    regex: '10.0.0.203:9100'
+    action: drop
+```
+
+**效果**：不采集 `10.0.0.203:9100` 这个 `node_exporter` 目标。
+
+**🔹 示例 2：修改 `instance` 标签**
+
+```yaml
+relabel_configs:
+  - source_labels: ['__address__']
+    target_label: 'instance'
+    regex: '(.+):9100'
+    replacement: 'node-$1'
+```
+
+**效果**：`instance=10.0.0.203:9100` → `instance=node-10.0.0.203`
+
+
+
+##### `metric_relabel_configs` 是在时间序列存储前生效
+
+**作用阶段**：
+
+- Prometheus **已经抓取了数据**，在存入 **时间序列数据库（TSDB）之前** 生效
+- 主要用于 **修改、删除、过滤具体的指标**
+
+**作用范围**：
+
+- **作用于每个指标（metric）**
+- **不会影响目标（target）是否被采集**
+
+**🔹 示例 1：删除所有 `go_\*` 开头的指标**
+
+```yaml
+metric_relabel_configs:
+  - source_labels: ['__name__']
+    regex: 'go_.*'
+    action: drop
+```
+
+**效果**：删除所有 `go_info`、`go_memstats_*` 等 `go_*` 开头的指标，但目标（如 `node_exporter`）仍然被采集
+
+**🔹 示例 2：修改 `instance` 标签**
+
+```yaml
+metric_relabel_configs:
+  - source_labels: ['instance']
+    target_label: 'server'
+```
+
+**效果**：`instance="10.0.0.203:9100"` → `server="10.0.0.203:9100"`
+
+
+
+##### **`relabel_configs` vs `metric_relabel_configs` 区别**
+
+| 配置项                   | 作用时机       | 作用范围               | 常用于                                  |
+| ------------------------ | -------------- | ---------------------- | --------------------------------------- |
+| `relabel_configs`        | 采集前         | **整个目标（target）** | 目标筛选、修改 `job` 或 `instance` 标签 |
+| `metric_relabel_configs` | 采集后，存储前 | **具体指标（metric）** | 过滤、修改、删除指标                    |
+
+**结论**
+
+- **`relabel_configs` 影响的是采集目标**，可以决定是否拉取目标数据
+- **`metric_relabel_configs` 影响的是具体的指标**，但不影响采集目标
+
+
+
+### 标签管理
+
+#### 全局性标签
+
+对于一些全局性的标签，可以在global部分通过属性来设置，格式如下：
+
+```yaml
+global:
+  ...
+  # 与外部系统通信时添加到任何时间序列或警报的标签
+  external_labels:
+    <label_name>: <labelvalue>  # 这里是键值对，不是列表
+```
+
+**示例**
+
+```bash
+[root@ubuntu2204 ~]#cat /usr/local/prometheus/conf/prometheus.yml 
+# my global config
+global:
+  scrape_interval: 15s # Set the scrape interval to every 15 seconds. Default is every 1 minute.
+  evaluation_interval: 15s # Evaluate rules every 15 seconds. The default is every 1 minute.
+  # scrape_timeout is set to the global default (10s).
+  external_labels:
+    manager: "mystical"
+......
+
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+
+# 检查 external_labels 是否生效
+[root@ubuntu2204 ~]# echo -e $(curl -s http://10.0.0.201:9090/api/v1/status/config|jq '.data.yaml')|grep  "manager:"
+ manager: mystical
+```
+
+**🔍`external_labels` 的作用**
+
+**`external_labels` 只在远程存储、联邦（federation）、远程写入（remote_write）时生效**。
+
+- 它不会影响 **PromQL 查询结果**，也不会自动添加到 `Prometheus` 内部存储的时间序列数据中。
+- 它的主要作用是在 **数据推送到远程存储或联邦集群** 时，确保数据可以被正确标识。
+
+
+
+#### relabel_config、metric_relabel_configs
+
+**常见配置如下：**
+
+```bash
+# 配置示例如下：
+scrape_configs:
+  - job_name: 'prometheus'
+    relabel_configs|metric_relabel_configs:
+    - source_labels: [<labelname> [, ...]]
+      separater: '<string> | default = ;'
+      regex: '<regex> | default = (.*)'
+      replacement: '<string> | default = $1'
+      target_label: '<labelname>'
+      action: '<relabel_action> | default = replace'
+ 
+# 属性解析：
+action        # 对标签或指标进行管理，常见的动作有replace|keep|drop|labelmap|labeldrop等，默认为replace
+source_labels # 指定正则表达式匹配成功的Label进行标签管理,此为列表
+target_label  # 在进行标签替换的时候，可以将原来的source_labels替换为指定修改后的label
+reparator     # 指定用于联接多个source_labels为一个字符串的分隔符,默认为分号
+regex         # 表示source_labels对应Label的名称或者值(和action有关)进行匹配此处指定的正则表达式
+replacement   # 替换标签时,将 target_label对应的值进行修改成此处的值
+
+# action说明
+# 1) 替换标签的值:
+replace       # 此为默认值，首先将source labels中指定的各标签的值使用separator指定的字符进行串连,如果串连后的值和regex匹                  配，则使用replacement指定正则表达式模式或值对target_label字段进行赋值，如果target_label不存在，也可以用                  于创建新的标签名为target_label
+hashmod       # 对标签的值 计算哈希值, 然后对该哈希值进行 取模运算，并存储到 target_label
+
+# 2）保留或删除指标(值): 该处的每个指标名称对应一个target或metric
+keep          # 如果获取指标的source_labels的各标签的值串连后的值与regex匹配时,则保留该指标,反之则删除该指标
+drop          # 如果获取指标的source_labels的各标签的值串连后的值与regex匹配时,则删除该指标,反之则保留该指标，即与keep相反
+
+# 3）创建或删除标签(键)
+labeldrop     # 如果source labels中指定的标签名称和regex相匹配,则删除此标签,相当于标签黑名单
+labelkeep     # 如果source labels中指定的标签名称和regex相匹配,则保留,不匹配则删除此标签,相当于标签白名单
+labelmap      # 一般用于生成新标签，将regex对source labels中指定的标签名称进行匹配，而后将匹配到的标签的值赋值给                          replacement字段指定的标签；通常用于取出匹配的标签名的一部分生成新标签,旧的标签仍会存在
+
+# 4）大小写转换
+lowercase     # 将串联的 source_labels 映射为其对应的小写字母
+uppercase     # 将串联的 source_labels 映射到其对应的大写字母
+```
+
+
+
+#### 案例
+
+##### 范例：基于source_labels的值赋值给新的标签名（即替换标签名，值不变）
+
+```bash
+scrape_configs:
+  ...
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: ['10.0.0.203:9091']
+    relabel_configs:
+    - source_labels: ['instance']   
+      target_label: 'ip_address'
+
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+```
+
+![image-20250309183615983](../markdown_img/image-20250309183615983.png)
+
+**没出现新标签 `ip_address`**，因为`relabel_configs` **主要用于修改 Prometheus 内部变量（discovered labels）**，即从目标发现阶段 (`service discovery`) 获取的原始标签，如 `__address__`、`__meta_kubernetes_pod_name` 等。
+
+```ABAP
+它不能修改 Prometheus 已经抓取的 metrics 数据，只能在采集目标发现阶段生效
+```
+
+
+
+**修改后**
+
+```bash
+scrape_configs:
+  ...
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: ['10.0.0.203:9091']
+    relabel_configs:
+    - source_labels: ['__address__']     # 这里改为Prometheus内部变量
+      target_label: 'ip_address'
+      
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+```
+
+![image-20250309192055672](../markdown_img/image-20250309192055672.png)
+
+
+
+##### 将Target的默认标签修改为定制的新标签
+
+```bash
+scrape_configs:
+  .....
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: ['10.0.0.203:9091']
+    relabel_configs:
+    - source_labels: 
+      - '__scheme__'
+      - '__address__'
+      - '__metrics_path__'
+      regex: "(http|https)(.*)"
+      separator: ""
+      target_label: "endpoint"
+      replacement: "${1}://${2}"
+
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+
+# 上述标签管理行为解析
+# 1. 上述配置没有action，所以action是默认值replace
+#     而replace的作用是将source_labels上指定的标签的值，使用separator串联起来，形成一个新值
+# 2. 如果串连后的值和regex匹配，则使用replacement指定正则表达式模式或值对target_label字段进行赋值
+# 3. 如果target_label不存在，也可以用于创建新的标签名,为target_label
+```
+
+![image-20250309193045304](../markdown_img/image-20250309193045304.png)
+
+#####  基于Target上已存在的标签名称进行匹配生成新标签，然后进行删除旧标签
+
+```bash
+scrape_configs:
+  .....
+  - job_name: 'pushgateway'
+    static_configs:
+      - targets: ['10.0.0.203:9091']
+    relabel_configs:
+    - source_labels: 
+      - '__scheme__'
+      - '__address__'
+      - '__metrics_path__'
+      regex: "(http|https)(.*)"
+      separator: ""
+      target_label: "endpoint"
+      replacement: "${1}://${2}"
+    - regex: "(job|app)"
+      replacement: ${1}_name
+      action: labelmap
+    - regex: "(job|app)"
+      action: labeldrop
+    - source_labels: [endpoint]
+      target_label: myendpoint
+
+# 重启服务
+[root@ubuntu2204 ~]#systemctl status prometheus.service 
+```
+
+![image-20250309200402116](../markdown_img/image-20250309200402116.png)
+
+上面的`regex` 和 `- regex` 的区别
+
+| 部分         | **匹配作用**              | **匹配对象**                 | **修改内容**                       |
+| ------------ | ------------------------- | ---------------------------- | ---------------------------------- |
+| **第一部分** | 处理 `source_labels` 的值 | **标签值（labels' values）** | 生成 `endpoint`                    |
+| **第二部分** | 处理标签名                | **标签名（labels' keys）**   | `job → job_name`, `app → app_name` |
+
+**`regex` 的用途不同，主要是因为 `action` 不同**。所以在分析 `relabel_configs` 时，正确的步骤应该是：
+
+ **先分析 `action`**
+
+不同的 `action` 决定了 `regex` 如何被应用：
+
+- **`replace`**：用于修改标签的值
+- **`labelmap`**：用于修改标签的名称
+- **`keep/drop`**：用于保留或丢弃某些匹配的目标
+- **`hashmod`**：用于计算哈希并存储到目标标签
+- **`uppercase/lowercase`**：用于转换标签的值大小写
+- **`keepequal/dropequal`**：用于比较两个标签的值并决定保留或丢弃
+
+**再分析 `regex`**
+
+- **如果 `action` 作用在标签名**（例如 `labelmap`），`regex` 就匹配 **标签的名称（key）**
+- **如果 `action` 作用在标签值**（例如 `replace`），`regex` 就匹配 **标签的值（value）**
+
+
+
+##### `hashmod` 在 `relabel_configs` 中的作用详解
+
+**`hashmod` 的作用是**：
+
+- 对标签的值 **计算哈希值**
+- 然后对该哈希值进行 **取模运算**，并存储到 `target_label`
+
+💡 **主要用途**：
+
+- **负载均衡采集**：将实例分散到多个 Prometheus 任务中
+- **分片存储**：对数据进行分区，保证不同的数据片段在不同的存储层
+- **均匀分配告警**：给不同的监控实例分配不同的 `shard` 号
+
+**举例：demo测试**
+
+```yaml
+......
+    relabel_configs:
+    - regex: "(job_name)"
+      target_label: 'job_hash_name'
+      action: hashmod
+      modulus: 3
+```
+
+![image-20250309204403609](../markdown_img/image-20250309204403609.png)
+
+**举例：将实例均匀分配到 3 个采集任务**
+
+```yaml
+relabel_configs:
+  - source_labels: ['instance']
+    target_label: 'shard'
+    action: hashmod
+    modulus: 3
+```
+
+**解析**
+
+- `source_labels: ['instance']` → 选取 `instance` 作为哈希计算的输入
+- `action: hashmod` → 计算哈希值，并对 `modulus` 进行取模运算
+- `modulus: 3` → 取模 3，结果范围是 `0`, `1`, `2`
+- `target_label: 'shard'` → 计算结果存入 `shard` 这个标签
+
+**示例数据**
+
+| `instance`        | `hash(instance) % 3` | `shard` |
+| ----------------- | -------------------- | ------- |
+| `10.0.0.201:9090` | `12345 % 3 = 0`      | `0`     |
+| `10.0.0.202:9090` | `67890 % 3 = 1`      | `1`     |
+| `10.0.0.203:9090` | `54321 % 3 = 2`      | `2`     |
+| `10.0.0.204:9090` | `98765 % 3 = 0`      | `0`     |
+| `10.0.0.205:9090` | `13579 % 3 = 1`      | `1`     |
+
+**应用场景**
+
+**✅负载均衡 Prometheus 采集**
+
+如果有多个 Prometheus 负责采集，我们可以使用 `shard` 进行负载均衡
+
+```yaml
+- job_name: 'kubernetes-nodes'
+  static_configs:
+    - targets:
+        - "10.0.0.201:9100"
+        - "10.0.0.202:9100"
+        - "10.0.0.203:9100"
+        - "10.0.0.204:9100"
+        - "10.0.0.205:9100"
+  relabel_configs:
+    - source_labels: ['instance']
+      target_label: 'shard'
+      action: hashmod
+      modulus: 3
+```
+
+然后，多个 Prometheus 任务可以只采集 `shard=0`, `shard=1`, `shard=2` 的数据，以减轻单个 Prometheus 的压力。
+
+**✅在 `Alertmanager` 进行告警分片**
+
+如果你有多个 `Alertmanager` 服务器，你可以用 `hashmod` 确保不同 `instance` 的告警被不同的 `Alertmanager` 处理：
+
+```yaml
+relabel_configs:
+  - source_labels: ['instance']
+    target_label: 'alert_shard'
+    action: hashmod
+    modulus: 2  # 两个 Alertmanager 进行负载均衡
+```
+
+这样：
+
+- `alert_shard=0` 走 `Alertmanager A`
+- `alert_shard=1` 走 `Alertmanager B`
+
+**总结**
+
+- `hashmod` **计算哈希值并取模**
+- **主要用于分片数据**，如 **Prometheus 负载均衡、告警分片**
+- 可以让数据**均匀分布**，避免单点压力过大
+
+🚀 **使用 `hashmod`，可以让 Prometheus 采集和存储更加可扩展，避免单点瓶颈！**
+
+
+
+##### 用于在相应的job上，删除发现的各target之上面以"go"为前名称前缀的指标
+
+```bash
+#默认有很多go开头的指标，下面删除此类指标
+......
+  - job_name: 'node_exporter'
+    static_configs:
+      - targets: ['10.0.0.201:9100','10.0.0.203:9100']
+        labels:
+          node: "work node"
+          type: "test"
+    metric_relabel_configs:
+    - source_labels: ['__name__']
+      regex: 'go.*'
+      action: drop
+
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+
+# 查看浏览器
+```
+
+![image-20250309214624839](../markdown_img/image-20250309214624839.png)
+
+**删除标签前，查询 go_info**
+
+![image-20250309212216211](../markdown_img/image-20250309212216211.png)
+
+
+
+##### 关于`labelmap`的解读
+
+**`labelmap` 的作用**
+
+`labelmap` 主要用于 **重命名或筛选标签**。它的典型应用包括：
+
+- **批量修改标签名称**
+
+- **删除匹配某个模式的标签**
+
+- **给标签添加前缀/后缀**
+
+**`labelmap` 语法**
+
+```yaml
+- action: labelmap
+  regex: "<匹配的标签名正则表达式>"
+  replacement: "<新的标签名>"
+```
+
+**🔹 示例 1：给 `app` 和 `job` 标签名加 `_name` 后缀**
+
+```yaml
+relabel_configs:
+  - regex: "(app|job)"
+    replacement: "${1}_name"
+    action: labelmap
+```
+
+**作用**
+
+| 原始标签              | 变更后                     |
+| --------------------- | -------------------------- |
+| `app="nginx"`         | `app_name="nginx"`         |
+| `job="node_exporter"` | `job_name="node_exporter"` |
+
+**📝 解析**：
+
+- `regex: "(app|job)"` 匹配 `app` 或 `job`
+- `replacement: "${1}_name"` 让匹配到的 `app` 变成 `app_name`，`job` 变成 `job_name`
+- `action: labelmap` 说明这是一个**标签名重命名**
+
+**🔹 示例 2：删除所有 `env_` 开头的标签**
+
+```yaml
+relabel_configs:
+  - regex: "env_.*"
+    action: labelmap
+```
+
+**作用**
+
+| 原始标签            | 变更后   |
+| ------------------- | -------- |
+| `env_prod="true"`   | ❌ 被删除 |
+| `env_stage="false"` | ❌ 被删除 |
+
+**📝 解析**：
+
+- 这个 `regex: "env_.*"` 匹配所有 `env_` 开头的标签
+- `action: labelmap` 作用是**删除匹配的标签**
+
+**🔹 示例 3：将 `app_` 开头的标签转换为 `service_`**
+
+```yaml
+relabel_configs:
+  - regex: "app_(.*)"
+    replacement: "service_${1}"
+    action: labelmap
+```
+
+**作用**
+
+| 原始标签             | 变更后                   |
+| -------------------- | ------------------------ |
+| `app_backend="true"` | `service_backend="true"` |
+| `app_db="postgres"`  | `service_db="postgres"`  |
+
+**解析**：
+
+- `regex: "app_(.*)"` 匹配 `app_` 开头的标签
+- `replacement: "service_${1}"` 让 `app_backend` 变成 `service_backend`
+- `action: labelmap` 让标签名进行转换
+
+**结论**
+
+- **`labelmap` 主要用于标签名的批量修改**
+- **可以用 `regex` 匹配标签名，并用 `replacement` 进行替换**
+- **如果 `replacement` 为空，则删除匹配的标签**
+
+
+
+## 记录和告警规则
+
+![image-20250309220538263](../markdown_img/image-20250309220538263.png)
+
+### 记录规则
+
+#### 规则简介
+
+**Prometheus 支持两种类型的规则：**
+
+- **记录规则**
+- **警报规则**
+
+它们可以进行配置，然后定期进行评估。 要将规则包含在Prometheus中，需要先创建一个包含必要规 则语句的文件，并让Prometheus通过Prometheus配置中的rule_fies字段加载该文件。 默认情况下， prometheus的规则文件使用YAML格式
+
+**规则的使用流程**
+
+- 首先创建一个满足规则标准的规则语句，然后发送SIGHUP给Prometheus进程
+- prometheus在运行时重新加载规则文件，从而让规则在prometheus运行环境中生效
+
+
+
+**规则语法检查**
+
+```bash
+promtool check rules prometheus_rues_fie.yml
+
+# 说明：
+# 当该文件在语法上有效时，检查器将已解析规则的文本表示形式打印到标准输出，然后以0返回状态退出。
+# 如果有任何语法错误或无效的输入参数，它将打印一条错误消息为标准错误，并以1返回状态退出。
+```
+
+可以在prometheus.yaml配置文件中通过rule_fies属性进行导入即可，格式如下
+
+```yaml
+rule_files:
+  - "first_rules.yaml"
+  - "second_rules.yaml"
+  - "../rules/*.yaml"
+
+# #注意: 如果用相对路径是指相对于prometheus.yml配置文件的路径
+```
+
+
+
+### 记录规则说明
+
+```http
+https://prometheus.io/docs/prometheus/latest/configuration/recording_rules/
+```
+
+在Prometheus的表达式浏览器进行的查询会生成的新的数据序列，但其结果仅会临时保存于 Prometheus Server 上
+
+在样本数据量较大、工作较为繁忙的Prometheus Server上，对于那些查询频率较高且运算较为复杂的查询来说，实时查询可能会存在一定程度的响应延迟
+
+记录规则的作用其实将之前的监控命令采用配置文件的方式进行编写，从而大大减轻工作量
+
+记录规则(Recording rule）能够预先运行频繁用到或计算消耗较大的表达式，并将其结果保存为一组新的时间序列
+
+记录规则是定义在Prometheus配置文件中的查询语句，由Server加载后以类似批处理任务的方式在后 台周期性(evaluation_interval)的执行并记录查询结果
+
+客户端只需要查询由记录规则生成的结果序列上的样本数据即可，速度远快于实时查询;常用于跨多个时间序列生成聚合数据，或者计算消耗较大的查询等场景中
+
+多见于同可视化工具结合使用的需求中，也可**用于生成可产生告警信息的时间序列**
+
+**记录规则常用的场景**
+
+- 将预先计算经常需要或计算量大的复杂的PromQL语句指定为一个独立的metric监控项，这样在查询的时候就非常方便，而且查询预计算结果通常比每次需要原始表达式都要快得多，尤其是**对于仪表板特别有用**，仪表板每次刷新时都需要重复查询相同的表达式。
+
+- 此外在告警规则中也可以引用记录规则
+- 记录规则效果与shell中的别名相似
+
+```yaml
+#规则文件的语法为：
+groups:
+  - name: <规则组名称>
+    interval: <执行间隔时间>
+    rules:
+      - record: <新指标名称>
+        expr: <PromQL 表达式>
+        labels:
+          <自定义标签>
+
+#简单的规则文件示例
+groups:
+  - name: cpu_usage
+    interval: 1m
+    #limit: <init> | default=0
+    rules:
+      - record: instance:cpu:usage:rate5m
+        expr: rate(node_cpu_seconds_total{mode!="idle"}[5m])
+        labels:
+          job: "node_exporter"
+```
+
+**属性解析**
+
+```bash
+name       # 规则组名，必须是唯一的
+interval   # 定制规则执行的间隔时间,默认值为prometheus.yml配置文件中global.evaluation_interval
+limit      # 限制条件，对于记录规则用于限制其最多可生成序列数量，对于告警规则用于限制最多可生成的告警数量
+rules      # 设定规则具体信息
+record     # 定制指标的名称
+expr       # 执行成功的PromQL
+labels     # 为该规则设定标签
+```
+
+
+
+### 记录规则案例
+
+#### 案例说明
+
+```bash
+#在Prometheus查询部分指标时需要通过将现有的规则组合成一个复杂的表达式，才能查询到对应的指标结果，比如在查询"自定义的指标请求处理时间"，参考如下
+rate(node_cpu_seconds_total{mode!="idle"}[5m]) #计算5分钟内 CPU 非空闲时间的平均使用率
+
+#以上的查询语句写起来非常长，在我们graph绘图的时候，每次输入命令都是非常繁琐,很容易出现问题
+```
+
+
+
+#### 记录规则实现
+
+```bash
+```
+
+
+
+
+
+
+
+## Prometheus Federation 联邦
+
+### Prometheus Federation 说明
+
+```http
+https://prometheus.io/docs/prometheus/latest/federation/
+```
+
+在生产环境中，一个Prometheus服务节点所能接管的主机数量有限。只使用一个prometheus节点，随 着监控数据的持续增长，将会导致压力越来越大
+
+可以采用prometheus的集群联邦模式，即在原有 Prometheus的Master 节点基础上,再部署多个 prometheus的Slave 从节点，分别负责不同的监控数据采集，而Master节点只负责汇总数据与  Grafana 数据展示
+
+联邦模式允许 Prometheus 服务器从另一个 Prometheus 服务器抓取特定数据。
+
+联邦有不同的用例。 通常，它用于实现可扩展的Prometheus监控设置或将相关指标从一个服务的 Prometheus拉到另一个服务。
+
+联邦模式有**分层联邦**和**跨服务联邦**两种模式，分层联邦较为常用，且配置简单
+
+
+
+
+
 
 
 # Skywalking
@@ -44858,3 +49600,826 @@ output {
 - **制品存入 Nexus，Docker 镜像存入 Harbor**
 - **Kubernetes 自动部署**
 - **ELK + Prometheus 监控日志 & 运行状态**
+
+
+
+## 搭建 Prometheus 监控环境，使用 SNMP Exporter 监控交换机
+
+使用 **Prometheus + SNMP Exporter** 来监控 **交换机（Switch）**，这是一个典型的 **网络设备监控方案**
+
+**目标**
+
+- **搭建 Prometheus 监控环境**
+- **使用 SNMP Exporter 获取交换机数据**
+- **配置 Prometheus 采集 SNMP 数据**
+- **在 Grafana 可视化交换机指标**
+
+
+
+### SNMP 监控交换机的原理
+
+**SNMP（Simple Network Management Protocol，简单网络管理协议）** 是网络设备（如 **交换机、路由器、防火墙**）的标准监控协议。
+
+**SNMP Exporter** 负责：
+
+- **从交换机 SNMP 端口抓取数据**
+- **转换成 Prometheus 可识别的格式**
+- **Prometheus 定期抓取并存储数据**
+
+**监控示意图**
+
+```lua
++------------------------+        +----------------+        +-----------------+
+|  交换机（SNMP 设备）   | ----> | SNMP Exporter  | ----> |  Prometheus  |
++------------------------+        +----------------+        +-----------------+
+                                                         |
+                                                         V
+                                                     +-----------+
+                                                     |  Grafana  |
+                                                     +-----------+
+```
+
+
+
+### Prometheus 使用 SNMP_exporter 抓取交换机指标的详细流程
+
+**Prometheus 按照 `prometheus.yml` 里的 `targets` 发送 HTTP 请求到 `snmp_exporter`**
+
+- `prometheus.yml` 里配置
+
+  ```yaml
+  scrape_configs:
+    - job_name: 'snmp_huawei_switch'
+      static_configs:
+        - targets:
+          - "192.168.1.1"  # 交换机 A
+          - "192.168.1.2"  # 交换机 B
+      metrics_path: /snmp
+      params:
+        module: [huawei_acc]  # 采集规则，snmp_exporter 会用它匹配 yml 文件
+      relabel_configs:
+        - source_labels: [__address__]
+          target_label: __param_target
+        - target_label: instance
+          source_labels: [__address__]
+        - target_label: __address__
+          replacement: "localhost:9116"  # Prometheus 直接请求本机的 snmp_exporte
+  ```
+
+- `Prometheus` 最终会请求
+
+  ```bash
+  http://localhost:9116/snmp?module=huawei_acc&target=192.168.1.1
+  http://localhost:9116/snmp?module=huawei_acc&target=192.168.1.2
+  ```
+
+- `localhost:9116` 是 `snmp_exporter`，它会解析 `target=192.168.1.1`，然后去访问 `192.168.1.1` 的 SNMP 端口
+
+**`snmp_exporter` 收到请求后，按照 `snmp_huawei_switch.yml` 里的 `modules` 规则去抓取 `OID` 数据**
+
+- **例如**
+
+  ```yaml
+  modules:
+    huawei_acc:
+      walk:
+      - 1.3.6.1.2.1.2.2.1.13
+      - 1.3.6.1.2.1.2.2.1.14
+      get:
+      - 1.3.6.1.4.1.2011.5.25.42.2.1.1.0
+  ```
+
+- `snmp_exporter` 知道 **目标 IP 是 `192.168.1.1`**，然后它会
+
+  - **向 `192.168.1.1:161` 发送 SNMP 请求**
+  -  **`walk` 和 `get` 指定的 `OID` 抓取 SNMP 指标**
+  - **返回给 `Prometheus`**
+
+**Prometheus 收到 `snmp_exporter` 采集的数据，并存入时序数据库**
+
+- 你可以在 Prometheus UI (`http://localhost:9090/targets`) 查看 `snmp_exporter` 是否正常返回数据。
+
+
+
+### 部署 SNMP Exporter
+
+SNMP Exporter 需要 **`snmp.yml`** 文件来定义监控项，默认不包含 **交换机** 配置，你需要生成。
+
+#### 编译生成 generator 二进制文件 和 snmp_exporter 二进制文件
+
+源码编译 generator 用来生成 **`snmp_*.yml`** 文件
+
+```bash
+# clone 源码
+[root@ubuntu2204 ~]# git clone https://github.com/prometheus/snmp_exporter.git
+
+[root@ubuntu2204 ~]#cd snmp_exporter
+[root@ubuntu2204 snmp_exporter]#ls
+auth-split-migration.md  config_test.go   go.mod          Makefile         SECURITY.md
+CHANGELOG.md             CONTRIBUTING.md  go.sum          Makefile.common  snmp-mixin
+CODE_OF_CONDUCT.md       Dockerfile       LICENSE         NOTICE           snmp.yml
+collector                examples         main.go         README.md        testdata
+config                   generator        MAINTAINERS.md  scraper          VERSION
+
+# 查看版本
+[root@ubuntu2204 snmp_exporter]#cat VERSION 
+0.28.0
+
+# 注意: 因为这里的版本是0.28.0，因此后续生成的snmp.yml，需要“snmp_exporter-0.28.0”执行，否则会报错
+# 报错内容如下，即无法再config.plain里找到对应的模块
+level=info ts=2025-03-08T05:08:46.677Z caller=main.go:149 msg="Starting snmp_exporter" version="(version=bc02f59648b21fcf632de1b62a30df70f4649)"
+level=info ts=2025-03-08T05:08:46.677Z caller=main.go:150 build_context="(go=go1.14.7, user=root@387afaad
+level=error ts=2025-03-08T05:08:46.679Z caller=main.go:156 msg="Error parsing config file" err="yaml: unmublic_v2 not found in type config.plain\n  line 10: field huawei_acc not found in type config.plain\n  lid in type config.plain\n  line 717: field huawei_common not found in type config.plain\n  line 889: fieldnfig.plain"
+
+# 查看建议编译版本
+[root@ubuntu2204 snmp_exporter]# cat go.mod | grep go
+go 1.22
+toolchain go1.23.1
+	github.com/gosnmp/gosnmp v1.38.0
+	github.com/itchyny/timefmt-go v0.1.6
+	github.com/prometheus/client_golang v1.21.0
+	gopkg.in/yaml.v2 v2.4.0
+	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/mwitkow/go-conntrack v0.0.0-20190716064945-2f068394615f // indirect
+	github.com/xhit/go-str2duration/v2 v2.1.0 // indirect
+	golang.org/x/crypto v0.32.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
+	golang.org/x/oauth2 v0.24.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.29.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
+	google.golang.org/protobuf v1.36.1 // indirect
+
+# 上述说明推荐 Go 1.22.1+ 或 Go 1.23.1
+
+# 部署GO语言编译环境
+[root@ubuntu2204 snmp_exporter]# wget -P /usr/local/src https://go.dev/dl/go1.23.1.linux-amd64.tar.gz
+[root@ubuntu2204 snmp_exporter]# tar xf /usr/local/src/go1.23.1.linux-amd64.tar.gz -C /usr/local
+
+# /etc/profile文件下添加三条语句
+[root@ubuntu2204 snmp_exporter]# vim /etc/profile
+export GOROOT=/usr/local/go
+export PATH=$PATH:$GOROOT/bin
+export GOPATH=$HOME/goprojects
+
+[root@ubuntu2204 snmp_exporter]# . /etc/profile
+
+# 检查go
+[root@ubuntu2204 snmp_exporter]# go version
+go version go1.23.1 linux/amd64
+
+# generator是交叉编译，因此除了go之外，还要下载gcc和libsnmp-dev
+[root@ubuntu2204 generator]# apt install -y gcc
+[root@ubuntu2204 generator]# apt install -y libsnmp-dev
+
+# go编译
+[root@ubuntu2204 snmp_exporter]# go build .
+
+# 查看编译结果
+[root@ubuntu2204 snmp_exporter]# ls
+auth-split-migration.md  CONTRIBUTING.md  LICENSE          README.md      testdata
+CHANGELOG.md             Dockerfile       main.go          scraper        VERSION
+CODE_OF_CONDUCT.md       examples         MAINTAINERS.md   SECURITY.md
+collector                generator        Makefile         snmp_exporter #（编译的二进制文件）
+config                   go.mod           Makefile.common  snmp-mixin
+config_test.go           go.sum           NOTICE           snmp.yml
+
+[root@ubuntu2204 snmp_exporter]# cd generator/
+[root@ubuntu2204 generator]# go build .
+[root@ubuntu2204 generator]#ls
+config.go   Dockerfile-local  generator #（编译的二进制文件）      
+huawei   Makefile  net_snmp.go  test.sh  tree_test.go
+Dockerfile  FORMAT.md         generator.yml  main.go  mibs      README.md    tree.go
+```
+
+
+
+#### 导入 MIB 使用  generator 生成 snmp_*.yml 配置文件
+
+```bash
+[root@ubuntu2204 ~]# cd snmp_exporter/generator
+[root@ubuntu2204 generator]# mkdir -pv huawei/mibs/switch
+[root@ubuntu2204 generator]# mkdir -pv huawei/switch
+
+# /root/snmp_exporter/generator/huawei/mibs/switch 目录中需要放置 MIB 后缀的 MIB 文件
+[root@ubuntu2204 switch]# ls
+ATM-TC-MIB.mib                         HUAWEI-QINQ-MIB.mib
+BGP4-MIB.mib                           HUAWEI-RIPV2-EXT-MIB.mib
+BRIDGE-MIB.mib                         HUAWEI-RM-EXT-MIB.mib
+DIFFSERV-DSCP-TC.mib                   HUAWEI-RRPP-MIB.mib
+DIFFSERV-MIB.mib                       HUAWEI-RSVPTE-MIB.mib
+DISMAN-NSLOOKUP-MIB.mib                HUAWEI-RUMNG-MIB.mib
+DISMAN-PING-MIB.mib                    HUAWEI-SECURITY-IPSEC-MIB.mib
+DISMAN-TRACEROUTE-MIB.mib              HUAWEI-SECURITY-MIB.mib
+ENTITY-MIB.mib                         HUAWEI-SECURITY-PKI-MIB.mib
+......
+
+# /root/snmp_exporter/generator/huawei/switch 目录中需要放置 generator_huawei_switch.yml 生成器配置文件 
+```
+
+#### **generator_huawei_switch.yml 配置文件**
+
+```bash
+[root@ubuntu2204 generator]# vim huawei/switch/generator_huawei_switch.yml
+auths:
+  public_v2:  # 认证模块名称
+    version: 2  # snmp v2c版本
+    community: public  # snmp 团体名
+
+modules:
+  huawei_common:  # 华为公共指标模块名称
+    walk:
+      # 交换机基础信息 温度信息 风扇信息 电源信息
+      - 1.3.6.1.2.1.1.1                       # sysDescr 系统的文字描述
+      - 1.3.6.1.2.1.1.5                       # sysName 交换机名称
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.6.1.1    # hwEntPowerUsedInfoBoardName 板卡实体名称
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.10   # hwEntityUpTime 板卡实体启动时间 单位秒
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.11   # hwEntityTemperature 实体温度 单位°C
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.12   # hwEntityTemperatureThreshold 实体温度高门限 单位°C
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.10.1.7   # hwEntityFanState 风扇状态
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.10.1.6   # hwEntityFanPresent 风扇的在位状态
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.10.1.5   # hwEntityFanSpeed 风扇的转速
+      #- 1.3.6.1.4.1.2011.5.25.31.1.1.18.1.1  # hwEntityPwrSlot 电源的槽位号
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.18.1.6   # hwEntityPwrState 电源的状态
+      - 1.3.6.1.4.1.2011.6.157.1.6            # hwCurrentPower 当前功率mW
+      - 1.3.6.1.4.1.2011.6.157.1.3            # hwAveragePower 平均功率mW
+      # 交换机CPU和内存信息
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.5    # hwEntityCpuUsage 实体CPU使用率
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.1.1.7    # hwEntityMemUsage 实体内存使用率
+      - 1.3.6.1.4.1.2011.6.9.1.4.2.1.3        # hwStorageSpace Flash设备空间的大小 单位是千字节
+      - 1.3.6.1.4.1.2011.6.9.1.4.2.1.4        # hwStorageSpaceFree Flash设备剩余空间 单位是千字节
+      - 1.3.6.1.4.1.2011.6.9.1.4.2.1.5        # hwStorageName Flash设备名称
+      #- 1.3.6.1.4.1.2011.6.3.4.1.2            # hwCpuDevDuty 5秒钟内的CPU的平均使用率
+      #- 1.3.6.1.4.1.2011.6.3.4.1.3            # hwCpuDuty1min 1分钟内的CPU的平均使用率
+      #- 1.3.6.1.4.1.2011.6.3.4.1.4            # hwCpuDuty5min 5分钟内的CPU的平均使用率
+      #- 1.3.6.1.4.1.2011.6.3.5.1.1.2          # hwMemoryDevSize 每块板上内存总量
+      #- 1.3.6.1.4.1.2011.6.3.5.1.1.3          # hwMemoryDevFree 每块板上空闲的内存总量
+      #- 1.3.6.1.4.1.2011.6.3.5.1.1.4          # hwMemoryDevRawSliceUsed 每块板上已占用的raw slice内存总量
+
+    max_repetitions: 50
+    retries: 3
+    timeout: 5s
+
+    lookups:
+      - source_indexes: [hwEntityFanSlot, hwEntityFanSn]
+        lookup: hwEntityFanPresent
+      - source_indexes: [hwEntityFanSlot, hwEntityFanSn]
+        lookup: hwEntityFanState
+      - source_indexes: [entPhysicalIndex]
+        lookup: 1.3.6.1.4.1.2011.5.25.31.1.1.6.1.1
+        #drop_source_indexes: true
+      - source_indexes: [hwStorageIndex]
+        lookup: hwStorageName
+
+    overrides:
+      hwEntityFanPresent:
+        ignore: true
+      hwEntityFanState:
+        ignore: true
+      hwEntPowerUsedInfoBoardName:
+        ignore: true
+        type: DisplayString
+      hwStorageName:
+        ignore: true
+        type: DisplayString
+  
+  huawei_core:  # 华为核心交换机模块指标 基于CloudEngine S12700E-4
+    walk:
+      # 接口信息
+      #- 1.3.6.1.2.1.2.2.1.1                  # ifIndex 接口索引 该值大于零且全局唯一
+      #- 1.3.6.1.2.1.2.2.1.2                  # ifDescr 描述接口的字符串
+      - 1.3.6.1.2.1.31.1.1.1.1                # ifName 由本地设备分配的接口名 同上指标 取其中之一
+      - 1.3.6.1.2.1.2.2.1.7                   # ifAdminStatus 理想的接口状态
+      - 1.3.6.1.2.1.2.2.1.8                   # ifOperStatus 接口当前的状态
+      - 1.3.6.1.2.1.31.1.1.1.18               # ifAlias 该节点是由网络管理员指定的接口别名 description命令
+      - 1.3.6.1.2.1.31.1.1.1.15               # ifHighSpeed 接口当前带宽 单位 Mbit/s
+      - 1.3.6.1.2.1.31.1.1.1.6                # ifHCInOctets 接口上接收到的字节总数 byte/s
+      - 1.3.6.1.2.1.31.1.1.1.10               # ifHCOutOctets 接口发送的字节总数 byte/s
+      - 1.3.6.1.2.1.2.2.1.13                  # ifInDiscards 入方向的被丢弃的报文个数
+      - 1.3.6.1.2.1.2.2.1.19                  # ifOutDiscards 出方向的被丢弃的报文个数
+      - 1.3.6.1.2.1.2.2.1.14                  # ifInErrors 入方向出错报文个数
+      - 1.3.6.1.2.1.2.2.1.20                  # ifOutErrors 出方向出错报文个数
+      #- 1.3.6.1.4.1.2011.5.25.41.1.7.1.1.2    # hwIfMonitorCrcErrorStatistics CRC错包统计值
+      #- 1.3.6.1.4.1.2011.5.25.41.1.7.1.1.8    # hwIfMonitorInputRate 接口入方向带宽占用率
+      #- 1.3.6.1.4.1.2011.5.25.41.1.7.1.1.10   # hwIfMonitorOutputRate 接口出方向带宽占用率
+
+      # 光模块信息
+      #- 1.3.6.1.2.1.47.1.1.1.1.1             # entPhysicalIndex 物理实体索引
+      - 1.3.6.1.2.1.47.1.1.1.1.7              # entPhysicalName 物理实体名 光模块接口名称
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.8    # hwEntityOpticalRxPower 光模块接收功率 单位 uW
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.9    # hwEntityOpticalTxPower 光模块发送功率 单位 uW
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.20   # hwEntityOpticalRxLowWarnThreshold 光模块接收功率过低的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.21   # hwEntityOpticalRxHighWarnThreshold 光模块接收功率过高的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.22   # hwEntityOpticalTxLowWarnThreshold 光模块发送功率过低的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.23   # hwEntityOpticalTxHighWarnThreshold 光模块发送功率过高的预警门限值 单位 dBm
+      # CSS集群状态 
+      - 1.3.6.1.4.1.2011.5.25.183.3.1.1       # hwCssEnable 使能设备集群功能
+      - 1.3.6.1.4.1.2011.5.25.183.3.2.1.8     # hwCssMemberRole 集群角色
+      - 1.3.6.1.4.1.2011.5.25.183.3.2.1.7     # hwCssMemberConfigEnable 集群使能状态
+      - 1.3.6.1.4.1.2011.5.25.42.2.1.14       # hwMacGlobalStatistics 获取设备上的MAC地址数
+      - 1.3.6.1.4.1.2011.5.25.42.2.1.1        # hwL2MaxMacLimit MAC地址限定的最大规则数
+    
+    max_repetitions: 50
+    retries: 3
+    timeout: 5s
+    
+    lookups:
+      - source_indexes: [ifIndex]
+        lookup: ifAlias
+        # 如果新的索引唯一 可以删除原来的索引 true
+        #drop_source_indexes: false
+      - source_indexes: [ifIndex]
+        lookup: ifName
+      - source_indexes: [ifIndex]
+        lookup: ifOperStatus
+      - source_indexes: [ifIndex]
+        lookup: ifHighSpeed
+      - source_indexes: [entPhysicalIndex]
+        lookup: entPhysicalName
+    
+    overrides:
+      ifAlias:
+        ignore: true # 查找的指标在snmp_exporter输出控制台直接不显示该指标
+        #regex_extracts:  # 根据正则表达式和指标值创建新指标
+        #   Temp: 
+        #     - regex: '(.*)' # 正则表达式从返回的 SNMP walks 值中提取一个值
+        #       value: '$1' # 结果将被解析为 float64，默认为 $1
+        #   Status:
+        #     - regex: '.*Example'
+        #       value: '1' # 正则表达式匹配且值解析的第一个条目获胜
+        #     - regex: '.*'
+        #       value: '0'
+        #type: DisplayString
+      ifName:
+        ignore: true
+      ifOperStatus:
+        ignore: true
+      ifHighSpeed:
+        ignore: true
+      entPhysicalName:
+        ignore: true
+    
+    filters:
+      # static:
+      #   - targets:
+      #     - ifIndex
+      #     indices: ["2","3","4"]
+      dynamic:  # 根据接口当前状态收集接口指标
+        - oid: 1.3.6.1.2.1.2.2.1.7
+          targets:
+            - "1.3.6.1.2.1.31.1.1.1.6"
+            - "1.3.6.1.2.1.31.1.1.1.10"
+            - "1.3.6.1.2.1.2.2.1.13"
+            - "1.3.6.1.2.1.2.2.1.19"
+            - "1.3.6.1.2.1.2.2.1.14"
+            - "1.3.6.1.2.1.2.2.1.20"
+          values: ["1"]
+  
+  huawei_agg:  # 华为汇聚和接入交换机模块指标
+    walk:
+      # 接口信息
+      #- 1.3.6.1.2.1.2.2.1.1                  # ifIndex 接口索引 该值大于零且全局唯一
+      #- 1.3.6.1.2.1.2.2.1.2                  # ifDescr 描述接口的字符串
+      - 1.3.6.1.2.1.31.1.1.1.1                # ifName 由本地设备分配的接口名 同上指标 取其中之一
+      - 1.3.6.1.2.1.2.2.1.7                   # ifAdminStatus 理想的接口状态
+      - 1.3.6.1.2.1.2.2.1.8                   # ifOperStatus 接口当前的状态
+      - 1.3.6.1.2.1.31.1.1.1.18               # ifAlias 该节点是由网络管理员指定的接口别名 description命令
+      - 1.3.6.1.2.1.31.1.1.1.15               # ifHighSpeed 接口当前带宽 单位 Mbit/s
+      - 1.3.6.1.2.1.31.1.1.1.6                # ifHCInOctets 接口上接收到的字节总数 byte/s
+      - 1.3.6.1.2.1.31.1.1.1.10               # ifHCOutOctets 接口发送的字节总数 byte/s
+      - 1.3.6.1.2.1.2.2.1.13                  # ifInDiscards 入方向的被丢弃的报文个数
+      - 1.3.6.1.2.1.2.2.1.19                  # ifOutDiscards 出方向的被丢弃的报文个数
+      - 1.3.6.1.2.1.2.2.1.14                  # ifInErrors 入方向出错报文个数
+      - 1.3.6.1.2.1.2.2.1.20                  # ifOutErrors 出方向出错报文个数
+      #- 1.3.6.1.4.1.2011.5.25.41.1.7.1.1.2    # hwIfMonitorCrcErrorStatistics CRC错包统计值
+      #- 1.3.6.1.4.1.2011.5.25.41.1.7.1.1.8    # hwIfMonitorInputRate 接口入方向带宽占用率
+      #- 1.3.6.1.4.1.2011.5.25.41.1.7.1.1.10   # hwIfMonitorOutputRate 接口出方向带宽占用率
+
+      # 光模块信息
+      #- 1.3.6.1.2.1.47.1.1.1.1.1             # entPhysicalIndex 物理实体索引
+      - 1.3.6.1.2.1.47.1.1.1.1.7              # entPhysicalName 物理实体名 光模块接口名称
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.8    # hwEntityOpticalRxPower 光模块接收功率 单位 uW
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.9    # hwEntityOpticalTxPower 光模块发送功率 单位 uW
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.20   # hwEntityOpticalRxLowWarnThreshold 光模块接收功率过低的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.21   # hwEntityOpticalRxHighWarnThreshold 光模块接收功率过高的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.22   # hwEntityOpticalTxLowWarnThreshold 光模块发送功率过低的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.23   # hwEntityOpticalTxHighWarnThreshold 光模块发送功率过高的预警门限值 单位 dBm
+      # 堆叠状态 
+      - 1.3.6.1.4.1.2011.5.25.183.1.1         # hwStackRun 堆叠是否使能
+      - 1.3.6.1.4.1.2011.5.25.183.1.2         # hwStackTopoType 环形拓扑还是链式拓扑
+      - 1.3.6.1.4.1.2011.5.25.183.1.4         # hwStackSystemMac 堆叠系统MAC
+      - 1.3.6.1.4.1.2011.5.25.183.1.5         # hwStackIsStackDevice 设备是否在堆叠环境
+      - 1.3.6.1.4.1.2011.5.25.42.2.1.14       # hwMacGlobalStatistics 获取设备上的MAC地址数
+      - 1.3.6.1.4.1.2011.5.25.42.2.1.1        # hwL2MaxMacLimit MAC地址限定的最大规则数
+    
+    max_repetitions: 50
+    retries: 3
+    timeout: 5s
+    
+    lookups:
+      - source_indexes: [ifIndex]
+        lookup: ifAlias
+        # 如果新的索引唯一 可以删除原来的索引 true
+        #drop_source_indexes: false
+      - source_indexes: [ifIndex]
+        lookup: ifName
+      - source_indexes: [ifIndex]
+        lookup: ifOperStatus
+      - source_indexes: [ifIndex]
+        lookup: ifHighSpeed
+      - source_indexes: [entPhysicalIndex]
+        lookup: entPhysicalName
+    
+    overrides:
+      ifAlias:
+        ignore: true # 查找的指标在snmp_exporter输出控制台直接不显示该指标
+        #regex_extracts:  # 根据正则表达式和指标值创建新指标
+        #   Temp: 
+        #     - regex: '(.*)' # 正则表达式从返回的 SNMP walks 值中提取一个值
+        #       value: '$1' # 结果将被解析为 float64，默认为 $1
+        #   Status:
+        #     - regex: '.*Example'
+        #       value: '1' # 正则表达式匹配且值解析的第一个条目获胜
+        #     - regex: '.*'
+        #       value: '0'
+        #type: DisplayString
+      ifName:
+        ignore: true
+      ifOperStatus:
+        ignore: true
+      ifHighSpeed:
+        ignore: true
+      entPhysicalName:
+        ignore: true
+    
+    filters:
+      # static:
+      #   - targets:
+      #     - ifIndex
+      #     indices: ["2","3","4"]
+      dynamic:  # 根据接口当前状态收集接口指标
+        - oid: 1.3.6.1.2.1.2.2.1.7
+          targets:
+            - "1.3.6.1.2.1.31.1.1.1.6"
+            - "1.3.6.1.2.1.31.1.1.1.10"
+            - "1.3.6.1.2.1.2.2.1.13"
+            - "1.3.6.1.2.1.2.2.1.19"
+            - "1.3.6.1.2.1.2.2.1.14"
+            - "1.3.6.1.2.1.2.2.1.20"
+          values: ["1"]
+
+  huawei_acc:  # 华为接入交换机模块指标 未堆叠
+    walk:
+      # 接口信息
+      #- 1.3.6.1.2.1.2.2.1.1                  # ifIndex 接口索引 该值大于零且全局唯一
+      #- 1.3.6.1.2.1.2.2.1.2                  # ifDescr 描述接口的字符串
+      - 1.3.6.1.2.1.31.1.1.1.1                # ifName 由本地设备分配的接口名 同上指标 取其中之一
+      - 1.3.6.1.2.1.2.2.1.7                   # ifAdminStatus 理想的接口状态
+      - 1.3.6.1.2.1.2.2.1.8                   # ifOperStatus 接口当前的状态
+      - 1.3.6.1.2.1.31.1.1.1.18               # ifAlias 该节点是由网络管理员指定的接口别名 description命令
+      - 1.3.6.1.2.1.31.1.1.1.15               # ifHighSpeed 接口当前带宽 单位 Mbit/s
+      - 1.3.6.1.2.1.31.1.1.1.6                # ifHCInOctets 接口上接收到的字节总数 byte/s
+      - 1.3.6.1.2.1.31.1.1.1.10               # ifHCOutOctets 接口发送的字节总数 byte/s
+      - 1.3.6.1.2.1.2.2.1.13                  # ifInDiscards 入方向的被丢弃的报文个数
+      - 1.3.6.1.2.1.2.2.1.19                  # ifOutDiscards 出方向的被丢弃的报文个数
+      - 1.3.6.1.2.1.2.2.1.14                  # ifInErrors 入方向出错报文个数
+      - 1.3.6.1.2.1.2.2.1.20                  # ifOutErrors 出方向出错报文个数
+      #- 1.3.6.1.4.1.2011.5.25.41.1.7.1.1.2    # hwIfMonitorCrcErrorStatistics CRC错包统计值
+      #- 1.3.6.1.4.1.2011.5.25.41.1.7.1.1.8    # hwIfMonitorInputRate 接口入方向带宽占用率
+      #- 1.3.6.1.4.1.2011.5.25.41.1.7.1.1.10   # hwIfMonitorOutputRate 接口出方向带宽占用率
+
+      # 光模块信息
+      #- 1.3.6.1.2.1.47.1.1.1.1.1             # entPhysicalIndex 物理实体索引
+      - 1.3.6.1.2.1.47.1.1.1.1.7              # entPhysicalName 物理实体名 光模块接口名称
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.8    # hwEntityOpticalRxPower 光模块接收功率 单位 uW
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.9    # hwEntityOpticalTxPower 光模块发送功率 单位 uW
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.20   # hwEntityOpticalRxLowWarnThreshold 光模块接收功率过低的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.21   # hwEntityOpticalRxHighWarnThreshold 光模块接收功率过高的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.22   # hwEntityOpticalTxLowWarnThreshold 光模块发送功率过低的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.31.1.1.3.1.23   # hwEntityOpticalTxHighWarnThreshold 光模块发送功率过高的预警门限值 单位 dBm
+      - 1.3.6.1.4.1.2011.5.25.42.2.1.14       # hwMacGlobalStatistics 获取设备上的MAC地址数
+      - 1.3.6.1.4.1.2011.5.25.42.2.1.1        # hwL2MaxMacLimit MAC地址限定的最大规则数
+    
+    max_repetitions: 50
+    retries: 3
+    timeout: 5s
+    
+    lookups:
+      - source_indexes: [ifIndex]
+        lookup: ifAlias
+        # 如果新的索引唯一 可以删除原来的索引 true
+        #drop_source_indexes: false
+      - source_indexes: [ifIndex]
+        lookup: ifName
+      - source_indexes: [ifIndex]
+        lookup: ifOperStatus
+      - source_indexes: [ifIndex]
+        lookup: ifHighSpeed
+      - source_indexes: [entPhysicalIndex]
+        lookup: entPhysicalName
+    
+    overrides:
+      ifAlias:
+        ignore: true # 查找的指标在snmp_exporter输出控制台直接不显示该指标
+        #regex_extracts:  # 根据正则表达式和指标值创建新指标
+        #   Temp: 
+        #     - regex: '(.*)' # 正则表达式从返回的 SNMP walks 值中提取一个值
+        #       value: '$1' # 结果将被解析为 float64，默认为 $1
+        #   Status:
+        #     - regex: '.*Example'
+        #       value: '1' # 正则表达式匹配且值解析的第一个条目获胜
+        #     - regex: '.*'
+        #       value: '0'
+        #type: DisplayString
+      ifName:
+        ignore: true
+      ifOperStatus:
+        ignore: true
+      ifHighSpeed:
+        ignore: true
+      entPhysicalName:
+        ignore: true
+    
+    filters:
+      # static:
+      #   - targets:
+      #     - ifIndex
+      #     indices: ["2","3","4"]
+      dynamic:  # 根据接口当前状态收集接口指标
+        - oid: 1.3.6.1.2.1.2.2.1.7
+          targets:
+            - "1.3.6.1.2.1.31.1.1.1.6"
+            - "1.3.6.1.2.1.31.1.1.1.10"
+            - "1.3.6.1.2.1.2.2.1.13"
+            - "1.3.6.1.2.1.2.2.1.19"
+            - "1.3.6.1.2.1.2.2.1.14"
+            - "1.3.6.1.2.1.2.2.1.20"
+          values: ["1"]
+```
+
+#### **执行命令采集配置**
+
+```bash
+[root@ubuntu2204 generator]#/root/snmp_exporter/generator/generator --fail-on-parse-errors generate -m /root/snmp_exporter/generator/huawei/mibs/switch -g /root/snmp_exporter/generator/huawei/switch/generator_huawei_switch.yml -o /root/snmp_exporter/generator/huawei/switch/snmp_huawei_switch.yml
+
+# 查看
+[root@ubuntu2204 generator]#ls /root/snmp_exporter/generator/huawei/switch/snmp_huawei_switch.yml 
+/root/snmp_exporter/generator/huawei/switch/snmp_huawei_switch.yml
+```
+
+#### 配置 Service 文件
+
+```bash
+[root@ubuntu2204 generator]#cat /lib/systemd/system/snmp_exporter.service
+[Unit]
+Description=snmp_exporter
+After=network.target
+
+[Service]
+ExecStart=/root/snmp_exporter/snmp_exporter --config.file=/root/snmp_exporter/generator/huawei/switch/snmp_huawei_switch.yml
+Restart=on-failure
+user=root
+
+[Install]
+WantedBy=multi-user.target
+
+# 启动服务
+[root@ubuntu2204 generator]#systemctl daemon-reload 
+[root@ubuntu2204 generator]#systemctl start snmp_exporter.service 
+
+# 查看端口
+[root@ubuntu2204 generator]#ss -nlt
+State     Recv-Q    Send-Q       Local Address:Port        Peer Address:Port    Process                   
+LISTEN    0         4096                     *:9116                   *:*  
+
+# 浏览器访问查看
+```
+
+![image-20250308175533760](../markdown_img/image-20250308175533760.png)
+
+![image-20250308175739262](../markdown_img/image-20250308175739262.png)
+
+
+
+
+
+### 配置 Prometheus 采集 SNMP 数据
+
+编辑 Prometheus 配置文件 **`prometheus.yml`**：
+
+```yaml
+[root@ubuntu2204 generator]#cat /usr/local/prometheus/conf/prometheus.yml 
+......
+  - job_name: 'snmp_huawei_switch'
+    static_configs:
+      - targets:
+        - "10.0.0.206"  # 交换机 A
+    metrics_path: /snmp
+    params:
+      module: [huawei_acc]  # 采集规则，snmp_exporter 会用它匹配 yml 文件
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: instance
+        source_labels: [__address__]
+      - target_label: __address__
+        replacement: "localhost:9116"  # Prometheus 直接请求本机的 snmp_exporte
+        
+# 重启服务
+[root@ubuntu2204 snmp_exporter]#systemctl restart prometheus.service 
+
+# 浏览器查看
+```
+
+![image-20250308181238527](../markdown_img/image-20250308181238527.png)
+
+### 在 Grafana 可视化
+
+**添加 Prometheus 数据源**
+
+- **打开 Grafana**
+- **进入 “Settings” → “Data Sources”**
+- **添加 Prometheus**
+  - URL: `http://localhost:9090`
+  - Click **"Save & Test"**
+
+**创建 SNMP 监控面板**
+
+- **进入 "Dashboard" → "Create" → "New Panel"**
+
+- **在 PromQL 输入**：
+
+  ```bash
+  snmp_scrape_walk_duration_seconds{instance="10.0.0.206", job="snmp_huawei_switch", module="huawei_acc"}
+  ```
+
+- **修改单位**
+
+  - 在 **Panel → Visualization** 选择 **"Time Series"**
+  - 在 **Axes → Unit** 选择 **"bits/sec"**
+
+- **点击 "Apply" 保存面板**
+
+**建议直接使用模版，在模版上修改**
+
+![image-20250308182313444](../markdown_img/image-20250308182313444.png)
+
+
+
+
+
+### 在 VMware 虚拟机中模拟 SNMP 交换机
+
+**目标：**
+
+- 在 **VMware** 内创建一个 **Linux 虚拟机**
+- **安装 SNMP 服务器（snmpd）**
+- **配置 SNMP 允许 Prometheus 访问**
+- **使用 Prometheus + SNMP Exporter 进行监控**
+
+
+
+### 配置 SNMP 服务器（在 Linux 虚拟机上）
+
+**在 VMware 内安装 Linux（推荐 Ubuntu 或 CentOS）**
+
+**创建一台虚拟机**
+
+- 操作系统选择 **Ubuntu 22.04 或 CentOS 7**
+- **网络模式选择 "桥接模式"**（Bridge），这样 Prometheus 可以访问 SNMP 设备
+- **分配固定 IP**（方便 Prometheus 监控）
+
+**安装 SNMP 服务器**
+
+```bash
+# Ubuntu
+sudo apt update && sudo apt install -y snmp snmpd
+
+# （CentOS/RHEL）
+sudo yum install -y net-snmp net-snmp-utils
+```
+
+
+
+### 配置 `snmpd` 作为 SNMP 交换机
+
+**修改 `snmpd` 配置**
+
+```bash
+vim /etc/snmp/snmpd.conf
+```
+
+**替换以下内容**
+
+```yaml
+agentAddress udp:161  # 监听 SNMP 161 端口
+rocommunity public     # 允许使用 "public" 读取 SNMP 数据
+syslocation "VMware Simulated Switch"
+syscontact "admin@example.com"
+```
+
+**添加接口流量监控**
+
+```yaml
+view all included .1 80
+```
+
+**重启 SNMP 服务**
+
+```bash
+sudo systemctl restart snmpd
+sudo systemctl enable snmpd
+```
+
+**验证 SNMP 是否正常工作** 在虚拟机 **本地测试 SNMP 响应**
+
+```bash
+snmpwalk -v2c -c public localhost
+```
+
+**如果返回了 SNMP 数据，说明 SNMP 交换机模拟成功！**
+
+
+
+
+
+## SNMP、OID 和 MIB
+
+SNMP（Simple Network Management Protocol，简单网络管理协议）是一种用于管理和监控网络设备（如交换机、路由器、服务器等）的协议。它依赖 **OID（对象标识符）** 和 **MIB（管理信息库）** 进行数据查询和组织。
+
+
+
+### OID（对象标识符，Object Identifier）
+
+**OID 是 SNMP 设备中每个可管理对象（指标）的唯一编号**，它是一组以 **`.`（点号）分隔的数字**，比如：
+
+```ABAP
+1.3.6.1.2.1.1.3.0
+```
+
+它类似于 **路径** 或 **地址**，可以唯一地标识某个 SNMP 设备上的一个变量（比如 CPU 使用率、端口状态、流量统计等）。
+
+**例子**
+
+| **OID**                  | **描述**                               |
+| ------------------------ | -------------------------------------- |
+| `1.3.6.1.2.1.1.3.0`      | 设备的系统启动时间（`sysUpTime`）      |
+| `1.3.6.1.2.1.2.2.1.10.1` | 端口 1 的接收字节数（`ifInOctets.1`）  |
+| `1.3.6.1.2.1.2.2.1.16.2` | 端口 2 的发送字节数（`ifOutOctets.2`） |
+
+**OID 作用**：
+
+- **SNMP 只能通过 OID 访问数据**，你无法直接用 `"CPU 使用率"` 这样的字符串去查询设备，只能用 `1.3.6.1.4.1.xxxxxx` 这种 OID。
+- **OID 组织方式是树状结构**，所有 SNMP 设备遵循相同的层次结构，每个设备厂商在 `1.3.6.1.4.1` 下面注册自己的 OID。
+
+
+
+### MIB（管理信息库，Management Information Base）
+
+MIB **是一种描述 OID 结构的文本文件**，用来解释 OID 代表的内容。例如
+
+```ABAP
+sysUpTime OBJECT-TYPE
+    SYNTAX  TimeTicks
+    ACCESS  read-only
+    STATUS  current
+    DESCRIPTION "The time since the network management portion of the system was last re-initialized."
+    ::= { 1.3.6.1.2.1.1.3 }
+```
+
+📌 这个 MIB 定义了 `sysUpTime`：
+
+- `1.3.6.1.2.1.1.3` 对应 **设备运行时间**
+- **MIB 让 OID 更易读**（否则我们只能记 `1.3.6.1.2.1.1.3`）
+
+
+
+### OID 和 MIB 的关系
+
+**MIB = OID 的“翻译字典”**
+
+- MIB 只是文本文件，不包含数据
+- 设备里的 **真实数据** 只能通过 **OID** 获取
+- **OID 是数值化的地址，MIB 只是给 OID 起了个易读的名字**
+- SNMP 通过 OID 查询设备数据，MIB 只是帮助我们理解这些数据
+
+👉 **例子**
+
+| **OID**                  | **MIB 变量**    | **作用**            |
+| ------------------------ | --------------- | ------------------- |
+| `1.3.6.1.2.1.1.3.0`      | `sysUpTime.0`   | 设备运行时间        |
+| `1.3.6.1.2.1.2.2.1.10.1` | `ifInOctets.1`  | 端口 1 的接收字节数 |
+| `1.3.6.1.2.1.2.2.1.16.2` | `ifOutOctets.2` | 端口 2 的发送字节数 |
+
+📌 **没有 MIB，我们仍然可以用 OID 访问数据**，但只能看到数字 OID，不知道它具体代表什么。
+
+
+
+### **总结**
+
+✅ **OID（对象标识符）**：每个 SNMP 指标的唯一编号，比如 `1.3.6.1.2.1.1.3`
+ ✅ **MIB（管理信息库）**：OID 的文本描述文件，帮助我们理解 OID 代表什么
+ ✅ **SNMP 必须通过 OID 抓取数据**，MIB 只是让 OID 更易读
+
+🚀 **`snmp_exporter` 依赖 `snmp_huawei_switch.yml` 里的 OID 规则去抓取交换机数据**，而 Prometheus 通过 `snmp_exporter` 获取交换机的监控指标！
