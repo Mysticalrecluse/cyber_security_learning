@@ -5270,7 +5270,7 @@ c03848a8d6b01a655268a1d7224e26a74049c606a1624c08ad8ee75024c6244d
 
 ##### 容器名称介绍
 
-即在同一个宿主机上的容器之间可以通过自定义的容器名称相互访问，比如:  一个业务前端静态页面是使用nginx，动态页面使用的是tomcat，另外还需要负载均衡调度器，如:  haproxy 对请求调度至nginx 和tomcat的容器，由于容器在启动的时候其内部IP地址是DHCP 随机分配的，而给容器起个固定的名 称，则是相对比较固定的，因此比较适用于此场景
+即在同一个宿主机上的容器之间可以通过自定义的容器名称相互访问，比如:  一个业务前端静态页面是使用nginx，动态页面使用的是tomcat，另外还需要负载均衡调度器，如:  haproxy 对请求调度至nginx 和tomcat的容器，由于容器在启动的时候其内部IP地址是DHCP 随机分配的，而给容器起个固定的名称，则是相对比较固定的，因此比较适用于此场景
 
 **注意: 如果被引用的容器地址变化,必须重启当前容器才能生效**
 
@@ -22687,9 +22687,5691 @@ rate(node_cpu_seconds_total{mode!="idle"}[5m]) #计算5分钟内 CPU 非空闲�
 #### 记录规则实现
 
 ```bash
+# 创建规则记录文件
+[root@ubuntu2204 ~]# cd /usr/local/prometheus
+[root@ubuntu2204 prometheus]# mkdir /usr/local/prometheus/rules
+[root@ubuntu2204 prometheus]# vim /usr/local/prometheus/rules/prometheus_record_rules.yml
+groups:
+- name: myrules
+  interval: 15s
+  rules:
+  - record: "cpu_usage"
+    expr: rate(node_cpu_seconds_total{mode!="idle"}[5m])
+    labels:
+      job_demo: "node_exporter"
+
+[root@ubuntu2204 prometheus]#vim /usr/local/prometheus/conf/prometheus.yml
+......
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+  - ../rules/*.yml
+......
+
+# 检查文件有效性
+[root@ubuntu2204 prometheus]#promtool check config /usr/local/prometheus/conf/prometheus.yml 
+Checking /usr/local/prometheus/conf/prometheus.yml
+  SUCCESS: 1 rule files found
+ SUCCESS: /usr/local/prometheus/conf/prometheus.yml is valid prometheus config file syntax
+
+Checking /usr/local/prometheus/rules/prometheus_record_rules.yml
+  SUCCESS: 1 rules found
+
+# 重启服务，加载prometheus配置
+[root@ubuntu2204 prometheus]#systemctl restart prometheus.service
+
+# 查看浏览器
+```
+
+![image-20250310091834647](../markdown_img/image-20250310091834647.png)
+
+点击 Status 下面的 Rules，查看效果
+
+![image-20250310091940086](../markdown_img/image-20250310091940086.png)
+
+示例：系统相关指标的记录规则
+
+```bash
+[root@ubuntu2204 prometheus]#vim /usr/local/prometheus/rules/prometheus_record_rules.yml
+groups:
+- name: myrules
+  interval: 15s
+  rules:
+  - record: "cpu_usage"
+    expr: rate(node_cpu_seconds_total{mode!="idle"}[5m])
+    labels:
+      job_demo: "node_exporter"
+  - record: "instance:node_cpu:avg_rate5m"
+    expr: 100 - avg(irate(node_cpu_seconds_total{job="node_exporter", mode="idle"}[5m])) by (instance) * 100
+  - record: instace:node_memory_MemFree_percent
+    expr: 100 - (100 * node_memory_MemFree_bytes / node_memory_MemTotal_bytes)
+  - record: instance:root:node_filesystem_free_percent
+    expr: 100 * node_filesystem_free_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}
+```
+
+![image-20250310092759983](../markdown_img/image-20250310092759983.png)
+
+
+
+
+
+### 告警说明 和 Alertmanager 部署
+
+#### 告警介绍
+
+官方文档
+
+```http
+https://prometheus.io/docs/alerting/latest/overview/
+```
+
+Prometheus作为一个大数据量场景下的监控平台来说，数据收集是核心功能，虽然监控数据可视化 了，也非常容易观察到运行状态。但是最能产生价值的地方就是对数据分析后的告警处理措施，因为我 们很难做到时刻盯着监控并及时做出正确的决策，所以程序来帮巡检并自动告警，是保障业务稳定性的决定性措施。可以说任何一个监控平台如果没有告警平台，那么他就逊色不少甚至都不能称之为平台。
+
+Prometheus报警功能主要是利用Alertmanager这个组件来实现功能的。Alertmanager作为一个独立的 组件，负责接收并处理来自Prometheus Server(也可以是其它的客户端程序)的告警信息。
+
+Alertmanager可以对这些告警信息进行进一步的处理，比如当接收到大量重复告警时能够消除重复的告 警信息，同时对告警信息进行分组并且路由到正确的通知方，Prometheus内置了对邮件，Slack等多种通知方式的支持，同时还支持与Webhook的集成，以支持更多定制化的场景。
+
+
+
+#### 告警组件
+
+告警能力在Prometheus的架构中被划分成两个独立的部分。
+
+- 通过在Prometheus中定义AlertRule(告警规则)，Prometheus会周期性的对告警规则进行计算，如果满足告警触发条件就会向Alertmanager发送告警信息。
+
+- 然后，Alertmanager管理这些告警，包括进行重复数据删除，分组和路由，以及告警的静默和抑制
+
+当Alertmanager接收到 Prometheus 或者其它应用发送过来的 Alerts 时，Alertmanager 会对 Alerts  进行去重复，分组，按标签内容发送不同报警组，包括：邮件，微信，Webhook。AlertManager还提供了静默和告警抑制机制来对告警通知行为进行优化。
+
+![image-20250310093719167](../markdown_img/image-20250310093719167.png)
+
+
+
+#### 告警特性
+
+```http
+https://prometheus.io/docs/alerting/latest/alertmanager/
+```
+
+![image-20250310093951778](../markdown_img/image-20250310093951778.png)
+
+**去重**
+
+将多个相同的告警,去掉重复的告警,只保留不同的告警
+
+**分组 Grouping**
+
+分组机制可以将相似的告警信息合并成一个通知
+
+在某些情况下，比如由于系统宕机导致大量的告警被同时触发，在这种情况下分组机制可以将这些 被触发的告警合并为一个告警通知，避免一次性接受大量的告警通知，而无法对问题进行快速定位。
+
+告警分组，告警时间，以及告警的接受方式可以通过Alertmanager的配置文件进行配置。
+
+**抑制 Inhibition**
+
+系统中某个组件或服务故障，那些依赖于该组件或服务的其它组件或服务可能也会因此而触发告 警，抑制便是避免类似的级联告警的一种特性，从而让用户能将精力集中于真正的故障所在
+
+抑制可以避免当某种问题告警产生之后用户接收到大量由此问题导致的一系列的其它告警通知
+
+抑制的关键作用在于，同时存在的两组告警条件中，其中一组告警如果生效，能使得另一组告警失效
+
+同样通过Alertmanager的配置文件进行设置
+
+**静默 Silent**
+
+静默提供了一个简单的机制可以快速根据标签在一定的时间对告警进行静默处理。
+
+如果接收到的告警符合静默的配置，Alertmanager则不会发送告警通知。
+
+比如：通常在系统例行维护期间，需要激活告警系统的静默特性
+
+静默设置可以在Alertmanager的Web页面上进行设置。
+
+**路由 Route**
+
+将不同的告警定制策略路由发送至不同的目标，比如：不同的接收人或接收媒介
+
+
+
+
+
+#### Alertmanager 部署
+
+##### 二进制部署
+
+Alertmanager 下载链接
+
+```http
+https://github.com/prometheus/alertmanager/releases
+```
+
+软件安装配置
+
+```bash
+# 下载软件
+[root@ubuntu2204 prometheus]# wget -P /usr/local/src https://github.com/prometheus/alertmanager/releases/download/v0.23.0/alertmanager-0.23.0.linux-amd64.tar.gz
+
+# 解压软件
+[root@ubuntu2204 prometheus]# tar xf /usr/local/src/alertmanager-0.23.0.linux-amd64.tar.gz -C /usr/local/
+[root@ubuntu2204 prometheus]# ln -s /usr/local/alertmanager-0.23.0.linux-amd64 /usr/local/alertmanager
+
+# 准备工作
+[root@ubuntu2204 prometheus]# cd /usr/local/alertmanager
+[root@ubuntu2204 alertmanager]# mkdir {bin,conf,data}
+[root@ubuntu2204 alertmanager]# mv alertmanager amtool bin/
+[root@ubuntu2204 alertmanager]# cp alertmanager.yml conf/
+[root@ubuntu2204 alertmanager]# useradd -r -s /sbin/nologin prometheus
+[root@ubuntu2204 alertmanager]# chown -R prometheus.prometheus /usr/local/alertmanager/
+```
+
+服务文件
+
+```bash
+[root@ubuntu2204 alertmanager]#cat /lib/systemd/system/alertmanager.service
+[Unit]
+Description=alertmanager project
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/alertmanager/bin/alertmanager --config.file=/usr/local/alertmanager/conf/alertmanager.yml --storage.path=/usr/local/alertmanager/data --web.listen-address=0.0.0.0:9093
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+User=prometheus
+Group=prometheus
+
+[Install]
+WantedBy=multi-user.target
+
+# 属性解析：最好配置 --web.listen-address ，因为默认的配置是:9093,有可能在启动时候报错
+
+# 启动服务
+[root@ubuntu2204 alertmanager]# systemctl daemon-reload 
+[root@ubuntu2204 alertmanager]# systemctl enable --now alertmanager.service 
+[root@ubuntu2204 alertmanager]# systemctl status alertmanager.service
+
+# 查看端口
+[root@ubuntu2204 alertmanager]# ss -nltp|grep alertmanager
+LISTEN 0      4096               *:9093            *:*    users:(("alertmanager",pid=142794,fd=8))   
+LISTEN 0      4096               *:9094            *:*    users:(("alertmanager",pid=142794,fd=3))
+
+# 结果显示：当前主机上出现了两个端口9093(与prometheus交互端口)和9094(Alertmanager集群HA mode使用)
+# 查看AlertManager也会暴露指标，http://alertmanager_server:9093/metrics
+# 可以通过访问http://alertmanager_server:9093/ 来看 alertmanager 提供的 Web 界面
+```
+
+![image-20250310100340223](../markdown_img/image-20250310100340223.png)
+
+
+
+
+
+![image-20250310100415300](../markdown_img/image-20250310100415300.png)
+
+
+
+##### 容器方式部署
+
+基于 docker compose 方式部署
+
+```yaml
+version: '3.6'
+
+#volumes:
+#  alertmanager_data: {}
+networks:
+  monitoring:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 172.31.0.0/24
+
+services:
+  alertmanager:
+    image: prom/alertmanager:v0.24.0
+    volumes:
+    - ./alertmanager/:/etc/alertmanager
+    networks:
+    - monitoring
+    restart: always
+    ports:
+    - 9093:9093
+    command:
+    - '--config.file=/etc/alertmanager/config.yml'
+    - '--storage.path=/alertmanager'
+    - '--log.level=debug'
 ```
 
 
+
+#### Prometheus 集成
+
+配置修改
+
+```bash
+# 修改配置文件，加载alertmanager配置属性
+# 方式1：静态配置
+[root@ubuntu2204 prometheus]# vim /usr/local/prometheus/conf/prometheus.yml
+......
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["10.0.0.201:9093"]
+......
+#注意：alertmanager服务启动时候的监控开放主机地址必须保证正确，否则服务启动不起来
+
+# 方式2: 文件发现
+[root@ubuntu2204 conf]#cat prometheus.yml
+alerting:
+  alertmanagers:
+    - file_sd_configs:
+      - files:
+        - "targets/alertmanager*.yaml"
+        
+[root@ubuntu2204 conf]#cat targets/alertmanager.yml 
+- targets:
+  - "10.0.0.201:9093"
+  labels:
+    app: alertmanager
+    job: alertmanager
+
+# 检查语法
+[root@ubuntu2204 conf]#promtool check config /usr/local/prometheus/conf/prometheus.yml
+
+# 重启服务
+[root@ubuntu2204 conf]#systemctl restart prometheus.service
+
+# 建议配置alertmanager自身也被Prometheus监控
+# 方式1：
+[root@ubuntu2204 conf]#cat prometheus.yml
+......
+  - job_name: "alertmanager"
+    static_configs:
+      - targets: ["10.0.0.201:9093"]
+
+# 方式2：
+[root@ubuntu2204 conf]#cat prometheus.yml 
+......
+  - job_name: "alertmanager"
+    file_sd_configs:
+    - files:
+      - targets/alertmanager.yml
+      
+[root@ubuntu2204 conf]#cat targets/alertmanager.yml 
+- targets:
+  - "10.0.0.201:9093"
+  labels:
+    app: alertmanager
+    job: alertmanager
+    
+# 重启服务
+[root@ubuntu2204 conf]#systemctl restart prometheus.service
+```
+
+![image-20250310115526656](../markdown_img/image-20250310115526656.png)
+
+![image-20250310115616987](../markdown_img/image-20250310115616987.png)
+
+
+
+
+
+#### Alertmanager 配置文件
+
+##### Alertmanager 配置文件说明
+
+官文文档
+
+```http
+https://prometheus.io/docs/alerting/latest/configuration/
+```
+
+ Alertmanager 通过yml格式的配置文件
+
+Alertmanager 配置文件格式说明
+
+```yaml
+# 配置文件总共定义了五个模块，global、templates、route，receivers，inhibit_rules
+global:
+  resolve_timeout: 1m
+  smtp_smarthost: 'localhost:25'
+  smtp_from: 'ops@example.com'
+  smpt_require_tls: false
+
+templates:
+- '/etc/alertmanager/template/*.tmpl'
+
+route:
+  receiver: 'mystical'
+  group_by: ['alertname']
+  group_wait: 20s
+  group_interval: 10m
+  repeat_interval: 3h
+  
+receivers:
+- name: 'admin'
+  email_configs:
+  - to: 'admin@example.com'
+  
+# 说明
+global
+# 用于定义Alertmanager的全局配置
+# 相关配置参数
+resolve_timeout   # 定义持续多长时间未接收到告警标记后，就将告警状态标记为resolved
+# resolve_timeout 具体作用
+# 当 Prometheus 监控的某个指标触发了告警规则，它会将告警发送给 Alertmanager。
+# 只要该指标持续超过阈值，Prometheus 会定期向 Alertmanager 发送告警，这通常由 group_interval 和 repeat_interval 控制。
+# 如果 Prometheus 在 resolve_timeout 时间内没有再发送该告警，Alertmanager 会将告警状态标记为 resolved，并通知接收方（如 Slack、邮件等），表示该告警 已恢复。
+
+smtp_smarthost     # 指定SMTP服务器地址和端口
+smtp_from          # 定义了邮件发件的的地址
+smtp_require_tls   # 配置禁用TLS的传输方式
+
+# ======================================================================================================== #
+
+templates          # 用于指定告警通知的信息模板，如邮件模板等。由于Alertmanager的信息可以发送到多种接收介质，如邮件、微信                        等，通常需要能够自定义警报所包含的信息，这个就可以通过模板来实现。
+
+# ======================================================================================================== #
+
+route（顶级路由）
+# 用于定义告警的路由规则，决定哪些告警发送到哪个接收器（receiver）。
+# receivers 用于定义具体的通知方式（如邮件、Slack、Webhook 等）。
+# route.receiver 字段用于关联 receivers.name，确保告警可以正确发送。
+
+# 简易化理解：
+# route 负责分类、筛选、转发告警 
+# receivers 负责实际发送告警
+
+receiver          # 指定默认的（default）接收器（receiver），即如果没有子路由匹配（即routes里的匹配规则都不生效），就使用                     这个接收器
+routes            # 定义子规则，用于匹配特定的告警并指定不同的接收器（receiver）。它可以有多个 matchers 规则。
+group_by          # 对相同标签的告警进行分组，避免重复发送
+group_wait        # 当 Alertmanager 收到一个告警组时，它会在 group_wait 时间内等待是否还有其他属于同一组的告警。如果在这                     个时间内没有收到其他属于同一组的告警，Alertmanager 将认为该组的告警已经完整，并开始进行通知操作。这样做                     可以在一定程度上避免频繁发送不完整的告警通知，而是等待一段时间后再一起发送
+group_interval    # 用于控制在一段时间内收集这些相同告警规则的实例，并将它们组合成一个告警组。在这个时间间隔内，如果相同的告警                     规则再次触发，它们将被添加到同一个告警组中。这样做可以避免过于频繁地发送重复的告警通知，从而避免对接收者造                     成困扰。配置分组等待的时间间隔，在这个时间内收到的告警，会根据前面的规则做合并
+repeat_interval   # 告警首次触发后，Alertmanager 发送告警通知。
+                  # 如果告警状态仍然是 "FIRING"，则每隔 repeat_interval 时间 再次发送同样的告警。
+                  # 如果告警恢复（RESOLVED），则会发送 RESOLVED 状态的通知（如果 send_resolved: true）。
+                  # 如果 repeat_interval 设置得太短，可能会导致告警风暴。
+
+# ======================================================================================================== #
+
+receivers
+# 用于定义相关接收者的地址信息
+# 告警的方式支持如下
+email_configs     # 配置相关的邮件地址信息
+wechat_configs    # 指定微信配置
+webhook_configs   # 指定webhook配置,比如:dingtalk
+
+# ======================================================================================================== #
+
+inhibit_rules（抑制规则）
+# 用于防止某些告警在特定条件下发送
+# 应用场景：
+# 屏蔽低级告警：当高优先级告警已经触发时，不再发送低优先级告警。
+# 减少重复告警：避免同一问题触发多个告警，导致运维人员被“告警风暴”淹没
+# 层级依赖屏蔽：如果 某个服务不可用，它的下游服务也会报警。只发送上游告警，抑制下游告警。
+
+source_matchers   # 匹配源告警（高优先级告警）
+target_matchers   # 匹配目标告警（低优先级告警）
+equal             # 要求两个告警的这些 label 值必须一致，才会触发抑制
+```
+
+alertmanager配置文件语法检查命令
+
+```ABAP
+amtool check-config /usr/local/alertmanager/conf/alertmanager.yml
+```
+
+
+
+##### Alertmanager 启用邮件告警
+
+```http
+https://prometheus.io/docs/alerting/latest/configuration/#email_config
+```
+
+###### 启用邮箱
+
+邮箱服务器开启smtp的授权码，每个邮箱开**启授权码**操作不同
+
+**QQ邮箱开启邮件通知功能**
+
+![image-20250310145539351](../markdown_img/image-20250310145539351.png)
+
+**网易邮箱开启邮件通知功能**
+
+![image-20250310145916434](../markdown_img/image-20250310145916434.png)
+
+![image-20250310150200806](../markdown_img/image-20250310150200806.png)
+
+
+
+##### Alertmanager 实现邮件告警
+
+范例:  实现邮件告警的配置文件
+
+```bash
+[root@ubuntu2204 conf]#vim /usr/local/alertmanager/conf/alertmanager.yml 
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.qq.com:25或465'   # 基于全局指定发件人信息
+  smtp_from: '3140394153@qq.com'
+  smtp_auth_username: '3140394153@qq.com'
+  smtp_auth_password: 'xxxxxxxxxxxxxxxxx'
+  smtp_hello: 'qq.com'
+  smtp_require_tls: false                 # 开启tls安全，默认true
+
+route:
+  group_by: ['alertname', 'cluster']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 10s                    # 此值不要过低，否则短期会收到大量告警通知
+  receiver: 'email'                       # 默认接受者
+
+receivers:
+- name: 'email'
+  email_configs:
+  - to: '15104600741@163.com'
+    send_resolved: true                   # 问题解决后也会发送恢复通知
+    # from: '29308620@qq.com'             # 除了前面的基于全局块实现发件人信息，也支持在此处配置发件人信息
+    # smarthost: 'smtp.qq.com:25或465'
+    # auth_username: '29308620@qq.com'
+    # auth_password: 'xxxxxxxxxxxxxxx'
+    # require_tls: false                  # 启用tls安全,默认true   
+    # headers:                            # 定制邮件格式，可选
+    #    subject: "{{ .Status | toUpper }} {{ .CommonLabels.env }}:{{ .CommonLabels.cluster }} {{ .CommonLabels.alertname }}" 
+    # html: '{{ template "email.default.html" . }}' 
+
+########### 以下可选 ###################
+# 抑制规则，此为可选项
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'dev', 'instance']
+
+#属性解析：repeat_interval配置项，用于降低告警收敛，减少报警，发送关键报警，对于email来说，此项不可以设置过低，否则将会由于邮件发送太多频繁，被smtp服务器拒绝
+
+# 语法检查
+[root@ubuntu2204 bin]# amtool  check-config /usr/local/alertmanager/conf/alertmanager.yml
+Checking '/usr/local/alertmanager/conf/alertmanager.yml'  SUCCESS
+Found:
+ - global config
+ - route
+ - 1 inhibit rules
+ - 1 receivers
+ - 0 templates
+ 
+#重启服务
+systemctl restart alertmanager.service
+```
+
+
+
+### 告警规则
+
+#### 告警规则说明
+
+```http
+https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+```
+
+警报规则可以实现基于Prometheus表达式语言定义警报条件，并将有关触发警报的通知发送到外部服务。 只要警报表达式在给定的时间点生成一个或多个动作元素，警报就被视为这些元素的标签集处于活动状态。
+
+**告警规则中使用的查询语句较为复杂时**，可将**其保存为记录规则**，而后通过查询该记录规则生成的时间序列来参与比较，从而避免实时查询导致的较长时间延迟
+
+警报规则在Prometheus中的基本配置方式与记录规则基本一致。
+
+在Prometheus中一条告警规则主要由以下几部分组成
+
+- **告警名称**：用户需要为告警规则命名，当然对于命名而言，需要能够直接表达出该告警的主要内容
+- **告警规则**：告警规则实际上主要由PromQL进行定义，其实际意义是当表达式（PromQL）查询结 果持续多长时间（During）后出发告警
+
+在Prometheus中，还可以通过Group（告警组）对一组相关的告警进行统一定义。这些定义都是通过 YAML文件来统一管理的
+
+**告警规则文件示例**
+
+```yaml
+groups:
+- name: example
+  rules:
+  - alert: HighRequestLatency
+    # expr: up == 0
+    expr: job:request_latency_seconds:mean5m{job="myjob"} > 0.5   # 这里使用了记录规则
+    for: 10m
+    labels:
+      severity: warning
+      project: myproject
+    annotations:
+      summary: "Instance {{ $labels.instance }} down"
+      description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minutes."
+      
+# 属性解析
+alert            # 定制告警的动作名称
+expr             # 是一个布尔型的条件表达式，一般表示满足此条件时即为需要告警的异常状态
+for              # 条件表达式被触发后，一直持续满足该条件长达此处时长后才会告警，即发现满足expr表达式后，在告警前的等待时                        长，默认为0，此时间前为pending状态，之后为firing，此值应该大于抓取间隔时长，避免偶然性的故障
+labels           # 指定告警规则的标签，若已添加，则每次告警都会覆盖前一次的标签值 
+labels.severity  # 自定义的告警级别的标签
+annotations      # 自定义注释信息，注释信息中的变量需要从模板中或者系统中读取，最终体现在告警通知的信息中
+```
+
+**范例: Node  Exporter的告警规则**
+
+```yaml
+groups:
+- name: node-exporter
+  rules:
+  # Host out of memory
+  - alert: HostOutOfMemory
+    expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: Host Out of memory (instance {{ $labels.instance }})
+      description: "Node memory is filling up (< 10% left)\n VALUE = {{ $value }}\n LABELS = {{ $labels }}"
+      
+  # Host unusual network throughput in
+  - alert: HostUnusualNetworkThroughputIn
+    expr: sum by (instance) (rate(node_network_receive_bytes_total[2m])) / 1024 / 1024 > 100
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: Host unusual network throughput in (instance {{ $labels.instance }})
+      description: "Host network interfaces are probably receiving too much data (>100 MB/s)\n VALUE = {{ $value }}\n LABELS = {{ $labels }}"
+       
+  # Host unusual network throughput out
+  - alert: HostUnusualNetworkThroughputOut
+    expr: sum by (instance) (rate(node_network_transmit_bytes_total[2m])) / 1024 / 1024 > 100
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: Host unusual network througput out (instance {{ $labels.instance }})
+      description: "Host network interfaces are probably sending too much data (> 100 MB/s)\n VALUE = {{ $value }}\n LABELS = {{ $labels }}"
+    
+  # Host out of disk space
+  # --collector.filesystem.ignored-mount-points="^/(sys|proc|dev|run)($|/)" 用于告诉 node_exporter 忽略这些挂载点，如果不忽略 /sys、/proc、/dev、/run 这些挂载点，可能会触发 node_filesystem_free_bytes 相关的告警（即磁盘空间不足）
+  # 因为这些目录通常是虚拟文件系统，非 root 用户可能会看到它们“满了”，但实际上这些不是普通的磁盘存储
+  # 因此，忽略这些挂载点可以减少无意义的告警
+  - alert: HostOutOfDiskSpace
+    expr: (node_filesystem_avail_bytes * 100) / node_filesystem_size_bytes < 10 and ON (instance, device, mountpoint) node_filesystem_readonly == 0
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: Host out of disk space (instance {{ $labels.instance }})
+      description: "Disk is almost full (< 10% left)\n VALUE = {{ $value }}\n LABELS = {{ $labels }}"
+ 
+  # Host high CPU load
+  - alert: HostHighCpuLoad
+    expr: 100 - (avg by(instance)(rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 80
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: Host high CPU load (instance {{ $labels.instance }})
+      description: "CPU load is > 80%\n VALUE = {{ $value }}\n LABELS = {{ $labels }}"  
+      
+  # Host CPU high iowait
+  - alert: HostCpuHignIowait
+    expr: avg by (instance) (rate(node_cpu_seconds_total{mode="iowait"}[5m])) * 100 > 5
+    for: 0m
+    labels:
+      severity:warning
+    annotations:
+      summary: Host CPU high iowait (instance {{ $labels.instance }})
+      description: "CPU iowait > 5%. A high iowait means that you are disk or network bound.\n VALUE = {{ $value }}\n LABELS = {{ $labels }}" 
+```
+
+范例：MySQL的告警规则
+
+```yaml
+groups:
+- name: mysqld
+  rules:
+  # MySQL instance is down on {{ $labels.instance }}
+  - alert: MysqlDown
+    expr: mysql_up == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: MySQL down (instance {{ $labels.instance }})
+      description: "MySQL instance is down on {{ $labels.instance }}\n VALUE = {{ $value }}\n LABELS = {{ $labels }}"
+      
+  # MySQL too many connections (> 80%)
+  - alert: MysqlTooManyConnections(>80%)
+    expr: max_over_time(mysql_global_status_threads_connected[1m]) / mysql_global_variables_max_connections * 100 > 80
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: MySQL too many connections (> 80%) (instance {{ $labels.instance}})
+      description: "More than 80% of MySQL connections are in use on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      
+  # MySQL Slave IO thread not running
+  - alert: MysqlSlaveIoThreadNotRunning
+    expr: mysql_slave_status_master_server_id > 0 and ON (instance) mysql_slave_status_slave_io_running == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: MySQL Slave IO thread not running (instance {{ $labels.instance }})
+      description: "MySQL Slave IO thread not running on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+  # MySQL Slave SQL thread not running
+  - alert: MysqlSlaveSqlThreadNotRunning
+    expr: mysql_slave_status_master_server_id > 0 and ON (instance) mysql_slave_status_slave_sql_running == 0 # and ON (instance) 解读：只在 instance 相同的情况下，将 master_server_id > 0 的实例 和 slave_sql_running == 0 的实例 进行匹配。如果一个实例同时满足两个条件，则返回该实例的数据点。
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: MySQL Slave SQL thread not running (instance {{ $labels.instance }})
+      description: "MySQL Slave SQL thread not running on {{ $labels.instance }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+```
+
+范例：blackbox 的告警规则
+
+```yaml
+groups:
+- name: blackbos
+  rules:
+  
+  # Blackbox probe failed
+  - alert: BlackbosProbeFaild
+    expr: probe_success == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Blackbox probe failed (instance {{ $labels.instance }})
+      description: "Probe failed\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      
+   # Blackbox slow probe
+   - alert: BlackboxSlowProbe
+    expr: avg_over_time(probe_duration_seconds[1m]) > 1
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: Blackbox slow probe (instance {{ $labels.instance }})
+      description: "Blackbox probe took more than 1s to complete\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      
+  # Blackbox probe HTTP failure
+  - alert: BlackboxProbeHttpFailure
+    expr: probe_http_status_code <= 199 OR probe_http_status_code >= 400
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: Blackbox probe HTTP failure (instance {{ $labels.instance }})
+      description: "HTTP status code is not 200-399\n  VALUE = {{ $value }}\n LABELS = {{ $labels }}"
+```
+
+
+
+#### 告警规则案例: 邮件告警
+
+##### 案例说明
+
+编写一个检查自定义metrics的接口的告警规则，在prometheus中我们可以借助于up指标来获取对应的 状态效果，查询语句如下：
+
+```bash
+up{job_name="pushgateway"}
+#注意：如果结果是1表示服务正常，否则表示该接口的服务出现了问题。
+```
+
+![image-20250310172003085](../markdown_img/image-20250310172003085.png)
+
+##### 配置告警规则
+
+编写规则定义文件
+
+```bash
+# 确认包含rules目录中的yml文件
+[root@ubuntu2204 prometheus]#cat /usr/local/prometheus/conf/prometheus.yml 
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+  - ../rules/*.yml
+
+# 准备告警rule文件
+[root@ubuntu2204 prometheus]#cat /usr/local/prometheus/rules/prometheus_alert_rules.yml
+groups:
+- name: pushgateway      # 指定分组名称,在一个组中可以有多个 alert ,只要其中一个alert条件满足,就会触发告警
+  rules:
+  - alert: InstanceDown
+    expr: up{job_name="pushgateway"} == 0
+    for: 1m
+    labels:
+      severity: 1
+    annotations:
+      summary: "Instance {{ $labels.instance  }} 停止工作"
+      description: "{{ $labels.instance  }} job {{ $labels.job  }} 已经停止1m以上"
+
+# 语法检查
+[root@ubuntu2204 rules]#promtool check rules prometheus_alert_rules.yml
+Checking prometheus_alert_rules.yml
+  SUCCESS: 1 rules found
+
+#重启prometheus服务
+systemctl restart prometheus.service
+```
+
+浏览器查看 Prometheus  的 rules 的页面查看效果
+
+![image-20250310172845967](../markdown_img/image-20250310172845967.png)
+
+查看告警界面效果
+
+![image-20250310172954148](../markdown_img/image-20250310172954148.png)
+
+**告警状态**
+
+- **Inactive**：正常效果
+- **Pending**：已触发阈值，但未满足告警持续时间（即rule中的for字段）
+- **Firing**：已触发阈值且满足告警持续时间。
+
+
+
+**验证结果**
+
+```bash
+# 停止pushgateway
+[root@ubuntu2204 ~]#systemctl stop pushgateway.service
+```
+
+![image-20250310174121063](../markdown_img/image-20250310174121063.png)
+
+等待时间超过for持续的标准后，就会改变告警的状态，效果如下
+
+![image-20250310174209701](../markdown_img/image-20250310174209701.png)
+
+![image-20250310174343457](../markdown_img/image-20250310174343457.png)
+
+**邮件告警效果**
+
+Alertmanager 的配置文件设置
+
+```bash
+[root@ubuntu2204 conf]#cat alertmanager.yml 
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.163.com:25'   # 基于全局指定发件人信息
+  smtp_from: '15104600741@163.com'
+  smtp_auth_username: '15104600741@163.com'
+  smtp_auth_password: 'XXXXXXXXXXXXXXXXXX'
+  smtp_hello: '163.com'
+  smtp_require_tls: false                 # 开启tls安全，默认true
+
+route:
+  group_by: ['alertname', 'cluster']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 30s                    # 此值不要过低，否则短期会收到大量告警通知
+  receiver: 'email'                       # 默认接受者
+
+receivers:
+- name: 'email'
+  email_configs:
+  - to: '3140394153@qq.com'
+    send_resolved: true
+```
+
+![image-20250310175420051](../markdown_img/image-20250310175420051.png)
+
+因为 `repeat_interval: 30s `，因此 30s 发送一次告警邮件
+
+![image-20250310175749749](../markdown_img/image-20250310175749749.png)
+
+
+
+**重启服务后也会收到恢复通知邮件，如下界面**
+
+![image-20250310175920080](../markdown_img/image-20250310175920080.png)
+
+
+
+### 告警模板
+
+#### 告警模板说明
+
+```http
+https://prometheus.io/docs/alerting/latest/notifications/
+```
+
+默认的告警信息界面有些简单，可以借助于告警的模板信息，对告警信息进行丰富。需要借助于 alertmanager的模板功能来实现。
+
+**使用流程**
+
+- **分析关键信息**
+- **定制模板内容**
+- **Alertmanager 加载模板文件**
+- **告警信息使用模板内容属性**
+
+
+
+#### 定制模板案例
+
+##### 定制模板
+
+模板文件使用标准的Go语法，并暴露一些包含时间标签和值的变量
+
+```bash
+标签引用： {{ $labels.<label_name> }}
+指标样本值引用： {{ $value }}
+
+#示例：若要在description注解中引用触发告警的时间序列上的instance和iob标签的值，可分别使用
+{{$label.instance}}和{{$label.job}}
+```
+
+为了更好的显示效果,需要了解html相关技术,参考链接
+
+```http
+https://www.w3school.com.cn/html/html_tables.asp
+```
+
+范例:  邮件告警通知模板
+
+```bash
+#建立邮件模板文件
+[root@ubuntu2204 alertmanager]# mkdir /usr/local/alertmanager/tmpl -p
+
+#基于jin2的模板内容
+[root@ubuntu2204 alertmanager]# vim /usr/local/alertmanager/tmpl/email.tmpl
+
+{{ define "test.html" }}
+<table border="1">
+       <tr>
+               <th>报警项</th>
+               <th>实例</th>
+               <th>报警阀值</th>
+               <th>开始时间</th>
+       </tr>
+       {{ range $i, $alert := .Alerts }}
+               <tr>
+                       <td>{{ index $alert.Labels "alertname" }}</td>
+                       <td>{{ index $alert.Labels "instance" }}</td>
+                       <td>{{ index $alert.Annotations "value" }}</td>
+                       <td>{{ $alert.StartsAt }}</td>
+               </tr>
+       {{ end }}
+</table>
+{{ end }}
+ 
+#属性解析
+{{ define "test.html" }} 表示定义了一个 test.html 模板文件，通过该名称在配置文件中应用上边模板文件就是使用了大量的jinja2模板语言。$alert.xxx 其实是从默认的告警信息中提取出来的重要信息
+```
+
+范例：邮件模板2
+
+```bash
+root@ubuntu2204 tmpl]#cat email_template.tmpl 
+{{ define "email.html" }}
+{{- if gt (len .Alerts.Firing) 0 -}}
+{{ range .Alerts }}
+=========start==========<br>
+告警程序: prometheus_alert <br>
+告警级别: {{ .Labels.severity }} <br>
+告警类型: {{ .Labels.alertname }} <br>
+告警主机: {{ .Labels.instance }} <br>
+告警主题: {{ .Annotations.summary }}  <br>
+告警详情: {{ .Annotations.description }} <br>
+触发时间: {{ .StartsAt.Format "2006-01-02 15:04:05" }} <br>
+=========end==========<br>
+{{ end }}{{ end -}}
+{{- if gt (len .Alerts.Resolved) 0 -}}
+{{ range .Alerts }}
+=========start==========<br>
+告警程序: prometheus_alert <br>
+告警级别: {{ .Labels.severity }} <br>
+告警类型: {{ .Labels.alertname }} <br>
+告警主机: {{ .Labels.instance }} <br>
+告警主题: {{ .Annotations.summary }} <br>
+告警详情: {{ .Annotations.description }} <br>
+触发时间: {{ .StartsAt.Format "2006-01-02 15:04:05" }} <br>
+恢复时间: {{ .EndsAt.Format "2006-01-02 15:04:05" }} <br>
+ =========end==========<br>
+{{ end }}{{ end -}}
+{{- end }}
+
+#说明
+# "2006-01-02 15:04:05"是一个特殊的日期时间格式化模式，在Golang中，日期和时间的格式化是通过指定特定的模式来实现的。它用于表示日期和时间的具体格式
+```
+
+
+
+##### **应用模版**
+
+```bash
+# 更改配置文件
+[root@ubuntu2204 tmpl]#vim /usr/local/alertmanager/conf/alertmanager.yml
+global:
+...
+templates:
+  - '../tmpl/*.tmpl'
+  
+route:
+...
+# 收信人员
+receivers:
+- name: 'email'
+  email_configs:
+  - to: '3140394153@qq.com'
+    send_resolved: true
+    headers: { Subject: "[WARN] 报警邮件" }
+    html: '{{ template "test.html" . }}'
+...
+
+# 属性解析
+{{}} 属性用于加载其它信息，所以应该使用单引号括住
+{} 不需要使用单引号，否则服务启动不成功
+
+# 重启服务
+[root@ubuntu2204 tmpl]#systemctl restart alertmanager.service
+
+# 关闭pushgateway，查看报警邮件
+[root@ubuntu2204 ~]#systemctl stop pushgateway.service 
+
+# 收到的告警信息中告警阈值是空的
+```
+
+![image-20250310192552807](../markdown_img/image-20250310192552807.png)
+
+
+
+##### 更改规则
+
+上面我们定制的邮件内容中包含阈值的部分，而我们在规则中并没有指定，所以需要修改一下规则文 件，效果如下
+
+```bash
+[root@ubuntu2204 rules]#cat prometheus_alert_rules.yml 
+groups:
+- name: pushgateway
+  rules:
+  - alert: InstanceDown
+    expr: up{job_name="pushgateway"} == 0
+    for: 1m
+    labels:
+      severity: 1
+    annotations:
+      summary: "Instance {{ $labels.instance  }} 停止工作"
+      description: "{{ $labels.instance  }} job {{ $labels.job  }} 已经停止1m以上"
+      value: "{{$value}}"      # 只添加这一行
+
+#属性解析：这里在注释部分增加了一个value的属性信息，会从prometheus的默认信息中获取阈值
+#annotations这部分内容不再显示邮件中,而按模板形式显示
+
+#语法检查
+[root@ubuntu2204 rules]# promtool check rules /usr/local/prometheus/rules/prometheus_alert_tmpl.yml
+[root@ubuntu2204 rules]# promtool check config /usr/local/prometheus/conf/prometheus.yml
+
+#重启prometheus服务生效
+[root@ubuntu2204 rules]#systemctl restart prometheus.service 
+```
+
+##### 测试结果
+
+![image-20250310201450745](../markdown_img/image-20250310201450745.png)
+
+
+
+
+
+### 告警路由
+
+#### 告警路由说明
+
+Alertmanager的route配置段支持定义"树"状路由表，入口位置称为根节点，每个子节点可以基于匹配条件定义出一个独立的路由分支
+
+- 所有告警都将进入路由根节点，而后进行子节点遍历
+- 若路由上的continue字段的值为false，则遇到第一个匹配的路由分支后即终止；否则，将继续匹配后续的子节点
+
+![image-20250310204607976](../markdown_img/image-20250310204607976.png)
+
+
+
+上图所示：Alertmanager中的第一个Route是根节点，每一个match 都是子节点
+
+比如，我们之前定义的告警策略中，只有一个route，这意味着所有由Prometheus产生的告警在发送到 Alertmanager之后都会通过名为email的receiver接收。
+
+```ABAP
+注意: 新版中使用指令matchers替换了match和match_re指令
+```
+
+范例：路由示例
+
+```yaml
+route:
+  group_by: ['alertname', 'cluster']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 10s
+  receiver: 'email'
+```
+
+通过在Prometheus中给不同的告警规则添加不同的label,再在Alertmanager中添加针对不同的lable使 用不同的路由至不同的receiver,即可以实现路由的分组功能
+
+Alertmanager 的相关配置参数
+
+```bash
+# 默认信息的接收者，这一项是必须选项，否则程序启动不成功
+[ receiver: <string> ]
+
+# 分组时使用的标签，默认情况下，所有的告警都组织在一起，而一旦指定分组标签，则Alertmanager将按这些标签进行分组
+[ group_by: '[' <labelname>, ... ']' ]
+
+# 在匹配成功的前提下，是否继续进行深层次的告警规则匹配
+[ continue: <boolean> | default = false ]
+
+# 基于字符串验证，判断当前告警中是否存在标签labelname并且其值等于label value，满足则进行内部的后续处理。
+# 新版使用指令matchers替换match和match_re
+matchers:
+  - alertname = Watchdog
+  - severity =~ "warning|critical"
+  
+match:
+  [ <labelname>: <labelvalue>, ... ]
+  
+match_re:
+  [ <labelname>: <regex>, ... ]
+  
+  
+# 当 Alertmanager 收到一个告警组时，它会在 group_wait 时间内等待是否还有其他属于同一组的告警。如果在这个时间内没有收到其他属于同一组的告警，Alertmanager 将认为该组的告警已经完整，并开始进行通知操作。这样做可以在一定程度上避免频繁发送不完整的告警通知，而是等待一段时间后再一起发送
+[ group_wait: <duration> | default = 30s ]
+
+# 配置分组等待的时间间隔，在这个时间内收到的告警，会根据前面的规则做合并
+[ group_interval: <duration> | default = 5m ]
+
+# 成功发送了告警后再次发送告警信息需要等待的时长，一般至少为3个小时
+[ repeat_interval: <duration> | default = 4h ]
+
+# 子路由配置
+routes:
+  [ - <route> ... ]
+  
+#注意：每一个告警都会从配置文件中顶级的route进入路由树，需要注意的是顶级的route必须匹配所有告警, 不能有 match 和 match_re
+```
+
+**配置示例**
+
+```bash
+#1) 在prometheus上定制告警规则
+groups:
+- name: example
+  ......
+- name: nodes_alerts
+  rules:
+  - alert: DiskwillFillIn12Hours
+    expr: predict_linear(node_filesystem_free_bytes{mountpoint="/"}[h], 12*3600)
+    for: 1h
+    labels:
+      severity: critital
+    annotations:
+      discription: Disk on {{ $label.instance }} will fill in approximately 12 hours
+- name: prometheus_alerts
+  rules:
+  - alert: PrometheusConfigReloadFailed
+    expr: prometheus_config_last_reload_successful == 0
+    for: 3m
+    labels:
+      severity: warning
+    annotations:
+      description: Reloading Prometheus configuration has failed on {{ $labels.instance }}
+
+#2) 在alertmanager 定制路由
+global:
+  ...
+templates:
+  ...
+route:
+  group_by: ['instance']
+  ...
+  receiver: email-receiver
+  routes:
+  - match:
+      severity: critical
+    receiver: leader-team
+  - match_re:
+      severity: ^(warning)
+    receiver: ops-team
+    
+receivers:
+  - name:email-receiver
+    email_configs:
+      - to: 'mysticalrecluse@gmail.com'
+  - name: 'leader-team'
+    email_configs:
+    # - to: '29308620@qq.com', 'admin@qq.com'  错误写法，to: 只能写一个邮箱地址，多个邮箱不能用逗号 , 分隔
+      - to: '29308620@qq.com'
+      - to: 'admin@qq.com'
+  - name: 'ops-team'
+    email_configs:
+      - to: 'root@wangxiaochun.com'
+      - to: 'wang@163.com'
+```
+
+
+
+#### 告警路由案例
+
+**定制路由分组**
+
+```bash
+# 指定路由分组
+vim /usr/local/alertmanager/conf/alertmanager.yml
+# 全局配置
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.163.com:25'
+  smtp_from: '15104600741@163.com'
+  smtp_auth_username: '15104600741@163.com'
+  smtp_auth_password: 'XXXXXXXXXXXXXXXXXXX'
+  smtp_hello: '163.com'
+  smtp_require_tls: false
+  
+# 模版配置
+templates:
+  - '../tmpl/*.tmpl'
+  
+# 路由配置
+# 新版使用指令matchers替换match和match_re,如下示例
+route:
+  group_by: ['instance', 'cluster']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 10s
+  routes:
+  - receiver: 'leader-team'
+    matchers:
+    - severity: "critical"
+  - receiver: 'ops-team'
+    matchers:
+    - severity =~ "^(warning)$"
+    
+# 收信人员
+receivers:
+- name: 'email'
+  email_configs:
+  - to: 'root@wang.com'
+    send_resolved: true
+    html: '{{ template "test.html" . }}'
+    headers: { Subject: "[WARN] 报警邮件"}
+- name: 'leader-team'
+  email_configs:
+  - to: 'root@wang.com'
+    html: '{{ template "test.html" . }}'
+    headers: { Subject: "[CRITICLAL] 应用服务报警邮件"}
+    send_resolved: true
+- name: 'ops-team'
+  email_configs:
+  - to: 'root@wang.com'
+    html: '{{ template "test.html" }}'
+    headers: {Subject: "[WARNING] QPS负载报警邮件"}
+    send_resolved: true
+    
+# 定义邮件模板文件
+vim /usr/local/alertmanager/tmpl/email.tmpl
+{{ define "test.html" }}
+<table border="1">
+        <tr>
+                <th>报警项</th>
+                <th>实例</th>
+                <th>报警阀值</th>
+                <th>开始时间</th>
+        </tr>
+        {{ range $i, $alert := .Alerts }}
+                <tr>
+                        <td>{{ index $alert.Labels "alertname" }}</td>
+                        <td>{{ index $alert.Labels "instance" }}</td>
+                        <td>{{ index  $alert.Annotations "value" }}</td>
+                        <td>{{ $alert.StartsAt }}</td>
+                </tr>
+        {{ end }}
+</table>
+{{ end }}
+
+# 服务生效
+systemctl restart alertmanager.service
+```
+
+
+
+##### 不同严重等级，设定不同的 `repeat_interval`
+
+```bash
+route:
+  receiver: "default"
+  routes:
+    - match:
+        severity: "critical"
+      receiver: "pagerduty"
+      repeat_interval: 30m   # 关键告警，每30分钟重复
+    - match:
+        severity: "warning"
+      receiver: "email-alert"
+      repeat_interval: 6h    # 普通警告，每6小时重复
+```
+
+
+
+#### 补充
+
+##### `group_by`详解
+
+###### `group_by` 的作用
+
+在 **Alertmanager** 配置中，`group_by` **决定了告警如何被分组**，确保相似的告警不会单独发送，而是合并在一起，从而**减少重复告警通知。**
+
+
+
+###### group_by 详细解析
+
+- **将告警按照 `group_by` 指定的标签进行分组**
+
+- **相同组的告警会合并，并在 `group_wait` 时间后一起发送**
+
+- **可以减少邮件/通知的频率，防止告警风暴**
+
+- **未指定的标签默认全部被分到一起**
+
+
+
+###### `group_by` 例子
+
+**1️⃣ 按 `instance` 进行分组**
+
+```yaml
+route:
+  group_by: ['instance']
+  receiver: email-receiver
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+```
+
+**📌 解释**
+
+- **假设收到的告警：**
+  - `instance=node1:9100` 发生 **CPU 过高**
+  - `instance=node1:9100` 发生 **内存使用率过高**
+  - `instance=node2:9100` 发生 **磁盘使用率过高**
+- **`group_by: ['instance']` 的效果**
+  - **`node1:9100` 的 CPU 和内存告警** 被合并为一个通知
+  - **`node2:9100` 的磁盘告警** 被单独发送
+
+**✅ 这样，每个实例（instance）只会收到一条合并的告警，减少通知数量。**
+
+
+
+**2️⃣ 按 `alertname` 和 `severity` 进行分组**
+
+```yaml
+route:
+  group_by: ['alertname', 'severity']
+  receiver: email-receiver
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+```
+
+ **解释**
+
+- **假设收到的告警：**
+  - `alertname=CPUHighUsage` 且 `severity=critical`
+  - `alertname=CPUHighUsage` 且 `severity=warning`
+  - `alertname=MemoryUsageHigh` 且 `severity=critical`
+- **`group_by: ['alertname', 'severity']` 的效果**
+  - **所有 `CPUHighUsage` 且 `severity=critical` 的告警合并成一个**
+  - **所有 `CPUHighUsage` 且 `severity=warning` 的告警合并成一个**
+  - **所有 `MemoryUsageHigh` 且 `severity=critical` 的告警合并成一个**
+
+**✅ 这样，相同告警名称+相同严重级别的告警会被合并，减少告警混乱。**
+
+
+
+**3️⃣ `group_by: ['...']` 代表所有告警都合并**
+
+```yaml
+route:
+  group_by: ['...']
+  receiver: email-receiver
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+```
+
+**📌 解释**
+
+- **无论告警属于哪个 `instance` 或 `alertname`，都会合并在一起。**
+- **所有告警都只会生成一个通知**
+- 适用于 **单个团队接收所有告警，且不需要细粒度分组** 的场景。
+
+**⚠️ 可能导致的问题**
+
+- **如果短时间内告警数量激增，合并后的通知可能包含太多告警，影响可读性。**
+
+
+
+**4️⃣ `group_by: []` 代表完全不分组，每个告警单独通知**
+
+```yaml
+route:  
+  group_by: []
+  receiver: email-receiver
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+```
+
+**📌 解释**
+
+- **收到的每个告警都是一个独立的通知**
+- 适用于 **每个告警都需要立即被关注** 的情况（比如核心业务告警）。
+
+
+
+##### `html: '{{ template "test.html" . }}'` 语法解析
+
+`html: '{{ template "test.html" . }}'` 这行代码中的 **`.`（dot，点）** 代表 **当前上下文对象（context）**，用于将告警数据传递给 `test.html` 模板文件。
+
+在 Go 模板语法中，`template "test.html" .` 的含义是：
+
+- **`template "test.html"`** ：引用 `test.html` 这个模板文件。
+- **`.`（dot）** ：代表 **当前数据上下文**，即 `Alertmanager` 传递给模板的数据。
+
+**📝 如果不加 `.`，模板文件 `test.html` 可能无法正确获取告警数据**
+
+
+
+###### `.` 代表的是什么数据？
+
+在 Alertmanager 中，`.`（dot） 代表 **整个告警通知对象**，它包含多个字段，如：
+
+- **`.CommonLabels`** ：公共标签（如 `severity`、`instance`）
+- **`.CommonAnnotations`** ：公共注释（如 `description`）
+- **`.GroupLabels`** ：用于分组的标签
+- **`.Alerts`** ：包含所有告警的详细信息列表
+
+
+
+###### 例子：`test.html` 解析 `.（dot）`
+
+`test.html` 示例
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .alert { color: red; font-weight: bold; }
+        .content { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h2>🚨 [ALERT] Prometheus 告警通知 🚨</h2>
+    <p class="alert">严重级别: <b>{{ .CommonLabels.severity }}</b></p>
+    <p class="content">告警名称: {{ .CommonLabels.alertname }}</p>
+    <p class="content">发生实例: {{ .CommonLabels.instance }}</p>
+    <p class="content">告警详情: {{ .CommonAnnotations.description }}</p>
+    <hr>
+    <p>请尽快处理该告警。</p>
+</body>
+</html>
+```
+
+
+
+###### `.` 在模板中的实际作用
+
+假设 `Alertmanager` 触发了以下告警：
+
+```json
+{
+  "receiver": "ops-team",
+  "status": "firing",
+  "groupLabels": {
+    "alertname": "HighLoad"
+  },
+  "commonLabels": {
+    "alertname": "HighLoad",
+    "instance": "server01",
+    "severity": "critical"
+  },
+  "commonAnnotations": {
+    "description": "服务器 CPU 使用率过高"
+  },
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "HighLoad",
+        "instance": "server01",
+        "severity": "critical"
+      },
+      "annotations": {
+        "description": "服务器 CPU 使用率过高"
+      }
+    }
+  ]
+}
+```
+
+**解析 `.` 的结果**
+
+如果 `html: '{{ template "test.html" . }}'` 传递数据，`test.html` 模板会被渲染成：
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .alert { color: red; font-weight: bold; }
+        .content { margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h2>🚨 [ALERT] Prometheus 告警通知 🚨</h2>
+    <p class="alert">严重级别: <b>critical</b></p>
+    <p class="content">告警名称: HighLoad</p>
+    <p class="content">发生实例: server01</p>
+    <p class="content">告警详情: 服务器 CPU 使用率过高</p>
+    <hr>
+    <p>请尽快处理该告警。</p>
+</body>
+</html>
+```
+
+
+
+
+
+### 告警机制总结
+
+#### **Prometheus 监控并触发告警**
+
+- **Prometheus** 通过 `alerting` 字段配置 `Alertmanager` 的 **targets**
+- **Prometheus** 通过 `rule_files` 字段加载 **告警规则文件**
+- **告警规则** 在 `rule_files` 中定义，比如 **某个指标超过阈值时触发告警**
+- **Prometheus 评估规则，若满足条件，则触发告警**
+- **告警信息通过 HTTP API 发送给 Alertmanager**
+
+💡 **涉及的配置文件**： ✅ **Prometheus 主配置文件 (`prometheus.yml`)** ✅ **Prometheus 告警规则文件 (`rules/\*.yml`)**
+
+
+
+#### **Alertmanager 处理告警**
+
+- **Alertmanager 接收 Prometheus 发送的告警**
+- **Alertmanager 根据 `route` 规则，决定告警发送给谁**
+- **根据 `group_by` 对类似告警进行合并**
+- **根据 `inhibit_rules` 进行告警抑制（如高优先级告警会抑制低优先级告警）**
+- **最终决定如何发送（邮件、Slack、Webhook、短信等）**
+
+💡 **涉及的配置文件**： ✅ **Alertmanager 主配置文件 (`alertmanager.yml`)**
+
+
+
+#### **Alertmanager 生成告警消息**
+
+- **Alertmanager 使用 `template` 模板文件**
+- **格式化告警消息**
+- **最终将消息发送到指定渠道（邮件、Slack、Webhook等）**
+
+💡 **涉及的配置文件**： ✅ **Alertmanager 模板文件 (`templates/\*.tmpl`)**
+
+
+
+#### **接收告警**
+
+- **运维人员或其他系统接收告警**
+- **根据告警信息采取相应措施（处理、自动化恢复等）**
+- **可以在 Grafana 等监控平台上查看告警状态**
+
+
+
+```ABAP
+主要涉及4个配置文件，分别是 
+prometheus.yml
+rules/*.yml
+alertmanager.yml
+templates/*.tmpl
+```
+
+
+
+
+
+### 告警抑制
+
+#### 告警抑制说明
+
+对于一种业务场景，有相互依赖的两种服务：A服务和B服务，一旦A服务异常，依赖A服务的B服务也会 异常,从而导致本来没有问题的B服务也不断的发出告警
+
+Alertmanager的抑制机制可以避免当某种问题告警产生之后用户接收到大量由此问题导致的一系列的其它告警通知。例如当集群不可用时，用户可能只希望接收到一条告警，告知用户这时候集群出现了问 题，而不是大量的如集群中的应用异常、中间件服务异常的告警通知。
+
+当已经发送的告警通知匹配到target_match和target_match_re规则，当有新的告警规则如果满足 source_match或者定义的匹配规则，并且已发送的告警与新产生的告警中equal定义的标签完全相同， 则启动抑制机制，新的告警不会发送。
+
+通过上面的配置，可以在alertname/operations/instance相同的情况下，high的报警会抑制warning级 别的报警信息
+
+抑制是当出现其它告警的时候压制当前告警的通知，可以有效的防止告警风暴。
+
+```ABAP
+比如当机房出现网络故障时，所有服务都将不可用而产生大量服务不可用告警，但这些警告并不能反映真实问题在哪，真正需要发出的应该是网络故障告警。当出现网络故障告警的时候，应当抑制服务不可用告警的通知。
+```
+
+
+
+**配置解析**
+
+```bash
+#源告警信息匹配 -- 报警的来源
+source_match:
+  [ <labelname>: <labelvalue>, ... ]
+source_match_re:
+  [ <labelname>: <regex>, ... ]
+  
+#目标告警信息匹配 - 触发的其他告警
+target_match:
+  [ <labelname>: <labelvalue>, ... ]
+target_match_re:
+  [ <labelname>: <regex>, ... ]
+  
+#目标告警是否是被触发的 - 要保证业务是同一处来源
+[ equal: '[' <labelname>, ... ']' ]
+#同时告警目标上的标签与之前的告警标签一样，那么就不再告警
+```
+
+**配置示例**
+
+集群中的A主机节点异常导致NodeDown告警被触发，该告警会触发一个severity=critical的告警级别。 
+
+由于A主机异常导致该主机上相关的服务，会因为不可用而触发关联告警。 根据抑制规则的定义： 
+
+如果有新的告警级别为severity=critical，且告警中标签的node值与NodeDown告警的相同 则说明新的告警是由NodeDown导致的，则启动抑制机制,从而停止向接收器发送通知。
+
+```yaml
+inhibit_rules:
+- source_match:
+    alertname: NodeDown
+    severity: critical
+  target_match:
+    severity: normal
+  equal:
+    - instance
+```
+
+
+
+
+
+#### 完整的抑制告警（Inhibit Rules）部署流程
+
+##### 第一步：查看 Prometheus 告警规则的 Labels
+
+在配置 `inhibit_rules` 之前，你需要知道 **当前告警规则的 Labels**，以便定义 **匹配规则**。
+
+🔍 **使用 Prometheus API 查询现有告警规则**
+
+```bash
+curl -s http://localhost:9090/api/v1/rules | jq '.data.groups[].rules[] | {alert: .name, labels: .labels}'
+```
+
+**🔍 示例输出**
+
+```json
+{
+  "alert": "InstanceDown",
+  "labels": {
+    "severity": "critical",
+    "team": "ops"
+  }
+}
+{
+  "alert": "HighMemoryUsage",
+  "labels": {
+    "severity": "warning",
+    "team": "ops"
+  }
+}
+```
+
+**解释**：
+
+- `InstanceDown` 这个告警的 `severity` 是 `critical`
+- `HighMemoryUsage` 这个告警的 `severity` 是 `warning`
+- `team` 标签表明它属于 `ops` 团队
+
+**💡 目标**：
+
+- 当 **`InstanceDown` (critical)** 触发时，我们 **抑制** `HighMemoryUsage` (warning) 告警
+
+
+
+##### **第二步：配置 Alertmanager 的 Inhibit Rules**
+
+在 Alertmanager 配置文件 **`alertmanager.yml`** 中，添加 `inhibit_rules` 规则
+
+**🚀 具体配置**
+
+```yaml
+inhibit_rules:
+  - source_match:
+      severity: "critical"
+    target_match:
+      severity: "warning"
+    equal: ["instance", "job"]
+```
+
+**解释**：
+
+- **source_match**: 代表 **"触发抑制规则的告警"**，即 **当 `severity="critical"` 的告警触发** 时
+- **target_match**: 代表 **"被抑制的告警"**，即 **`severity="warning"` 的告警会被抑制**
+- **equal**: 只有 **相同的 `instance` 和 `job`** 才触发抑制
+
+**💡 作用**： 当 **某个 `instance` 触发了 `critical` 告警** (`InstanceDown`)，则该 `instance` 的 `warning` 级别 (`HighMemoryUsage`) 告警 **不会被发送**。
+
+
+
+##### 第三步：重启 Alertmanager 使配置生效
+
+修改 `alertmanager.yml` 之后，需要重启 Alertmanager：
+
+```
+systemctl restart alertmanager
+```
+
+
+
+##### 第四步：验证抑制规则是否生效
+
+在 Alertmanager UI 页面 `http://localhost:9093` 上：
+
+1. 点击 **“Alerts”** 选项卡，查看当前触发的告警
+2. 被抑制的告警会显示 **“Inhibited”** 状态
+
+或者使用 API 检查已触发的告警：
+
+```bash
+curl -s http://localhost:9093/api/v2/alerts | jq
+```
+
+如果 `HighMemoryUsage` 告警没有出现在 API 返回值中，说明它被 `InstanceDown` 告警 **成功抑制**
+
+
+
+##### 结论
+
+| 步骤       | 说明                                                         |
+| ---------- | ------------------------------------------------------------ |
+| **第一步** | 使用 Prometheus API 查看告警规则的 Labels                    |
+| **第二步** | 在 `alertmanager.yml` 中配置 `inhibit_rules`                 |
+| **第三步** | 重启 Alertmanager 使新规则生效                               |
+| **第四步** | 在 UI 或 API 界面验证抑制效果                                |
+| **第五步** | 进行测试，确认 `warning` 级别告警被 `critical` 级别告警成功抑制 |
+
+
+
+#### 告警抑制案例
+
+##### 案例说明
+
+对于当前的flask应用的监控来说，上面做了两个监控指标：
+
+- 告警级别为 critical 的 服务异常终止
+- 告警级别为 warning 的 QPS访问量突然降低为0，这里以服务状态来模拟
+
+当python服务异常终止的时候，不要触发同节点上的 QPS 过低告警动作。
+
+##### 告警规则
+
+```bash
+# 准备告警规则
+[root@ubuntu2204 rules]# vim /usr/local/prometheus/rules/prometheus_alert_inhibit.yml
+groups:
+- name: flask_web
+  rules:
+  - alert: InstanceDown
+    expr: up{job="my_metric"} == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Instance {{ $labels.instance }} 停止工作"
+      description: "{{ $labels.instance }} job {{ $labels.job }} 已经停止1分钟以上"
+      value: "{{$value}}"
+- name: flask_QPS
+  rules:
+  - alert: InstanceQPSIsHight
+    expr: increase(request_count_total{job="my_metric"}[1m]) > 50
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Instance {{ $labels.instance }} QPS 持续过高"
+      description: "{{ $labels.instance }} job {{ $labels.job }} QPS 持续过高"
+      value: "{{$value}}"
+  - alert: InstanceQPSIsLow
+    expr: up{job="my_metric"} == 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Instance {{ $labels.instance }} QPS 异常为零"
+      description: "{{ $labels.instance }} job {{ $labels.job }} QPS 异常为0"
+      
+# 定制告警对象，并定定制抑制
+[root@ubuntu2204 rules]# vim /usr/local/alertmanager/conf/alertmanager.yml
+# 全局配置
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.qq.com:25'
+  smtp_from: '3140394153@qq.com'
+  smtp_auth_username: '3140394153@qq.com'
+  smtp_auth_password: 'XXXXXXXXXXXXXXXXX'
+  smtp_hello: 'qq.com'
+  smtp_require_tls: false
+
+# 模版配置
+templates:
+  - '../tmpl/*.tmpl'
+  
+# 路由配置
+route:
+  group_by: ['instance', 'cluster']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 10s
+  receiver: 'email'
+  routes:
+  - match:
+      severity: critical
+    receiver: 'admin-team'
+  - match_re:
+      severity: ^(warning)$
+    receiver: 'supper-team'
+
+# 收信人员
+receivers:
+- name: 'email'
+  email_configs:
+  - to: '15104600741@163.com'
+    send_resolved: true
+    html: '{{ template "test.html" . }}'
+    headers: { Subject: "[WARN] 报警邮件"}
+- name: 'admin-team'
+  email-configs:
+  - to: '15104600741@163.com'
+    html: '{{ template "test.html" . }}'
+    headers: { Subject "[CRITICAL] 应用服务报警邮件"}
+    send_resolved: true
+- name: 'supper-team'
+  email_configs:
+  - to: '15104600741@163.com'
+    html: '{{ template "test.html" . }}'
+    headers: { Subject: "[WARNNING] QPS负载告警邮件"}
+    send_resolved: true
+    
+# 抑制措施
+inhibit_rules:
+- source_match:
+    severity: critical
+  target_match
+    severity: warning
+  equal:
+    - instance
+
+# 重启ALertmanager服务
+[root@ubuntu2204 rules]# systemctl restart alertmanager.service
+```
+
+
+
+
+
+### Alertmanager 高可用
+
+#### 负载均衡
+
+![image-20250311100716671](../markdown_img/image-20250311100716671.png)
+
+#### Gossip协议实现
+
+```http
+https://yunlzheng.gitbook.io/prometheus-book/part-ii-prometheus-jin-jie/readmd/alertmanager-high-availability
+```
+
+Alertmanager引入了Gossip机制。**Gossip机制为多个Alertmanager之间提供了信息传递的机制**。确保及时在多个Alertmanager分别接收到相同告警信息的情况下，也只有一个告警通知被发送给Receiver。
+
+![image-20250311101848896](../markdown_img/image-20250311101848896.png)
+
+**Gossip**是分布式系统中被广泛使用的协议，**用于实现分布式节点之间的信息交换和状态同步**。Gossip协议同步状态类似于流言或者病毒的传播，[详请查看补充知识：Gossip协议](#Gossip协议)
+
+Gossip有两种实现方式分别为 **Push-based** 和 **Pull-based**。
+
+**Push-based**：在Push-based当集群中某一节点A完成一个工作后，随机的挑选其它节点B并向其发送相应的消息，节 点B接收到消息后在重复完成相同的工作，直到传播到集群中的所有节点。
+
+**Pull-based**：Pull-based的实现中节点A会随机的向节点B发起询问是否有新的状态需要同步，如果有则返回
+
+
+
+##### 搭建本地集群环境
+
+为了能够让Alertmanager节点之间进行通讯，需要在Alertmanager启动时设置相应的参数。其中主要 的参数包括：
+
+```bash
+--web.listen-address string          #当前实例Web监听地址和端口,默认9093
+--cluster.listen-address string      #当前实例集群服务监听地址,默认9094,集群必选
+--cluster.peer value                 #后续集群实例在初始化时需要关联集群中的已有实例的服务地址,集群的后续节点必选
+```
+
+**范例：在同一个主机用Alertmanager多实例实现**
+
+定义Alertmanager实例A1，其中Alertmanager的服务运行在9093端口，集群服务地址运行在8001端口。
+
+```bash
+alertmanager  --web.listen-address=":9093" --cluster.listen-address="127.0.0.1:8001" --config.file=/etc/prometheus/alertmanager.yml  --storage.path=/data/alertmanager/
+```
+
+定义Alertmanager实例A2，其中Alertmanager的服务运行在9094端口，集群服务运行在8002端口。 
+
+为了将A1，A2组成集群。 A2启动时需要定义--cluster.peer参数并且指向A1实例的集群服务地址:8001
+
+```bash
+alertmanager  --web.listen-address=":9094" --cluster.listen-address="127.0.0.1:8002" --cluster.peer=127.0.0.1:8001 --config.file=/etc/prometheus/alertmanager.yml  --storage.path=/data/alertmanager2/
+```
+
+**范例: 同一个主机上alertmanager三个实例实现Promthues与Alertmanager HA部署结构**
+
+![image-20250311144754307](../markdown_img/image-20250311144754307.png)
+
+```bash
+# 创建Alertmanager配置文件/etc/prometheus/alertmanager-ha.yml, 为了验证Alertmanager的集群行为，这里在本地启动一个webhook服务用于打印Alertmanager发送的告警通知信息
+route:
+  receiver: 'default-receiver'
+receivers:
+  - name: default-receiver
+    webhook_configs:
+    - url: 'http://127.0.0.1:5001/'
+    
+# 获取alertmanager提供的webhook示例，如果该目录下定义了main函数，go get会自动将其编译成可执行文件
+go get github.com/prometheus/alertmanager/examples/webhook
+
+# 设置环境变量指向GOPATH的bin目录
+export PATH=$GOPATH/bin:$PATH
+# 启动服务
+webhook
+
+#a1:
+alertmanager  --web.listen-address=":9093" --cluster.listen-address="127.0.0.1:8001" --config.file=/etc/prometheus/alertmanager-ha.yml  --storage.path=/data/alertmanager/ --log.level=debug
+#a2:
+alertmanager  --web.listen-address=":9094" --cluster.listen-address="127.0.0.1:8002" --cluster.peer=127.0.0.1:8001 --config.file=/etc/prometheus/alertmanager-ha.yml  --storage.path=/data/alertmanager2/ --log.level=debug
+#a3:
+alertmanager  --web.listen-address=":9095" --cluster.listen-address="127.0.0.1:8003" --cluster.peer=127.0.0.1:8001 --config.file=/etc/prometheus/alertmanager-ha.yml  --storage.path=/data/alertmanager2/ --log.level=debug
+
+#创建Promthues集群配置文件/etc/prometheus/prometheus-ha.yml，完整内容如下：
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+rule_files:
+  - /etc/prometheus/rules/*.rules
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - 127.0.0.1:9093
+      - 127.0.0.1:9094
+      - 127.0.0.1:9095
+scrate_configs:
+- job_name: prometheus
+  static_configs:
+  - targets:
+    - localhost: 9090
+- job_name: 'node'
+  static_configs:
+  - targets: ['localhost:9100']
+  
+#同时定义告警规则文件/etc/prometheus/rules/hoststats-alert.rules，如下所示：
+groups:
+- name: hostStatsAlert
+  rules:
+  - alert: hostCpuUsageAlert
+    expr: sum(avg without (cpu)(irate(node_cpu{mode!='idle'}[5m]))) by(instance) * 100 > 50
+    for: 1m
+    labels:
+      severity: page
+    annotations:
+      summary: "Instance {{ $labels.instance }} CPU usage high"
+      description: "{{ $labels.instance }} CPU usage above 50% (current value: {{ $value }})"
+  - alert: hostMamUsageAlert
+    expr:  (node_memory_MemTotal - node_memory_MemAvailable)/node_memory_MemTotal * 100 > 85
+    for: 1m
+    labels:
+      severity: page
+    annotations:
+      summary: "Instance {{ $labels.instance }} MEM usage high"
+      description: "{{ $labels.instance }} MEM usage above 85% (crrent value: {{ $value }})"
+      
+# 创建prometheus.procfile文件，创建两个Promthues节点，分别监听9090和9091端口:
+# p1:
+prometheus --config.file=/etc/prometheus/prometheus-ha.yml --storage.tsdb.path=/data/prometheus/ --web.listen-address="127.0.0.1:9090"
+# p2:
+prometheus --config.file=/etc/prometheus/prometheus-ha.yml --storage.tsdb.path=/data/prometheus2/ --web.listen-address="127.0.0.1:9091"
+
+#node_exporter
+node_exporter: node_exporter -web.listen-address="0.0.0.0:9100"
+```
+
+范例：docker compose 实现
+
+```yaml
+version: '3.6'
+networks:
+  monitoring:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+        
+volumes:
+  alertmanager01_data: {}
+  alertmanager02_data: {}
+  alertmanager03_data: {}
+  
+services:
+  alertmanager01:
+    image: prom/alertmanager:v0.24.0
+    volumes:
+      - ./alertmanager/:/etc/alertmanager/
+      - alertmanager01_data:/alertmanager
+    networks:
+      - monitoring
+    ports:
+      - 9093:9093
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+      - '--cluster.listen-address=0.0.0.0:9094'
+      -- '--cluster.peer-timeout=15s'
+      
+  alertmanager02:
+    image: prom/alertmanager:v0.24.0
+    volumes:
+      - ./alertmanager/:/etc/alertmanager/
+      - alertmanager02_data:/alertmanager
+    networks:
+      - monitoring
+    ports:
+      - 19093:9093
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+      - '--cluster.listen-address=0.0.0.0:9094'
+      -- '--cluster.peer-timeout=15s'
+      
+  alertmanager03:
+    image: prom/alertmanager:v0.24.0
+    volumes:
+      - ./alertmanager/:/etc/alertmanager/
+      - alertmanager03_data:/alertmanager
+    networks:
+      - monitoring
+    ports:
+      - 29093:9093
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+      - '--cluster.listen-address=0.0.0.0:9094'
+      -- '--cluster.peer-timeout=15s'
+      
+  prometheus-webhook-dingtalk:
+    image: timonwong/prometheus-webhook-dingtalk:v2.1.0
+    volumes:
+      - ./dingtalk/:/etc/prometheus-webhook-dingtalk/
+    #command:
+      # --config.file=config.yml
+      # --config.file=/etc/prometheus-webhook-dingtalk/config-with-template.yml
+    networks:
+      - monitoring
+    ports:
+      - 8086:8086
+      
+# prometheus.yml 添加配置
+......
+alerting:
+  alertmanager:
+  - static_configs:
+    - targets:
+      - alert.mystical.org:9093
+      - alert.mystical.org:19093
+      - alert.mystical.org:29093
+......
+```
+
+
+
+
+
+## 服务发现
+
+### 服务发现原理
+
+#### 服务发现介绍
+
+Prometheus Server的数据抓取工作于Pull模型，因而，它必需要事先知道各Target的位置，然后才能从相应的Exporter或Instrumentation中抓取数据。
+
+在不同的场景下，需要结合不同的机制来实现对应的数据抓取目的。
+
+对于小型的系统环境来说，通过static_configs指定各Target便能解决问题，这也是最简单的配置方法,我 们只需要在配置文件中，将每个Targets用一个网络端点（ip:port）进行标识；
+
+```bash
+  - job_name: 'node_exporter'
+    static_configs:
+    - targets: ['10.0.0.101:9100']
+```
+
+对于中大型的系统环境或具有较强动态性的云计算环境来说，由于场景体量的因素，静态配置显然难以适用
+
+![image-20250311154443872](../markdown_img/image-20250311154443872.png)
+
+因此，Prometheus为此专门设计了一组服务发现机制，以便于能够基于服务注册中心自动发现、检测、分类可被监控的各Target，以及更新发生了变动的Target
+
+各个节点会主动注册相关属性信息到服务注册中心，即使属性发生变动，注册中心的属性也会随之更改。
+
+一旦节点过期了，或者失效了，服务注册中心，会周期性的方式自动将这些信息清理出去。
+
+**服务发现机制**
+
+```http
+https://prometheus.io/docs/prometheus/latest/configuration/configuration/
+```
+
+对于prometheus的服务发现机制，这里面提供了二十多种服务发现机制，常见的几种机制如下：
+
+| 方法                 | 解析                                                         |
+| -------------------- | ------------------------------------------------------------ |
+| 静态服务发现         | 在Prometheus配置文件中**通过static_config项**,手动添加监控的主机实现 |
+| 基于文件的服务发现   | 将各target记录到文件中，prometheus启动后，周期性刷新这个文件，从而获取最新的target |
+| 基于 DNS 的服务发现  | 针对一组DNS域名进行定期查询，以发现待监控的目标，并持续监视相关资源的变动 |
+| 基于 Consul 服务发现 | 基于 Consul 服务实现动态自动发现                             |
+| 基于 HTTP 的服务发现 | 基于 HTTP 的服务发现提供了一种更通用的方式来配置静态目标，并用作插入自定义 服务发现机制的接口。<br />它从包含零个或多个  列表的 HTTP 端点获取目标。 目标必须回复 HTTP 200 响应。 HTTP header Content-Type 必须是 application/json，body 必须 是有效的 JSON |
+| 基于 API 的服务发现  | 支持将Kubernetes API Server中Node、Service、Endpoint、Pod和Ingress等资源类型下相应的各资源对象视作target，并持续监视相关资源的变动。 |
+
+
+
+#### 服务发现原理
+
+![image-20250311160834013](../markdown_img/image-20250311160834013.png)
+
+Prometheus 的 **服务发现（Service Discovery, SD）** 主要用于动态发现要监控的目标（targets），避免手动配置目标 IP 或主机名，特别适用于 **云环境、Kubernetes、Consul、ECS** 等动态变化的场景。 
+
+##### 服务发现的主要组成部分
+
+Prometheus 服务发现大致由以下 3 个部分组成：
+
+- 配置处理模块（配置解析）
+- `DiscoveryManager` 发现管理器
+- Scrape 组件（拉取数据）
+
+**配置处理模块**
+
+- **作用：** 解析 `prometheus.yml` 中的 `scrape_configs` 配置，将每个 `job` **生成不同类型的 Discoverer（发现器）**。
+- **不同的 Discoverer 实现方式：**
+  - 静态配置（Static Configuration）
+  - Kubernetes API 服务发现（Kubernetes SD）
+  - Consul 服务发现（Consul SD）
+  - EC2、Azure、OpenStack、Docker、Eureka 等
+
+**示例**
+
+```bash
+scrape_configs:
+  - job_name: 'node'
+    static_configs:
+      - targets: ['10.0.0.1:9100', '10.0.0.2:9100']
+    file_sd_configs:
+      - files:
+        - 'targets.json'
+```
+
+**解析过程**：Prometheus 发现 `scrape_configs` 下有 `static_configs` 和 `file_sd_configs`，它会生成两个不同的 Discoverer 进行 target 发现。
+
+
+
+##### DiscoveryManager 组件
+
+**作用：** 负责管理所有 Discoverer，并定期检查是否有新的 targets 出现或消失。
+
+**工作方式:**
+
+- **每 5 秒检查** target 列表
+- **如果有变更**，则将最新的 target 信息放入 `syncCh` 消息队列
+- `syncCh` 里的数据会被 `Scrape` 组件消费
+
+**作用类似 “搬运工”**，本身不做任何处理，只负责发现并同步 targets。
+
+**示例**
+
+```bash
+scrape_configs:
+  - job_name: 'consul'
+    consul_sd_configs:
+      - server: 'consul-server:8500'
+```
+
+**发现过程：**
+
+- Prometheus 发现 `consul_sd_configs`，创建 `ConsulDiscoverer`
+- `ConsulDiscoverer` 连接到 `consul-server`
+- **每 5 秒轮询 Consul API**，如果有服务变更，就更新 targets 并放入 `syncCh` 队列
+
+
+
+##### Scrape 组件
+
+**作用：** 负责实际的 `HTTP` 拉取目标数据
+
+**如何使用服务发现结果**
+
+- `Scrape` 组件不关心服务发现的细节
+- 只会消费 `syncCh` 队列里的 targets
+- 如果 `syncCh` 里有变更，就更新 `scrape` 任务
+
+**示例**
+
+```yaml
+scrape_configs:
+  - job_name: 'kubernetes-nodes'
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - source_labels: ['__meta_kubernetes_node_name']
+        target_label: 'node'
+```
+
+**拉取过程：**
+
+- `kubernetes_sd_configs` 发现 Kubernetes `node` 变更
+- `syncCh` 收到新 targets
+- `Scrape` 组件收到后，开始对新的 targets 进行数据拉取
+
+
+
+##### **总结**
+
+| 组件                 | 作用                                  | 关键点                                 |
+| -------------------- | ------------------------------------- | -------------------------------------- |
+| **配置解析**         | 解析 `scrape_configs` 生成 Discoverer | 不同 Discoverer 负责不同类型的服务发现 |
+| **DiscoveryManager** | 统一管理所有 Discoverer，每 5 秒同步  | 发现目标变更并存入 `syncCh` 队列       |
+| **Scrape 组件**      | 实际拉取数据的执行者                  | 只消费 `syncCh` 里的 targets           |
+
+✅ **不同 Discoverer 维护各自的 target 列表，而 DiscoveryManager 统一管理这些 Discoverer**。
+✅ **DiscoveryManager 每 5s 检查 Discoverer 发现的 targets 是否有变化**，如果有变化，就**向 `syncCh` 发送变更通知**。
+✅ **Scrape 组件监听 `syncCh`，并从 `DiscoveryManager` 获取最新的 targets 列表，以更新抓取任务，最终拉取监控数据**。
+
+
+
+### 文件服务发现
+
+#### 文件发现服务说明
+
+基于文件的服务发现是仅仅略优于静态配置的服务发现方式，它不依赖于任何平台或第三方服务，因而也是最为简单和通用的实现方式
+
+**文件发现原理**
+
+- Target的文件可由手动创建或利用工具生成，例如Ansible或Saltstack等配置管理系统，也可能是由脚本基于CMDB定期查询生成
+- 文件可使用YAML和JSON格式，它含有定义的Target列表，以及可选的标签信息,YAML 适合于运维场景, JSON 更适合于开发场景
+- Prometheus Server定期从文件中加载Target信息，根据文件内容发现相应的Target
+
+**参考资料**
+
+```http
+https://prometheus.io/blog/2015/06/01/advanced-service-discovery/#custom-service-discovery
+https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config
+```
+
+**配置过程和格式**
+
+```bash
+# 准备主机节点列表文件,可以支持 yaml 格式和 json 格式
+# 注意：此文件不建议就地编写生成，可能出现加载一部分的情况
+cat targets/prometheus*.yaml
+- targets:
+  - master1: 9100
+  labels:
+    app: prometheus
+
+# 修改prometheus配置文件自动加载实现自动发现
+cat prometheus.yml
+......
+  - job_name: 'file_sd_prometheus'
+    scrape_interval: 10s             # 指定抓取数据的时间间隔,默认继取全局的配置15s
+    file_sd_configs:
+    - files:                         # 指定要加载的文件列表
+      - targets/prometheus*.yaml     # 要加载的yml或json文件路径，支持glob通配符,相对路径是相对于prometheus.yml配置文                                        件路径
+      refresh_interval: 2m           # 每隔2分钟重新加载一次文件中定义的Targets，默认为5m
+      
+# 注意：文件格式都是yaml或json格式
+```
+
+
+
+#### 文件服务发现案例
+
+范例:  通过yaml格式的文件发现，将所有的节点都采用自动发现机制
+
+```bash
+# 创建目标目录
+[root@ubuntu2204 rules]# mkdir /usr/local/prometheus/conf/targets
+[root@ubuntu2204 rules]# cd /usr/local/prometheus/conf/targets
+
+# 添加linux主机目标
+[root@ubuntu2204 rules]# ls /usr/local/prometheus/conf/targets/
+prometheues-flask.yml  prometheues-node.yml  prometheues-server.yml
+
+# 创建prometheus的服务配置
+[root@ubuntu2204 rules]# cat  /usr/local/prometheus/conf/targets/prometheues-server.yml
+- targets:
+  - 10.0.0.101:9090
+  labels:
+    app: prometheus-server
+    job: prometheus-server
+    
+[root@ubuntu2204 rules]# cat  /usr/local/prometheus/conf/targets/prometheues-node.yml
+- targets:
+  - 10.0.0.101:9100
+  labels:
+    app: prometheus
+    job: prometheus
+- targets:
+  - 10.0.0.104:9100
+  - 10.0.0.105:9100
+  labels:
+    app: node-exporter
+    job: node
+    
+[root@ubuntu2204 rules]# cat  /usr/local/prometheus/conf/targets/prometheues-flask.yml
+- targets:
+  - 10.0.0.101:8000
+  labels:
+    app: flask-web
+    job: prometheus-flask
+    
+# 修改prometheus的配置文件，让它自动加载文件中的节点信息
+cd /usr/local/prometheus/conf
+cp prometheus.yml{,.bak}
+
+# 编辑配置文件
+[root@ubuntu2204 rules]# cat /usr/local/prometheus/conf/prometheus.yml
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+      - targets:
+
+rule_files:
+scrape_configs:
+  - job_name: "file_sd_prometheus"
+    scrape_interval: 10s               # 指定抓取数据的时间间隔
+    file_sd_configs:
+    - files:
+      - targets/prometheus-server.yml
+      refresh_interval: 10s            # 指定重读文件的时间间隔
+      
+  - job_name: 'file_sd_node_exporter'
+    file_sd_configs:
+    - files:
+      - targets/prometheus-node.yml
+      refresh_interval: 10s
+  
+  - job_name: 'file_sd_flask_web'
+    file_sd_configs:
+    - files:
+      - targets/prometheus-flask.yml
+      refresh_interval: 10s
+      
+# 配置文件语法检查
+promtool check config prometheus.yml
+
+# 重启服务
+systemctl restart prometheus.service
+
+# 稍等几秒钟，到浏览器中查看监控目标
+# c结果显示：所有的节点都添加完毕了，而且每个节点都有自己的标签信息
+```
+
+```bash
+# 后续可以自由的编辑文件，无需重启prometheus服务，就可以做到自动发现的效果
+[root@ubuntu2204 rules]# cd /usr/local/prometheus/targets
+[root@ubuntu2204 rules]# vim  prometheues-node.yml
+
+# 添加linux主机目标
+[root@ubuntu2204 rules]# cat prometheues-node.yml
+- targets:
+  - 10.0.0.104: 9100
+  - 10.0.0.105: 9100
+  - 10.0.0.106: 9100   # 加此行
+......
+
+# 文件保存后，稍等几秒钟，会自动加载当前的配置文件里面的信息，查看一下浏览器
+# 结果显示：节点的自动服务发现成功了。以后，对所有节点批量管理的时候，借助于ansible等工具，就可以非常轻松的实现
+# 如果将文件中的指定的节点行删除，Prometheus也会自动将其从发现列表中删除
+```
+
+
+
+### DNS 服务发现
+
+#### DNS 服务发现说明
+
+参考资料：
+
+```http
+https://prometheus.io/docs/prometheus/latest/configuration/configuration/#dns_sd_config
+```
+
+基于DNS的服务发现针对一组DNS域名进行定期查询，以发现待监控的目标
+
+- 查询时使用的DNS服务器由Prometheus服务器的 **/etc/resolv.conf** 文件指定
+- 该发现机制依赖于A、AAAA和SRV资源记录，且仅支持该类方法，尚不支持RFC6763中的高级 DNS 发现方式
+
+基于DNS服务发现会自动生成的元数据标签：
+
+```bash
+__meta_dns_name
+    the record name that produced the discovered target.
+__meta_dns_srv_record_target
+    the target field of the SRV record
+__meta_dns_srv_record_port
+    the port field of the SRV record
+```
+
+
+
+#### SRV记录详解
+
+SRV (**Service Record**) 记录是一种 **DNS 记录**，用于指定某个**服务**（如 HTTP、LDAP、SIP、Minecraft 等）在哪些服务器上运行，以及它们的**端口**、**优先级**和**权重**。
+
+**它的主要作用：**
+
+- 允许为**同一个服务**（如 `sip.example.com`）使用多个服务器
+- 方便**将服务从一个主机迁移到另一个主机**，而无需更改客户端配置
+- 允许**负载均衡和主备切换**，通过不同的优先级（`priority`）和权重（`weight`）控制流量分配
+
+
+
+##### 🔍 SRV 记录的格式
+
+```ABAP
+_service._protocol.name. TTL class SRV priority weight port target
+```
+
+| **字段**    | **说明**                               |
+| ----------- | -------------------------------------- |
+| `_service`  | 服务名称，例如 `_sip`, `_ldap`         |
+| `_protocol` | 使用的协议，如 `_tcp`, `_udp`          |
+| `name`      | 关联的域名                             |
+| `TTL`       | 生存时间                               |
+| `class`     | 通常为 `IN`（Internet）                |
+| `SRV`       | 记录类型                               |
+| `priority`  | **优先级**（数值越小优先级越高）       |
+| `weight`    | **权重**（相同优先级时，用于流量分配） |
+| `port`      | 该服务监听的端口                       |
+| `target`    | 提供该服务的主机名                     |
+
+
+
+##### **🔍 SRV 记录示例**
+
+假设 **example.com** 提供 SIP 服务，运行在 3 台服务器上：
+
+1. 主服务器：sip1.example.com
+   - 端口 **5060**
+   - **优先级** 10
+   - **权重** 60%
+2. 备用服务器 1：sip2.example.com
+   - 端口 **5060**
+   - **优先级** 10
+   - **权重** 40%
+3. 备用服务器 2：sip3.example.com
+   - 端口 **5060**
+   - **优先级** 20（备用）
+   - **权重** 100%（如果启用）
+
+**DNS 配置**
+
+```bash
+_sip._tcp.example.com. 3600 IN SRV 10 60 5060 sip1.example.com.
+_sip._tcp.example.com. 3600 IN SRV 10 40 5060 sip2.example.com.
+_sip._tcp.example.com. 3600 IN SRV 20 100 5060 sip3.example.com.
+```
+
+
+
+##### 🛠 如何解析 SRV 记录？
+
+当客户端请求 `_sip._tcp.example.com`，DNS 服务器返回：
+
+1. **sip1.example.com（优先级 10，权重 60）**
+2. **sip2.example.com（优先级 10，权重 40）**
+3. **sip3.example.com（优先级 20，权重 100，仅 sip1 和 sip2 不可用时才会用）**
+
+客户端解析方式：
+
+- **先选择优先级最低的（数值最小的）**
+- 在相同优先级下，按权重分配流量（如 60% 给 `sip1`，40% 给 `sip2`）
+- 只有当 **sip1 和 sip2 均不可用** 时，才会使用 `sip3`
+
+
+
+##### 🔍 使用 `nslookup` 查询 SRV 记录
+
+**语法**
+
+```bash
+nslookup -querytype=SRV _service._protocol.domain
+```
+
+其中：
+
+- `_service`：要查询的服务名，例如 `_sip`
+- `_protocol`：使用的协议，如 `_tcp` 或 `_udp`
+- `domain`：所属的域名
+
+**示例 1：查询 VoIP / SIP 服务**
+
+如果 `example.com` 提供 SIP 服务器：
+
+```bash
+_sip._tcp.example.com. 3600 IN SRV 10 60 5060 sip1.example.com.
+_sip._tcp.example.com. 3600 IN SRV 10 40 5060 sip2.example.com.
+_sip._tcp.example.com. 3600 IN SRV 20 100 5060 sip-backup.example.com.
+```
+
+**使用 `nslookup` 查询**
+
+```bash
+nslookup -querytype=SRV _sip._tcp.example.com
+```
+
+**输出示例**
+
+```bash
+Server:  dns.example.com
+Address:  192.168.1.1
+
+Non-authoritative answer:
+_sip._tcp.example.com  SRV service location:
+   priority = 10
+   weight   = 60
+   port     = 5060
+   target   = sip1.example.com
+_sip._tcp.example.com  SRV service location:
+   priority = 10
+   weight   = 40
+   port     = 5060
+   target   = sip2.example.com
+_sip._tcp.example.com  SRV service location:
+   priority = 20
+   weight   = 100
+   port     = 5060
+   target   = sip-backup.example.com
+```
+
+**解析**
+
+- `sip1.example.com` 和 `sip2.example.com` 具有相同的 **优先级 10**，所以会进行 **60:40 负载均衡**
+- `sip-backup.example.com` 的 **优先级 20**，只有在前两个不可用时才会被使用
+
+
+
+#### Prometheus 使用 DNS SRV 进行服务发现的流程
+
+- **查询 SRV 记录**
+
+​	Prometheus 解析 `SRV` 记录，获取目标服务的**主机名和端口**。
+
+- **解析 A / AAAA 记录**
+
+​	解析 `SRV` 记录中指定的主机名，获取其对应的**IP 地址**（A 记录返回 IPv4，AAAA 记录返回 IPv6）
+
+- **最终生成 Target 列表**
+
+​	Prometheus 将解析出的 **(IP:Port) 目标列表** 添加到 `scrape` 任务中，并定期更新。
+
+
+
+**示例：使用 DNS SRV 进行 Prometheus 服务发现**
+
+**1️⃣ DNS 配置**
+
+假设 `example.com` 负责负载均衡 `node-exporter` 进程，我们可以配置 SRV 记录：
+
+```bash
+# DNS SRV 记录 (提供 node-exporter 的主机名 + 端口)
+_node-exporter._tcp.example.com. 300 IN SRV 10 60 9100 node1.example.com.
+_node-exporter._tcp.example.com. 300 IN SRV 10 40 9100 node2.example.com.
+
+# DNS A 记录 (解析主机名到 IP 地址)
+node1.example.com.  300 IN A 192.168.1.10
+node2.example.com.  300 IN A 192.168.1.20
+```
+
+**解析结果**
+
+- **SRV 记录告诉 Prometheus**：
+  - `node1.example.com:9100`（60% 权重）
+  - `node2.example.com:9100`（40% 权重）
+- **A 记录解析**：
+  - `node1.example.com` → `192.168.1.10`
+  - `node2.example.com` → `192.168.1.20`
+- **最终 Prometheus 发现的 Targets**：
+  - `192.168.1.10:9100`
+  - `192.168.1.20:9100`
+
+**2️⃣ Prometheus 配置**
+
+在 `prometheus.yml` 配置文件中使用 `dns_sd_configs`：
+
+```yaml
+scrape_configs:
+  - job_name: 'node-exporter'
+    dns_sd_configs:
+      - names:
+          - '_node-exporter._tcp.example.com'
+        type: 'SRV'
+        refresh_interval: 30s  # 每30秒重新发现
+```
+
+🔹 `names`: 指定 `SRV` 记录的名称
+ 🔹 `type`: 设为 `SRV`，让 Prometheus 使用 **SRV + A 记录** 完整解析
+ 🔹 `refresh_interval`: 定期检查更新 Target 列表（默认 30s）
+
+**3️⃣ Prometheus 执行解析**
+
+**先查询 `_node-exporter._tcp.example.com` 的 `SRV` 记录，获得：**
+
+```bash
+node1.example.com:9100
+node2.example.com:9100
+```
+
+**再查询 `A` 记录，将主机名解析为 IP**
+
+```bash
+192.168.1.10:9100
+192.168.1.20:9100
+```
+
+**最终 Prometheus 开始抓取数据** 🎯
+
+```bash
+http://192.168.1.10:9100/metrics
+http://192.168.1.20:9100/metrics
+```
+
+
+
+#### Prometheus 解析 SRV 记录的过程
+
+**🔍 Prometheus 的 DNS 服务发现机制**
+
+1. **从 `scrape_configs` 读取 `dns_sd_configs` 配置**
+
+   ```yaml
+   scrape_configs:
+     - job_name: 'srv_example'
+       dns_sd_configs:
+         - names:
+             - '_database._tcp.example.com'
+           type: 'SRV'
+           refresh_interval: 30s
+   ```
+
+   这里指定 **Prometheus 使用 `SRV` 记录进行服务发现**，每 `30s` 重新解析一次。
+
+2. **调用 `Discoverer` 组件**
+
+   - `Discoverer` 组件会查询 **DNS SRV 记录**，获取**主机名（域名）和端口**。
+
+   - 例如：
+
+     ```bash
+     _database._tcp.example.com.  300  IN  SRV  10  100  5432  db1.example.com.
+     _database._tcp.example.com.  300  IN  SRV  20  100  5432  db2.example.com.
+     ```
+
+   - 这个 `SRV` 记录告诉 Prometheus：
+
+     - `db1.example.com`（优先级 10）端口 `5432`
+     - `db2.example.com`（优先级 20）端口 `5432`
+
+3. **解析 SRV 记录的主机名**
+
+   - `Discoverer` 进一步查询 `A` 记录或 `CNAME` 将域名解析成 IP 地址：
+
+     ```bash
+     db1.example.com.  300  IN  A  192.168.1.10
+     db2.example.com.  300  IN  A  192.168.1.20
+     ```
+
+   - 最终，Prometheus 发现了这两个 `target`：
+
+     ```bash
+     192.168.1.10:5432
+     192.168.1.20:5432
+     ```
+
+4. **将发现的 `target` 存入 `targets` 列表**
+
+   - Prometheus `Discoverer` 组件把解析出的 IP + 端口添加到 `targets` 列表，并在 `scrape_interval` 进行数据抓取。
+
+```ABAP
+注意：对于 Prometheus 的服务发现，SRV 记录的优先级（priority）没有作用，Prometheus 会并行抓取所有解析出的 targets，并不会根据优先级进行筛选或排序。
+```
+
+
+
+#### DNS服务发现案例
+
+##### 部署和配置 DNS
+
+```bash
+#安装软件
+apt update && apt -y install bind9
+
+# 定制正向解析zone的配置
+[root@devops bind]# cat /etc/bind/named.conf.default-zones 
+zone "mystical.org" {
+    type master;
+    file "/etc/bind/db.mystical.org";
+};
+
+# 定制主域名的zone文件
+[root@devops bind]#cat /etc/bind/db.mystical.org 
+$TTL 86400
+
+@ IN SOA ns1 mysticalrecluse.gmail.com. (123 1h 10m 1D 12h)
+
+      NS ns1
+ns1   A  10.0.0.207
+node1 A  10.0.0.201
+node2 A  10.0.0.203
+
+# 重启dns服务
+[root@devops bind]# systemctl restart named
+
+# 配置prometheus服务器使用DNS域名服务器
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    eth0:
+      addresses:
+      - 10.0.0.201/24
+      gateway4: 10.0.0.2
+      nameservers:
+        addresses: [10.0.0.207]
+
+# 应用网络配置
+[root@ubuntu2204 ~]#netplan apply
+
+# 确认dns解析结果
+[root@ubuntu2204 ~]#nslookup node1.mystical.org
+Server:		127.0.0.53
+Address:	127.0.0.53#53
+
+Non-authoritative answer:
+Name:	node1.mystical.org
+Address: 10.0.0.201
+```
+
+##### 配置 DNS 服务支持 SRV 记录
+
+```bash
+# 添加SRV记录
+[root@devops bind]#cat /etc/bind/db.mystical.org 
+$TTL 86400
+
+@ IN SOA ns1 mysticalrecluse.gmail.com. (123 1h 10m 1D 12h)
+
+      NS ns1
+ns1   A  10.0.0.207
+node1 A  10.0.0.201
+node2 A  10.0.0.203
+
+# 添加下面的SRV记录，对应上面的两条A记录
+_prometheus._tcp.mystical.org. SRV 10 10 9100 node1.mystical.org.
+_prometheus._tcp.mystical.org. SRV 10 10 9100 node2.mystical.org.
+
+# 生效
+[root@devops bind]#rndc reload
+
+# 测试解析
+[root@ubuntu2204 ~]#nslookup -querytype=SRV _prometheus._tcp.mystical.org
+Server:		127.0.0.53
+Address:	127.0.0.53#53
+
+Non-authoritative answer:
+_prometheus._tcp.mystical.org	service = 10 10 9100 node2.mystical.org.
+_prometheus._tcp.mystical.org	service = 10 10 9100 node1.mystical.org.
+
+Authoritative answers can be found from:
+node1.mystical.org	internet address = 10.0.0.201
+node2.mystical.org	internet address = 10.0.0.203
+```
+
+##### 配置 Prometheus 使用 DNS
+
+```bash
+[root@ubuntu2204 ~]#vim /usr/local/prometheus/conf/prometheus.yml
+......
+  - job_name: "dns_sd_node_exporter"            # 实现批量主机解析
+    dns_sd_configs:
+    - name: ['_prometheus._tcp_mystical.org']   # SRV记录必须通过DNS的实现
+      refresh_interval: 10s                     # 指定DNS资源记录的刷新间隔,默认30s
+      :wq
+#  - job_name: 'dns_sd_node'                    # 实现单个主机定制的信息解析，也支持DNS或/etc/hosts文件实现解析
+#    dns_sd_configs:
+#    - name: ['node1.mystical.org']
+#      type: A                                  # 指定记录类型，默认SRV
+#      port: 9100                               # 不是SRV时，需要指定Port号
+#      refresh_interval: 10s
+
+# 语法检查
+[root@ubuntu2204 ~]#promtool check config /usr/local/prometheus/conf/prometheus.yml
+
+# 重启
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+```
+
+##### 验证结果
+
+![image-20250312095720287](../markdown_img/image-20250312095720287.png)
+
+![image-20250312095804390](../markdown_img/image-20250312095804390.png)
+
+##### 添加和删除SRV记录
+
+```bash
+[root@devops bind]#cat /etc/bind/db.mystical.org 
+$TTL 86400
+
+@ IN SOA ns1 mysticalrecluse.gmail.com. (123 1h 10m 1D 12h)
+
+      NS ns1
+ns1   A  10.0.0.207
+node1 A  10.0.0.201
+node2 A  10.0.0.203
+node3 A  10.0.0.202
+
+_prometheus._tcp.mystical.org. SRV 10 10 9100 node1.mystical.org.
+_prometheus._tcp.mystical.org. SRV 10 10 9100 node2.mystical.org.
+_prometheus._tcp.mystical.org. SRV 10 10 9100 node3.mystical.org.     # 添加这一行
+
+# 注意将安全策略关闭
+[root@devops bind]#cat /etc/bind/named.conf.options 
+options {
+	directory "/var/cache/bind";
+
+	// If there is a firewall between you and nameservers you want
+	// to talk to, you may need to fix the firewall to allow multiple
+	// ports to talk.  See http://www.kb.cert.org/vuls/id/800113
+
+	// If your ISP provided one or more IP addresses for stable 
+	// nameservers, you probably want to use them as forwarders.  
+	// Uncomment the following block, and insert the addresses replacing 
+	// the all-0's placeholder.
+
+	// forwarders {
+	// 	0.0.0.0;
+	// };
+
+	//========================================================================
+	// If BIND logs error messages about the root key being expired,
+	// you will need to update your keys.  See https://www.isc.org/bind-keys
+	//========================================================================
+	dnssec-validation no;    # 一定要显式的改为no
+
+	listen-on-v6 { any; };
+};
+
+# 测试
+[root@ubuntu2204 ~]#nslookup -q=srv _prometheus._tcp.mystical.org
+Server:		127.0.0.53
+Address:	127.0.0.53#53
+
+Non-authoritative answer:
+_prometheus._tcp.mystical.org	service = 10 10 9100 node2.mystical.org.
+_prometheus._tcp.mystical.org	service = 10 10 9100 node1.mystical.org.
+_prometheus._tcp.mystical.org	service = 10 10 9100 node3.mystical.org.
+
+Authoritative answers can be found from:
+node2.mystical.org	internet address = 10.0.0.203
+node1.mystical.org	internet address = 10.0.0.201
+node3.mystical.org	internet address = 10.0.0.202
+```
+
+#####  确认是否自动发现生效
+
+![image-20250312100841814](../markdown_img/image-20250312100841814.png)
+
+
+
+### Consul 服务发现
+
+#### Consul 介绍
+
+![image-20250311224403144](../markdown_img/image-20250311224403144.png)
+
+单体架构逐渐被微服务架构所替代，原本不同功能模被拆分成了多个不同的服务
+
+原本模块间的通信只需要函数调用就能够实现，现在却做不到了，因为它们不在同一个进程中，甚至服务都可能部署到不同的机房。
+
+服务间的通信成为了迈向微服务大门的第一道难关
+
+- ServiceA 如何知道 ServiceB 在哪里
+- ServiceB 可能会有多个副本提供服务，其中有些可能会挂掉，如何避免访问到"不健康的"的  ServiceB
+- 如何控制只有 ServiceA 可以访问到 ServiceB
+
+Consul 是HashiCorp 公司开发的一种服务网格解决方案，使团队能够管理服务之间以及跨本地和多云环境和运行时的安全网络连接
+
+Consul 提供服务发现、服务网格、流量管理和网络基础设施设备的自动更新
+
+Consul 是一个用来实现分布式系统的服务发现与配置的开源工具
+
+Consul 采用golang开发
+
+Consul 具有高可用和横向扩展特性
+
+Consul的一**致性协议采用更流行的Raft 算法**（Paxos的简单版本），用来**保证服务的高可用**
+
+Consul **使用 GOSSIP 协议**（P2P的分布式协议去中心化结构下，通过将信息部分传递，达到全集群的状态信息传播,和 Raft 目标是强一致性不同，Gossip 达到的是最终一致性）**管理成员和广播消息, 并且支持  ACL 访问控制**
+
+Consul自带一个Web UI管理系统， 可以通过参数启动并在浏览器中直接查看信息。
+
+Consul 提供了一个控制平面，使您能够注册、查询和保护跨网络部署的服务。控制平面是网络基础结构的一部分，它维护一个中央注册表来跟踪服务及其各自的 IP 地址。它是一个分布式系统，在节点集群上运行，例如物理服务器、云实例、虚拟机或容器。
+
+**官网:**
+
+```http
+https://www.consul.io/
+```
+
+![image-20250311225128998](../markdown_img/image-20250311225128998.png)
+
+**帮助文档**
+
+```http
+https://developer.hashicorp.com/consul/docs
+```
+
+ **Consul 关键特性：**
+
+- **service discovery**：consul通过DNS或者HTTP接口实现服务注册和服务发现
+- **health checking**：健康检测使consul可以快速的告警在集群中的操作。和服务发现的集成，可以 防止服务转发到故障的服务上面。
+- **key/value storage**：一个用来存储动态配置的系统。提供简单的HTTP接口，可以在任何地方操作
+- **multi-datacenter**：无需复杂的配置，即可支持任意数量的区域
+
+
+
+**Gossip vs Raft 在 Consul 中的作用**
+
+Consul **同时使用** **Gossip 协议** 和 **Raft 共识算法**，但它们的 **作用范围不同**：
+
+| **协议**   | **作用**                                               | **在哪些组件之间使用**                     | **作用范围**         |
+| ---------- | ------------------------------------------------------ | ------------------------------------------ | -------------------- |
+| **Gossip** | 维护集群成员状态（节点发现、健康检查、失效检测）       | `所有 Server Agent` 和 `所有 Client Agent` | 轻量级元数据传播     |
+| **Raft**   | 维护 Server 之间的数据一致性（KV 存储、服务注册、ACL） | `仅用于 Server Agent 之间`                 | **强一致性数据复制** |
+
+
+
+#### Consul 数据同步流程
+
+##### **（1）Gossip 协议**
+
+**作用：**
+
+- **节点发现**
+- **健康状态传播**
+- **Failure Detection（失效检测）**
+
+**Gossip 负责的是元数据，而不是服务注册数据**
+
+- Gossip **不会在 Client → Server 之间同步服务注册**
+- **Gossip 只负责节点信息的传播**，比如：
+  - **“这个节点是健康的”**
+  - **“这个节点已经宕机”**
+  - **“这个 Client Agent 连接到了哪个 Server”**
+
+**Gossip 在 Server 和 Client 之间同步的内容**
+
+- **Server 发现新的 Client**
+- **Client 发现并连接最近的 Server**
+- **Client 发现其他 Client**
+- **Server 之间同步彼此的健康状态**
+
+**示例**
+
+```sql
++------------------+    Gossip    +------------------+
+|  Client Agent 1  | <----------> |  Client Agent 2  |
++------------------+              +------------------+
+
++------------------+    Gossip    +------------------+
+|  Server Agent 1  | <----------> |  Server Agent 2  |
++------------------+              +------------------+
+```
+
+##### **（2）Raft 协议**
+
+**作用：**
+
+- **Server 之间的数据一致性**
+- **维护服务发现、KV 存储、ACL、Session 信息**
+- **选举 Leader**
+
+**Raft 仅用于 Server 之间**
+
+- 当 **Client Agent** 向 **Server** 注册服务时，**Server 需要将服务注册数据存储到 Raft 日志**，以确保所有 Server 看到相同的数据。
+
+**示例**
+
+```sql
++------------------+     Raft     +------------------+     Raft     +------------------+
+|  Server Agent 1  | <---------> |  Server Agent 2  | <---------> |  Server Agent 3  |
++------------------+              +------------------+              +------------------+
+```
+
+**Server 之间的数据同步**
+
+- **Leader 负责存储数据，并通过 Raft 复制到 Follower**
+- 如果 Leader 挂了，其他 Server 通过 Raft 重新选举新的 Leader
+- **Client Agent 查询时，会被路由到当前的 Leader Server**
+
+##### （3）Client 代理查询
+
+**服务注册流程**
+
+1. **服务（比如 Nginx）注册到本地 Client Agent**
+2. **Client Agent 通过 API 将注册信息发送给 Server**
+3. **Server 使用 Raft 复制数据**
+4. **所有 Server 现在都知道这个服务**
+
+**查询流程**
+
+1. **Client Agent 发送查询请求**
+2. **Client Agent 代理请求到 Server**
+3. **Server 直接查询 Raft 日志，返回数据**
+4. **Client Agent 缓存查询结果**
+
+**示例**
+
+```sql
++------------------+     HTTP API    +------------------+
+|  Client Agent 1  | -------------> |  Server Agent 1  |
++------------------+                 +------------------+
+
++------------------+      Raft      +------------------+
+|  Server Agent 1  | <-----------> |  Server Agent 2  |
++------------------+                +------------------+
+```
+
+
+
+**Prometheus 基于的Consul服务发现过程：**
+
+![image-20250312162126825](../markdown_img/image-20250312162126825.png)
+
+- 安装并启动 Consul 服务
+- 在Prometheus的配置中关联 Consul服务发现
+- 新增服务节点向Consul进行注册
+- Prometheus 自动添加新增的服务节点的Target
+
+
+
+#### Consul 部署
+
+##### 部署 Consul 单机
+
+**说明**
+
+```http
+https://developer.hashicorp.com/consul/docs/agent/config
+```
+
+###### 包安装 Consul
+
+官方安装
+
+```http
+https://developer.hashicorp.com/consul/tutorials/production-deploy/deployment-guide
+```
+
+范例: Ubuntu 包安装 Consul
+
+```bash
+#Ubuntu2204内置consul源，直接安装
+[root@devops ~]#apt list consul
+正在列表... 完成
+consul/jammy 1.8.7+dfsg1-3 amd64
+
+# 导入密钥
+[root@devops ~]# curl --fail --silent --show-error --location https://apt.releases.hashicorp.com/gpg |gpg --dearmor |dd of=/usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+[root@devops ~]# echo "deb [arch=amd64 signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" |tee -a /etc/apt/sources.list.d/hashicorp.list
+
+[root@devops ~]# apt update
+
+# 查看版本
+[root@devops ~]#apt-cache policy consul
+consul:
+  已安装：(无)
+  候选： 1.20.4-1
+  版本列表：
+     1.20.4-1 500
+        500 https://apt.releases.hashicorp.com jammy/main amd64 Packages
+     1.20.3-1 500
+        500 https://apt.releases.hashicorp.com jammy/main amd64 Packages
+     1.20.2-1 500
+        500 https://apt.releases.hashicorp.com jammy/main amd64 Packages
+     1.20.1-1 500
+        500 https://apt.releases.hashicorp.com jammy/main amd64 Packages
+     1.20.0-1 500
+        500 https://apt.releases.hashicorp.com jammy/main amd64 Packages
+     ......
+     
+# 安装指定版本
+[root@devops ~]# apt -y install consul=1.8.3
+
+# 安装最新版
+[root@devops ~]# apt -y install consul
+
+# 更改配置文件
+[root@devops consul.d]#cat consul.hcl
+......
+# bootstrap
+# This flag is used to control if a server is in "bootstrap" mode.
+# It is important that no more than one server per datacenter be running in this mode.
+# Technically, a server in bootstrap mode is allowed to self-elect as the Raft leader.
+# It is important that only a single node is in this mode; otherwise, consistency
+# cannot be guaranteed as multiple nodes are able to self-elect. It is not recommended
+# to use this flag after a cluster has been bootstrapped.
+bootstrap=true      # 取消注释，这里表示单机模式
+
+# server
+# This flag is used to control if an agent is in server or client mode. When provided,
+# an agent will act as a Consul server. Each Consul cluster must have at least one
+# server and ideally no more than 5 per datacenter. All servers participate in the Raft
+# consensus algorithm to ensure that transactions occur in a consistent, linearizable
+# manner. Transactions modify cluster state, which is maintained on all server nodes to
+# ensure availability in the case of node failure. Server nodes also participate in a
+# WAN gossip pool with server nodes in other datacenters. Servers act as gateways to
+# other datacenters and forward traffic as appropriate.
+server = true      # 取消注释，必须开启 Server 模式
+
+# 重启
+[root@devops consul.d]#systemctl restart consul.service 
+
+# 查看端口
+[root@devops consul.d]#ss -nlt
+State         Recv-Q        Send-Q               Local Address:Port               Peer Address:Port       Process        
+LISTEN        0             4096                 127.0.0.53%lo:53                      0.0.0.0:*            
+LISTEN        0             128                        0.0.0.0:22                      0.0.0.0:*            
+LISTEN        0             128                      127.0.0.1:6010                    0.0.0.0:* 
+LISTEN        0             4096                             *:8300                          *:*
+LISTEN        0             4096                             *:8301                          *:*  
+LISTEN        0             4096                             *:8302                          *:*  
+LISTEN        0             4096                             *:8500                          *:*  
+LISTEN        0             4096                             *:8600                          *:* 
+
+# 端口说明
+8500    # http端口，用于 http 接口和 web ui
+8300    # server rpc 端口，同一数据中心 consul server 之间通过该端口通信
+8301    # serf lan 端口，统一数据中心 consul client 通过该端口通信
+8302    # serf wan 端口，不同数据中心 consul server 通过该端口通信
+8600    # dns端口，用于服务发现
+```
+
+![image-20250312174943280](../markdown_img/image-20250312174943280.png)
+
+###### 二进制安装 Consul
+
+**下载链接**
+
+```http
+https://releases.hashicorp.com/consul/
+```
+
+**范例**
+
+```bash
+[root@devops ~]#wget https://releases.hashicorp.com/consul/1.13.3/consul_1.13.3_linux_amd64.zip
+[root@devops ~]#apt update && apt install -y unzip
+[root@devops ~]#unzip consul_1.13.3_linux_amd64.zip -d /usr/local/bin
+
+#实现consul命令自动补全
+[root@devops ~]#consul -autocomplete-install
+
+# 重新登录生效
+[root@devops ~]#exit
+
+ #创建用户
+[root@devops ~]#useradd -s /sbin/nologin consul
+
+# 创建目录
+[root@devops ~]#mkdir -p /data/consul /etc/consul.d
+[root@devops ~]#chown -R consul.consul /data/consul /etc/consul.d
+
+# 以server模式启动服务consul agent
+# 创建service文件
+[root@devops ~]#cat /lib/systemd/system/consul.service
+[Unit]
+Description="HashiCorp Consul - A service mesh solution"
+Documentation=https://www.consul.io/
+Requires=network-online.target
+After=network-online.target
+[Service]
+Type=simple
+User=consul
+Group=consul
+ExecStart=/usr/local/bin/consul agent -server -bind=0.0.0.0 -ui -bootstrap-expect=1 -data-dir=/data/consul -node=consul -client=0.0.0.0 -config-dir=/etc/consul.d
+#ExecReload=/bin/kill --signal HUP \$MAINPID
+KillMode=process
+KillSignal=SIGTERM
+Restart=on-failure
+LimitNOFILE=65536
+[Install]
+WantedBy=multi-user.target
+
+# 重启
+[root@devops ~]#systemctl daemon-reload
+[root@devops ~]#systemctl restart consul.service
+
+# 浏览器查看
+```
+
+![image-20250312180411005](../markdown_img/image-20250312180411005.png)
+
+###### Docker 启动 Consul
+
+```bash
+docker pull consul # 默认拉取latest,现在会报错
+docker pull consul:1.6.1 # 拉取指定版本
+
+[root@devops ~]# docker run -d -p 18500:8500 -p 18301:8301/udp -p 18302:8302/udp -p 18600:8600/udp -p 18300:8300 --restart=always --name=consul consul:1.15.4 agent -server -client=0.0.0.0 -bootstrap-expect=1 -ui
+
+
+#相关参数
+–net=host         # docker参数, 使得docker容器越过了netnamespace的隔离，免去手动指定端口映射的步骤
+-server           # consul支持以server或client的模式运行, server是服务发现模块的核心, client主要用于转发请求
+-advertise        # 将本机私有IP传递到consul
+-bootstrap-expect #指定consul将等待几个节点连通，成为一个完整的集群
+-retry-join       #指定要加入的consul节点地址，失败会重试, 可多次指定不同的地址
+-bind             #该地址用来在集群内部的通讯，集群内的所有节点到地址都必须是可达的，默认是0.0.0.0,有多个IP需要手动指定,否则会出错
+-client           #设置客户端访问的监听地址,此地址提供HTTP、DNS、RPC等服务，默认是127.0.0.1,0.0.0.0 表示任何地址可以访问
+--name            # DOCKER容器的名称
+-ui               # 提供图形化的界
+```
+
+![image-20250312215642368](../markdown_img/image-20250312215642368.png)
+
+
+
+##### 部署 Consul 集群
+
+###### Consul 集群说明
+
+**帮助**
+
+```http
+https://developer.hashicorp.com/consul/docs/agent/config/config-files
+https://developer.hashicorp.com/consul/docs/agent/config/cli-flags
+```
+
+**集群架构说明**
+
+```http
+https://developer.hashicorp.com/consul/docs/install/glossary
+```
+
+**Consul 集群架构**
+
+![image-20250312220629824](../markdown_img/image-20250312220629824.png)
+
+Server是consul服务端高可用集群，Client是consul客户端
+
+consul客户端不保存数据，客户端将接收到的请求转发给响应的Server端。
+
+Server之间通过局域网或广域网通信实现数据一致性。
+
+每个Server或Client都是一个consul agent。
+
+Consul集群节点之间使用了**GOSSIP协议 **通信和 **raft一致性算法**。
+
+**Consul 集群中的每个 Agent 生命周期**
+
+```http
+https://developer.hashicorp.com/consul/docs/agent
+```
+
+- Agent 可以手动启动，也可以通过自动化或程序化过程启动。 新启动的 Agent 不知道集群中的其他节点。
+- Agent 加入集群，使 Agent 能够发现 Agent 对等点。 当发出加入命令或根据自动加入配置时，  Agent 会在启动时加入集群。
+-  有关 Agent 的信息被传递到整个集群。 结果，所有节点最终都会相互了解
+- 如果 Agent 是 Server，现有服务器将开始复制到新节点。
+
+
+
+###### 二进制部署 Consul 集群
+
+**官方说明**
+
+```http
+https://developer.hashicorp.com/consul/docs/agent/config/cli-flags
+```
+
+ **consul agent  选项说明**
+
+```bash
+-server               #使用 server 模式运行consul 服务,consul支持以server或client的模式运行, server是服务发现模块的核                        心, client主要用于转发请求
+-bootstrap            #首次部署使用初始化模式
+-bostrap-expect 2     #集群"至少"两台服务器，才能选举集群leader,默认值为3
+-bind                 #该地址用来在集群内部的通讯，集群内的所有节点到地址都必须是可达的，默认是0.0.0.0,有多个IP需要手动指                          定,否则可能会出错
+-client               #设置客户端访问的监听地址,此地址提供HTTP、DNS、RPC等服务，默认是127.0.0.1
+-data-dir             #指定数据保存路径
+-ui                   #运行 web 控制台,监听8500/tcp端口
+-node                 #此节点的名称,群集中必须唯一
+-datacenter=dc1       #数据中心名称，默认是dc1
+-retry-join           #指定要加入的consul节点地址，失败会重试, 可多次指定不同的地址,代替旧版本中的join选项 
+```
+
+范例
+
+```bash
+# node1
+[root@devops ~]# consul agent -server -bind=10.0.0.201 -client=0.0.0.0 -data-dir=/data/consul  -node=node1 -ui -bootstrap
+
+# node2
+[root@devops ~]# consul agent -server -bind=10.0.0.202 -client=0.0.0.0 -data-dir=/data/consul  -node=node2 -ui -retry-join=10.0.0.201 -ui -bootstrap-expect 2
+
+# node3
+[root@devops ~]# consul agent -server -bind=10.0.0.203 -client=0.0.0.0 -data-dir=/data/consul  -node=node3 -ui -retry-join=10.0.0.201 -ui -bootstrap-expect 2
+```
+
+
+
+###### docker部署consul集群
+
+```bash
+# 创建一个自定义网络
+root@devops ~]# docker network create --subnet 172.31.0.0/16 net1
+
+# 创建并运行consul集群
+[root@devops ~]# docker run -d --net=net1 -p 18500:8500 -p 18301:8301/udp -p 18302:8302/udp -p 18600:8600/udp -p 18300:8300 --restart=always --name=consul consul:1.15.4 agent -server  -client=0.0.0.0 -bootstrap-expect=2 -ui -node=node1
+
+[root@devops ~]# docker run -d --net=net1 -p 18510:8500 -p 18311:8301/udp -p 18312:8302/udp -p 18610:8600/udp -p 18310:8300 --restart=always --name=consul2 consul:1.15.4 agent -server -client=0.0.0.0 -bootstrap-expect=2 -retry-join=consul -ui -node=node2
+
+[root@devops ~]# docker run -d --net=net1 -p 18520:8500 -p 18321:8301/udp -p 18322:8302/udp -p 18620:8600/udp -p 18320:8300 --restart=always --name=consul3 consul:1.15.4 agent -server -client=0.0.0.0 -bootstrap-expect=2 -retry-join=consul -ui -node=node3
+
+# 浏览器查看
+```
+
+![image-20250313093526334](../markdown_img/image-20250313093526334.png)
+
+
+
+##### consul 集群管理
+
+**查看集群成员**
+
+- 使用consul members命令
+
+```bash
+# 执行consul members <node_name>
+[root@devops ~]#docker exec -it consul consul members node
+Node   Address          Status  Type    Build   Protocol  DC   Partition  Segment
+node1  172.31.0.2:8301  alive   server  1.15.4  2         dc1  default    <all>
+node2  172.31.0.3:8301  alive   server  1.15.4  2         dc1  default    <all>
+node3  172.31.0.4:8301  alive   server  1.15.4  2         dc1  default    <all>
+
+[root@devops ~]#curl localhost:18500/v1/catalog/nodes|jq
+[
+  {
+    "ID": "8323f85c-bbf3-3be6-cee8-88f25df5d340",
+    "Node": "node1",
+    "Address": "172.31.0.2",
+    "Datacenter": "dc1",
+    "TaggedAddresses": {
+      "lan": "172.31.0.2",
+      "lan_ipv4": "172.31.0.2",
+      "wan": "172.31.0.2",
+      "wan_ipv4": "172.31.0.2"
+    },
+    "Meta": {
+      "consul-network-segment": ""
+    },
+    "CreateIndex": 12,
+    "ModifyIndex": 17
+  },
+  {
+    "ID": "d13ba523-4b21-01b1-f564-5ff8f5634b3d",
+    "Node": "node2",
+    "Address": "172.31.0.3",
+    "Datacenter": "dc1",
+    "TaggedAddresses": {
+      "lan": "172.31.0.3",
+      "lan_ipv4": "172.31.0.3",
+      "wan": "172.31.0.3",
+      "wan_ipv4": "172.31.0.3"
+    },
+    "Meta": {
+      "consul-network-segment": ""
+    },
+    "CreateIndex": 14,
+    "ModifyIndex": 15
+  },
+  {
+    "ID": "709e6ce3-cd6a-5ff5-fbdc-2928bbbb09a0",
+    "Node": "node3",
+    "Address": "172.31.0.4",
+    "Datacenter": "dc1",
+    "TaggedAddresses": {
+      "lan": "172.31.0.4",
+      "lan_ipv4": "172.31.0.4",
+      "wan": "172.31.0.4",
+      "wan_ipv4": "172.31.0.4"
+    },
+    "Meta": {
+      "consul-network-segment": ""
+    },
+    "CreateIndex": 28,
+    "ModifyIndex": 31
+  }
+]
+```
+
+**在Server上添加其它agent**
+
+```bash
+# 用于 让单个 Consul 服务器或客户端加入现有的 Consul 集群。
+consul join [options] address ...
+```
+
+**在agent主机上，设置该agent离开集群并关闭agent**
+
+```bash
+consul leave 
+```
+
+
+
+#### Consul 自动注册和删除服务
+
+##### Consul 常用 API 接口
+
+官方文档 API
+
+```http
+https://developer.hashicorp.com/consul/api-docs
+```
+
+用法说明
+
+```bash
+# 列出数据中心
+curl http://consul.mystical.org:8500/v1/catalog/datacenters
+# 示例
+[root@devops ~]#curl localhost:18500/v1/catalog/datacenters|jq
+[
+  "dc1"
+]
+
+# 列出节点
+curl http://localhost:8500/v1/catalog/nodes
+# 示例
+[root@devops ~]#curl localhost:18500/v1/catalog/nodes|jq
+[
+  {
+    "ID": "8323f85c-bbf3-3be6-cee8-88f25df5d340",
+    "Node": "node1",
+    "Address": "172.31.0.2",
+    "Datacenter": "dc1",
+    "TaggedAddresses": {
+      "lan": "172.31.0.2",
+      "lan_ipv4": "172.31.0.2",
+      "wan": "172.31.0.2",
+      "wan_ipv4": "172.31.0.2"
+    },
+    "Meta": {
+      "consul-network-segment": ""
+    },
+    "CreateIndex": 12,
+    "ModifyIndex": 17
+  },
+  {
+    "ID": "d13ba523-4b21-01b1-f564-5ff8f5634b3d",
+    "Node": "node2",
+    "Address": "172.31.0.3",
+    "Datacenter": "dc1",
+    "TaggedAddresses": {
+      "lan": "172.31.0.3",
+      "lan_ipv4": "172.31.0.3",
+      "wan": "172.31.0.3",
+      "wan_ipv4": "172.31.0.3"
+    },
+    "Meta": {
+      "consul-network-segment": ""
+    },
+    "CreateIndex": 14,
+    "ModifyIndex": 15
+  },
+  {
+    "ID": "709e6ce3-cd6a-5ff5-fbdc-2928bbbb09a0",
+    "Node": "node3",
+    "Address": "172.31.0.4",
+    "Datacenter": "dc1",
+    "TaggedAddresses": {
+      "lan": "172.31.0.4",
+      "lan_ipv4": "172.31.0.4",
+      "wan": "172.31.0.4",
+      "wan_ipv4": "172.31.0.4"
+    },
+    "Meta": {
+      "consul-network-segment": ""
+    },
+    "CreateIndex": 28,
+    "ModifyIndex": 31
+  }
+]
+
+# 列出服务
+curl http://consul.wang.org:8500/v1/catalog/services
+# 示例
+[root@devops ~]#curl localhost:18500/v1/catalog/services|jq
+{
+  "consul": []
+}
+
+# 指定节点状态
+curl http://consul.wang.org:8500/v1/health/node/node2
+# 举例
+[root@devops ~]#curl localhost:18500/v1/health/node/node2|jq
+[
+  {
+    "Node": "node2",
+    "CheckID": "serfHealth",
+    "Name": "Serf Health Status",
+    "Status": "passing",
+    "Notes": "",
+    "Output": "Agent alive and reachable",
+    "ServiceID": "",
+    "ServiceName": "",
+    "ServiceTags": [],
+    "Type": "",
+    "Interval": "",
+    "Timeout": "",
+    "ExposedPort": 0,
+    "Definition": {},
+    "CreateIndex": 14,
+    "ModifyIndex": 14
+  }
+]
+
+#提交Json格式的数据进行注册服务
+curl -X PUT -d '{"id": "myservice-id","name": "myservice","address": "10.0.0.201","port": 9100,"tags": ["service"],"checks": [{"http":"http://10.0.0.201:9100/","interval": "5s"}]}' http://localhost:18500/v1/agent/service/register
+
+#也可以将注册信息保存在json格式的文件中，再执行下面命令注册
+[root@devops ~]#cat nodes.json
+{
+  "id": "myservice-id",
+  "name": "myservice",
+  "address": "10.0.0.201",
+  "port": 9100,
+  "tags": [
+    "service"
+    ],
+  "checks": [
+    {
+     "http": "http://10.0.0.201:9100/",
+     "interval": "5s"
+    }
+  ]
+}
+
+[root@devops ~]#curl -X PUT --data @nodes.json http://localhost:18500/v1/agent/service/register
+
+#查询指定节点以及指定的服务信息
+curl http://consul.wang.org:8500/v1/catalog/service/<service_name>
+# 示例
+[root@devops ~]#curl http://localhost:18500/v1/catalog/service/myservice|jq
+[
+  {
+    "ID": "8323f85c-bbf3-3be6-cee8-88f25df5d340",
+    "Node": "node1",
+    "Address": "172.31.0.2",
+    "Datacenter": "dc1",
+    "TaggedAddresses": {
+      "lan": "172.31.0.2",
+      "lan_ipv4": "172.31.0.2",
+      "wan": "172.31.0.2",
+      "wan_ipv4": "172.31.0.2"
+    },
+    "NodeMeta": {
+      "consul-network-segment": ""
+    },
+    "ServiceKind": "",
+    "ServiceID": "myservice-id",   # myservice的id，可以使用它取消注册
+    "ServiceName": "myservice",
+    "ServiceTags": [
+      "service"
+    ],
+    "ServiceAddress": "10.0.0.201",
+    "ServiceTaggedAddresses": {
+      "lan_ipv4": {
+        "Address": "10.0.0.201",
+        "Port": 9100
+      },
+      "wan_ipv4": {
+        "Address": "10.0.0.201",
+        "Port": 9100
+      }
+    },
+    "ServiceWeights": {
+      "Passing": 1,
+      "Warning": 1
+    },
+    "ServiceMeta": {},
+    "ServicePort": 9100,
+    "ServiceSocketPath": "",
+    "ServiceEnableTagOverride": false,
+    "ServiceProxy": {
+      "Mode": "",
+      "MeshGateway": {},
+      "Expose": {}
+    },
+    "ServiceConnect": {},
+    "CreateIndex": 299,
+    "ModifyIndex": 299
+  }
+]
+
+#删除服务，注意：集群模式下需要在service_id所有在主机节点上执行才能删除该service
+curl -X PUT http://consul.wang.org:8500/v1/agent/service/deregister/<service_id>
+# 示例
+curl -X PUT http://localhost:18500/v1/agent/service/deregister/myservice-id
+```
+
+范例：查看节点状态
+
+```bash
+[root@devops ~]#curl -s http://localhost:18500/v1/health/node/node2|jq
+[
+  {
+    "Node": "node2",
+    "CheckID": "serfHealth",
+    "Name": "Serf Health Status",
+    "Status": "passing",
+    "Notes": "",
+    "Output": "Agent alive and reachable",
+    "ServiceID": "",
+    "ServiceName": "",
+    "ServiceTags": [],
+    "Type": "",
+    "Interval": "",
+    "Timeout": "",
+    "ExposedPort": 0,
+    "Definition": {},
+    "CreateIndex": 14,
+    "ModifyIndex": 14
+  }
+]
+```
+
+
+
+##### 使用consul services命令注册和注销服务
+
+consul services register命令也可用于进行服务注册，只是其使用的配置格式与直接请求HTTP API有所 不同。
+
+**注册服务**
+
+```bash
+consul services register /path/file.json
+```
+
+注册单个服务时，file.json文件使用service进行定义，注册多个服务时，使用services以列表格式进行定义。
+
+示例: 定义了单个要注册的服务
+
+```json
+{
+    "service": {
+        "id": "myservice-id",
+        "name": "myservice",
+        "address": "10.0.0.201",
+        "port": 9100,
+        "tags": ["node_exporter"],
+        "checks": [{
+            "http": "http://10.0.0.201:9100/metrics",
+            "interval": "5s"
+        }]
+    }
+}
+```
+
+示例: 以多个的服务的格式给出了定义
+
+```bash
+[root@devops ~]#vim nodes.json
+{
+    "services": [
+        {
+            "id": "myservice1-id",
+            "name": "myservice1",
+            "address": "10.0.0.201",
+            "port": 9100,
+            "tags": ["node_exporter"],
+            "checks": [{
+                "http": "http://10.0.0.201:9100/metrics",
+                "interval": "5s"
+            }]
+        },
+        {
+            "id": "myservice2-id",    # Consul 使用 id 作为唯一标识
+            "name": "myservice2",
+            "address": "10.0.0.203",
+            "port": 9100,
+            "tags": ["node_exporter"],
+            "checks": [{
+                "http": "http://10.0.0.203:9100/metrics",
+                "interval": "5s"
+            }]
+        },
+        {......}
+    ]
+}
+
+[root@devops ~]#docker cp nodes.json consul:/opt/
+[root@devops ~]#docker exec -it consul consul services register /opt/nodes.json
+Registered service: myservice1
+Registered service: myservice2
+
+# 查看浏览器
+```
+
+![image-20250313111014253](../markdown_img/image-20250313111014253.png)
+
+
+
+**注册服务**
+
+可以使用consul services deregister命令实现
+
+```bash
+consul services deregister -id <SERVICE_ID>
+```
+
+
+
+#### 配置 Prometheus 使用 Consul 服务发现
+
+官方文档
+
+```http
+https://prometheus.io/docs/prometheus/latest/configuration/configuration/#consul_sd_config
+```
+
+默认情况下，当Prometheus加载Target实例完成后，这些Target时候都会包含一些默认的标签：
+
+```bash
+__address__        #当前Target实例的访问地址<host>:<port>
+__scheme__         #采集目标服务访问地址的HTTP Scheme，HTTP或者HTTPS
+__metrics_path__   #采集目标服务访问地址的访问路径
+__param_<name>     #采集任务目标服务的中包含的请求参数
+```
+
+通过Consul动态发现的服务实例还会包含以下Metadata标签信息
+
+```bash
+__meta_consul_address            # consul地址
+__meta_consul_dc                 # consul中服务所在的数据中心
+__meta_consulmetadata            # 服务的metadata
+__meta_consul_node               # 服务所在consul节点的信息
+__meta_consul_service_address    # 服务访问地址
+__meta_consul_service_id         # 服务ID
+__meta_consul_service_port       # 服务端口
+__meta_consul_service            # 服务名称
+__meta_consul_tags               # 服务包含的标签信息
+```
+
+利用 Relabeling 实现基于Target实例中包含的metadata标签，动态的添加或者覆盖标签。
+
+```bash
+[root@ubuntu2204 ~]#vim /usr/local/prometheus/conf/prometheus.yml
+......
+  - job_name: 'consul'
+    honor_labels: true                          # 如果标签冲突，覆盖Prometheus添加的标签，保留原标签
+    consul_sd_configs:
+      - server: '10.0.0.208:18500'
+        services: []                            # 指定需要发现的service名称,默认为所有service，或者如下面两行指定只从                                                   consul中加载特定的service
+        # tags:                                 # 可以过滤具有指定的tag的service
+        # - "service"
+        # refresh_interval: 2m                  # 刷新时间间隔，默认30s
+      - server: '10.0.0.208:18510'              # 添加其它两个节点实现冗余
+      - server: '10.0.0.208:18520'              # 添加其它两个节点实现冗余
+    relabel_configs:
+    - source_labels: ['__meta_consul_service']  # 生成新标签名
+      target_label: 'consul_service'
+    - source_labels: ['__meta_consul_dc']       # 生成新标签名
+      target_label: 'datacenter'
+    - source_labels: ['__meta_consul_tags']     # 生成新标签名
+      target_label: 'app'
+    - source_labels: ['__meta_consul_service']  # 删除consul的service,此service是consul内置,但并不提供metrics数据
+      regex: "consul"
+      action: drop
+      
+# 语法检查
+[root@ubuntu2204 ~]#promtool check config /usr/local/prometheus/conf/prometheus.yml
+
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+
+# 查看浏览器
+```
+
+![image-20250313112500603](../markdown_img/image-20250313112500603.png)
+
+**删除服务**
+
+```bash
+[root@devops ~]#docker exec -it consul consul services deregister -id myservice1-id
+Deregistered service: myservice1-id
+```
+
+![image-20250313112605103](../markdown_img/image-20250313112605103.png)
+
+![image-20250313112623375](../markdown_img/image-20250313112623375.png)
+
+
+
+### Kubernetes 发现
+
+```http
+https://prometheus.io/docs/prometheus/latest/configuration/configuration/#kubernetes_sd_config
+https://github.com/prometheus/prometheus/blob/release-2.44/documentation/examples/prometheus-kubernetes.yml
+https://github.com/prometheus/prometheus/blob/release-2.46/documentation/examples/prometheus-kubernetes.yml
+```
+
+#### 基于Kubernetes API的服务发现介绍
+
+基于Kubernetes API的服务发现机制，支持将API Server中Node、Service、Endpoint、Pod和Ingress 等资源类型下相应的各资源对象视作target，并持续监视相关资源的变动
+
+- Node、Service、Endpoint、Pod和Ingress资源分别由各自的发现机制进行定义
+- 负责发现每种类型资源对象的组件，在Prometheus中称为一个"role"
+- 同时支持在集群上基于DaemonSet控制器部署node-exporter后发现各节点
+
+##### **Node资源发现**
+
+Prometheus的node role将Kubernetes集群中的每个节点视作一个target，这些节点都监听着kubelet 使用的端口
+
+node role依次检索节点规范上的NodeInternallP、NodeInternallP、NodeExternallP、 NodeLegacyHostP和NodeHostName字段，并将发现的第一个地址作为目标地址（__address__) ;
+
+可用的meta标签有如下几个:
+
+```bash
+__meta_kubernetes_node_name:                               # The name of the node object.
+__meta_kubernetes_node_provider_id                         # The cloud provider's name for the node object.
+__meta_kubernetes_node_label_<labelname>                   # Each label from the node object.
+__meta_kubernetes_node_labelpresent_<labelname>            # true for each label from the node object.
+__meta_kubernetes_node_annotation_<annotationname>         # Each annotation from the node object.
+__meta_kubernetes_node_annotationpresent_<annotationname>  # true for each annotation from the node object.
+__meta_kubernetes_node_address_<address_type>  # The first address for each node address type, if it exists.
+```
+
+节点上instance标签的值取自从API Server中发现的节点的名称;
+
+##### Pod资源发现
+
+Prometheus 的 pod role 负责发现 Kubernetes 集群上的每个 Pod 资源并暴露其容器为 target
+
+- 把Pod上声明的每个端口视作一个target
+- 会为未指定端口的容器创建“无端口”类型的target，以便于用户通过relabel机制手动添加端口
+- 可用的部分metadata标签如下
+
+```bash
+__meta_kubernetes_namespace                               # The namespace of the pod object.
+__meta_kubernetes_pod_name                                # The name of the pod object.
+__meta_kubernetes_pod_ip                                  # The pod IP of the pod object.
+__meta_kubernetes_pod_label_<labelname>                   # Each label from the pod object.
+__meta_kubernetes_pod_labelpresent_<labelname>            # true for each label from the pod object.
+__meta_kubernetes_pod_annotation_<annotationname>         # Each annotation from the pod object.
+__meta_kubernetes_pod_annotationpresent_<annotationname>  # true for each annotation from the pod object.
+__meta_kubernetes_pod_container_init                      # true if the container is an InitContainer
+__meta_kubernetes_pod_container_name                      # Name of the container the target address points                                                           to.
+__meta_kubernetes_pod_container_id                        # ID of the container the target address points                                                             to. The ID is in the form <type>://<container_id>.
+__meta_kubernetes_pod_container_image                     # The image the container is using.
+__meta_kubernetes_pod_container_port_name                 # Name of the container port.
+__meta_kubernetes_pod_container_port_number               # Number of the container port. 
+__meta_kubernetes_pod_container_port_protocol             # Protocol of the container port.
+__meta_kubernetes_pod_ready                               # Set to true or false for the pod's ready state.
+__meta_kubernetes_pod_phase                               # Set to Pending, Running, Succeeded, Failed or                                                             Unknown in the lifecycle.
+__meta_kubernetes_pod_node_name                           # The name of the node the pod is scheduled onto.
+__meta_kubernetes_pod_host_ip                             # The current host IP of the pod object.
+__meta_kubernetes_pod_uid                                 # The UID of the pod object.
+__meta_kubernetes_pod_controller_kind                     # Object kind of the pod controller.
+__meta_kubernetes_pod_controller_name                     # Name of the pod controller.
+```
+
+##### Service资源发现
+
+Prometheus的service role负责发现Kubernetes集群上的每个Service资源
+
+- 把Service上声明的每个端口视作一个target
+- 特别适用于对Service进行黑盒监控的场景；
+- target地址为Service的DNS名称及相应的端口
+- 可用的部分meta标签如下
+
+```bash
+__meta_kubernetes_namespace                                   # The namespace of the service object.
+__meta_kubernetes_service_annotation_<annotationname>         # Each annotation from the service object.
+__meta_kubernetes_service_annotationpresent_<annotationname>  # "true" for each annotation of the service                                                                   object.
+__meta_kubernetes_service_cluster_ip                          # The cluster IP address of the service. (Does                                                                 not apply to services of type ExternalName)
+__meta_kubernetes_service_loadbalancer_ip                     # The IP address of the loadbalancer. (Applies                                                                 to services of type LoadBalancer)
+__meta_kubernetes_service_external_name                       # The DNS name of the service.(Applies to                                                                     services of type ExternalName)
+__meta_kubernetes_service_label_<labelname>                   # Each label from the service object.
+__meta_kubernetes_service_labelpresent_<labelname>            # true for each label of the service object.
+__meta_kubernetes_service_name                                # The name of the service object.
+__meta_kubernetes_service_port_name                           # Name of the service port for the target.
+__meta_kubernetes_service_port_number                         # Number of the service port for the target. 
+__meta_kubernetes_service_port_protocol                       # Protocol of the service port for the target.
+__meta_kubernetes_service_type                                # The type of the service.
+```
+
+#####  Endpoint资源发现
+
+Prometheus的endpoint role从各Endpoint资源中发现目标；
+
+- 它把endpoint上的每个端口都视作一个单独的target
+- 若endpoint的后端工作负载是Pod，则会把该Pod上其它未绑定到endpoint的端口同样视作一个单独的目标
+- 可用的部分meta标签如下
+
+```bash
+__meta_kubernetes_namespace                                # The namespace of the endpoints object.
+__meta_kubernetes_endpoints_name                           # The names of the endpoints object.
+__meta_kubernetes_endpoints_label_<labelname>              # Each label from the endpoints object.
+__meta_kubernetes_endpoints_labelpresent_<labelname>       # true for each label from the endpoints object.
+__meta_kubernetes_endpoints_annotation_<annotationname>    # Each annotation from the endpoints object.
+__meta_kubernetes_endpoints_annotationpresent_<annotationname> 
+# true for each annotation from the endpoints object.
+
+#对于通过附加在Endpoint资源上的端口发现的各target，还以如下meta标签
+__meta_kubernetes_endpoint_hostname                   # Hostname of the endpoint.
+__meta_kubernetes_endpoint_node_name                  # Name of the node hosting the endpoint.
+__meta_kubernetes_endpoint_ready                      # Set to true or false for the endpoint's ready state.
+__meta_kubernetes_endpoint_port_name                  # Name of the endpoint port.
+__meta_kubernetes_endpoint_port_protocol              # Protocol of the endpoint port.
+__meta_kubernetes_endpoint_address_target_kind        # Kind of the endpoint address target.
+__meta_kubernetes_endpoint_address_target_name        # Name of the endpoint address target.
+```
+
+##### Ingress资源发现
+
+Prometheus的ingress role负责从API Server中发现Ingress资源
+
+- 它把Ingress资源上的每个path视作一个target
+- 特别适用于对Ingress进行黑盒监控的场景；
+- 相关的地址被设定为Ingress资源上相关host字段的值；
+- 可用的部署meta标签如下
+
+```bash
+__meta_kubernetes_namespace                                   # The namespace of the ingress object.
+__meta_kubernetes_ingress_name                                # The name of the ingress object.
+__meta_kubernetes_ingress_label_<labelname>                   # Each label from the ingress object.
+__meta_kubernetes_ingress_labelpresent_<labelname>            # true for each label from the ingress object.
+__meta_kubernetes_ingress_annotation_<annotationname>         # Each annotation from the ingress object.
+__meta_kubernetes_ingress_annotationpresent_<annotationname>  # true for each annotation from the ingress                                                                   object.
+__meta_kubernetes_ingress_class_name                          # Class name from ingress spec, if present.
+__meta_kubernetes_ingress_scheme                              # Protocol scheme of ingress, https if TLS                                                                     config is set. Defaults to http.
+__meta_kubernetes_ingress_path                                # Path from ingress spec. Defaults to /.
+```
+
+
+
+#### 基于 Kubernetes 的服务发现机制详解
+
+Prometheus 提供了 **Kubernetes 服务发现（Kubernetes Service Discovery）**，可以**自动发现 Kubernetes 集群中的目标对象（Targets）**，例如 **Pods、Services、Endpoints、Nodes、Ingress 等**，并根据配置动态调整监控目标。本文将详细讲解 `kubernetes_sd_configs` 相关的配置参数，并结合示例帮助理解。
+
+
+
+##### Kubernetes 服务发现机制
+
+Prometheus 通过 `kubernetes_sd_configs` 发现 Kubernetes 中的监控目标，主要有**两种模式**：
+
+- **运行在 Kubernetes 集群内部**：直接使用 Pod 自带的 ServiceAccount 访问 API Server。
+- **运行在 Kubernetes 集群外部**：需要提供 API Server 地址、认证信息等。
+
+**Prometheus 在 Kubernetes 内部运行**
+
+- Prometheus **自动发现 API Server**，不需要额外配置 `api_server`。
+- 通过 ServiceAccount **自动认证**，不需要手动提供 `bearer_token` 或 `kubeconfig`。
+- **默认读取 `/var/run/secrets/kubernetes.io/serviceaccount/` 目录**，包含：
+  - `ca.crt`：CA 证书
+  - `token`：身份认证 Token
+  - `namespace`：当前命名空间
+
+
+
+**Prometheus 在 Kubernetes 外部运行**
+
+- 需要 **手动指定 `api_server` 地址**，否则无法访问 Kubernetes API。
+- 需要提供 **身份认证信息**，例如 `bearer_token`、`kubeconfig`。
+
+
+
+##### 关键配置参数解析
+
+🔹 `api_server`**（Kubernetes API 服务器地址）**
+
+```yaml
+api_server: "https://10.0.0.1:6443"
+```
+
+- **仅在 Prometheus 运行在 Kubernetes 外部时需要配置**。
+- 如果 Prometheus 运行在集群内部，则 **会自动发现 API Server**，无需手动配置。
+- **默认为空**，即自动发现 API Server。
+
+
+
+🔹 `role`**（发现目标的类型）**
+
+```yaml
+role: pod
+```
+
+- **指定 Prometheus 需要发现的 Kubernetes 资源类型**。
+- **可选值**：
+  - `pod`：发现 Pod（最常用）
+  - `service`：发现 Service
+  - `endpoints`：发现 Endpoints
+  - `endpointslice`：发现 EndpointSlice
+  - `node`：发现 Node
+  - `ingress`：发现 Ingress
+
+📌 **示例：发现集群中的 Pods**
+
+```yaml
+kubernetes_sd_configs:
+  - role: pod
+```
+
+📌 **示例：发现集群中的 Nodes**
+
+```yaml
+kubernetes_sd_configs:
+  - role: node
+```
+
+
+
+🔹 `kubeconfig_file`**（Kubeconfig 认证方式）**
+
+```yaml
+kubeconfig_file: "/root/.kube/config"
+```
+
+- **指定 Prometheus 访问 Kubernetes API 的 `kubeconfig` 文件**，用于认证。
+- **`api_server` 和 `kubeconfig_file` 不能同时使用**，否则会冲突。
+- 仅在 **Prometheus 运行在 Kubernetes 集群外部** 时需要手动配置。
+
+
+
+🔹 `basic_auth`**（HTTP Basic 认证）**
+
+```yaml
+basic_auth:
+  username: "admin"
+  password: "secret"
+```
+
+- **使用 HTTP Basic 认证访问 Kubernetes API**，适用于 Kubernetes API Server 需要用户名和密码的情况。
+- **与 `authorization` 方式互斥**，不能同时使用。
+
+
+
+🔹 `authorization`**（Token 认证）**
+
+```yaml
+authorization:
+  type: Bearer
+  credentials: "my-token"
+```
+
+- **使用 Bearer Token 进行身份认证**（Kubernetes 默认的认证方式）。
+- `credentials` 可直接提供 Token，或使用 `credentials_file` 指定 Token 文件。
+
+
+
+🔹 `oauth2`**（OAuth 认证）**
+
+```yaml
+oauth2:
+  token_url: "https://example.com/oauth2/token"
+  client_id: "prometheus"
+  client_secret: "secret"
+```
+
+- **使用 OAuth 认证** 访问 Kubernetes API（较少使用）。
+
+
+
+🔹 `proxy_url` & `no_proxy`**（代理配置）**
+
+```yaml
+proxy_url: "http://proxy.example.com:8080"
+no_proxy: "10.0.0.0/8,127.0.0.1"
+```
+
+- **使用代理访问 Kubernetes API**。
+- `no_proxy` 用于**排除不走代理的 IP 或域名**。
+
+
+
+
+🔹 `follow_redirects`**（是否跟随 3xx 跳转）**
+
+```yaml
+follow_redirects: true  # 默认值
+```
+
+- **是否允许 Prometheus 追踪 3xx HTTP 重定向**。
+
+
+
+🔹 `enable_http2`**（是否启用 HTTP2）**
+
+```yaml
+enable_http2: true  # 默认值
+```
+
+- **是否使用 HTTP2 访问 Kubernetes API**。
+
+
+
+🔹 `tls_config`**（TLS 安全配置）**
+
+```yaml
+tls_config:
+  insecure_skip_verify: false
+  ca_file: "/etc/prometheus/ca.crt"
+  cert_file: "/etc/prometheus/tls.crt"
+  key_file: "/etc/prometheus/tls.key"
+```
+
+- **配置 TLS 证书，确保 Prometheus 访问 Kubernetes API Server 的安全性**。
+
+
+
+##### 目标筛选
+
+🔹 `namespaces`**（限制服务发现的命名空间）**
+
+```yaml
+namespaces:
+  own_namespace: true
+```
+
+- **仅发现当前 Prometheus 运行所在的命名空间内的资源**。
+
+```yaml
+namespaces:
+  names:
+    - "monitoring"
+    - "default"
+```
+
+- **仅发现 `monitoring` 和 `default` 命名空间内的资源**。
+
+
+
+🔹 `selectors`**（标签 & 字段选择器）**
+
+```yaml
+selectors:
+  - role: pod
+    label: "app=nginx"
+```
+
+- **筛选 `app=nginx` 的 Pods**，只发现 **Nginx** 相关的 Pod。
+
+```yaml
+selectors:
+  - role: node
+    field: "metadata.name=worker-node-1"
+
+```
+
+- 仅发现 `worker-node-1` 这个 Node
+
+
+
+🔹 `attach_metadata`**（自动附加 Kubernetes 元数据）**
+
+```yaml
+attach_metadata:
+  node: true
+```
+
+- **自动附加 Kubernetes Node 的元数据到目标**，适用于 **pod、endpoints、endpointslice**。
+
+
+
+##### 完整配置示例
+
+**方式 1：Kubernetes 内部运行（推荐方式）**
+
+```yaml
+kubernetes_sd_configs:
+  - role: pod
+    namespaces:
+      names:
+        - "monitoring"
+    selectors:
+      - role: pod
+        label: "app=nginx"
+    attach_metadata:
+      node: true
+```
+
+📌 **解释**
+
+- 发现 **`monitoring` 命名空间内的 Pods**
+- 仅发现 **`app=nginx` 的 Pods**
+- 自动附加 **Node 元数据**
+
+
+
+**方式 2：Kubernetes 外部运行**
+
+```yaml
+kubernetes_sd_configs:
+  - api_server: "https://10.0.0.1:6443"
+    role: pod
+    kubeconfig_file: "/root/.kube/config"
+    authorization:
+      credentials_file: "/etc/prometheus/token"
+    namespaces:
+      names:
+        - "default"
+```
+
+📌 **解释**
+
+- **手动指定 API Server**
+- **使用 `kubeconfig_file` 认证**
+- **仅发现 `default` 命名空间的 Pods**
+
+
+
+#### 案例: 基于Kubernetes API的服务发现
+
+范例:  配置实现自动发现各种Kubernetes 资源
+
+```bash
+[root@master1 prom]#cat prometheus-cfg.yaml
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  labels:
+    app: prometheus
+  name: prometheus-config
+  namespace: prom
+data:
+  prometheus.yaml: |
+  global:
+    scrape_interval: 15s
+    scrate_timeout: 10s
+    evaluation_interval: 1m
+    
+  rule_files:
+    - /etc/prometheus/prometheus.rules
+    
+  alerting:
+    alertmanagers:
+    - scheme: http
+      static_configs:
+      - targets:
+        - "alertmanager: 9093"
+        
+  scrape_configs:
+  - job_name: 'kubernetes-apiservers'
+    kubernetes_sd_configs:
+    - role: endpoints
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabels_configs:
+    - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+      action: keep
+      regex: default; kubernetes; https
+......
+```
+
+
+
+## 各种 Exporter
+
+Prometheus 指供了大量的 Exporter 实现各种应用的监控功能
+
+Exporter 分类
+
+- **应用内置**: 软件内就内置了Exporter,比如: Grafana,Zookeeper,Gitlab,MinIO等
+- **应用外置**: 应用安装后,还需要单独安装对应的 Exporter,比如: MySQL,Redis,MongoDB,PostgreSQL等
+- **定制开发**: 如有特殊需要,用户自行开发
+
+Exporter 官方文档
+
+```http
+https://prometheus.io/docs/instrumenting/exporters/
+```
+
+
+
+### Node Exporter 监控服务
+
+#### 服务监控说明
+
+对于一些服务应用来说，我们可以通过对于node_exporter的启动参数改造来实现更多功能的获取
+
+```bash
+# 查看node_exporter命令的帮助信息，发现它有很多扩展的参数，通过这些参数来实现更多的功能监控
+[root@ubuntu2204 ~]#/usr/local/node_exporter/bin/node_exporter --help
+......
+--collector.systemd                   # 显示当前系统中所有的服务状态信息
+--collector.systemd.unit-include      # 仅仅显示符合条件的systemd服务条目
+--collector.systemd.unit-exclude      # 显示排除列表范围之外的服务条目
+
+# 注意：
+上面三条仅显示已安装的服务条目，没有安装的服务条目是不会被显示的。
+而且后面两个属性是依赖于第一条属性的
+这些信息会被显示在 node_systemd_unit_state对应的metrics中
+```
+
+#### 实战案例
+
+##### 修改 node_exporter 的配置文件
+
+```bash
+# 在node1节点修改node_exporter配置文件
+[root@ubuntu2204 ~]#vim /lib/systemd/system/node_exporter.service
+[Unit]
+Description=Prometheus Node Exporter
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/node_exporter/bin/node_exporter --collector.zoneinfo --collector.systemd --collector.systemd.unit-include=".*(ssh|mysql|node_exporter|nginx).*"
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+User=prometheus
+Group=prometheus
+
+[Install]
+WantedBy=multi-user.target
+
+# 属性解析:
+# 如果没有提前安装的服务，是不会被查看到的
+# 服务名称的正则符号必须解析正确，否则无法匹配要现实的服务名称
+
+# 重启node_exporter服务
+[root@ubuntu2204 ~]#systemctl daemon-reload 
+[root@ubuntu2204 ~]#systemctl restart node_exporter.service
+```
+
+```bash
+ # 稍等几秒钟，到浏览器中查看监控目标 
+ # 结果显示：每个服务都有五种状态，只有成功的状态才会显示值为1，其他状态为0
+ # 只有已安装的服务才会在这里显示，否则不显示
+```
+
+![image-20250313152145316](../markdown_img/image-20250313152145316.png)
+
+```bash
+#在node1节点安装nginx服务后,再次观察可以看到下面结果
+[root@node1 ~]#apt -y install nginx
+```
+
+![image-20250313152340802](../markdown_img/image-20250313152340802.png)
+
+
+
+### MySQL 监控
+
+#### MySQL 监控说明
+
+prometheus提供了专属于 MySQL 的服务监控工具 mysqld_exporter，可以借助于该模块，来实现数据库的基本监控
+
+```bash
+#下载链接
+https://prometheus.io/download/
+#使用说明
+https://github.com/prometheus/mysqld_exporter
+```
+
+![image-20250313152635545](../markdown_img/image-20250313152635545.png)
+
+#### 案例：二进制安装
+
+##### MySQL 数据库环境准备
+
+```bash
+#安装数据库软件
+# apt update && apt -y install mysql-server
+
+# 二进制安装mysql
+[root@ubuntu2204 ~]#wget https://www.mysticalrecluse.com/script/Shell/install_mysql_binary.sh
+[root@ubuntu2204 ~]#bash install_mysql_binary.sh
+
+# 为mysqld_exporter配置获取数据库信息的用户并授权
+[root@ubuntu2204 ~]# mysql -uroot -h127.0.0.1 -p'123456'
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 11
+Server version: 8.4.2 MySQL Community Server - GPL
+
+Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> CREATE USER 'exporter'@'localhost' IDENTIFIED BY '123456' WITH MAX_USER_CONNECTIONS 3;
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> flush privileges;
+Query OK, 0 rows affected (0.00 sec)
+```
+
+##### mysqld_exporter 安装
+
+```bash
+# 获取软件
+[root@ubuntu2204 ~]#wget -P /usr/local/src https://github.com/prometheus/mysqld_exporter/releases/download/v0.17.2/mysqld_exporter-0.17.2.linux-amd64.tar.gz
+
+# 解压软件
+[root@ubuntu2204 ~]#tar xf /usr/local/src/mysqld_exporter-0.17.2.linux-amd64.tar.gz -C /usr/local
+[root@ubuntu2204 ~]#ln -s /usr/local/mysqld_exporter-0.17.2.linux-amd64 /usr/local/mysqld_exporter
+[root@ubuntu2204 ~]#cd /usr/local/mysqld_exporter
+[root@ubuntu2204 mysqld_exporter]#ls
+LICENSE  mysqld_exporter  NOTICE
+[root@ubuntu2204 mysqld_exporter]#mkdir bin
+[root@ubuntu2204 mysqld_exporter]#mv mysqld_exporter bin/
+
+# 在mysqld_exporter的服务目录下，创建 .my.cnf 隐藏文件，为mysqld_exporter配置获取数据库信息的基本属性
+[root@ubuntu2204 mysqld_exporter]#cat /usr/local/mysqld_exporter/.my.cnf
+[client]
+host=127.0.0.1
+port=3306
+user=exporter
+password=123456
+
+# 创建mysqld_exporter的服务启动文件
+[root@ubuntu2204 mysqld_exporter]#cat /lib/systemd/system/mysqld_exporter.service
+[Unit]
+Description=mysqld exporter project
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/mysqld_exporter/bin/mysqld_exporter --config.my-cnf="/usr/local/mysqld_exporter/.my.cnf"
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+#配置解析：在原来的配置文件基础上，添加了 --config.my-cnf属性
+
+# 重载并启动服务
+[root@ubuntu2204 mysqld_exporter]#systemctl daemon-reload 
+[root@ubuntu2204 mysqld_exporter]#systemctl enable --now mysqld_exporter.service 
+
+# 检查是否打开9104/tcp端口
+[root@ubuntu2204 mysqld_exporter]#ss -nlt
+LISTEN        0             4096              *:9104                    *:* 
+#结果显示：该组件对外暴露的端口是 9104 端口
+```
+
+![image-20250313155136434](../markdown_img/image-20250313155136434.png)
+
+##### 修改 Prometheus 配置
+
+```bash
+#修改prometheus的配置文件，让它自动过滤文件中的节点信息
+[root@ubuntu2204 ~]#vim /usr/local/prometheus/conf/prometheus.yml
+  - job_name: "mysqld_exporter"
+    static_configs:
+      - targets: ["10.0.0.202:9104"]
+      
+#重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+
+#稍等几秒钟，到浏览器中查看监控目标
+```
+
+![image-20250313160301751](../markdown_img/image-20250313160301751.png)
+
+
+
+#### Grafana 图形展示
+
+```bash
+#导入grafana的镜像模板文件 
+https://grafana.com/grafana/dashboards/14057,7362,11323,13106,17320(中文版)
+```
+
+**14057 模版**
+
+![image-20250313160621829](D:\git_repository\cyber_security_learning\markdown_img\image-20250313160621829.png)
+
+
+
+###  Java 应用监控
+
+对于 Java 应用，可以借助于专门的 **jmx exporter** 方式来暴露相关的指标数据
+
+```bash
+#下载链接:
+https://prometheus.io/download/
+#官方地址：
+https://github.com/prometheus/jmx_exporter
+```
+
+#### 准备 Java 环境
+
+```bash
+# 安装tomcat
+# 方法1：包安装 Tomcat
+[root@ubuntu2204 ~]#apt install -y tomcat9
+
+# 方法2: 二进制安装
+[root@ubuntu2204 ~]#wget https://www.mysticalrecluse.com/script/Shell/install_tomcat.sh
+[root@ubuntu2204 ~]#bash install_tomcat.sh 
+
+# 启动tomcat
+[root@ubuntu2204 ~]#systemctl start tomcat.service 
+```
+
+####  准备 Jmx Exporter
+
+```bash
+# 获取软件
+[root@ubuntu2204 ~]#wget -P /usr/local/src https://github.com/prometheus/jmx_exporter/releases/download/1.2.0/jmx_prometheus_javaagent-1.2.0.jar
+
+# 配置文件
+[root@ubuntu2204 ~]#cat tomcat.yml 
+# https://grafana.com/grafana/dashboards/8704-tomcat-dashboard/
+---   
+lowercaseOutputLabelNames: true
+lowercaseOutputName: true
+whitelistObjectNames: ["java.lang:type=OperatingSystem", "Catalina:*"]
+blacklistObjectNames: []
+rules:
+  - pattern: 'Catalina<type=Server><>serverInfo: (.+)'
+    name: tomcat_serverinfo
+    value: 1
+    labels:
+      serverInfo: "$1"
+    type: COUNTER
+  - pattern: 'Catalina<type=GlobalRequestProcessor, name=\"(\w+-\w+)-(\d+)\"><>(\w+):'
+    name: tomcat_$3_total
+    labels:
+      port: "$2"
+      protocol: "$1"
+    help: Tomcat global $3
+    type: COUNTER
+  - pattern: 'Catalina<j2eeType=Servlet, WebModule=//([-a-zA-Z0-9+&@#/%?=~_|!:.,;]*[-a-zA-Z0-9+&@#/%=~_|]), name=([-a-zA-Z0-9+/$%~_-|!.]*), J2EEApplication=none, J2EEServer=none><>(requestCount|processingTime|errorCount):'
+    name: tomcat_servlet_$3_total
+    labels:
+      module: "$1"
+      servlet: "$2"
+    help: Tomcat servlet $3 total
+    type: COUNTER
+  - pattern: 'Catalina<type=ThreadPool, name="(\w+-\w+)-(\d+)"><>(currentThreadCount|currentThreadsBusy|keepAliveCount|connectionCount|acceptCount|acceptorThreadCount|pollerThreadCount|maxThreads|minSpareThreads):'
+    name: tomcat_threadpool_$3
+    labels:
+      port: "$2"
+      protocol: "$1"
+    help: Tomcat threadpool $3
+    type: GAUGE
+  - pattern: 'Catalina<type=Manager, host=([-a-zA-Z0-9+&@#/%?=~_|!:.,;]*[-a-zA-Z0-9+&@#/%=~_|]), context=([-a-zA-Z0-9+/$%~_-|!.]*)><>(processingTime|sessionCounter|rejectedSessions|expiredSessions):'
+    name: tomcat_session_$3_total
+    labels:
+      context: "$2"
+      host: "$1"
+    help: Tomcat session $3 total
+    type: COUNTER  
+    
+# 准备相关文件
+[root@ubuntu2204 ~]#cp /usr/local/src/jmx_prometheus_javaagent-1.2.0.jar /usr/local/tomcat/bin/
+[root@ubuntu2204 ~]#cp tomcat.yml /usr/local/tomcat/bin/
+
+# 修改tomcat的启动脚本 catalina.sh ，插入下面2两行
+[root@ubuntu2204 ~]#vim /usr/local/tomcat/bin/catalina.sh
+# OS specific support.  $var _must_ be set to either true or false.
+JAVA_OPTS="$JAVA_OPTS $JSSE_OPTS"
+JAVA_OPTS="-javaagent:/usr/local/tomcat/bin/jmx_prometheus_javaagent-1.2.0.jar=9527:/usr/local/tomcat/bin/tomcat.yml"
+
+# 重启tomcat
+[root@ubuntu2204 ~]#vim /usr/local/tomcat/bin/catalina.sh
+
+# 浏览器访问
+http://10.0.0.203:9527/metrics
+```
+
+![image-20250313164846776](../markdown_img/image-20250313164846776.png)
+
+
+
+#### 修改 Prometheus 配置
+
+```bash
+#修改prometheus的配置文件，让它自动过滤文件中的节点信息
+[root@ubuntu2204 ~]#cat /usr/local/prometheus/conf/prometheus.yml
+......
+  - job_name: "metrics_from_tomcat"
+    static_configs:
+      - targets: ["10.0.0.203:9527"]
+
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+```
+
+![image-20250313165457261](../markdown_img/image-20250313165457261.png)
+
+####  Grafana 图形展示
+
+![image-20250313171924522](../markdown_img/image-20250313171924522.png)
+
+
+
+### Nginx 监控
+
+Nginx 默认自身没有提供 Json 格式的指标数据,可以通过下两种方式实现 Prometheus 监控Nginx 默认自身没有提供 Json 格式的指标数据,可以通过下两种方式实现 Prometheus 监控
+
+- **方法1**：通过nginx/nginx-prometheus-exporter容器配合nginx的stub状态页实现nginx的监控
+- **方法2**：需要先编译安装一个模块nginx-vts,将状态页转换为Json格式，再利用nginx-vts-exporter采集数据到Prometheus
+
+
+
+#### nginx-prometheus-exporter 容器实现
+
+```http
+https://hub.docker.com/r/nginx/nginx-prometheus-exporter
+```
+
+**范例：基于 docker 实现**
+
+```bash
+[root@devops ~]#apt install -y nginx
+
+# 开启stub_tatus
+[root@devops ~]#vim /etc/nginx/sites-enabled/default
+...
+location /stub_status {
+        stub_status;
+    }
+...
+
+# 测试
+[root@devops ~]#curl 127.0.0.1/stub_status
+Active connections: 1 
+server accepts handled requests
+ 1 1 1 
+Reading: 0 Writing: 1 Waiting: 0 
+
+# 使用 docker 创建 nginx-prometheus-exporter
+[root@devops ~]#docker run -p 9113:9113 nginx/nginx-prometheus-exporter:1.1.0 --nginx.scrape-uri=http://localhost/stub_status
+
+# 测试
+[root@devops ~]# curl -s 127.0.0.1:9113/metrics|grep nginx
+# HELP nginx_exporter_build_info A metric with a constant '1' value labeled by version, revision, branch, goversion from which nginx_exporter was built, and the goos and goarch for the build.
+# TYPE nginx_exporter_build_info gauge
+nginx_exporter_build_info{branch="HEAD",goarch="amd64",goos="linux",goversion="go1.21.5",revision="85fa58b9f8979eeed776a1df58495ef5baa4d9d7",tags="unknown",version="1.1.0"} 1
+# HELP nginx_up Status of the last metric scrape
+# TYPE nginx_up gauge
+nginx_up 0
+
+[root@ubuntu2204 ~]#vim /usr/local/prometheus/conf/prometheus.yml 
+......
+  - job_name: "nginx_exporter"
+    static_configs:
+      - targets: ["10.0.0.208:9113"]
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+```
+
+![image-20250313174633521](../markdown_img/image-20250313174633521.png)
+
+
+
+### Consul 监控
+
+Consul Exporter 可以实现对 Consul 的监控
+
+需要为每个Consul实例部署consul-exporter，它负责将Consul的状态信息转为Prometheus兼容的指标格式并予以暴露。
+
+
+
+#### 下载程序包和展开程序包
+
+```bash
+#先安装consul.再部署consul_exporter
+[root@devops ~]#wget -P /usr/local/src https://github.com/prometheus/consul_exporter/releases/download/v0.8.0/consul_exporter-0.8.0.linux-amd64.tar.gz
+
+[root@devops ~]#tar xf /usr/local/src/consul_exporter-0.8.0.linux-amd64.tar.gz -C /usr/local
+[root@devops ~]#ln -sv /usr/local/consul_exporter-0.8.0.linux-amd64 /usr/local/consul_exporter
+```
+
+#### 创建用户
+
+若consul用户已经存在，可略过该步骤：
+
+```bash
+[root@devops ~]#id consul
+uid=1001(consul) gid=1001(consul) 组=1001(consul)
+
+# 如果不存在
+[root@devops ~]#useradd -r consul
+```
+
+#### 创建 Service 文件
+
+保存于/lib/systemd/system/consul_exporter.service文件中
+
+```bash
+[root@devops ~]#cat /lib/systemd/system/consul_exporter.service
+[Unit]
+Description=consul_exporter
+Documentation=https://prometheus.io/docs/introduction/overview/
+After=network.target
+
+[Service]
+Type=simple
+User=consul
+EnvironmentFile=-/etc/default/consul_exporter
+ExecStart=/usr/local/consul_exporter/consul_exporter --consul.server="http://localhost:18500" --web.listen-address=":9107" --web.telemetry-path="/metrics" --log.level=info $ARGS
+ExecReload=/bin/kill -HUP $MAINPID
+TimeoutStopSec=20s
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+# 启用服务
+[root@devops ~]#systemctl daemon-reload 
+[root@devops ~]#systemctl start consul_exporter.service
+```
+
+#### 验证监听的端口，并测试访问其暴露的指标
+
+```bash
+[root@devops ~]#ss -nlt|grep 9107
+LISTEN 0      4096               *:9107             *:*
+
+# 浏览器访问： http://10.0.0.208:9107/metrics
+```
+
+![image-20250313180426142](../markdown_img/image-20250313180426142.png)
+
+#### 修改prometheus配置文件监控 consul_exporter
+
+```bash
+[root@ubuntu2204 ~]#vim /usr/local/prometheus/conf/prometheus.yml
+......
+  - job_name: "consul_exporter"
+    static_configs:
+      - targets: ["10.0.0.208:9107"]
+      
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+```
+
+![image-20250313180639104](../markdown_img/image-20250313180639104.png)
+
+
+
+### 黑盒监控 blackbox_exporter
+
+#### blackbox_exporter 说明
+
+![image-20250313194311824](../markdown_img/image-20250313194311824.png)
+
+黑盒监视也称远端探测，监测应用程序的外部，可以查询应用程序的外部特征
+
+比如：是否开放相应的端口,并返回正确的数据或响应代码，执行icmp或者echo检查并确认收到响应
+
+prometheus探测工具是通过运行一个blackbox exporter来探测远程目标，并公开在本地端点上
+
+blackbox_exporter允许通过HTTP、HTTPS、DNS、TCP和ICMP等协议来探测端点状态
+
+blackbox_exporter中，定义一系列执行特定检查的模块，例:检查正在运行的web服务器，或者DNS解析记录
+
+blackbox_exporter运行时，它会在URL上公开这些模块和API
+
+blackbox_exporter是一个二进制Go应用程序，默认监听端口9115
+
+Github 链接
+
+```http
+https://github.com/prometheus/blackbox_exporter
+https://github.com/prometheus/blackbox_exporter/blob/master/blackbox.yml
+https://github.com/prometheus/blackbox_exporter/blob/master/example.yml
+```
+
+
+
+#### 黑盒监控的核心作用
+
+##### **1️⃣ 监测外部可用性**
+
+即使你的 **应用、数据库、服务器状态都正常**，但是：
+
+- **CDN 故障** 可能导致用户访问不到网站
+- **DNS 解析失败** 可能导致客户端无法获取服务 IP
+- **防火墙规则错误** 可能导致外部无法访问
+- **TLS 证书过期** 可能导致 HTTPS 访问失败
+- **API 依赖故障** 可能导致你的 API 无法访问
+
+**✅ 解决方案：** 使用 `blackbox_exporter` 进行外部监控：
+
+- `HTTP` 探测：检测 **Web 应用的可用性**
+- `ICMP` 探测：检测 **服务器是否存活**
+- `TCP` 探测：检测 **端口是否可用**
+- `DNS` 探测：检查 **域名解析是否正常**
+
+##### **2️⃣ 监控整个服务链路**
+
+你的 `Prometheus` **白盒监控** 只能监控 **本地服务的运行状态**，但它不能判断：
+
+- **请求是否能成功传递到目标服务？**
+- **多个微服务之间是否有异常？**
+- **用户从不同地区访问是否有问题？**
+
+**✅ 解决方案：**
+
+- **HTTP 探测 API 端点**，查看是否返回 `200`
+- **端到端测试**，检查多个服务是否联通
+- **全球站点监控**，模拟不同地区的用户访问服务
+
+##### **3️⃣ 提供“最终用户体验”视角**
+
+即使 `Prometheus` 采集的数据都正常，但：
+
+- 用户 **仍然可能访问不到你的服务**
+- 页面 **可能加载很慢**
+- `TLS 证书` 可能已经快过期了
+
+**✅ 解决方案：**
+
+- **监测 HTTP 响应时间**，查看页面是否加载过慢
+- **检测 SSL 证书有效期**，提前告警
+- **探测 API 端点**，确保 API 服务可用
+
+
+
+##### **黑盒监控 vs. 白盒监控**
+
+| 监控方式                             | 主要监测内容                       | 作用                                 |
+| ------------------------------------ | ---------------------------------- | ------------------------------------ |
+| **白盒监控**（Prometheus Exporters） | 服务器状态、应用程序状态、业务指标 | **内部视角，分析系统健康状况**       |
+| **黑盒监控**（Blackbox Exporter）    | HTTP、TCP、ICMP、DNS 探测          | **外部视角，检测用户是否能访问服务** |
+
+
+
+#### blackbox_exporter 安装
+
+```http
+https://prometheus.io/download/#blackbox_exporter
+```
+
+#####  二进制安装
+
+```bash
+[root@ubuntu2204 ~]# wget -P /usr/local/src https://github.com/prometheus/blackbox_exporter/releases/download/v0.22.0/blackbox_exporter-0.22.0.linux-amd64.tar.gz
+[root@ubuntu2204 ~]# tar xf /usr/local/src/blackbox_exporter-0.22.0.linux-amd64.tar.gz -C /usr/local
+[root@ubuntu2204 ~]#ln -s /usr/local/blackbox_exporter-0.22.0.linux-amd64 /usr/local/blackbox_exporter
+[root@ubuntu2204 ~]#cd /usr/local/blackbox_exporter
+[root@ubuntu2204 blackbox_exporter]#ls
+blackbox_exporter  blackbox.yml  LICENSE  NOTICE
+
+[root@ubuntu2204 blackbox_exporter]#mkdir bin conf
+[root@ubuntu2204 blackbox_exporter]#mv blackbox_exporter bin/
+[root@ubuntu2204 blackbox_exporter]#mv blackbox.yml conf/
+
+#默认配置文件无需修改
+[root@ubuntu2204 blackbox_exporter]#cat conf/blackbox.yml 
+modules:
+  http_2xx:           # 名字
+    prober: http      # 协议
+  http_post_2xx:
+    prober: http
+    http:
+      method: POST     # 支持GET,POST,默认GET
+  tcp_connect:
+    prober: tcp
+  pop3s_banner:
+    prober: tcp
+    tcp:
+      query_response:
+      - expect: "^+OK"
+      tls: true
+      tls_config:
+        insecure_skip_verify: false  # 启用远程探测证书检查
+  grpc:
+    prober: grpc
+    grpc:
+      tls: true
+      preferred_ip_protocol: "ip4"   # 探测的ip协议版本
+  grpc_plain:
+    prober: grpc
+    grpc:
+      tls: false
+      service: "service1"
+  ssh_banner:
+    prober: tcp
+    tcp:
+      query_response:
+      - expect: "^SSH-2.0-"
+      - send: "SSH-2.0-blackbox-ssh-check"
+  irc_banner:
+    prober: tcp
+    tcp:
+      query_response:
+      - send: "NICK prober"
+      - send: "USER prober prober prober :prober"
+      - expect: "PING :([^ ]+)"
+        send: "PONG ${1}"
+      - expect: "^:[^ ]+ 001"
+  icmp:
+    prober: icmp
+  icmp_ttl5:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      ttl: 5
+      
+# 创建 Service 文件
+[root@ubuntu2204 blackbox_exporter]#vim /lib/systemd/system/blackbox_exporter.service
+[Unit]
+Description=Prometheus Black Exporter
+After=network.target
+[Service]
+Type=simple
+ExecStart=/usr/local/blackbox_exporter/bin/blackbox_exporter --config.file=/usr/local/blackbox_exporter/conf/blackbox.yml --web.listen-address=:9115
+Restart=on-failure
+LimitNOFILE=100000
+[Install]
+WantedBy=multi-user.target
+
+# 重启服务
+[root@ubuntu2204 blackbox_exporter]#systemctl daemon-reload 
+[root@ubuntu2204 blackbox_exporter]#systemctl enable --now blackbox_exporter.service
+
+# 浏览器访问下面链接,可以看到如下
+http://10.0.0.203:9115/
+```
+
+![image-20250313200000535](../markdown_img/image-20250313200000535.png)
+
+
+
+##### Docker 容器启动
+
+```bash
+docker run --rm -d -p 9115:9115 -v pwd:/config prom/blackbox-exporter:master --config.file=/config/blackbox.yml
+```
+
+
+
+#### blackbox_exporter 的工作机制
+
+- **Prometheus 发送请求** 给 `blackbox_exporter`，请求探测某个目标（带参数）。
+- `blackbox_exporter` **执行探测任务**（Ping、HTTP 请求、DNS 解析等）。
+- `blackbox_exporter` **将探测结果以 Prometheus 指标格式暴露出来**。
+- **Prometheus 采集这些指标** 并存入 TSDB（时序数据库）。
+
+##### 详细流程
+
+假设 Prometheus 配置如下：
+
+```bash
+- job_name: 'http_status_blackbox_exporter'
+  metrics_path: /probe
+  params:
+    module: [http_2xx]  # 选择 HTTP 探测模式
+  static_configs:
+    - targets:
+      - "https://example.com"
+      - "https://mywebsite.com"
+  relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - target_label: instance
+      source_labels: [__param_target]
+    - target_label: __address__
+      replacement: "blackbox_exporter:9115"
+```
+
+**🔹 第一步：Prometheus 发送请求**
+
+Prometheus 向 `blackbox_exporter` 发送如下 HTTP 请求：
+
+```bash
+http://blackbox_exporter:9115/probe?module=http_2xx&target=https://example.com
+http://blackbox_exporter:9115/probe?module=http_2xx&target=https://mywebsite.com
+```
+
+📌 **参数解析**
+
+- `module=http_2xx`：指定 `blackbox_exporter` 执行 HTTP 监测，期望返回 2xx 状态码。
+- `target=https://example.com`：`blackbox_exporter` 需要探测的目标地址。
+
+**🔹 第二步：`blackbox_exporter` 进行探测**
+
+`blackbox_exporter` **根据参数执行探测**：
+
+- **执行 HTTP 请求**
+
+  ```bash
+  curl -I https://example.com
+  ```
+
+- **检查 HTTP 状态码**
+
+  - **返回 `200 OK`** ✅  说明服务正常。
+  - **返回 `500 Internal Server Error`** ❌  说明服务异常
+
+**🔹 第三步：`blackbox_exporter` 暴露探测结果**
+
+`blackbox_exporter` 处理后，**将探测数据暴露成 Prometheus 指标**：
+
+```bash
+curl http://blackbox_exporter:9115/metrics
+```
+
+示例返回值：
+
+```bash
+probe_success 1
+probe_http_status_code 200
+probe_duration_seconds 0.123
+probe_ssl_earliest_cert_expiry 1.6958e+09
+```
+
+📌 **指标解析**
+
+- `probe_success 1`：探测成功（`0` 表示失败）。
+- `probe_http_status_code 200`：目标网站返回 **200 OK** 状态码。
+- `probe_duration_seconds 0.123`：探测耗时 **123ms**。
+
+**🔹 第四步：Prometheus 采集数据**
+
+Prometheus **定期抓取 `blackbox_exporter` 的 `/metrics`**，并将数据存入 TSDB（时序数据库）。
+
+```yaml
+scrape_configs:
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    static_configs:
+      - targets:
+        - "https://example.com"
+```
+
+
+
+#### Prometheus 配置定义监控规则
+
+在 Prometheus 上定义实现具体的业务的监控规则的配置
+
+##### 网络连通性监控
+
+```bash
+[root@ubuntu2204 ~]#vim /usr/local/prometheus/conf/prometheus.yml 
+......
+  - job_name: 'ping_status_blackbox_exporter'
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    static_configs:
+      - targets: ['10.0.0.202', '10.0.0.203']
+        labels:
+          instance: 'ping_status'
+          group: 'icmp'
+    relabel_configs:
+      - source_labels: [__address__]      # 修改目标URL地址的标签[__address__]为__param_target,用于发送给blackbox                                             使用
+        target_label: __param_target
+      - target_label: __address__
+        replacement: '10.0.0.203:9115'
+      - source_labels: [__param_target]
+        target_label: ipaddr
+        
+# 检查语法
+[root@ubuntu2204 ~]#promtool check config /usr/local/prometheus/conf/prometheus.yml 
+```
+
+![image-20250313210114069](../markdown_img/image-20250313210114069.png)
+
+##### TCP端口连通性监控
+
+```bash
+[root@ubuntu2204 ~]#vim /usr/local/prometheus/conf/prometheus.yml
+......
+  - job_name: 'port_status_blackbox_exporter'
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets: ['10.0.0.208:80']
+        labels:
+          instance: 'port_status'
+          group: 'port'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: 10.0.0.203:9115
+      - source_labels: [__param_target]
+        target_label: ipaddr_port
+   
+[root@ubuntu2204 ~]#promtool check config /usr/local/prometheus/conf/prometheus.yml
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+```
+
+![image-20250313213040106](../markdown_img/image-20250313213040106.png)
+
+
+
+##### Http/Https 网站监控
+
+```bash
+[root@ubuntu2204 ~]#vim /usr/local/prometheus/conf/prometheus.yml 
+......
+  - job_name: 'http_status_blackbox_exporter'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ['https://www.baidu.com']
+        labels:
+          instance: http_status
+          group: web
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - target_label: __address__
+        replacement: 10.0.0.203:9115
+      - source_labels: [__param_target]
+        target_label: url
+
+# 语法检查
+[root@ubuntu2204 ~]#promtool check config /usr/local/prometheus/conf/prometheus.yml
+
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+```
+
+![image-20250313215032995](../markdown_img/image-20250313215032995.png)
+
+
+
+#### Grafana 展示
+
+**Grafana 导入模板 9965**
+
+![image-20250313215753248](../markdown_img/image-20250313215753248.png)
+
+
+
+
+
+## Prometheus 实现容器监控
+
+###  cAdvisor 简介
+
+![image-20250313220051705](../markdown_img/image-20250313220051705.png)
+
+对于物理主机可以在其上安装Node Exporter实现监控，但是对于容器的监控并不适用
+
+对于一些容器类型的服务应用来说，可以借助于一些专用工具的方式来实现监控，比如docker类型的容器应用，可以通过 cAdvisor 的方式来进行监控。
+
+cadvisor(Container Advisor容器顾问) 是 Google 开源的一个容器监控工具，它以守护进程方式运行， 用于收集、聚合、处理和导出正在运行容器的有关信息。具体来说，该组件对每个容器都会记录其资源隔离参数、历史资源使用情况、完整历史资源使用情况的直方图和网络统计信息。它不仅可以搜集一台机器上所有运行的容器信息，还提供基础查询界面和http接口，方便其他组件如Prometheus进行数据 抓取
+
+cAdvisor使用Go语言开发，对Node机器上的资源及容器进行实时监控和性能数据采集，包括CPU使用情况、内存使用情况、网络吞吐量及文件系统使用情况，**利用Linux的cgroups**获取容器的资源使用信息，可用于对容器资源的使用情况和性能进行监控。
+
+在Kubernetes1.10之前cAdvisor内置在kubelet,通过启动参数–cadvisor-port可以定义cAdvisor对外提供服务的端口，默认为4194。可以通过浏览器访问,Kubernetes1.11之后不再内置,需自行安装
+
+```http
+https://github.com/kubernetes/kubernetes/pull/65707
+```
+
+安装 cAdvisor 后,通过  http://cAdvisor-server:8080/metrics 暴露metrics
+
+```ABAP
+注意：一个cAdvisor仅对一台主机进行监控。在Kubernetes集群中可以通过DaemonSet方式自行安装在每个节点主机
+```
+
+项目主页： http://github.com/google/cadvisor
+
+**下载地址**
+
+```http
+https://github.com/google/cadvisor/releases/latest
+https://github.com/google/cadvisor/archive/refs/tags/v0.39.3.tar.gz
+```
+
+
+
+### cAdvisor 工作原理
+
+![image-20250313220908081](../markdown_img/image-20250313220908081.png)
+
+#### cAdvisor 主要组件
+
+从 **架构图** 看，cAdvisor 主要由以下几个核心部分组成：
+
+- **cAdvisor API**
+- **Manager 管理组件**
+- **Machine Info 机器信息**
+- **Container Info 容器信息**
+- **Process List 进程列表**
+- **Metrics 采集与存储**
+
+
+
+#### 详细工作流程
+
+##### 1️⃣ 采集主机信息（Machine Info）
+
+cAdvisor 需要获取宿主机的资源信息，包括：
+
+- **CPU 频率** (`/proc/cpuinfo`)
+- **内存信息** (`/proc/meminfo`)
+- **主机 ID** (`/var/lib/dbus/machine-id`)
+- **系统 UUID** (`/sys/class/dmi/id/product_uuid`)
+- **文件系统信息** (`/proc/diskstats`)
+- **网络设备信息** (`/sys/class/net/`)
+
+📌 **获取方式**
+
+- cAdvisor **直接读取 Linux 相关的系统文件** 来获取主机资源信息。
+- 例如，获取 CPU 频率时，它会解析 `/proc/cpuinfo` 文件。
+
+
+
+##### 2️⃣ 容器管理与监控（Manager）
+
+cAdvisor 的 **Manager 组件** 负责管理所有正在运行的容器，并通过 **Docker API 或直接访问 cgroup** 来收集容器的性能数据。
+
+**Manager 主要功能**
+
+- **getDockerContainer()** ➜ 获取 Docker 容器信息
+- **getProcessList()** ➜ 获取容器内的进程列表
+- **MachineInfo()** ➜ 获取主机信息
+- **GetStats()** ➜ 获取容器运行时状态
+- **GetSpec()** ➜ 获取容器的 `cgroup` 配置信息
+
+📌 **关键点**
+
+- cAdvisor **默认扫描 `/sys/fs/cgroup` 目录**，获取容器的 cgroup 信息。
+- 访问 `/var/lib/docker/execdriver/native/containerID/state.json` 解析容器配置。
+- 通过 **Docker API** 获取运行中的容器状态。
+
+
+
+##### 3️⃣ 采集容器资源信息（Container Info）
+
+cAdvisor 需要获取 **每个容器的资源使用情况**，主要包括：
+
+1. **CPU、内存、网络、磁盘使用情况**
+2. **容器的 `cgroup` 限制**
+3. **容器内部运行的进程**
+
+📌 **数据来源**
+
+- **CPU、内存、磁盘**
+  - `/sys/fs/cgroup/cpuacct/docker/<container_id>/cpuacct.usage`
+  - `/sys/fs/cgroup/memory/docker/<container_id>/memory.usage_in_bytes`
+  - `/sys/fs/cgroup/blkio/docker/<container_id>/blkio.throttle.io_service_bytes`
+- **网络**
+  - `/sys/class/net/docker0/statistics/`
+  - 直接解析 `/proc/net/dev` 获取网络流量数据
+- **进程**
+  - `ps -eo user,pid,stime,pcpu,pmem,rss,vsz,stat,time,comm,cgroup`
+
+
+
+##### 4️⃣ 进程列表（Process List）
+
+cAdvisor 还可以监控 **容器内部运行的进程**，通过 `ps` 命令获取 **CPU、内存、状态等信息**
+
+```bash
+ps -eo user,pid,stime,pcpu,pmem,rss,vsz,stat,time,comm,cgroup
+```
+
+- **pid** ➜ 进程 ID
+- **pcpu** ➜ 进程 CPU 使用率
+- **pmem** ➜ 进程内存使用率
+- **rss** ➜ 进程占用的物理内存
+- **stat** ➜ 进程状态
+
+📌 **关键点**
+
+- cAdvisor **使用 `proc` 文件系统** 读取进程信息。
+- `/proc/<pid>/stat` 存储了该进程的详细资源占用情况。
+
+
+
+##### 5️⃣ 数据暴露与存储
+
+cAdvisor 采集完数据后，会：
+
+1. **暴露 API 端点**
+   - `/api/v1.3/docker/`
+   - `/api/v2.0/containers/`
+   - `/metrics`（Prometheus 格式）
+2. **存储到监控系统**
+   - **Prometheus**
+   - **InfluxDB**
+   - **Elasticsearch**
+   - **Google Cloud Monitoring**
+
+📌 **Prometheus 采集示例**
+
+```yaml
+- job_name: "cadvisor"
+  static_configs:
+    - targets: ["localhost:8080"]
+```
+
+- **Prometheus 通过 `cAdvisor` 提供的 `/metrics` 端点拉取监控数据**
+
+- **Grafana 可以直接可视化这些数据**
+
+
+
+#### cAdvisor 的核心原理总结
+
+✅ **1. 获取主机信息**
+
+- 通过读取 `/proc` 和 `/sys/class/` 目录，获取 CPU、内存、磁盘、网络等信息。
+
+✅ **2. 监控容器**
+
+- 直接读取 `cgroup` 数据，分析 CPU、内存、I/O 资源使用情况。
+- 读取 `/proc/net/dev` 解析网络流量。
+- 解析 Docker API 获取容器状态。
+
+✅ **3. 获取进程信息**
+
+- 通过 `ps` 命令获取容器内进程的 CPU、内存使用情况。
+
+✅ **4. 暴露指标**
+
+- 通过 `/metrics` 端点，向 **Prometheus** 提供监控数据。
+
+
+
+### cAdvisor 安装
+
+在需要被监控docker的主机准备 docker 环境
+
+#### 源码编译安装 cAdvisor
+
+官方文档
+
+```http
+https://github.com/google/cadvisor/blob/master/docs/development/build.md
+```
+
+范例: 编译安装cadvisor
+
+```bash
+#安装go环境，必须在 1.14+ 版本,注意:不要使用1.18以上版
+[root@devops ~]#wget -P /usr/local/src https://studygolang.com/dl/golang/go1.17.6.linux-amd64.tar.gz
+[root@devops ~]#tar -xf /usr/local/src/go1.17.6.linux-amd64.tar.gz  -C /usr/local/
+[root@devops ~]#vim /etc/profile
+export GOROOT=/usr/local/go
+export PATH=$PATH:$GOROOT/bin
+[root@devops ~]#. /etc/profile
+
+[root@devops ~]#go version
+go version go1.17.6 linux/amd64
+
+# 获取源码
+[root@devops ~]#wget https://github.com/google/cadvisor/archive/refs/tags/v0.39.3.tar.gz
+[root@devops ~]#tar xf v0.39.3.tar.gz -C /usr/local/
+[root@devops ~]#ln -s /usr/local/cadvisor-0.39.3 /usr/local/cadvisor
+[root@devops ~]#cd /usr/local/cadvisor
+
+#获取软件依赖
+go env -w GOPROXY=https://goproxy.cn
+go get -d github.com/google/cadvisor
+
+#Ubuntu系统
+apt -y install gcc make  libpfm4 libpfm4-dev jq
+#rhel系列
+yum -y install gcc make
+#编译安装cadvisor
+make build
+
+#确认效果
+[root@devops cadvisor]#./cadvisor --help
+Usage of ./cadvisor:
+  -add_dir_header
+    	If true, adds the file directory to the header of the log messages
+  -allow_dynamic_housekeeping
+    	Whether to allow the housekeeping interval to be dynamic (default true)
+  -alsologtostderr
+    	log to standard error as well as files
+......
+
+# 启动cadvisor
+[root@devops cadvisor]#./cadvisor -port=8080 &>>/var/log/cadvisor.log &
+
+# 浏览器访问 10.0.0.208:8080，可以查看cadvisor的默认ui页面的浏览器效果
+```
+
+![image-20250313224639066](../markdown_img/image-20250313224639066.png)
+
+```bash
+#浏览器访问 10.0.0.208:8080/metrics，可以查看cadvisor的默认采集的容器指标效果
+```
+
+![image-20250313224805615](../markdown_img/image-20250313224805615.png)
+
+
+
+
+
+#### Docker 方式安装 cAdvisor
+
+**安装说明**
+
+```http
+https://github.com/google/cadvisor/
+```
+
+**cAdvisor 版本**
+
+```http
+https://github.com/google/cadvisor/releases
+```
+
+**容器下载**
+
+```ABAP
+gcr.io/cadvisor/cadvisor
+```
+
+**范例: 拉取镜像**
+
+```bash
+#docker官方仓库的cAdvisor镜像只有旧版本,而且不再更新
+docker pull google/cadvisor:v0.33.0  
+
+#从google下载最新版的docker镜像,需要科学上网
+docker pull gcr.io/cadvisor/cadvisor:v0.49.1
+docker pull gcr.io/cadvisor/cadvisor:v0.47.0
+docker pull gcr.io/cadvisor/cadvisor:v0.37.0
+ 
+#从国内镜像下载
+docker pull wangxiaochun/cadvisor:v0.49.1
+docker pull wangxiaochun/cadvisor:v0.47.0
+docker pull wangxiaochun/cadvisor:v0.45.0
+docker pull wangxiaochun/cadvisor:v0.37.0
+ 
+#代理网站下载:https://dockerproxy.com/
+docker pull gcr.dockerproxy.com/cadvisor/cadvisor:v0.49.1
+
+#第三方镜像
+https://hub.docker.com/r/zcube/cadvisor/tags`
+```
+
+**在线下载并启动**
+
+```bash
+#从google官方下载需要科学上网
+VERSION=v0.49.1
+docker run \
+  --volume=/:/rootfs:ro \
+  --volume=/var/run:/var/run:ro \
+  --volume=/sys:/sys:ro \
+  --volume=/var/lib/docker/:/var/lib/docker:ro \
+  --volume=/dev/disk/:/dev/disk:ro \
+  --publish=8081:8080 \
+  --detach=true \
+  --name=cadvisor \
+  --privileged \
+  --device=/dev/kmsg \
+  gcr.dockerproxy.com/cadvisor/cadvisor:$VERSION
+```
+
+**离线下载镜像并启动容器**
+
+```bash
+#导入提前下载的镜像
+docker load -i cadvisor-v0.49.1.tar.gz
+docker load -i cadvisor-v0.37.0.tar.gz
+
+#注意：如果使用containerd容器运行时，改为下面内容
+-- volume=/var/lib/containerd/:/var/lib/containerd:ro 
+
+docker run \
+  --volume=/:/rootfs:ro \
+  --volume=/var/run:/var/run:ro \
+  --volume=/sys:/sys:ro \
+  --volume=/var/lib/docker/:/var/lib/docker:ro \
+ #-- volume=/var/lib/containerd/:/var/lib/containerd:ro \
+  --volume=/dev/disk/:/dev/disk:ro \
+  --publish=8081:8080 \
+  --detach=true \
+  --name=cadvisor \
+  --privileged \
+  --device=/dev/kmsg \
+  gcr.io/cadvisor/cadvisor:v0.37.0
+```
+
+![image-20250314094549980](../markdown_img/image-20250314094549980.png)
+
+
+
+#### kubernetes 方式部署 cAdvisor
+
+```bash
+[root@devops cadvisor]# cat /data/prometheus/yaml/cadvisor-daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cadvisor
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: cadvisor
+  template:
+    metadata:
+      labels:
+        app: cAdvisor
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      hostNetwork: true      # 使用宿主机网络，注意：8080的端口不要冲突
+      restartPolicy: Always
+      volumes:
+      - name: root
+        hostPath:
+          path: /
+      - name: run
+        hostPath:
+          path: /var/run
+      - name: sys
+        hostPath:
+          path: /sys
+      - name: docker
+        hostPath:
+          # path: /var/lib/containerd
+          path: /var/lib/docker
+      - name: dev
+        hostPath:
+          path: /dev/disk
+      containers:
+      - name: cadvisor
+        image: gcr.io/cadvisor/cadvisor:v0.37.0
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+          - name: root
+            mountPath: /rootfs
+          - name: run
+            mountPath: /var/run
+          - name: sys
+            mountPath: /sys
+          - name: docker
+            mountPath: /var/lib/containerd
+          - name: dev
+            mountPath: /dev/disk
+            
+[root@master1 ~]#kubectl apply -f yaml/cadvisor-daemonset.yaml
+```
+
+
+
+### Prometheus 配置
+
+ 修改 Prometheus 配置
+
+```bash
+#修改prometheus的配置文件，让它自动过滤文件中的节点信息
+[root@ubuntu2204 ~]# vim /usr/local/prometheus/conf/prometheus.yml
+......
+  - job_name: "cadvisor"
+    static_configs:
+      - targets:
+        - "10.0.0.208:8080"
+
+#重启服务
+[root@ubuntu2204 ~]# systemctl restart prometheus.service
+
+#稍等几秒钟，到浏览器中查看监控目标
+```
+
+![image-20250314100342580](../markdown_img/image-20250314100342580.png)
+
+
+
+### cAdvisor 常见指标
+
+```http
+https://github.com/google/cadvisor/blob/master/metrics/testdata/prometheus_metrics
+```
+
+**指标说明**
+
+```bash
+container_tasks_state  #gauge类型，容器特定状态的任务数,根据不同的pod_name和state有600+的不同label
+container_memory_failures_total #counter类型，内存分配失败的累积计数,根据不同的pod_name和state有600+的不同label.
+container_network_receive_errors_total #counter类型，容器网络接收时遇到的累计错误数。
+container_network_transmit_bytes_total #counter类型，容器发送传输的累计字节数。
+container_network_transmit_packets_dropped_total  #counter类型，容器传输时丢弃的累计包数
+container_network_transmit_packets_total  #counter类型，传输数据包的累计计数
+container_network_transmit_errors_total  #counter类型，传输时遇到的累积错误数
+container_network_receive_bytes_total  #counter类型，收到的累计字节数
+container_network_receive_packets_dropped_total  #counter类型，接收时丢弃的累计数据包数
+container_network_receive_packets_total  #counter类型，收到的累计数据包数
+container_spec_cpu_period  #gauge类型，容器的CPU period。
+container_spec_memory_swap_limit_bytes  #容器swap内存交换限制字节
+container_memory_failcnt  #counter类型，内存使用次数达到限制
+container_spec_memory_reservation_limit_bytes  #容器规格内存预留限制字节
+container_spec_cpu_shares  #gauge类型，
+container_spec_memory_limit_bytes  #容器规格内存限制字节
+container_memory_max_usage_bytes  #gauge类型，以字节为单位记录的最大内存使用量
+container_cpu_load_average_10s  #gauge类型，最近10秒钟内的容器CPU平均负载值。
+container_memory_rss  #gauge类型，容器RSS的大小（以字节为单位）
+container_start_time_seconds  #gauge类型，从Unix纪元开始的容器开始时间（以秒为单位）。
+container_memory_mapped_file  #gauge类型，内存映射文件的大小（以字节为单位）
+container_cpu_user_seconds_total  #conter类型，累计CPU user 时间（以秒为单位）
+container_memory_cache  #gauge类型，内存的cache字节数。
+container_memory_working_set_bytes  #gague类型，当前工作集（以字节为单位）
+container_cpu_system_seconds_total  #conter类型，累计CPU system时间（以秒为单位）
+container_memory_swap  #gauge类型，容器交换使用量（以字节为单位）
+container_memory_usage_bytes  #gauge类型，当前内存使用情况（以字节为单位），包括所有内存，无论何时访问
+container_last_seen  #gauge类型，上一次export看到此容器的时间
+container_fs_writes_total  #counter类型，累计写入次数
+container_fs_reads_total   #counter类型，类型读取次数
+container_cpu_usage_seconds_total  #counter类型，累计消耗CPU的总时间
+container_fs_reads_bytes_total  #容器读取的总字节数
+container_fs_writes_bytes_total  #容器写入的总字节数
+container_fs_sector_reads_total  #counter类型，扇区已完成读取的累计计数
+container_fs_inodes_free  #gauge类型，可用的Inode数量
+container_fs_io_current  #gauge类型，当前正在进行的I/O数
+container_fs_io_time_weighted_seconds_total  #counter类型，累积加权I/O时间（以秒为单位）
+container_fs_usage_bytes  #gauge类型，此容器在文件系统上使用的字节数
+container_fs_limit_bytes  #gauge类型，此容器文件系统上可以使用的字节数
+container_fs_inodes_total  #gauge类型，inode数
+container_fs_sector_writes_total  #counter类型，扇区写入累计计数
+container_fs_io_time_seconds_total  #counter类型，I/O花费的秒数累计
+container_fs_writes_merged_total  #counter类型，合并的累计写入数
+container_fs_reads_merged_total  #counter类型，合并的累计读取数
+container_fs_write_seconds_total  #counter类型，写花费的秒数累计
+container_fs_read_seconds_total   #counter类型，读花费的秒数累计
+container_cpu_cfs_periods_total  #counter类型，执行周期间隔时间数
+container_cpu_cfs_throttled_periods_total  #counter类型，节流周期间隔数
+container_cpu_cfs_throttled_seconds_total  #counter类型，容器被节流的总时间
+container_spec_cpu_quota  #gauge类型，容器的CPU配额
+machine_memory_bytes  #gauge类型，机器上安装的内存量
+machine_cpu_cores  #gauge类型，机器上的CPU核心数
+container_scrape_error  #gauge类型，如果获取容器指标时出错，则为1，否则为0
+```
+
+
+
+### Grafana 监控
+
+**193模版**
+
+![image-20250314101659136](D:\git_repository\cyber_security_learning\markdown_img\image-20250314101659136.png)
+
+```bash
+#模板中没有看到标签的样式，在当前的dashboard上定制一个查询的变量名，点击当前dashboard右侧的齿轮(编辑)，编辑内容如下：
+#过滤的标签:label_values(up,instance)
+#筛选的值:   .*:8080 
+```
+
+![image-20250314103159592](../markdown_img/image-20250314103159592.png)
+
+![image-20250314103228491](../markdown_img/image-20250314103228491.png)
+
+![image-20250314103405270](../markdown_img/image-20250314103405270.png)
+
+![image-20250314103508505](D:\git_repository\cyber_security_learning\markdown_img\image-20250314103508505.png) 
 
 
 
@@ -22715,7 +28397,453 @@ https://prometheus.io/docs/prometheus/latest/federation/
 
 
 
+#### **跨服务联邦（Cross-Service Federation）详解**
 
+跨服务联邦是 Prometheus **数据共享机制**，允许 **一个 Prometheus 实例从另一个 Prometheus 实例中拉取数据**，这样就可以在同一个 Prometheus 服务器中查询不同来源的数据，从而实现 **更全面的监控**。
+
+##### 为什么需要跨服务联邦？
+
+在一个大型系统中，不同的服务可能会运行在不同的 Prometheus 服务器上。例如：
+
+1. **集群级别的 Prometheus**：
+   - 监控整个集群的 **CPU、内存、磁盘等资源使用情况**。
+   - 例如，监控 **Kubernetes 节点、容器的 CPU 和内存使用情况**。
+2. **服务级别的 Prometheus**：
+   - 只监控特定的 **业务应用程序**，例如 Web 服务、数据库等。
+   - 这些 Prometheus 服务器只存储和应用本身相关的指标，例如 **HTTP 请求数、错误率等**。
+
+💡 **问题：**
+
+- 业务应用的开发者 **只关心它们的服务**，但有时候也需要知道 **这些服务消耗了多少 CPU 和内存**。
+- 但是，**服务级 Prometheus 服务器并没有 CPU 和内存数据**，因为它不抓取集群级数据。
+- 这时，我们希望 **服务级 Prometheus 能从 集群级 Prometheus 中获取这些数据**，这样 **它们能在同一台服务器上进行查询、告警**，这就是 **跨服务联邦**。
+
+
+
+##### 具体实现
+
+Prometheus **服务级联邦**的实现方式是：
+
+- **业务服务的 Prometheus** **（服务级）** **主动** 从 **集群的 Prometheus** **（集群级）** 中拉取相关指标。
+- 业务 Prometheus 配置 **federate 规则**，只抓取自己关心的数据。
+
+**📌 示例：**
+
+假设我们有两个 Prometheus 服务器：
+
+1. 集群级 Prometheus（抓取集群资源数据）
+   - 采集 **所有 Kubernetes Pod 和节点的 CPU、内存等指标**。
+2. 服务级 Prometheus（抓取业务服务数据）
+   - 采集 **HTTP 请求、数据库查询等应用级指标**。
+
+**🎯 目标：**
+
+让 **服务级 Prometheus** 能够访问 **集群级 Prometheus** 采集的 CPU、内存数据。
+
+
+
+###### Prometheus 配置
+
+在服务级 Prometheus 添加 `federate` 规则
+
+在 **服务级 Prometheus** 的 `prometheus.yml` 里添加：
+
+```yaml
+scrape_configs:
+  - job_name: 'federate'
+    scrape_interval: 15s
+    honor_labels: true
+    metrics_path: '/federate'
+    params:
+      'match[]': 
+        - '{job="kubernetes-nodes"}'
+        - '{job="kubernetes-pods"}'
+    static_configs:
+      - targets:
+          - 'cluster-prometheus:9090'
+```
+
+**解析配置**
+
+1. `metrics_path: '/federate'` → 让 Prometheus 通过 `/federate` 路径抓取数据。
+2. `params: match[]` → 只拉取 `kubernetes-nodes` 和 `kubernetes-pods` 相关的 **CPU 和内存指标**。
+3. `targets: ['cluster-prometheus:9090']` → **从集群级 Prometheus 抓取数据**。
+
+
+
+##### 跨服务联邦的好处
+
+- **在同一个 Prometheus 服务器上，业务开发者可以同时查询应用指标和 CPU、内存使用情况**，避免分开查询。
+
+- **提高监控数据的可用性和查询效率**，避免跨集群查询时的网络延迟。
+
+- **实现更精准的告警**：
+
+  - 以前，业务 Prometheus 只知道 **HTTP 请求量高了**，但不知道是否是 **CPU 资源不足导致的**。
+
+  - 现在，它可以直接 **查询 CPU 使用率和 HTTP 请求量的关系**，实现更智能的告警。
+
+
+
+#### 分层联邦（Hierarchical Federation）详解
+
+分层联邦（Hierarchical Federation）是 **Prometheus 在大规模环境中进行数据汇总** 的一种方法，主要用于 **大规模集群或跨区域环境**，通过多个层级的 Prometheus **逐层汇总数据**，最终在一个中央 Prometheus 服务器上统一查询和告警。
+
+##### 为什么需要分层联邦？
+
+当监控的数据量过大时，单个 Prometheus 服务器可能会遇到 **性能瓶颈**，例如：
+
+- **存储压力**：如果所有数据都存储在同一个 Prometheus 服务器上，会导致磁盘空间快速增长，查询性能下降。
+- **查询延迟**：查询所有指标需要遍历大量数据，查询时间可能会很长。
+- **网络负载**：如果所有指标都从远程拉取，网络带宽可能会成为瓶颈。
+
+💡 **解决方案：** 使用 **分层联邦**，**不同层级的 Prometheus 负责不同级别的指标**，并逐层聚合，最终形成 **全局可视化监控**
+
+##### 分层联邦的架构
+
+分层联邦通常采用 **三层结构**：
+
+1. **边缘（Edge）Prometheus**
+
+   - 部署在 **每个数据中心** 或 **每个 Kubernetes 集群** 中。
+   - 采集 **本地应用、节点、网络等数据**。
+   - 只保存**短时间内的原始数据**（例如 1-7 天）。
+   - **不会直接进行全局查询**，而是将数据上报给更高一级的 Prometheus。
+
+2. **区域（Regional）Prometheus**
+
+   - 每个 **大区域（例如 中国区、美国区、欧洲区）** 部署一个 Prometheus。
+
+   - 只从 
+
+     边缘 Prometheus 拉取
+
+      重要的聚合数据，例如：
+
+     - 每个服务的 **QPS、CPU、内存使用率、错误率**。
+
+   - 只存储 **中期数据**（例如 30 天）。
+
+   - **不会直接抓取边缘的所有数据**，而是基于 `/federate` 拉取一部分关键数据。
+
+3. **中心（Global）Prometheus**
+
+   - 部署在 **总部** 或 **云端**，用来汇总所有区域的数据。
+
+   - 只拉取 
+
+     区域 Prometheus 的聚合数据
+
+     ，例如：
+
+     - 每个区域的总 QPS、总 CPU 负载、总错误率。
+
+   - 只存储 **长期数据**（例如 1 年）。
+
+   - **最终用于全局告警、数据分析、长期存储**。
+
+##### 分层联邦的配置
+
+在 **区域 Prometheus** 拉取 **边缘 Prometheus** 的数据：
+
+```yaml
+scrape_configs:
+  - job_name: 'federate'
+    scrape_interval: 1m
+    honor_labels: true
+    metrics_path: '/federate'
+    params:
+      'match[]':
+        - '{job="app1"}'  # 只拉取 app1 的数据
+        - '{job="app2"}'  # 只拉取 app2 的数据
+    static_configs:
+      - targets:
+          - 'edge-prometheus-1:9090'  # 从边缘 Prometheus 拉取
+          - 'edge-prometheus-2:9090'
+```
+
+然后，在 **中心 Prometheus** 配置
+
+```yaml
+scrape_configs:
+  - job_name: 'federate'
+    scrape_interval: 5m
+    honor_labels: true
+    metrics_path: '/federate'
+    params:
+      'match[]':
+        - '{job="region1"}'  # 只拉取区域级别的汇总数据
+        - '{job="region2"}'
+    static_configs:
+      - targets:
+          - 'region-prometheus-1:9090'  # 从区域 Prometheus 拉取
+          - 'region-prometheus-2:9090'
+```
+
+##### 分层联邦的优势
+
+- **提高 Prometheus 服务器的可扩展性**：每一层只存储自己需要的数据，减轻单个 Prometheus 的负担。
+
+- **减少存储开销**：边缘只存储短期数据，区域存储中期数据，中心存储长期数据。
+
+- **减少查询压力**：全球级查询只需要查询汇总数据，而不需要扫描所有原始数据。
+
+- **提高数据可用性**：即使某个边缘 Prometheus 挂了，区域和中心仍然可以提供部分数据。
+
+
+
+#### 分层联邦 和 跨服务联邦 区别
+
+分层联邦（Hierarchical Federation）和跨服务联邦（Cross-Service Federation）最大的本质区别就在于 **上层 Prometheus 是否负责直接抓取业务指标**。
+
+##### 1️⃣ 分层联邦（Hierarchical Federation）
+
+上层 Prometheus 只从下层 Prometheus 拉取数据，不直接抓取业务指标！
+
+**用途**：
+
+- 适用于 **多数据中心、大规模集群** 的情况。
+- **上层 Prometheus** 只负责汇总数据，不直接拉取任何具体的监控指标。
+- **下层 Prometheus** 负责直接抓取 Kubernetes / 物理机 / 数据库 / 应用等具体的监控数据。
+
+**架构**
+
+```markdown
+                 ┌────────────────────────────────┐
+                 │    上层 Prometheus（汇总层）   │
+                 │       仅汇总子级数据          │
+                 └────────────────────────────────┘
+                                ▲
+                                │ Federation 机制
+                                ▼
+┌────────────────────────────────┐     ┌────────────────────────────────┐
+│  下层 Prometheus（数据采集层） │ ◀── │  下层 Prometheus（数据采集层） │
+│  采集 K8s / 物理机 / API       │     │  采集 MySQL / Redis / Blackbox │
+└────────────────────────────────┘     └────────────────────────────────┘
+```
+
+**Prometheus 配置（上层汇总层 Prometheus）**
+
+```yaml
+scrape_configs:
+  - job_name: 'federation'
+    scrape_interval: 5m
+    metrics_path: '/federate'
+    params:
+      'match[]':
+        - '{job="kubernetes-pods"}'
+        - '{job="node_exporter"}'
+        - '{job="mysql"}'
+    static_configs:
+      - targets:
+          - 'prometheus-k8s:9090'
+          - 'prometheus-db:9090'
+```
+
+**总结**： 
+
+✅ **上层 Prometheus 只从子级 Prometheus 拉取数据，不负责具体采集！**
+✅ **适用于大规模、多层次架构，减少 Prometheus 直接采集的数据量！**
+
+
+
+##### 2️⃣ 跨服务联邦（Cross-Service Federation）
+
+一个 Prometheus 既从本地抓取业务指标，又从另一个 Prometheus 获取补充数据！
+
+**用途**
+
+- 用于 **不同服务的 Prometheus 之间需要共享数据** 的场景。
+
+**例如：**
+
+- 一个 Prometheus 负责 **采集 Kubernetes 集群的资源利用率**（CPU / 内存）。
+- 另一个 Prometheus 采集 **应用自身的业务指标**（QPS / 错误率）。
+- 业务 Prometheus **需要 Kubernetes 资源数据**，因此它从 K8s Prometheus 拉取数据补充进来。
+
+**架构**
+
+```css
+             ┌────────────────────────────────┐
+             │  Service A 的 Prometheus       │
+             │  采集业务数据（QPS, 错误率）   │
+             └────────────────────────────────┘
+                                 ▲
+                                 │ Federation 机制（补充数据）
+                                 ▼
+             ┌────────────────────────────────┐
+             │  K8s 资源监控的 Prometheus     │
+             │  采集 Node / Pod 资源使用率   │
+             └────────────────────────────────┘
+```
+
+Prometheus 配置（跨服务抓取补充数据）：
+
+```yaml
+scrape_configs:
+  - job_name: 'k8s_resource_metrics'
+    scrape_interval: 1m
+    metrics_path: '/federate'
+    params:
+      'match[]':
+        - '{job="kubernetes-nodes"}'
+        - '{job="kubernetes-pods"}'
+    static_configs:
+      - targets:
+          - 'prometheus-k8s:9090'
+```
+
+**总结**： ✅ **两个 Prometheus 都采集业务指标，一个 Prometheus 需要补充另一个 Prometheus 的数据！**
+ ✅ **适用于跨服务共享数据，应用服务 Prometheus 需要补充集群资源数据！**
+
+##### **3️⃣ 分层联邦 vs. 跨服务联邦（核心区别）**
+
+| **对比项**                                 | **分层联邦（Hierarchical Federation）**            | **跨服务联邦（Cross-Service Federation）**         |
+| ------------------------------------------ | -------------------------------------------------- | -------------------------------------------------- |
+| **上级 Prometheus 是否直接抓取业务指标？** | ❌ 只汇总，不直接采集                               | ✅ 既抓取本地指标，又从其他 Prometheus 获取数据     |
+| **适用场景**                               | **大规模集群，数据汇总到统一查询层**               | **不同服务需要共享监控数据**                       |
+| **Prometheus 角色**                        | **上级只做数据汇总，下级负责采集**                 | **两个 Prometheus 都采集数据，一个补充另一个数据** |
+| **示例应用**                               | **企业多数据中心，多个区域的 Prometheus 统一汇总** | **某个业务 Prometheus 需要 Kubernetes 的资源指标** |
+
+
+
+### 实战案例: Prometheus 联邦
+
+![image-20250314120742177](../markdown_img/image-20250314120742177.png)
+
+| 编号 | 地址       | 角色                  |
+| ---- | ---------- | --------------------- |
+| 1    | 10.0.0.201 | Prometheus Master     |
+| 2    | 10.0.0.202 | Prometheus Federation |
+| 3    | 10.0.0.203 | Prometheus Federation |
+| 4    | 10.0.0.204 | Node Exporter         |
+| 5    | 10.0.0.205 | Node Exporter         |
+
+
+
+#### 部署 Prometheus 主节点和联邦节点
+
+所有联邦节点和Prometheus的主节点安装方法是一样的
+
+
+
+#### 部署 Node Exporter 节点
+
+在所有被监控的节点上安装 Node Exporter,安装方式一样
+
+
+
+#### 配置 Prometheus 联邦节点监控 Node Exporter
+
+```bash
+#第一个联邦节点配置监控Node Exporter
+[root@ubuntu2204 bin]#vim /usr/local/prometheus/conf/prometheus.yml
+......
+  - job_name: "node_exporter"
+    static_configs:
+      - targets: ["10.0.0.204:9100"]
+
+# 重启服务 
+[root@ubuntu2204 bin]#systemctl restart prometheus.service 
+
+#第二个联邦节点配置监控Node Exporter
+[root@ubuntu2204 bin]#vim /usr/local/prometheus/conf/prometheus.yml
+......
+  - job_name: "node_exporter"
+    static_configs:
+      - targets: ["10.0.0.2045:9100"]
+```
+
+
+
+#### 配置 Prometheus 主节点管理 Prometheus 联邦节点
+
+在任何给在任何给定的Prometheus 服务器上，/federate端点允许检索该服务器中所选时间序列集的当前值。定的Prometheus 服务器上，/federate端点允许检索该服务器中所选时间序列集的当前值。
+
+必须至少指定一个match[] URL参数才能选择要公开的系列。 每个match[]参数都需要指定一个即时向量 选择器。 如果提供了多个match[]参数，则选择所有匹配系列的并集。
+
+要将指标从一个服务器采集至另一个服务器，需要将目标Prometheus服务器配置为从源服务器 的/federate端点进行刮取，同时还启用honor_labels scrape选项（以不覆盖源服务器公开的任何标 签）并传入所需的 match[]参数。 
+
+**配置 Prometheus 主节点管理 Prometheus 联邦节点**
+
+```bash
+[root@ubuntu2204 ~]#vim /usr/local/prometheus/conf/prometheus.yml
+......
+  - job_name: 'federate-202'
+    scrape_interval: 15s
+    honor_labels: true
+    metrics_path: '/federate'
+    static_configs:
+      - targets:
+        - '10.0.0.202:9090'
+    params:
+      'match[]':
+        - '{job="prometheus"}'
+        - '{job="node_exporter"}'
+        - '{__name__=~"job:.*"}'
+        - '{__name__=~"node:.*"}'
+  
+  - job_name: 'federate-203'
+    scrape_interval: 15s
+    honor_labels: true
+    metrics_path: '/federate'
+    static_configs:
+      - targets:
+        - '10.0.0.203:9090'
+    params:
+      'match[]':
+        - '{job="prometheus"}'
+        - '{job="node_exporter"}'
+        - '{__name__=~"job:.*"}'
+        - '{__name__=~"node:.*"}'
+        
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart prometheus.service
+```
+
+#### Prometheus 联邦验证
+
+在 Prometheus 主节点验证联邦信息
+
+![image-20250314151707066](../markdown_img/image-20250314151707066.png)
+
+查看指定指标node_os_info,可以看到Node节点上的数据如下
+
+![image-20250314151804053](../markdown_img/image-20250314151804053.png)
+
+Grafana导入**8919**模板
+
+![image-20250314155122622](../markdown_img/image-20250314155122622.png)
+
+
+
+
+
+## Prometheus 存储
+
+### Prometheus 本地存储
+
+#### Prometheus TSDB数据库
+
+Prometheus 默认提供了本地存储（TSDB）时序型数据库的存储方式
+
+早期是一个单独的TSDB项目 ，从2.1.x版本后不单独维护这个项目，直接将这个项目合并到了 prometheus的主干上
+
+Prometheus内置TSDB经历了三个版本
+
+- v1.0: **基于LevelDB数据库**(Google基于C实现的K/V数据库)，性能不高，每秒只能接收**50000个样本**
+- v2.0: **基于LevelDB数据库**，但使用了**Facebook的Gorilla压缩算法**，极大地压缩了单个样本的大 小，每个采样数据仅仅占用3.5byte左右空间，每秒可接收的样本提升到80000个
+- v3.0: 基于自研的**Prometheus数据库**,由Prometheus 2.0时引入，是一个独立维护的TSDB开源项目;在单机上，每秒可处理数**百万个样本**
+
+
+
+#### Prometheus TSDB数据存储机制
+
+
+
+
+
+### Prometheus 远程存储 VictoriaMetrics
 
 
 
@@ -50423,3 +56551,881 @@ sysUpTime OBJECT-TYPE
  ✅ **SNMP 必须通过 OID 抓取数据**，MIB 只是让 OID 更易读
 
 🚀 **`snmp_exporter` 依赖 `snmp_huawei_switch.yml` 里的 OID 规则去抓取交换机数据**，而 Prometheus 通过 `snmp_exporter` 获取交换机的监控指标！
+
+
+
+## Gossip协议
+
+### Gossip是什么
+
+Gossip协议是一个通信协议，一种传播消息的方式，灵感来自于：瘟疫、社交网络等。使用Gossip协议的有：Redis Cluster、Consul、Apache Cassandra等。
+
+
+
+### 六度分隔理论
+
+说到社交网络，就不得不提著名的**六度分隔理论**。1967年，哈佛大学的心理学教授Stanley Milgram想要描绘一个连结人与社区的人际连系网。做过一次连锁信实验，结果发现了“六度分隔”现象。简单地说：“你和任何一个陌生人之间所间隔的人不会超过六个，也就是说，最多通过六个人你就能够认识任何一个陌生人
+
+数学解释该理论：若每个人平均认识260人，其六度就是260↑6 =1,188,137,600,000。消除一些节点重复，那也几乎**覆盖**了整个地球人口若干多多倍，这也是Gossip协议的雏形。
+
+
+
+### 原理
+
+Gossip协议基本思想就是：一个节点想要分享一些信息给网络中的其他的一些节点。于是，它**周期性**的**随机**选择一些节点，并把信息传递给这些节点。这些收到信息的节点接下来会做同样的事情，即把这些信息传递给其他一些随机选择的节点。一般而言，信息会周期性的传递给N个目标节点，而不只是一个。这个N被称为**fanout**（这个单词的本意是扇出）。
+
+
+
+### 用途
+
+Gossip协议的主要用途就是**信息传播和扩散**：即把一些发生的事件传播到全世界。它们也被用于数据库复制，信息扩散，集群成员身份确认，故障探测等。
+
+基于Gossip协议的一些有名的系统：Apache Cassandra，Redis（Cluster模式），Consul等。
+
+
+
+### 图解
+
+接下来通过多张图片剖析Gossip协议是如何运行的。如下图所示，Gossip协议是周期循环执行的。图中的公式表示Gossip协议把信息传播到每一个节点需要多少次循环动作，需要说明的是，公式中的20表示整个集群有20个节点，4表示某个节点会向4个目标节点传播消息：
+
+![image-20250311142008701](../markdown_img/image-20250311142008701.png)
+
+如下图所示，红色的节点表示其已经“受到感染”，即接下来要传播信息的源头，连线表示这个初始化感染的节点能正常连接的节点（其不能连接的节点只能靠接下来感染的节点向其传播消息）。并且N等于4，我们假设4根较粗的线路，就是它第一次传播消息的线路：
+
+![image-20250311142120703](../markdown_img/image-20250311142120703.png)
+
+第一次消息完成传播后，新增了4个节点会被“感染”，即这4个节点也收到了消息。这时候，总计有5个节点变成红色：
+
+![image-20250311142302631](../markdown_img/image-20250311142302631.png)
+
+
+
+那么在下一次传播周期时，总计有5个节点，且这5个节点每个节点都会向4个节点传播消息。最后，经过3次循环，20个节点全部被感染（都变成红色节点），即说明需要传播的消息已经传播给了所有节点：
+
+![image-20250311142358338](../markdown_img/image-20250311142358338.png)
+
+需要说明的是，20个节点且设置fanout=4，公式结果是2.16，这只是个近似值。**真实传递时，可能需要3次甚至4次循环才能让所有节点收到消息**。这是因为每个节点在传播消息的时候，是随机选择N个节点的，这样的话，就有可能某个节点会被选中2次甚至更多次
+
+
+
+### 发送消息
+
+由前面对Gossip协议图解分析可知，节点传播消息是周期性的，并且**每个节点有它自己的周期**。另外，节点发送消息时的**目标节点数**由参数fanout决定。至于往哪些目标节点发送，则是**随机**的。
+
+一旦消息被发送到目标节点，那么目标节点也会被感染。一旦某个节点被感染，那么它也会向其他节点传播消息，试图感染更多的节点。最终，每一个节点都会被感染，即消息被同步给了所有节点：
+
+
+
+### 可扩展性与失败容错
+
+Gossip协议是可扩展的，因为它只需要O(logN) 个周期就能把消息传播给所有节点。某个节点在往固定数量节点传播消息过程中，并不需要等待确认（ack），并且，即使某条消息传播过程中丢失，它也不需要做任何补偿措施。打个比方，某个节点本来需要将消息传播给4个节点，但是由于网络或者其他原因，只有3个消息接收到消息，即使这样，这对最终所有节点接收到消息是没有任何影响的。
+
+如下表格所示，假定fanout=4，那么在节点数分别是20、40、80、160时，消息传播到所有节点需要的循环次数对比，在节点成倍扩大的情况下，循环次数并没有增加很多。所以，Gossip协议具备可扩展性：
+
+| 节点数       | 20   | 40   | 80   | 160  | 320  |
+| ------------ | ---- | ---- | ---- | ---- | ---- |
+| **循环次数** | 2.16 | 2.66 | 3.16 | 3.44 | 4.16 |
+
+
+
+
+
+## Raft协议
+
+​        在分布式的世界里，要说最核心最复杂的功能，**一致性**的实现无出其右，之前的paxos算法堪称经典，被认为是同类算法中效果最好的，基本上成为分布式一致性的代名词，但是paxos算法也是出了名的难理解，而且相当不好实现。本人也花了很多时间、看了很多材料也没有真正理解。所以基于paxos的思想进行的一致性算法的简化和实现就成为了现实的需求，在此背景下，本文的主角Raft就出现了。
+​        **Raft算法的头号目标就是容易理解（UnderStandable）**，这从论文中就可以看出来。当然，Raft增强了可理解性，在性能、可靠性、可用性方面是不输于Paxos的。建议大家拜读下作者的论文[Raft论文](https://docs.qq.com/doc/DY0VxSkVGWHFYSlZJ)，下面将详细说明raft的思想以及实现的过程
+
+
+
+​        raft为了实现容易理解的目标，在paxos的基础上进行的状态简化以及问题拆分，将之前复杂的逻辑拆成若干个子问题，基本上可以总结成下面几个方面：
+
+- **leader election**：选取主节点
+- **log replication**：日志备份，数据同步
+- **safety**：为了实现上述两点而产生的一些约束条件和保障条件
+
+
+
+### 前置知识补充：
+
+#### Raft 协议中的 `term`（任期）详解
+
+##### **1️⃣ 什么是 `term`（任期）？**
+
+在 Raft 协议中，**`term`（任期）是一个单调递增的整数**，用于标识集群当前所处的 **时间段** 或 **选举周期**。Raft 选举的基本规则是：
+
+- **每次新的选举开始，`term +1`**（意味着进入了新的一轮选举）。
+
+- **每个 Leader 在任期内保持有效，直到被新的 Leader 取代**。
+
+- **如果一个节点发现自己落后于其他节点的 `term`，它会立即更新自己的 `term`，并转变为 Follower**。
+
+**📌 重点：**
+
+- `term` **保证了整个集群的线性时间顺序**，确保不同 Leader 的选举不会发生冲突。
+- `term` **永远递增**，不会回退。
+- **Leader 只能在某个特定 `term` 内存活**，如果 `term` 变化，则 Leader 失效，需要重新选举。
+
+
+
+##### **2️⃣ `term` 变化的时机**
+
+在 Raft 中，`term` 主要在 **选举过程中变化**。以下是 `term` 发生变化的场景：
+
+**(1) Follower 超时，发起选举（`term +1`）**
+
+如果 Follower **超过选举超时时间**（150ms-300ms），但 **没有收到 Leader 的心跳**，它会：
+
+1. **进入 Candidate 状态**。
+2. **`term +1`**（进入新的任期）。
+3. **发送 `RequestVote RPC` 给其他节点**，请求投票
+
+✅ 例子：
+
+- 当前 `term = 3`，Follower 超时，成为 Candidate。
+- Candidate `term +1`，变成 `term = 4`。
+- 向其他节点请求投票。
+
+**(2) Candidate 失败，重新进入下一轮选举（`term +1`）**
+
+如果 Candidate 在某个 `term` 内 **未能获得半数选票**（比如两个 Candidate 竞争，导致选票分裂），它会：
+
+1. **等待一个随机超时时间**（以避免再次分裂）。
+2. **`term +1`，重新尝试选举**。
+3. **继续向其他节点发送 `RequestVote RPC`**。
+
+✅ 例子：
+
+- `term = 4` 的选举失败。
+- 进入下一轮选举，`term +1`，变成 `term = 5`。
+
+**(3) 发现更大的 `term`，更新自己**
+
+Raft 的规则：**如果某个节点收到一个比自己大的 `term`，它必须更新自己的 `term` 并降级为 Follower**。
+
+- 如果 Candidate 或 Leader **收到一个更大的 `term`**（比如 `RequestVote RPC` 或 `AppendEntries RPC` 中的 `term` 更大），它会：
+  - **更新自己的 `term`**
+  - **变成 Follower**
+  - **重置选举超时，等待新的 Leader**
+
+✅ 例子：
+
+- 当前 `term = 5`，Leader 正在工作。
+- 突然收到来自其他节点的 `AppendEntries RPC`，发现 `term = 6`。
+- 说明集群已经有了新的 Leader（自己是过期的）。
+- 于是 Leader **回退为 Follower**，并更新 `term = 6`。
+
+
+
+##### 3️⃣ `term` 在 Raft 中的作用
+
+**(1) 维持全局时序**
+ `term` **保证了集群的时间顺序**，使得不同 Leader 之间不会产生混乱：
+
+- **不同 `term` 代表不同 Leader 选举周期**。
+- **同一个 `term` 内最多只能有一个 Leader**。
+
+**(2) 选举合法性判断**
+
+- **Follower 只会投票给 `term` 大于等于自己的 Candidate**，确保 Leader 始终是最新的。
+- **如果 Candidate `term` 过小，Follower 拒绝投票**。
+
+**(3) 保护集群一致性**
+
+- **如果 Leader `term` 过期，它不能提交日志**，避免提交无效日志。
+- **如果 Leader 发现更高的 `term`，必须立即退位**，避免出现多个 Leader。
+
+
+
+##### 4️⃣ `term` 的存储
+
+- `term` **必须持久化存储到磁盘**，避免节点重启后丢失状态。
+- `term` 作为 **Raft 元数据** 存储在 `etcd` 或 `Kubernetes` 的 `WAL`（Write Ahead Log）日志中。
+
+
+
+##### **5️⃣ 举例：Raft 选举流程（带 `term`）**
+
+假设一个 **5 节点集群（A, B, C, D, E）**，Leader A 崩溃后，会发生如下情况：
+
+1. **初始状态**
+   - **所有节点的 `term = 1`**
+   - **Leader = `A`**
+   - **Follower = `B, C, D, E`**
+   - `A` 发送心跳 (`AppendEntries(term=1)`)
+   - `B, C, D, E` 正常接受心跳，维持 Follower 状态
+2. `A` **崩溃**
+   - `B` 等待了一段时间，没有收到 `A` 的心跳，超时触发选举。
+3. **`B` 进入 Candidate 状态**
+   - `B.term + 1`，**从 `1` 变为 `2`**
+   - `B` 向所有节点 **`C, D, E` 发送 `RequestVote(term=2)`**
+   - **`C, D, E` 发现 `term = 2` 大于 `1`，于是更新 `term = 2`，并把票投给 `B`**
+4. **`E` 也超时，进入 Candidate 状态**
+   - `E` **超时稍微晚于 `B`**，此时 `B` 还未当选 Leader
+   - `E` 进入 **Candidate 状态**，按照 Raft 规则：
+     - `E.term + 1`，从 `2` 变为 `3`
+     - `E` 发送 `RequestVote(term=3)` 给 `B, C, D`
+   - `B, C, D` 发现 `term = 3` 大于当前的 `2`，于是
+     - **更新 `term = 3`**
+     - **把票投给 `E`**
+   - `B` 发现 `term = 3` 大于自己的 `2`，于是
+     - **退回 Follower 状态**
+     - **不再参与本轮选举**
+
+
+
+**📌 关键点总结**
+
+1. **Raft 规定：每个 Candidate 进入选举时，必须 `term +1`**。
+   - `B` 先发起选举，`term = 2`
+   - `E` 由于超时时间较长，比 `B` 晚，发起选举时 `term = 3`
+2. **Follower 在接收到更大的 `term` 时，必须更新自己的 `term` 并投票给更高的 `term`。**
+   - `E` 发起 `RequestVote(term=3)` 时，`B, C, D` 发现 `term = 3 > 2`，于是都改成 `3` 并投票。
+3. **`term` 只会递增，不会回退。**
+   - 如果 `B` 选举失败（得票不够），它不会降低 `term`，而是等 `E` 当选 Leader 或重新发起选举。
+4. **Raft 通过 `term` 递增机制，确保最终能选出一个 Leader**
+   - 如果 `E` 也失败了（选票分裂），可能还会有 `term = 4`、`term = 5` 直到选举成功。
+
+
+
+**📌 实践中的影响**
+
+- **如果多个节点同时超时进入 Candidate，会造成选票分裂。**
+- **Raft 通过随机超时降低 Split Vote 发生的概率，但仍可能发生，需要继续选举。**
+- **Raft 的 `term` 递增机制确保了所有节点最终会收敛到一个 Leader**。
+
+
+
+#### Raft 选举中的 RequestVote RPC 详解
+
+在 Raft 选举过程中，当一个 **Follower 超时** 没有收到 **Leader 的心跳** 时，它会变成 **Candidate** 并发起选举，尝试成为新的 **Leader**。发起选举的关键步骤之一是 **RequestVote RPC**，即 **向其他节点发送请求，争取选票**。
+
+
+
+##### 1️⃣ 选举触发
+
+每个 **Follower** 维护一个 **选举超时时间（Election Timeout）**，一般为 **150ms ~ 300ms 的随机时间**。如果在此时间内：
+
+- **Follower 没有收到 Leader 的心跳（AppendEntries RPC**）
+- **没有其他节点当选 Leader**
+
+那么 Follower **超时**，它将：
+
+- **切换为 Candidate**
+- **开始一个新的 Term（任期编号 +1）**
+- **给自己投票**
+- **向其他节点发送 RequestVote RPC 进行拉票**
+
+
+
+##### 2️⃣ RequestVote RPC 工作原理
+
+在 Raft 中，每个节点在选举过程中会发送 **RequestVote RPC** 请求给其他节点，拉取选票
+
+ **(1) 发送投票请求**
+
+Candidate 向集群中**所有其他节点** 发送 `RequestVote` RPC 请求，请求投票：
+
+```go
+RequestVote(term, candidateId, lastLogIndex, lastLogTerm)
+```
+
+| 参数           | 说明                     |
+| -------------- | ------------------------ |
+| `term`         | Candidate 的当前任期     |
+| `candidateId`  | Candidate 自己的 ID      |
+| `lastLogIndex` | Candidate 最新日志的索引 |
+| `lastLogTerm`  | Candidate 最新日志的任期 |
+
+每个 **Follower** 收到 `RequestVote` 请求后，会进行**投票判断**。
+
+ **(2) Follower 处理投票请求**
+
+当 Follower 收到 **Candidate** 的 `RequestVote RPC` 请求后，会执行如下逻辑：
+
+**✅ 投票给 Candidate（同意）**
+
+如果满足以下 **所有条件**，Follower **同意投票**：
+
+1. **Candidate 的任期号（term）** **大于等于** Follower 当前的 `currentTerm`（任期号必须新）。
+
+2. **Follower 还没有投过票（votedFor == nil）**，或者已经投票给这个 Candidate。
+
+3. Candidate 的日志比自己新
+
+   ：
+
+   - `lastLogTerm` 更大，或者
+   - `lastLogTerm` 相等，但 `lastLogIndex` 更大（保证 Leader 拥有最新的日志）。
+
+如果以上条件成立，Follower **投票给 Candidate**，并更新：
+
+- `votedFor = candidateId`
+- `currentTerm = term`
+- 回复 `VoteGranted = true`
+
+**Follower 返回响应给 Candidate**
+
+```go
+RequestVoteResponse(term, VoteGranted)
+```
+
+| 参数          | 说明                 |
+| ------------- | -------------------- |
+| `term`        | Follower 当前的任期  |
+| `VoteGranted` | 是否投票给 Candidate |
+
+**❌ 拒绝投票**
+
+Follower 在以下情况下 **拒绝投票**：
+
+1. **Candidate 的 term 过旧（term < currentTerm）**
+   - 说明 Candidate 不是最新的 Leader 候选者。
+   - 直接返回 `VoteGranted = false`，拒绝投票。
+2. **Follower 之前已经投票给另一个 Candidate（votedFor ≠ nil）**
+   - Raft 选举规则规定，一个 Follower 在一个 Term **只能投一次票**。
+   - 如果 Follower 已经投过票，则拒绝投票。
+3. **Candidate 的日志比自己落后**
+   - 如果 Candidate **日志没有自己新**，拒绝投票。
+   - 这样可以避免选出一个日志过时的 Leader。
+
+
+
+##### 3️⃣ 选举成功与失败
+
+**📍 选举成功**
+
+- 如果 Candidate **收到超过半数（>N/2）** 选票，则它当选为 **Leader**。
+
+- 立即开始发送 **心跳（AppendEntries RPC）**，通知其他节点：
+
+   ```go
+   AppendEntries(term, leaderId, prevLogIndex, prevLogTerm, entries, leaderCommit)
+   ```
+
+- Follower 收到后，重置超时时间，继续作为 Follower。
+
+**📍 选举失败** 如果 Candidate **没有获得多数票**，选举失败：
+
+1. **多个 Candidate 竞争导致票数分裂**（Split Vote）
+2. **部分 Follower 拒绝投票**
+3. **网络问题导致部分节点无法投票**
+
+这种情况下，Candidate 进入新的**随机超时时间**后 **再次发起新一轮选举**（Term +1）。
+
+
+
+##### 4️⃣ 选举过程示例
+
+假设有 **5 个节点（A、B、C、D、E）**，Leader **A 崩溃**，选举流程如下：
+
+**🔹 Step 1: 触发选举**
+
+1. **Leader A 崩溃**，其他节点等待 **Election Timeout**。
+2. 由于没有收到 Leader 心跳，**C 变成 Candidate**：
+   - `term = 2`
+   - `votedFor = C`
+   - 给自己投票
+   - 发送 `RequestVote RPC` 给 B、D、E
+
+**🔹 Step 2: 其他 Follower 投票**
+
+- B、D、E **检查 term 和日志**，发现 C 的日志是最新的，投票给 C。
+- C **获得 3/5 票**（超过半数 5/2），当选为 Leader。
+
+**🔹 Step 3: Leader 开始工作**
+
+- C 发送 **心跳（AppendEntries RPC）** 给所有 Follower。
+- 其他 Follower 重置选举超时，继续作为 Follower。
+- 选举完成！
+
+
+
+##### 5️⃣ 解决 Split Vote（平票）的机制
+
+果两个 Candidate 竞争，票数可能会 **平分**（Split Vote），导致无法选出 Leader。
+
+**📍 解决方案**
+
+- **随机选举超时（Election Timeout 随机 150ms-300ms）**
+  - 避免所有 Follower **同时超时并变成 Candidate**。
+  - 让某个 Follower **更早发起选举**，增加赢得选举的概率。
+- **日志一致性检查**
+  - 只有日志最新的 Candidate 才能赢得选举。
+- **Term 递增**
+  - 没有当选的 Candidate **等待新的超时**，进入下一轮选举（Term +1）。
+  - 这样最终会有一个节点获得多数票，成为 Leader。
+
+
+
+##### **6️⃣ 总结**
+
+- **RequestVote RPC 作用**：在选举过程中，Candidate **向其他节点请求投票**。
+- **投票条件**：
+  - Candidate 的 term 必须大于等于当前 Follower 的 term。
+  - Candidate 的日志必须是最新的。
+  - Follower **只能投一次票**，且只能投给一个 Candidate。
+- **赢得选举的条件**：
+  - 必须获得 **超过半数（N/2）** 选票。
+- **Split Vote 解决方案**：
+  - 选举超时时间随机化。
+  - 选最新日志的 Candidate。
+  - 进入下一轮选举（Term +1）。
+
+
+
+### leader election
+
+#### Role
+
+首先先说明下Raft算法中节点的角色，分为以下三种：
+
+- **leader**：由所有节点选举，在candidate中产生，负责整个集群的状态以及元数据管理，当发现更大的term时，转化为follower
+- **candidate**：由follower在集群选举时转化而成，选举时得到多数选票，则转化为leader，若发现主节点或者更大的term则转化为follower
+- **follower**：集群初始化时所有节点的角色都是follower，若未发现leader心跳，则发起leader选举，并将角色转化为candidate；leader以及candidate在某些条件下也会转化成follower
+
+给出状态机，协助大家理解
+
+![image-20250312140445473](../markdown_img/image-20250312140445473.png)
+
+#### leader election process
+
+下面就来说说leader选举的详细过程，从上面的状态机可以看出，集群初始化时，大家都是follower，当未发现leader心跳并超时后，则follower变成candidate，并发起leader election。每个candidate的动作如下：
+
+- 给自己投一票
+- 向其他节点发起RequestVote RPC来进行拉票
+- 等待其他节点的响应
+
+**在此过程中会出现三种情况**
+
+- 该candidate收到了多数（majority）的选票当选了leader，并发送leader心跳告知其他节点，其他节点全部变成follower，集群选主成功
+
+- 该candidate收到了其他节点发来的leader心跳，说明主节点已经选举成功，该candidate变成follower，集群选主成功
+- 一段时间内（election timeout），该candidate未收到超过半数的选票，也未收到leader心跳，则说明该轮选主失败，重复进行leader election，直到选主成功
+
+**上述情况的产生需要满足下面几个约束：**
+
+- 在每个任期中每个人只能投出一票：注意是每个任期，任期变了（准确的说法是任期增加了）就可以重新投票
+- 投票的规则：candidate肯定投给自己，follower是先到先得
+- 当选leader的条件是得到多数（N/2+1）选票：此处的多数选票是为了避免脑裂而出现多leader的情况而进行的约束，保证了整个集群中leader的唯一性
+- leader的消息是最新的（其实就是term最大，index也是最大的，后面的log replication模块进行详细分析）
+
+**举例说明**
+
+有五个小伙伴要选取一个组长，选举过程如下：
+
+注：F,C,L分别对应的是follower，candidate和leader角色，在本例中就是组员，候选人和组长；名字是用来区分节点的标识；而括号中的数字则代表着term的值
+
+![image-20250312142930650](../markdown_img/image-20250312142930650.png)
+
+1. 初始状态大家都是组员，等待组长联系自己
+2. 等待一段时间后（leader heartbeat timeout），昌坦，继东和呈祥发现没有组长或者组长掉线了，这三个人就变成了候选人，然后发起了组长选举的流程
+3. 选举开始后，三个候选人都将自己的任期加1变成了2，然后投了自己一票，而组员晓通选了昌坦，组员溪泽选了呈祥，三个候选人的票数比是2：1：2，未能达到法定的半数以上的多数票，未能选出组长
+4. 漫长的等待后（election timeout），昌坦发现自己没有获得多数选票，也没有收到其他候选人当选组长的消息（leader heartbeat），意识到了此次选举失败，然后将自己的任期加1变成3，再次发起选举，组员晓通和溪泽发现该任期中未投票 ，先到先得，直接投给了昌坦，而候选人继东和呈祥发现昌坦的任期比自己大，则放弃候选人的角色变成了组员并投票给昌坦（此处从候选人变成组员也可能是收到了昌坦当选组长的消息后转变的，因为组长的当选并不需要全票，只要达到多数选票即可）
+5. 昌坦全票当选组长，并向其他组员通报了自己成为组长的消息，后续所有的组内管理以及消息同步都通过组长昌坦向其他组员传达
+
+
+
+整个leader election流程就是这样，是不是很好理解，基本上符合现实生活中的理解。但是上述的流程可能有一个问题，分为以下两种情况：
+
+- 如果在第三阶段三个候选人同时发现选举未成功，同时发起二次选举，而恰好昌坦和晓通的关系很好，呈祥和溪泽的关系很好（关系好可以理解为网络近，优先到达，优先获得投票），则可能出现多次2：1：2，无法达到多数（majority）的情况
+- 如果当前的组员不是5个人，而是4个人或者6个人，而候选人是2个，则会出现2：2或者3：3的情况，无法达到多数（majority）的情况
+
+上述的两种情况会影响到leader election的成功率和效率，在设计中应该被规避，面对这两种情况，Raft给出了自己的解决方案：
+
+- 节点数尽量是奇数个，尽量保证majority的产生
+- 每个candidate的election timeout时间在某一个时间段内随机，如150ms-300ms,这样能最大程度上避免同时再次发起选举的概率，某个candidate可以率先发现election timeout然后增加term并重新发起选举，大概率能获得多数选票而当选，另外每一次选举每个candidate都会刷新election timeout，来保证majority的产生
+
+
+
+### log replication
+
+当系统有了leader后，系统就进入对外工作期了。客户端的一切请求来发送到leader，leader来调度这些并发请求的顺序，并且保证leader与followers状态的一致性。raft中的做法是，将这些请求以及执行顺序告知followers。leader和followers以相同的顺序来执行这些请求，保证状态一致。
+
+**下图就是请求写入处理的相关流程：**
+
+![image-20250312143959304](../markdown_img/image-20250312143959304.png)
+
+1. 客户端向leader提交写入请求
+2. leader接收到客户端请求后封装RPC并行将修改发送到follower
+3. follower在接收到leader发送的RPC后，回复leader已经收到该请求
+4. 在leader接收到多数（majority，含leader）follower的回复后，回复客户端接收成功，将变更状态设置为***\*commited\****，然后将变更写入到状态机，此时写入实际上已经生效，无法回滚
+5. leader与follower通信，协助follower完成变更的提交，当变更提交完毕后，follower会将变更写入到状态机，此时变更才真正的影响到节点，此时的状态可以理解为applied。此过程中，可能会出现各种问题，比如说网络连接超时，命令执行不成功等问题，leader会持续和follower进行通信，保证follower最终完成所有的操作，与leader达成最终一致性。这种最终一致性是对内的，对外部的client的透明的，外部的client只会看到leader上状态的强一致性。这种强一致性和最终一致性的配合使用，不仅降低了一致性实现的各种成本，还保证了系统的健壮性，能保证在各种异常情况下的恢复与状态同步。
+   
+
+上述流程中，有点类似于两阶段提交（2PC），这种提交方式的好处就是能简化分布式事务的复杂性，在不直接使用分布式锁的前提下，能最大程度保证分布式事务的实现。但是这里和标准的2PC还是有差别的，差别就是这里**leader只需要多数（majority）的follower答复即可**，那么在这种情况下，raft是怎么保证一致性以及数据的完整性，尤其在集群主节点发生故障的时候呢？此处先留下这个问题，后续在safety模块进行解答
+
+**log的样子**
+
+![image-20250312144954765](../markdown_img/image-20250312144954765.png)
+
+
+
+
+
+## 完整的 Prometheus 监控架构设计（适用于 K8s 集群内 & 集群外）
+
+### **监控架构的三大层次**
+
+你的 Prometheus 监控架构，大致可以分为以下三层：
+
+1. **集群内部监控（K8s 内部 Prometheus）**
+   - 监控 **Kubernetes 资源**（Pod、Node、Service、Ingress、Network）。
+   - 监控 **应用程序指标**（HTTP 请求、QPS、错误率）。
+   - 通过 **服务发现（Kubernetes SD）** 自动发现目标。
+2. **集群外部监控（传统物理机/VM 监控）**
+   - 监控 **物理机、数据库、第三方 API、黑盒探测**。
+   - 监控 **自建服务（非 K8s 应用）**。
+   - 需要 **手动配置目标** 或 **使用 Consul / DNS 进行服务发现**。
+3. **统一汇总层（中央 Prometheus / Thanos / Cortex）**
+   - 汇总 **Kubernetes 集群 + 物理机数据**。4
+   - 进行 **全局查询、统一存储、长期存储**。
+   - 实现 **多数据中心联邦**。
+
+
+
+# Kubernetes 排错案例
+
+## 排错案例1
+
+### 问题背景
+
+#### **运行环境**
+
+- **单 Master 节点**：即 **etcd、scheduler、controller-manager、apiserver** 都运行在 **单个 Master 节点**。
+- **Kubernetes CNI**：Calico
+- **Service 网络模式**：IPVS
+- **关键组件**：etcd、kube-apiserver、kube-scheduler、kube-proxy、CNI（Calico）
+
+#### **问题起因**
+
+管理员为了修复 Kubernetes 集群访问异常，进行了以下操作：
+
+1. **备份** 了 **3 天前的 etcd 数据**
+2. **重启** 了 **Docker**
+3. **恢复** 了 **3 天前的 etcd 数据**
+4. **访问服务依然异常**
+
+**错误点：**
+
+- **etcd 数据回滚 3 天前**，意味着 **所有 Kubernetes 资源（Deployments、Services、Endpoints）都恢复到了 3 天前的状态**，这会导致资源版本（ResourceVersion）不匹配，甚至 pod 失效。
+
+
+
+### 故障排查与修复
+
+故障恢复过程分为 **三个核心阶段**：
+
+1. **Deployment 资源版本不匹配**
+2. **Iptables 丢失导致 Service 访问异常**
+3. **CNI 连接异常导致 Pod 网络不可用**
+
+
+
+#### 阶段 1：Deployment 资源版本不匹配
+
+**问题表现**
+
+- Pod 处于 **`Pending`** 状态
+- **无法调度到节点**
+- **删除 pod 后无法重建**
+- **尝试删除 `kube-scheduler`，发现无法重新创建**
+- **`kubectl rollout history` 发现 Deployment 版本不匹配**
+- **`kube-apiserver` 日志中出现 reversion 版本不匹配**
+
+**排查思路**
+
+**检查调度器（Scheduler）**
+
+- **删除 kube-scheduler Pod** 但未能自动重建
+- **手动移除并恢复 `/etc/kubernetes/manifests/kube-scheduler.yaml`** 重新创建 `kube-scheduler`
+  - 此时仍然无法调度pod，因此怀疑是在scheduler之前出现了问题，查看api-server的日志，发现有很多reversion版本不匹配的错误，应该是集群中的资源版本和etcd中的资源版本不匹配导致的
+
+**检查 API Server**
+
+- 使用 `kubectl logs -n kube-system kube-apiserver` 查看日志
+- 发现 **资源版本不匹配**，说明 etcd 版本与 API Server 中的对象版本对不上
+
+**检查 etcd 健康状况**
+
+```bash
+etcdctl endpoint health
+etcdctl endpoint status --write-out=table
+```
+
+结果显示 etcd 正常
+
+**查看 Deployment 版本**
+
+```bash
+kubectl rollout history deployment/<deployment_name>
+```
+
+**回滚 Deployment 版本（最终解决方案）**
+
+```bash
+kubectl rollout undo deployment/<deployment_name> --to-revision=<version>
+```
+
+**解决方案**
+
+- 通过 **回滚 Deployment** 解决资源版本不匹配问题。
+- **观察 Pod 重新创建情况，确保可以调度。**
+- **Pod 运行后，检查访问是否恢复。**
+
+
+
+#### 阶段 2：iptables 丢失导致 Service 访问异常
+
+**问题表现**
+
+- Service 无法访问
+- `kubectl describe service` 发现 **没有 endpoints**
+- `iptables-save` 发现 **丢失 Kubernetes 相关规则**
+- `ipvsadm -l -n` 发现 **没有 Service 对应的 Pod IP**
+
+**排查思路**
+
+1. **检查 Service 是否存在**
+
+   ```bash
+   kubectl get svc -A
+   ```
+
+2. **检查 Endpoint 是否被正确分配**
+
+   ```bash
+   kubectl get endpoints -A
+   ```
+
+3. **检查 iptables 规则**
+
+   ```bash
+   iptables-save | grep KUBE
+   ```
+
+4. **检查 ipvs 规则**
+
+   ```bash
+   ipvsadm -l -n  # 发现service的cluster IP没有对应的pod IP
+   ```
+
+5. **检查 kube-proxy 日志**
+
+   ```bash
+   kubectl logs -n kube-system -l k8s-app=kube-proxy  # 并未发现任何异常
+   ```
+
+**解决方案**
+
+- 发现 **iptables 规则丢失，重新初始化 kube-proxy**
+
+  ```bash
+  kubeadm init phase addon kube-proxy --kubeconfig ~/.kube/config --apiserver-advertise-address <api-server-ip>
+  ```
+
+- **重启 kube-proxy**
+
+  ```bash
+  kubectl delete pod -n kube-system -l k8s-app=kube-proxy
+  ```
+
+- **重新创建 Service**
+
+  ```bash
+  kubectl delete svc <service-name>
+  kubectl apply -f <service-yaml>
+  ```
+
+  
+
+#### 阶段 3：CNI 连接异常
+
+**问题表现**
+
+- `kubectl describe pod <pod>` 显示 CNI 连接错误
+
+  ```bash
+  networkPlugin cni failed to set up pod "webhook-1" network: Get "https://[10.233.0.1]:443/api/v1/namespaces/volcano-system": dial tcp 10.233.0.1:443: i/o timeout
+  ```
+
+- **calico-node pod 处于非 Ready 状态**
+
+- `telnet 10.233.0.1 443` 发现 API Server 无法访问
+
+**排查思路**
+
+- **检查 CNI 配置**
+
+  ```bash
+  # calico的/etc/cni/net.d/10-calico.conflist配置文件中定义了连接apiserver所需的kubeconfig文件
+  cat /etc/cni/net.d/10-calico.conflist
+  ```
+
+- **检查 CNI 访问 API Server**
+
+  ```bash
+  # /etc/cni/net.d/calico-kubeconfig中就定义了连接apiserver所需的地址和端口
+  cat /etc/cni/net.d/calico-kubeconfig
+  ```
+
+- **检查 calico-node 日志**
+
+  ```bash
+  kubectl logs -n kube-system -l k8s-app=calico-node
+  ```
+
+- **查看 API Server 地址**
+
+  ```bash
+  kubectl get endpoints -n default kubernetes
+  ```
+
+  
+
+**解决方案**
+
+- **修复 Calico CNI 配置**
+
+  ```yaml
+  - name: KUBERNETES_SERVICE_HOST
+    value: <api-server-pod-ip>
+  - name: KUBERNETES_SERVICE_PORT
+    value: <api-server-pod-port>
+  ```
+
+- **删除并重新创建 calico-node**
+
+  ```bash
+  kubectl delete pod -n kube-system -l k8s-app=calico-node
+  ```
+
+- **确认 CNI 连接恢复**
+
+  ```bash
+  telnet 10.233.0.1 443
+  ```
+
+
+
+### 案例知识点补充
+
+#### 为什么 etcd 数据回滚会导致资源版本不匹配？
+
+在 Kubernetes 集群中，**所有的资源对象（如 Pod、Deployment、Service 等）都存储在 etcd**，并且这些资源都有一个**资源版本（Resource Version）**，用于标识该资源的当前状态。
+
+当 **etcd 数据回滚** 时，会出现 **资源版本不匹配** 的问题，主要是因为
+
+- etcd 版本回滚后，资源状态恢复到了过去的某个时间点，但 API Server 的状态仍然是当前时间点的资源。
+- API Server 在处理资源变更时，依赖于 etcd 的递增版本号（revision）。如果 etcd 被回滚，这些 revision 可能会错乱，导致 API Server 无法正确同步资源
+- **Controller Manager、Scheduler 依赖的资源版本（ResourceVersion）和 etcd 不匹配，可能导致调度失败、无法更新 Deployment、无法创建新 Pod。**
+
+
+
+#### 什么是资源版本（Resource Version）？
+
+**ResourceVersion** 是 Kubernetes API 中的一个字段，每个 Kubernetes 资源（如 Pod、Deployment）在 **etcd** 中存储时都会有一个 **版本号**。
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mypod
+  namespace: default
+  resourceVersion: "13579"  # 资源版本号
+```
+
+- 每次资源更新（增删改）时，resourceVersion 都会增加
+- 当 API Server 查询资源时，会根据 resourceVersion 确保获取的是最新的状态。
+
+**举例**
+
+假设 etcd 存储了如下 Deployment 资源
+
+```yaml
+Deployment A:
+  ResourceVersion: 1001
+Deployment B:
+  ResourceVersion: 1002
+```
+
+- 之后某个 Pod 进行了 `kubectl apply`，Deployment A 的 `ResourceVersion` 变成 `1003`
+- 但是如果 **回滚 etcd 数据**（例如回到 `resourceVersion: 1001`），那么
+
+
+
+#### etcd 资源版本如何影响 Kubernetes？
+
+etcd **存储的所有 Kubernetes 资源**，例如：
+
+- **Deployments**
+- **Pods**
+- **Services**
+- **ConfigMaps**
+- **Secrets**
+- **DaemonSets**
+
+这些资源都有一个 **resourceVersion**，用于跟踪变更。
+
+当 etcd 发生回滚，可能会导致：
+
+1. **Pod 无法调度**
+   - **Scheduler 依赖于 API Server 获取最新的 Pod 版本**，如果 API Server 发现 etcd 版本比自己低，调度器可能无法正常工作。
+   - `kubectl get pods` 可能会出现旧版本的 Pod，但无法更新或调度新的 Pod。
+2. **Deployment/DaemonSet 失效**
+   - `kubectl rollout history deployment/<deployment_name>` 可能会显示旧版本，而新的 Pod 可能因为资源版本不匹配而无法创建。
+3. **Service 找不到 Endpoints**
+   - `kubectl get endpoints` 可能会出现为空的情况，因为 etcd 里的 Service 可能丢失了最新的 Endpoint 绑定信息。
+4. **API Server 无法正确查询资源**
+   - `kubectl get pods` 可能出现 **"resource version too old"** 错误。
+
+
+
+#### 为什么 etcd 回滚后，API Server 可能会报错？
+
+**因为 API Server 和 etcd 之间的通信基于资源版本的递增**，当 etcd 发生回滚时，API Server 仍然记得之前的较高版本的 resourceVersion，但 etcd 里存储的是旧数据，导致 API Server 发现：
+
+- 之前存在 `resourceVersion: 1050` 的资源
+- 但 etcd 里现在只有 `resourceVersion: 1000`
+- 于是 **API Server 认为数据不一致，可能会拒绝更新或出现错误**
+
+**💡 解决方案：** 如果 etcd 回滚了数据，并且 Kubernetes 组件出现问题，可能的修复方式：
+
+- **完全重启 API Server**
+
+  ```bash
+  systemctl restart kube-apiserver
+  ```
+
+  
+
+- **检查 etcd 数据一致性**
+
+  ```bash
+  etcdctl endpoint health
+  etcdctl endpoint status --write-out=table
+  ```
+
+- **手动回滚 Deployment 到正确版本**
+
+  ```bash
+  kubectl rollout history deployment/<deployment_name>
+  kubectl rollout undo deployment/<deployment_name> --to-revision=<version>
+  ```
+
+- **删除并重建 pod**
+
+  ```bash
+  kubectl delete pod --all -n default
+  ```
+
+- **如果问题严重，考虑重新初始化 etcd**
+
+  ```bash
+  kubeadm init phase etcd
+  ```
+
+  **重新初始化 etcd**（例如 `kubeadm init phase etcd`），那么 **etcd 的数据通常会被清空**，集群中的所有资源（Pods、Deployments、Services、ConfigMaps 等）都会丢失。**这类似于全新部署 etcd。**
+
+
+
+aaaaaaaaaa
