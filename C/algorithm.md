@@ -2223,14 +2223,255 @@ LL型和RR型对称，LR型和RL型也是对称的，也就是说LL型怎么调�
 - RL类型是
     - 先小右旋，再大左旋
 
-
 ## 红黑树
+
+```C
+/*************************************************************************
+	> File Name: 1.rbtree.c
+	> Author: 
+	> Mail: 
+	> Created Time: Sat 12 Oct 2024 02:11:50 PM CST
+ ************************************************************************/
+
+// 红黑树平衡条件
+// 1. 每个节点非红即黑
+// 2. 根节点是黑色
+// 3. 叶节点（NIL）是黑色,NIL：虚拟空节点是黑色，而不是我们看到的叶节点是黑色
+// 4. 如果一个节点是红色，则它的两个子节点都是黑色的，即红色节点不能接红色节点，只能接黑色节点
+// 5. 从根节点出发，到所有叶节点(或NIL节点)路径上，黑色节点数量相同
+
+// 这5条平衡调条件和后续的平衡调整是息息相关
+
+
+// 问题1：红黑树中，最长路径和最短路径长度的关系(2倍关系)
+// 本质上红黑树间接的通过控制最长路径和最短路径的长度关系(利用第4条和第5条)，使得整棵树相对平衡
+
+// 问题2：怎么理解条件3中的NIL节点
+// 在红黑树学习中，在某些场景下，如果加上NIL节点，更方便讨论问题，就加上；
+// 否则就当它不存在
+// 本质上有点像文章中的标点符号，可以没有，按时有时候很麻烦.比如：3天精通C++不是梦
+
+
+// 平衡调整方法
+// 插入调整站在祖父节点看，即使父节点和子节点已经冲突了，也没必要去调整
+// 删除调整站在父节点看
+// 插入和删除的情况处理一共五种
+
+// 插入调整的发生场景
+
+// 问题3：新插入的节点是什么颜色的？红色，黑色?
+// 答案：红色的，根据第5条性质，每条路径中黑色数量相同，如果我们插入的节点是黑色的，无论插入到哪里，直接gg，一定失衡
+// 如果插入红色节点，不一定失衡
+
+
+// 插入调整的目录主要就是为了干掉双红的问题,当红黑色发生失衡的时候，我们并不是站在这个节点处理，而是站在祖父节点处理
+
+
+// 插入调整情况1： 子节点和父节点发生双红冲突，此时子节点的叔父节点刚好是红色
+//
+//                                                 B
+//                             R（叔父节点）                  R(父节点)
+//                                                 R（子节点）
+// 红黑树相关调整一定遵循以下原则
+// 调整前后，每条路径中黑色数量相同
+// 因为我们判断调整的时候，所处理的一定看作是一个大红黑树的一小部分，只有保证局部每条路径黑色节点相同，才能保证整体不失衡
+
+// 调整如下
+//                                          B -> R
+//                            R -> B                    R -> B
+//                                              R
+//
+// 情况一：如果叔父节点是红色的，上面的3元组，就从黑红红，改为红黑黑
+
+// 插入调整情况2：发生失衡的叔父节点是黑色，此时按照失衡节点出现的位置进行分类，如下方LL类型，两颗失衡的节点分别是在左子树和它自己的左子树，这种是就是LL类型
+//
+//                                                      B(20)
+//
+//                                       R(15)                        B(25)
+//
+//                          R(10)                    B(19)
+//
+//                    B(5)         B(13)     R(17)    
+//
+// 先进行大右旋
+//                                                              R(15)
+//
+//                                       R(10)                                         B(20)     
+//
+//                          B(5)                     B(13)                   B(19)               B(25)
+//
+//                                                                   R(17)
+//
+//思考：在当前这种LL型的失衡中，有哪个节点的颜色是确定的，哪个节点的颜色是特例
+//答案：因为当前这个是LL型失衡，
+//因此15,10一定是Red，
+//20一定是Black, 
+//19一定是Black, 因为之前15是红色的
+//25一定是黑色，因为LL型，叔父节点是黑色的
+//5 和 13一定是确定性的Black，因为10一定是Red
+//17 不一定是红色，在实际调整过程中，17都可能不存在又或者这里17下面挂着子树的根节点，他可能是黑色的，所以17是不确定的
+//
+//为什么要判断哪个节点颜色是确定的，按个节点颜色是特例
+//因为我们在推导平衡调整策略的时候，我们只能以确定性颜色的节点的颜色进行调整，
+//如果一个节点不确定，就比如如果25号颜色节点不确定，说明25号可能是红色，而如果25号节点是红色，那20号一定不能是红色,
+//因此只要这个节点不确定，那上面的节点很难去调整，导致很难去平衡整个树
+//
+// 上图中，调整之前每个路径上的黑色节点是2个，那么调整后也得是2个
+// 为了实现上述性质，可以将大右旋的红黑树上面的三元组从红红黑，改为黑红红(红色下沉), 也可以是红黑黑(红色上浮)
+
+// (很多人这里会有疑问，就是如果把根节点改为红色，会不会和上面的冲突),所以会不会改成黑红红比改成红黑黑更好
+// 结论：没有这回事，都一样
+// 那么问题来了：为什么可以放心的将红黑树上面的三元组从红红黑，改为黑红红,因为他下面的5,13,19,25一定是黑色，都是确定性黑色
+// 因此上面的10和20改成红色完全ok,才不会产生新的冲突
+//
+// 
+// LR类型：先小左旋，在大右旋，在红色上浮或红色下沉
+// RL类型：同理
+// RR类型: 同理
+
+
+
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<time.h>
+
+#define RED 0
+#define BLACK 1
+#define DBLACK 2
+#define NIL (&__NIL)
+#define K(n) (n->key)
+#define L(n) (n->lchild)
+#define R(n) (n->rchild)
+#define C(n) (n->color)
+
+
+// 结构定义
+
+typedef struct Node {
+    int key, color; // 0 red, 1 black,2 double black
+    struct Node *lchild, *rchild;
+} Node;
+
+Node __NIL;
+__attribute__((constructor))
+void init_NIL() {
+    NIL->key = -1;
+    NIL->color = BLACK;
+    NIL->lchild = NIL->rchild = NIL;
+    return;
+}
+
+// 红黑树节点初始化
+
+Node *getNewNode(int key) {
+    Node *p = (Node *)malloc(sizeof(Node));
+    p->key = key;
+    p->color = RED;
+    p->lchild = p->rchild = NIL;
+    return p;
+}
+
+// 销毁节点
+void clear(Node *root) {
+    if (root == NIL) return ;
+    clear(root->lchild);
+    clear(root->rchild);
+    free(root);
+    return ;
+}
+
+// 对红色节点进行判断
+bool has_red_node(Node *root) {
+    return root->lchild->color == RED || root->rchild->color == RED;
+}
+
+// 左旋
+Node *left_rotate(Node *root) {
+    Node *new_root = root->rchild;
+    root->rchild = new_root->lchild;
+    new_root->lchild = root;
+    return new_root;
+}
+
+// 右旋
+Node *right_rotate(Node *root) {
+    Node *new_root = root->lchild;
+    root->lchild = new_root->rchild;
+    new_root->rchild = root;
+    return new_root;
+}
+
+
+
+
+// 当前树形结果的根节点地址
+Node *insert_maintain(Node *root) {
+    // 判断是否失衡（双红）
+    // 如果当前根节点都没有红色子节点，那不可能失衡
+    int flag = 0;
+    if (C(L(root)) == RED && has_red_node(L(root))) flag = 1;
+    if (C(R(root)) == RED && has_red_node(R(root))) flag = 2;
+    if (flag == 0) return root;
+
+    // 处理情况1
+    if (C(L(root)) == RED && C(R(root)) == RED) {
+        C(root) = RED;
+        C(L(root)) = C(R(root)) == BLACK;
+        return root;
+    }
+
+    // 情况2
+    // 判断是LL还是LR
+    if (flag == 1) {
+        if (C(R(L(root))) == RED) {
+            L(root) = left_rotate(L(root));
+        }
+        root = right_rotate(root);
+    } else {
+        if (C(L(R(root))) == RED) {
+            R(root) = right_rotate(R(root));
+        }
+        root = left_rotate(root);
+    }
+    // 红色上浮
+    C(root) = RED;
+    C(L(root)) = C(R(root)) = BLACK;
+    return root;
+}
+
+
+
+// 红黑色插入操作
+
+Node *insert(Node *root, int key){
+    if (root == NIL) return getNewNode(key);
+    if (root->key == key) return root;
+    if (key < root->key) root->lchild = insert(root->lchild,key);
+    else root->rchild = insert(root->rchild, key);
+    return insert_maintain(root);
+}
+
+
+
+int main() {
+
+    return 0;
+}
+```
+
+
 
 ## B-树
 ### B-树结构定义
 - B-树有有两种
   - B-树（不叫B减树，中间的减号是连接符）
   - B+树
+
+
+
+通常称呼一棵B树的时候，会说一棵M阶的B-树，所谓M阶B-树指的就是该B树，最多有多少棵子树，即（如果B-树的节点最多有M个子树，就说是M阶B-树，也可以理解为一个M叉树）
+
 - 一颗m阶B树，需要满足下列特性
   - 树中每个节点，最多含有m棵子树
     - m为3，则该树为3叉树
@@ -2244,7 +2485,7 @@ LL型和RR型对称，LR型和RL型也是对称的，也就是说LL型怎么调�
       - 而B树中，一个节点有多个关键字，且这多个关键字由小到大排列
         - 比如其中一个B树的节点有两个关键字，分别是3和9，则这两个关键字可以划分出3个空间，第一个区间就是小于3的值，第二个区间就是3-9之间的值，第三个区间就是大于9的值
         - 以此类推，有3个关键字就有4个分支，有4个关键字，就有5个分支
-  - 每个节点的结构为：（ n, A0, K1, A1, K2, A2, ..Kn, An ）
+  - 每个节点的结构为：（ n, A0, K1, A1, K2, A2, ..Kn, An ）【该条性质本质上是B树节点的形式化定义】
     - 对于B树节点而言，第一个信息:n -> 节点中包含的关键字的数量
       - 既然有n个关键字，则必然有n+1个分支，
       - n+1个分支就是A1到An
@@ -2291,12 +2532,276 @@ m阶B树的插入调整：
 
 ![alt text](images/image32.png)
 
+### B-树的插入代码演示
+
+```C
+/*************************************************************************
+        > File Name: Btree.c
+        > Author: 
+        > Mail: 
+        > Created Time: Sat 15 Mar 2025 09:40:48 PM CST
+ ************************************************************************/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+// 为简化代码，正常应该动态配置的M（M阶B树），固定为5
+# define MAX_M 5
+
+// B树节点的结构定义
+typedef struct Node {
+    int n;  // 当前节点中存储的关键字的数量
+    int key[MAX_M + 1]; // 开辟一个M+1的数组，用来放关键字
+    struct Node *next[MAX_M + 1]; // 因为B树有M个关键字，因此有M+1个边
+    // 如何表示B-树
+    // 假设有一个B树的节点结构(有两个关键字)：| (指针0) | 26 | (指针1) | 35 | (指针2) |
+    // 将关键字26和35放入key[]数组中，即[26, 35]
+    // 将指针0,1,2放入*next[]数组中，即[*next1, *next2, *next3]
+    // 所以同样的下标，比如下标为0的*next1指向的子树中的值，都比下标为key[0],即26小
+    // 同理，*next[1]指向的子树中的值都比key[1]小
+    // 因为key[2]为NULL，因此*next[2]指向的子树中的值都比key[1]即35大
+    
+} Node;
+
+// 获取一个新的B树的节点
+Node *getNewNode() {
+    Node *p = (Node *)malloc(sizeof(Node));
+    p->n = 0;
+    memset(p->next, 0, sizeof(Node *) * (MAX_M + 1));
+    return p;
+}
+
+// 将关键字插入到节点中
+Node *insert_key(Node *root, int key) {
+    if (root == NULL) {
+        root = getNewNode();
+        root->key[(root->n)++] = key;
+        return root;
+    }
+    int pos = 0;
+    while (pos < root->n && root->key[pos] < key) pos += 1;
+    if (root->key[pos] == key) return root;
+    for (int i = root->n - 1; i >= pos; i--) {
+        root->key[i + 1] = root->key[i];
+    }
+    root->key[pos] = key;
+    root->n += 1;
+    return root;
+}
+
+
+// 插入调整
+Node *insert_maintain(Node *root, Node *child, int pos) {
+    if(child->n < MAX_M) return root;
+    int spos = MAX_M / 2;
+    Node *node1 = getNewNode();
+    Node *node2 = getNewNode();
+    node1->n = spos;
+    node2->n = MAX_M - 1 - spos;
+    for (int i = 0; i < spos; i++) {
+        node1->key[i] = child->key[i];
+        node1->next[i] = child->next[i];
+    }
+    node1->next[spos] = child->next[spos];
+    for (int i = 0; i < node2->n; i++) {
+        node2->key[i] = child->key[i + spos + 1];
+        node2->next[i] = child->next[i + spos + 1];
+    }
+    node2->next[node2->n] = child->next[child->n];
+    // 将spos处的关键字插入到父节点
+    for (int i = root->n; i >= pos; i--) {
+        root->key[i + 1] = root->key[i];
+        root->next[i + 1] = root->next[i];
+    }
+    root->key[pos] = child->key[spos];
+    root->next[pos] = node1;
+    root->next[pos + 1] = node2;
+    root->n += 1;
+    free(child);
+    return root;
+} 
+
+Node *__insert(Node *root, int key) {
+    if (root == NULL || root->next[0] == NULL) {
+        return insert_key(root, key);
+    }
+    int pos = 0;
+    while (pos < root->n && root->key[pos] < key) pos += 1;
+    if (pos < root->n && root->key[pos] == key) return root;
+    __insert(root->next[pos], key);
+    return insert_maintain(root, root->next[pos], pos);
+}
+
+// 向B-树插入关键字
+Node *insert(Node *root, int key) {
+    // 根节点的插入
+    root = __insert(root, key);
+    if (root->n == MAX_M) {
+        Node *p = getNewNode();
+        p->next[0] = root;
+        // 插入调整的方案insert_maintain()有3个参数
+        // 第一个参数：插入调整的时候，所在节点的父节点
+        // 第二个餐宿：产生失衡的子节点
+        // 子节点在父节点中的编号，即指向子节点的索引是父节点的结构中指针数组的索引几
+        root = insert_maintain(p, root, 0);
+    }
+    return root;
+}
+
+// 销毁B树
+void clear(Node *root) {
+    if (root == NULL) return;
+    for (int i = 0; i <= root->n; i++) {
+        clear(root->next[i]);
+    }
+    free(root);
+    return;
+}
+
+void print_node(Node *root) {
+    printf("%d: ", root->n);
+    for (int i = 0; i < root->n; i++) {
+        printf("%4d", root->key[i]);
+    }
+    printf(" | ");
+    if (root->next[0] == NULL) goto output_end;
+    for (int i = 0; i <= root->n; i++) {
+        printf("%4d", root->next[i]->key[0]);
+    }
+    
+output_end:
+    printf("\n");
+    return ;
+}
+
+void output(Node *root) {
+    if (root == NULL) return;
+    print_node(root);
+    for (int i = 0; i <= root->n; i++) {
+        output(root->next[i]);   
+    }
+    return ;
+}
+
+int main() {
+    srand(time(0));
+    #define MAX_OP 25
+    Node *root = NULL;
+    for (int i = 0; i < MAX_OP; i++) {
+        int val = rand() % 100;
+        root = insert(root, val);
+        printf("\ninsert %d to Btree: \n", val);
+        output(root);
+    }
+    return 0;
+}
+```
+
+
+
+
+
+
+
+
 
 ## B+树
+
 ### B-树和B+树的不同
 - B+树中的节点并不存储数据，只是索引，而B树中的节点存储数据
 - B树中的叶子节点并不需要链表来串联，而B+树需要
 - B+树而言，一般情况下，根节点会被存储在内存中，其他节点存储在磁盘中
+
+
+
+## B树和B+树的区别
+
+### **B树（B-Tree）**
+
+- **每个节点既存储索引（键）也存储数据**。
+- 叶子节点和非叶子节点 **都可能存储数据**。
+- 查询数据时，如果一个非叶子节点命中了查询条件，就可以直接返回数据，而不需要继续向下查找。
+
+### **🔹 B树示例**
+
+假设有一棵 **阶数为 3** 的 B 树，存储数据 **(10, 20, 30, 40, 50, 60, 70, 80, 90)**：
+
+```css
+         [30]
+       /      \
+  [10, 20]    [40, 50, 60, 70, 80, 90]
+```
+
+- **根节点 `[30]`** 是索引，同时可能包含数据 `30`。
+- **子节点 `[10, 20]` 和 `[40, 50, 60, 70, 80, 90]`** 既存储索引（键），也存储数据。
+
+**📌 查询 50 的过程**
+
+- 先检查根节点 `[30]`，发现 `50 > 30`，所以进入右子树。
+- 在右子树 `[40, 50, 60, 70, 80, 90]` 直接找到 `50`，返回数据。
+
+✅ **查询可以在非叶子节点结束，不一定要到叶子节点。**
+
+
+
+### **📌 B+树（B+ Tree）**
+
+- **所有数据只存储在叶子节点**，**非叶子节点仅存索引**。
+- **叶子节点存储所有数据，并且用链表连接**，支持**范围查询**。
+- **查询时，必须到叶子节点才能找到数据**。
+
+### **🔹 B+树示例**
+
+假设存储相同的数据 **(10, 20, 30, 40, 50, 60, 70, 80, 90)**：
+
+```less
+         [30, 60]
+       /    |     \
+  [10,20] [40,50] [70,80,90]   ← 叶子节点（存储所有数据，并用链表连接）
+```
+
+- **根节点 `[30, 60]`** 仅存储索引，不存数据。
+- **子节点 `[10, 20]`、`[40, 50]`、`[70, 80, 90]`** 是叶子节点，存储所有数据，并且通过 **链表** 连接，支持**顺序扫描**。
+
+**📌 查询 50 的过程**
+
+- 先检查根节点 `[30, 60]`，发现 `30 < 50 < 60`，进入中间子树。
+- 在 `[40, 50]` 叶子节点找到 `50`，返回数据。
+
+✅ **所有查询都必须到叶子节点，非叶子节点只是索引。**
+
+
+
+### **📌 B+树 vs. B树 的关键区别**
+
+| 特性         | B 树                       | B+ 树                                |
+| ------------ | -------------------------- | ------------------------------------ |
+| **索引存储** | 每个节点都存索引和数据     | 只有叶子节点存数据，非叶子节点存索引 |
+| **查询过程** | 可能在非叶子节点就找到数据 | 一定要遍历到叶子节点                 |
+| **叶子节点** | 互相独立                   | 叶子节点通过**链表**相连             |
+| **范围查询** | 需要回溯树结构，效率较低   | 叶子节点有链表，范围查询效率高       |
+
+
+
+### **📌 为什么数据库更喜欢 B+树？**
+
+### ✅ **1. 范围查询更高效**
+
+- B+树的 **叶子节点通过链表相连**，范围查询只需遍历叶子节点，速度快。
+- B树没有链表，范围查询需要不断回溯树结构，效率较低。
+
+### ✅ **2. 磁盘存取更高效**
+
+- B+树的非叶子节点 **只存索引**，数据量小，可以存入更多索引，提高**磁盘页缓存命中率**。
+- B树的非叶子节点存储数据，会导致**索引层级增加**，磁盘IO成本更高。
+
+### ✅ **3. 适合数据库存储**
+
+- **索引结构更紧凑，查询更快。**
+- **范围查询、分页查询效率更高**（如 SQL `BETWEEN`）。
+- **所有数据都在叶子节点，适合磁盘顺序扫描。**
 
 
 
