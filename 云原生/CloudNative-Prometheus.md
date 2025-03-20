@@ -11981,3 +11981,33 @@ https://github.com/prometheus-operator/kube-prometheus/tree/main/manifests
 ```
 
 ![image-20250318214525986](../markdown_img/image-20250318214525986.png)
+
+
+
+**获取代码**
+
+```bash
+[root@master1 ~]#git clone -b v0.14.0 https://github.com/prometheus-operator/kube-prometheus.git
+[root@master1 ~]#cd kube-prometheus/
+
+[root@master1 kube-prometheus]#ls
+build.sh            developer-workspace  experimental  jsonnetfile.json           LICENSE    RELEASE.md
+CHANGELOG.md        docs                 go.mod        jsonnetfile.lock.json      Makefile   scripts
+code-of-conduct.md  example.jsonnet      go.sum        kubescape-exceptions.json  manifests  tests
+CONTRIBUTING.md     examples             jsonnet       kustomization.yaml         README.md
+
+[root@master1 kube-prometheus]#cd manifests/
+```
+
+
+
+##### 修改配置
+
+```bash
+# 创建名称空间
+[root@master1 manifests]# kub
+namespace/monitoring created
+
+
+```
+
