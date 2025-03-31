@@ -530,3 +530,137 @@ candidate@master01:~# exit·
 
 
 
+## Gateway
+
+
+
+### 考题
+
+```ABAP
+您必须连接到正确的主机。不这样做可能导致零分。 
+[candidate@base] $ ssh cka000057 
+ 
+Task 
+将现有 Web 应用程序从 Ingress 迁移到 Gateway API。您必须维护 HTTPS 访问权限。 
+注意：集群中安装了一个名为 nginx 的 GatewayClass 。 
+ 
+首先，创建一个名为 web-gateway 的 Gateway ，主机名为 gateway.web.k8s.local ，并保持现有名为 web 的Ingress 资源的现有 TLS 和侦听器配置。 
+ 
+接下来，创建一个名为 web-route 的 HTTPRoute ，主机名为gateway.web.k8s.local ，并保持现有名为 web 的Ingress 资源的现有路由规则。 
+ 
+您可以使用以下命令测试 Gateway API配置： 
+[candidate@cka000057]$ curl -Lk https://gateway.web.k8s.local:31443 
+ 
+最后，删除名为 web 的现有 Ingress 资源。
+```
+
+
+
+### 参考链接
+
+![image-20250321153835932](../markdown_img/image-20250321153835932.png)
+
+![image-20250321153945554](../markdown_img/image-20250321153945554.png)
+
+![image-20250321170027619](../markdown_img/image-20250321170027619.png)
+
+### 解答
+
+```bash
+# 按照题目要求，在base节点上执行，切换到题目要求节点
+candidate@base:~# ssh master01
+
+# 检查现有Ingress，确定一些必要信息
+# 查看Ingress的行为
+# 查看tls的secretName
+# 查看paths.path和service_name 和port_number
+candidate@master01:~# kubectl get ingress web -o yaml >> web-ingress.yaml
+candidate@master01:~# cat web-ingress.yaml 
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{"nginx.ingress.kubernetes.io/rewrite-target":"/","nginx.ingress.kubernetes.io/ssl-redirect":"true"},"name":"web","namespace":"default"},"spec":{"ingressClassName":"nginx","rules":[{"host":"ingress.web.k8s.local","http":{"paths":[{"backend":{"service":{"name":"web","port":{"number":80}}},"path":"/","pathType":"Prefix"}]}}],"tls":[{"hosts":["ingress.web.k8s.local"],"secretName":"web-cert"}]}}
+    nginx.ingress.kubernetes.io/rewrite-target: /          # 将匹配到的path重写到/
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"       # 将http -> https
+  creationTimestamp: "2025-03-02T06:10:13Z"
+  generation: 3
+  name: web
+  namespace: default
+  resourceVersion: "241698"
+  uid: 09b1388f-12b1-4a89-8251-bf15f97a1b19
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: ingress.web.k8s.local
+    http:
+      paths:
+      - backend:
+          service:
+            name: web                                    # 后端的Service.name：web
+            port:
+              number: 80                                 # 端口是80
+        path: /                                          # 匹配 /
+        pathType: Prefix                                 # 类型是Prefix
+  tls:
+  - hosts:
+    - ingress.web.k8s.local                              # hostname: ingress.web.k8s.local 改为gateway...
+    secretName: web-cert                                 # SecretName: web-cert                             
+status:
+  loadBalancer:
+    ingress:
+    - ip: 10.99.167.108
+
+# 因为题目中只能创建一个HTTPRoute，因此没办法实现http->https
+
+
+# 创建 Gateway
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: web-gateway
+spec:
+  gatewayClassName: nginx
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: web-cert
+
+# 创建 HTTPRoute
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web-route 
+spec:
+  parentRefs:
+  - name: web-gateway
+    sectionName: https
+  hostnames:
+  - gateway.web.k8s.local
+  rules:
+  # -----------------  这段可省略，不写默认和下方一致，pathType: PathPrefix，value: /是默认行为
+  - matches:
+    - path:
+      type: PathPrefix
+      value: /
+ # -------------------
+    backendRefs:
+    - name: web
+      port: 80  
+      
+# 查看nginx-gateway名称空间下的svc
+# 默认情况下，NGF 会为每个 Gateway 自动创建 NodePort 类型的 Service，用于暴露 listener 端口；这是控制器根据 Gateway 动态创建的。
+candidate@master01:~$ kubectl get svc -n nginx-gateway
+NAME            TYPE       CLUSTER-IP     EXTERNAL-IP   PORT(S)                      AGE
+nginx-gateway   NodePort   10.103.27.21   <none>        80:31880/TCP,443:31443/TCP   19d
+
+# 因为是 NodePort 类型，访问任意节点的 31443 就会到达 Ingress Gateway
+candidate@master01:~$ curl -kL https://gateway.web.k8s.local:31443
+Hello World ^_^
+```
+

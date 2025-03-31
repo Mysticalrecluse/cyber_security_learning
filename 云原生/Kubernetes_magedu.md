@@ -7125,6 +7125,7 @@ kube-flannel-ds-zctjq   1/1     running   0          37s
 
 calico-kube-controller: 用来支撑network-policy这样的api，这是一个控制器集，里面包含很多controller
 因为calico自定义了很多crd资源类型的实现
+
 - policy-controller
 - ns-controller
 - sa-controller
@@ -7228,11 +7229,11 @@ bird默认使用tcp的179端口
   env:
   # 默认ipip:always，且ipip和vxlan只能二选一
   - name: calico_ipv4pool_ipip
-    value: "always"
+    value: "Always"
   - name: calico_ipv4pool_vxlan
-    value: "never"
+    value: "Never"
   - name: calico_ipv6pool_vxlan
-    value: "never"
+    value: "Never"
   ```
 
 - ipip和vxlan的mtu
@@ -7499,6 +7500,6 @@ spec:
 
 
 #### 补充：将节点上的pod排空
-```shell
+```ip ashell
 kubectl drain
 ```

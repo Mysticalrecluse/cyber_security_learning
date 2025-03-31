@@ -5307,6 +5307,130 @@ No resources found in ns-mystical namespace.
 
 
 
+#### 什么是 Pod
+
+```ABAP
+关于Pod最重要的一个事实是：它只是一个逻辑概念
+```
+
+也就是说，Kubernetes 真正处理的，还是宿主机操作系统上 Linux 容器的 Namespace 和 Cgroups，而并不存在一个所谓的 Pod 的边界或者隔离环境。
+
+那么，Pod 又是怎么被“创建”出来的呢？
+
+答案是：Pod，其实是一组共享了某些资源的容器。
+
+具体的说：**Pod 里的所有容器，共享的是同一个 Network Namespace，并且可以声明共享同一个 Volume。**
+
+那这么来看的话，一个有 A、B 两个容器的 Pod，不就是等同于一个容器（容器 A）共享另外一个容器（容器 B）的网络和 Volume 的玩儿法么？
+
+这好像通过 docker run --net --volumes-from 这样的命令就能实现嘛，比如：
+
+```bash
+$ docker run --net=B --volumes-from=B --name=A image-A ...
+```
+
+但是，你有没有考虑过，如果真这样做的话，容器 B 就必须比容器 A 先启动，这样一个 Pod 里的多个容器就不是对等关系，而是拓扑关系了。
+
+所以，在 Kubernetes 项目里，Pod 的实现需要使用一个中间容器，这个容器叫作 **Infra 容器**。在这个 Pod 中，Infra 容器永远都是第一个被创建的容器，而其他用户定义的容器，则通过 Join Network Namespace 的方式，与 Infra 容器关联在一起。这样的组织关系，可以用下面这样一个示意图来表达
+
+![image-20250327094347088](../markdown_img/image-20250327094347088.png)
+
+
+
+如上图所示，这个 Pod 里有两个用户容器 A 和 B，还有一个 Infra 容器。很容易理解，在 Kubernetes 项目里，Infra 容器一定要占用极少的资源，所以它使用的是一个非常特殊的镜像，叫作：k8s.gcr.io/pause。这个镜像是一个用汇编语言编写的、永远处于“暂停”状态的容器，解压后的大小也只有 100~200 KB 左右。
+
+而在 Infra 容器“Hold 住”Network Namespace 后，用户容器就可以加入到 Infra 容器的 Network Namespace 当中了。所以，如果你查看这些容器在宿主机上的 Namespace 文件,它们指向的值一定是完全一样的。
+
+```bash
+[root@node1 ~]#docker ps|grep myapp
+2687320f8a75   22193a221b18                                        "/bin/sh -c 'python3…"   24 minutes ago   Up 24 minutes             k8s_pod-test_myapp-547df679bb-9nt5m_default_6a4910c2-a75f-4108-be3c-c00f6cf35889_1
+0563af6e6a3b   registry.aliyuncs.com/google_containers/pause:3.9   "/pause"                  24 minutes ago   Up 24 minutes             k8s_POD_myapp-547df679bb-9nt5m_default_6a4910c2-a75f-4108-be3c-c00f6cf35889_1
+
+[root@node1 ~]#docker inspect 2687320f8a75|grep -i pid
+            "Pid": 3961,
+            "PidMode": "",
+            "PidsLimit": null,
+[root@node1 ~]#docker inspect 0563af6e6a3b|grep -i pid
+            "Pid": 3856,
+            "PidMode": "",
+            "PidsLimit": null,
+
+[root@node1 ~]#ls -l /proc/3961/ns
+总计 0
+lrwxrwxrwx 1 root root 0  3月 27 09:31 cgroup -> 'cgroup:[4026533210]'
+lrwxrwxrwx 1 root root 0  3月 27 09:31 ipc -> 'ipc:[4026533128]'
+lrwxrwxrwx 1 root root 0  3月 27 09:31 mnt -> 'mnt:[4026533207]'
+lrwxrwxrwx 1 root root 0  3月 27 09:31 net -> 'net:[4026533130]'
+lrwxrwxrwx 1 root root 0  3月 27 09:31 pid -> 'pid:[4026533209]'
+lrwxrwxrwx 1 root root 0  3月 27 09:31 pid_for_children -> 'pid:[4026533209]'
+lrwxrwxrwx 1 root root 0  3月 27 09:31 time -> 'time:[4026531834]'
+lrwxrwxrwx 1 root root 0  3月 27 09:31 time_for_children -> 'time:[4026531834]'
+lrwxrwxrwx 1 root root 0  3月 27 09:31 user -> 'user:[4026531837]'
+lrwxrwxrwx 1 root root 0  3月 27 09:31 uts -> 'uts:[4026533208]'
+[root@node1 ~]#ls -l /proc/3856/ns
+总计 0
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:32 cgroup -> 'cgroup:[4026533204]'
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:06 ipc -> 'ipc:[4026533128]'                # 相同
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:32 mnt -> 'mnt:[4026533126]'
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:06 net -> 'net:[4026533130]'                # 相同
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:32 pid -> 'pid:[4026533129]'
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:32 pid_for_children -> 'pid:[4026533129]'
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:32 time -> 'time:[4026531834]'              # 相同
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:32 time_for_children -> 'time:[4026531834]' # 相同
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:32 user -> 'user:[4026531837]'              # 相同
+lrwxrwxrwx 1 65535 65535 0  3月 27 09:32 uts -> 'uts:[4026533127]'
+```
+
+这也就意味着，对于 Pod 里的容器 A 和容器 B 来说：
+
+- 它们可以直接使用 localhost 进行通信；
+- 它们看到的网络设备跟 Infra 容器看到的完全一样；
+- 一个 Pod 只有一个 IP 地址，也就是这个 Pod 的 Network Namespace 对应的 IP 地址；
+- 当然，其他的所有网络资源，都是一个 Pod 一份，并且被该 Pod 中的所有容器共享；
+- Pod 的生命周期只跟 Infra 容器一致，而与容器 A 和 B 无关。
+
+对于同一个 Pod 里面的所有用户容器来说，它们的进出流量，也可以认为都是通过 Infra 容器完成的。这一点很重要，因为**将来如果你要为 Kubernetes 开发一个网络插件时，应该重点考虑的是如何配置这个 Pod 的 Network Namespace，而不是每一个用户容器如何使用你的网络配置，这是没有意义的。**
+
+这就意味着，如果你的网络插件需要在容器里安装某些包或者配置才能完成的话，是不可取的：Infra 容器镜像的 rootfs 里几乎什么都没有，没有你随意发挥的空间。当然，这同时也意味着你的网络插件完全不必关心用户容器的启动与否，而只需要关注如何配置 Pod，也就是 Infra 容器的 Network Namespace 即可。
+
+有了这个设计之后，共享 Volume 就简单多了：Kubernetes 项目只要把所有 Volume 的定义都设计在 Pod 层级即可
+
+这样，一个 Volume 对应的宿主机目录对于 Pod 来说就只有一个，Pod 里的容器只要声明挂载这个 Volume，就一定可以共享这个 Volume 对应的宿主机目录。比如下面这个例子：
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: two-containers
+spec:
+  restartPolicy: Never
+  volumes:
+  - name: shared-data
+    hostPath:      
+      path: /data
+  containers:
+  - name: nginx-container
+    image: nginx
+    volumeMounts:
+    - name: shared-data
+      mountPath: /usr/share/nginx/html
+  - name: debian-container
+    image: debian
+    volumeMounts:
+    - name: shared-data
+      mountPath: /pod-data
+    command: ["/bin/sh"]
+    args: ["-c", "echo Hello from the debian container > /pod-data/index.html"]
+```
+
+在这个例子中，debian-container 和 nginx-container 都声明挂载了 shared-data 这个 Volume。而 shared-data 是 hostPath 类型。所以，它对应在宿主机上的目录就是：/data。而这个目录，其实就被同时绑定挂载进了上述两个容器当中。
+
+这就是为什么，nginx-container 可以从它的 /usr/share/nginx/html 目录中，读取到 debian-container 生成的 index.html 文件的原因。
+
+
+
+
+
 #### Pod资源基础
 
 Pod 是 Kubernetes API 中最常见最核心资源类型
@@ -6444,6 +6568,16 @@ kubectl run nginx --image=nginx --replicas=1
 - Kubelet 收到 API Server 发送的 Pod 数据后，Kubelet 使用**CRI（Container Runtime Interface）调用 containerd**。containerd 调用**runc**，创建 Pod 的 Linux 容器。Pod 进入**Running**状态。
 
 
+
+#### 各部分角色 & 通信方式说明：
+
+| 组件                   | 与谁通信                     | 是客户端还是服务端 | 使用协议        | 说明                                                         |
+| ---------------------- | ---------------------------- | ------------------ | --------------- | ------------------------------------------------------------ |
+| **scheduler**          | API Server                   | 客户端             | HTTP/HTTPS REST | 使用 API Server 提供的 `/api/v1/pods` 接口                   |
+| **controller-manager** | API Server                   | 客户端             | HTTP/HTTPS REST | 通过 `Watch` 或 `List` + `Patch` 等方法                      |
+| **API Server**         | scheduler/controller-manager | 服务端             | HTTP/HTTPS REST | 提供统一的入口                                               |
+| **API Server**         | etcd                         | 客户端             | **gRPC**        | 通过 [etcd client-go](https://github.com/etcd-io/etcd/tree/main/client/v3) 与 etcd 通信 |
+| **etcd**               | API Server                   | 服务端             | gRPC            | 只和 apiserver 通信，其他组件无直接权限访问                  |
 
 
 
@@ -8302,6 +8436,10 @@ spec:
     - name: PORT
       value: "8000"
 ```
+
+
+
+
 
 
 
@@ -10896,7 +11034,7 @@ spec:
   - name: <string>                  # 端口名称，需要保证唯一性
     protocol: <string>              # 协议，目前仅支持TCP、UDP和SCTP，默认为TCP
     port: <integer>                 # Service端口号
-    targetPort: <string>            # 后端Pod的端口号或名称，名称需由Pod中的规范定义
+    targetPort: <string>            # 后端Pod的端口号或名称，名称需由Pod中的规范定义，如果不写，默认和port一致
     nodePort: <integer>             # 节点端口号，仅使用NodePort和LoadBalancerl类型，范围：30000-32768，建议系统分配
   - name: <string>
     ...
@@ -11482,7 +11620,7 @@ metadata:
 spec:
   type: ExternalName
   externalName: www.mysticalrecluse.com
-  ports:
+  ports:                      # 可选字段（optional），而且基本是 占位作用，不会实际参与流量转发或监听端口。
   - protocol: TCP
     port: 80
     targetPort: 80
@@ -11509,6 +11647,48 @@ root@pod-18379 /# ping -c1 svc-externalname-web
 PING svc-externalname-web (101.35.250.82): 56 data bytes
 64 bytes from 101.35.250.82: seq=0 ttl=127 time=30.567 ms
 ```
+
+
+
+##### ExternalName本质
+
+它是 Kubernetes 中的一种特殊 Service 类型，用来**给一个外部域名起别名**，让集群内的 Pod 通过 Kubernetes 的服务域名来访问这个外部地址
+
+**举个例子说明**
+
+比如你有一个外部服务 `api.external.com`，你想让 Pod 通过 `my-external-svc.default.svc.cluster.local` 来访问它：
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-external-svc
+  namespace: default
+spec:
+  type: ExternalName
+  externalName: api.external.com
+```
+
+那么集群中的 Pod 就可以这样访问它
+
+```bash
+curl http://my-external-svc.default.svc.cluster.local
+```
+
+DNS 会把这个地址解析为 `api.external.com`。
+
+
+
+**关键特性总结**：
+
+| 特性                | 说明                                                         |
+| ------------------- | ------------------------------------------------------------ |
+| 是否创建 Endpoint   | ❌ 不创建。没有 selector、没有 endpoints。                    |
+| 是否负载均衡        | ❌ 不会轮询，只是一个 DNS 别名。                              |
+| 是否可以是 IP       | ⚠️ 不推荐。应使用 **合法的 DNS 名称**。                       |
+| 作用机制            | CoreDNS 通过 `CNAME` 把 Service 名称解析为 `externalName` 指定的域名。 |
+| 是否会转发流量      | ❌ 不做流量转发，仅 DNS 层处理。                              |
+| 能否用于 TLS 等功能 | ❌ 不适合做 Ingress 或 Gateway 的后端，因为它不是一个真正的 Endpoint。 |
 
 
 
@@ -11773,6 +11953,10 @@ TCP  10.0.0.201:30433 rr persistent 1800
   -> 10.244.2.52:80               Masq    1      0          0         
   -> 10.244.3.106:80              Masq    1      0          0 
   ......
+```
+
+```ABAP
+kube-proxy 启用 IPVS 后仍保留部分 iptables 是 设计如此，不要手动清理，否则可能影响 Service 功能。只要 IPVS 规则已生效，说明你的服务流量已经走 IPVS，iptables 是辅助存在的。
 ```
 
 
@@ -13804,6 +13988,80 @@ spec:
 
 
 
+##### subPath 人话版
+
+**`subPath` 是什么？**
+
+在 Kubernetes 的 `volumeMounts` 中，`subPath` 表示：
+
+**只挂载指定 Volume 的子目录** 到容器中，而不是整个 Volume。
+
+**示例解析**
+
+```yaml
+volumeMounts:
+  - name: data
+    mountPath: /var/lib/mysql
+    subPath: mysql
+```
+
+这段的含义是：
+
+- 将 `data` 这个 Volume 中的 **`mysql/` 子目录**，挂载到容器内的 `/var/lib/mysql` 路径。
+- 容器内部看到的是 `/var/lib/mysql`，但实际上只访问 Volume 中的 `mysql` 这个子目录。
+- 如果 `data` Volume 持久化的是 `/mnt/data/`，那么容器中 `/var/lib/mysql` 实际对应的就是 `/mnt/data/mysql`。
+
+
+
+**使用场景举例**
+
+**✅多个容器或路径共享一个 Volume，但需要不同子目录：**
+
+```yaml
+volumeMounts:
+- name: shared-data
+  mountPath: /var/log/nginx
+  subPath: nginx-logs
+
+- name: shared-data
+  mountPath: /var/log/mysql
+  subPath: mysql-logs
+```
+
+- 上面的例子中，`nginx` 和 `mysql` 访问的是同一个 PVC，但分属不同子目录，互不干扰。
+
+**✅配合 `emptyDir` 创建多个挂载点：**
+
+```yaml
+volumes:
+- name: data
+  emptyDir: {}
+```
+
+然后用不同容器挂不同的子目录：
+
+```yaml
+containers:
+- name: web
+  volumeMounts:
+  - name: data
+    mountPath: /app/cache
+    subPath: web-cache
+- name: worker
+  volumeMounts:
+  - name: data
+    mountPath: /worker/cache
+    subPath: worker-cache
+```
+
+⚠️ **注意事项**
+
+- **`subPath` 是单独目录**，无法在容器内动态创建多级目录（比如 `a/b/c` 这样不行，除非 `a/b` 已存在）。
+- 如果使用 `subPath` 写入数据后，删除 PVC，并重新使用这个 PVC，**子目录数据仍会保留**。
+- `subPath` 不适合挂载只读 ConfigMap 或 Secret，这类挂载推荐用 `subPathExpr` 或 `items` 精确路径。
+
+
+
 
 
 ### StorageClass
@@ -14574,6 +14832,378 @@ pod-nfs-sc-test   1/1     Running   0          11s   10.244.1.125   node1   <non
 # 等一段时间后（有短时间的延迟），再次查看，
 [root@master1 nsf-provisioner] # curl 10.244.1.125
 web1
+```
+
+
+
+### CAS 和 OpenEBS
+
+#### Kubernetes存储架构
+
+存储卷的具体的管理操作由相关的控制器向**卷插件**发起调用请求完成
+
+这里的卷插件指的就是CSI插件，也就是存储制备器，比如：provisioner
+
+- AD控制器：负责存储设备的Attach/Detach操作
+  - Attach：将设备附加到目标节点
+  - Detach：将设备从目标节点上拆除
+- 存储卷管理器：负责完成卷的Mount/Umount操作，以及设备的格式化操作等
+- PV控制器：负责PV/PVC的绑定、生命周期管理，以及存储卷的Provision/Delete操作
+
+
+
+##### **三大组成组件（逻辑上）**
+
+| 组件名                                          | 职责                                               | 举例                                                         |
+| ----------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| **AD 控制器**（Attach/Detach Controller）       | 控制器组件，负责将远端卷挂载到节点（如果是网络盘） | 把阿里云的云盘 attach 到某个 node 上                         |
+| **存储卷管理器**（Node Plugin / Mount Manager） | 运行在每个 Node 上，完成真正的挂载、格式化等操作   | 在某节点上将挂载好的云盘格式化为 ext4 并 mount 到 Pod 的路径 |
+| **PV 控制器**（Volume Provisioner Controller）  | 创建 / 删除 Volume（Provision 和 Delete 操作）     | 根据 PVC 的请求，去阿里云 API 创建云盘                       |
+
+
+
+##### **它们在 Kubernetes 中的体现**
+
+**AD 控制器：Attach/Detach Controller**
+
+- **是一个集群级别的控制器**，运行在 kube-controller-manager 里。
+- 在 CSI 模型中，由 **external-attacher** Sidecar 容器实现。
+- 作用：
+  - 负责在需要时将 Volume 附加（attach）到对应的节点。
+  - 如果是本地盘，则不需要该组件（不支持 attach）。
+
+🧠 举例：
+
+> Pod 计划在 Node1 上运行，使用了一块阿里云盘，这个组件就会让这块云盘先 attach 到 Node1。
+
+
+
+**存储卷管理器：Node Plugin**
+
+- 通常就是 CSI 插件部署在每个 Node 上的 `DaemonSet`。
+- 作用：
+  - 实际执行挂载动作（mount/umount）
+  - 格式化卷（mkfs）
+  - 确保挂载点可用
+
+🧠 举例：
+
+> Pod 在 Node1 上启动后，Node Plugin 会把刚刚 attach 过来的云盘 `/dev/vdb` 格式化，然后挂载到 `/var/lib/kubelet/pods/<uuid>/volumes/...`，再 bind mount 到 Pod 内。
+
+
+
+**V控制器：external-provisioner**
+
+- 由 CSI 插件附带的 Sidecar 实现（external-provisioner）。
+- 当你创建 PVC 时，Kubernetes 会调用这个组件去创建实际的 Volume。
+- 通常运行在控制器组件的 Deployment 中。
+
+🧠 举例：
+
+> 当你创建一个 PVC，请求 10Gi 云盘时，这个 controller 会调用云厂商 API 创建对应资源，并生成一个 PV。
+
+
+
+**举个真实例子（以阿里云盘为例）**
+
+阿里云盘 CSI 插件通常包含以下组件：
+
+| Pod/容器            | 作用                                   |
+| ------------------- | -------------------------------------- |
+| **csi-provisioner** | 实现 PV Controller（provision/delete） |
+| **csi-attacher**    | 实现 AD Controller（attach/detach）    |
+| **csi-plugin**      | 节点上的 NodePlugin，挂载云盘          |
+
+当你创建一个 PVC 的流程如下：
+
+1. `external-provisioner` 监听 PVC 事件，并调用阿里云 API 创建一块盘。
+2. 创建 PV 资源，并标注其 VolumeHandle。
+3. 当 Pod 被调度到某个 Node 上，`external-attacher` 负责将云盘 attach 到该节点。
+4. Node 上的 `csi-plugin`（DaemonSet）接收到请求，执行格式化和挂载动作。
+5. Pod 中的路径挂载完成，数据可读写。
+
+```ABAP
+通常CSI 的 attach、provision 和 node plugin 都不是内置的，它们都是 由各个 CSI 插件厂商提供的组件，需要我们 手动部署（通常作为一组 Helm Chart 或 YAML 文件部署）。
+```
+
+
+
+Scheduler：特定调度插件的调度决策会受到目标节点上的存储卷的影响
+
+
+
+##### CSI 简介
+
+- 容器存储接口规范，与平台无关
+- 驱动程序组件
+  - **CSI Controller**：负责与存储服务的API通信，从而完成后端存储的管理操作
+  - **Node Plugin**：也称为CSI-Node，负责在节点级别完成存储卷的管理
+
+```ABAP
+CSI 插件由 控制平面的 Controller（如 Provisioner 和 Attacher） 和 数据平面的 Node Plugin 组成，前者通常由 Deployment 或 StatefulSet 管理，后者作为 DaemonSet 运行在每个节点上，负责实际的存储操作。
+```
+
+
+
+#### CAS  (Container Attached Storage)
+
+##### CAS 简介
+
+**容器附加存储（Container Attached Storage）**
+
+Kubernetes的卷通常是基于外部文件系统或块存储实现的，这种存储方案称为共享存储（Shared Storage）
+
+CAS则是将存储系统自身部署为Kubernetes集群上的一种较新的存储解决方案
+
+- 存储系统自身（包括存储控制器）在Kubernetes上以容器化微服务的方式运行
+
+- 使得工作负载更易于移植，且更容器根据应用程序的需求改动使用的存储
+
+- 通常基于工作负载或者按集群部署，因此消除了共享存储的跨工作负载甚至是跨集群的爆炸半径
+
+  ```ABAP
+  CAS 通过在每个节点部署 容器化的存储组件（如代理、存储引擎），聚合节点上的本地磁盘资源，构建起一个具备分布式特性、高可用能力、K8s 深度集成的存储系统。
+  ```
+
+存储在CAS中的数据可以直接从集群内的容器访问，从而能显著较少读/写时间
+
+OpenEBS是CAS存储机制的著名实现之一，由CNCF孵化
+
+
+
+**基于CAS的存储解决方案，通常包含两类组件**
+
+**控制平面**
+
+- 负责配置卷以及其他同存储相关的任务
+- 由存储控制器，存储策略以及如何配置数据平面的指令组成
+
+**数据平面**
+
+- 接受并执行来自控制平面的有关如何保存和访问容器信息的指令
+- 主要组件是实现池化存储的存储引擎，这类引擎本质上负责输入/输出卷路径
+- OpenEBS支持存储引擎包括Mayastor、cStor、Jiva和 OpenEBS LocalPV 等
+
+
+
+#### OpenEBS
+
+##### openEBS 简介
+
+OpenEBS能够将Kubernetes工作节点上可用的任何存储转换为本地卷或分布式复制卷
+
+最初由MayaData构建，后捐赠给了CNCF，目前是CNCF的沙箱级项目
+
+
+
+![image-20250330103916823](../markdown_img/image-20250330103916823.png)
+
+
+
+##### OpenEBS 架构
+
+- **数据引擎**
+
+- **控制平面**
+
+![image-20250330105920486](../markdown_img/image-20250330105920486.png)
+
+
+
+###### OpenEBS 数据引擎
+
+**数据引擎的功能**
+
+数据引擎类似于存储控制器，也可将其比作是一种SDS的实现
+
+OpenEBS提供了一系列的数据引擎，所有引擎都支持PV的动态置备和数据的强一致性
+
+
+
+**数据引擎的分类**
+
+**本地引擎**
+
+- 本地引擎可以从本地磁盘设备（依赖NDM【Node Disk Manager，后续详解】）或主机路径创建PV，也可以基于集群节点上的LVM或ZFS创建PV
+- 适合内置可用性和可扩展性功能的应用程序，或者作业类的有状态工作负载
+- 基于节点上支持的存储机制，可选的动态 Local PV 包括 Local PV hostpath、Local PV device、ZFS Local PV、LVM Local PV 和 Rawfile Local PV 这五种
+
+✅ 什么是 Node Disk Manager？
+
+**NDM 是 OpenEBS 项目中的一个关键组件，专门用于**：在每个节点上自动发现、管理、监控可用的物理存储设备（如裸盘、块设备）。
+
+✅ NDM 的职责包括：
+
+| 功能           | 描述                                                         |
+| -------------- | ------------------------------------------------------------ |
+| 🧭 自动发现     | 自动扫描节点上的所有块设备（例如 `/dev/sdb`, `/dev/nvme0n1`） |
+| 🔍 过滤和标记   | 排除系统盘、正在被使用的盘，只暴露真正可用的裸设备           |
+| 🧱 存储资源注册 | 把每个盘注册为 Kubernetes CR（如 BlockDevice）               |
+| 🧩 卷调度支持   | 帮助 CSI 控制器根据磁盘情况调度 LocalPV 或 cStor Pool        |
+| 📊 健康监控     | 监控盘的容量、状态、I/O 错误等信息                           |
+
+✅ 工作流程（简化版）：
+
+1. 每个节点运行一个 NDM DaemonSet
+2. 启动后扫描本地 `/dev/` 下的块设备
+3. 判断该设备是否空闲 & 非系统盘（通过 udev 规则、挂载点检测等）
+4. 生成一个对应的 **`BlockDevice` CRD**
+5. 控制面通过这些 CRD 调度和绑定设备
+6. 用户请求 PVC 时，CSI Plugin 结合 BlockDevice 创建 Local PV
+
+✅ 补充：NDM 发现后会生成哪些资源？
+
+NDM 会创建这些 CRD 资源：
+
+- `BlockDevice`：每块裸盘都会对应一个 BlockDevice 资源
+- `BlockDeviceClaim`：请求使用 BlockDevice 时创建的声明
+- `BD` 标签：会标记设备是 “Active”, “InUse”, “Unclaimed” 等状态
+
+
+
+**复制引擎**
+
+- 复制卷，顾名思义，就是那些可以将数据同步复制到多个节点的卷
+- 复制引擎允许从复制节点范围内的任一节点上进行数据访问，并支持跨可用区进行复制
+- 复制卷通常还支持快照、克隆、扩展等功能
+- 基于节点上支持的存储机制，可选的复制引擎包括Mayastor、cStor 和 Jiva
+
+
+
+###### **数据引擎 和 NDM**
+
+**如何选择数据引擎**
+
+- 应用程序处于生成状态且不需要存储级复制，则首先LocalPV
+- 应用程序处于生产状态并且需要存储级复制，则首先cStor
+- 应用程序较小，需要存储级复制但不需要快照和克隆，则首先Jiva
+- 应用程序需要低延迟和接近磁盘的吞吐量，需要存储级复制，并且工作节点具有性能较高的CPU，RAM和NVME，那么Mayastor首选
+
+**NDM（Node Disk Manager）**
+
+- 部署OpenEBS的过程中，NDM由专用DaemonSet编排运行于每个节点上
+  - 负责发现裸设别并过滤不支持使用的设备，比如已经带有文件系统的磁盘
+  - 需要特权模式，访问/dev，/proc 和 /sys 目录来监视连接的设备，并使用各种探测器获取这些设备的详细信息
+- 根据过滤器（filter）检测附加到节点上的裸磁盘设备，并将它们识别为“块设备CRD”
+  - NDM 支持使用include filter 或 exclude filter
+  - filter 的配置保存于 ConfigMap 中
+- 基于节点上的罗磁盘设备提供PV的存储引擎，会依赖于NDM实现其功能，这包括LocalPV device 和 cStor
+
+
+
+##### 配置使用OpenEBS
+
+**openEBS官网**
+
+```http
+https://openebs.io/docs/quickstart-guide/installation
+```
+
+![image-20250330112734046](../markdown_img/image-20250330112734046.png)
+
+
+
+**部署使用OpenEBS的基本流程**
+
+- 在各节点上部署 **iSCSI client**
+- 在Kubernetes集群上部署OpenEBS
+- 选择要使用的数据引擎
+- 为选择的数据引擎准备StorageClass
+
+
+
+```bash
+# 下载yaml文件
+[root@master1 OpenEBS]#wget https://openebs.github.io/charts/openebs-operator.yaml
+[root@master1 OpenEBS]#ls
+openebs-operator.yaml
+
+# 启用
+[root@master1 OpenEBS]#kubectl apply -f openebs-operator.yaml 
+namespace/openebs created
+serviceaccount/openebs-maya-operator created
+clusterrole.rbac.authorization.k8s.io/openebs-maya-operator created
+clusterrolebinding.rbac.authorization.k8s.io/openebs-maya-operator created
+customresourcedefinition.apiextensions.k8s.io/blockdevices.openebs.io created
+customresourcedefinition.apiextensions.k8s.io/blockdeviceclaims.openebs.io created
+configmap/openebs-ndm-config created
+daemonset.apps/openebs-ndm created
+deployment.apps/openebs-ndm-operator created
+deployment.apps/openebs-ndm-cluster-exporter created
+service/openebs-ndm-cluster-exporter-service created
+daemonset.apps/openebs-ndm-node-exporter created
+service/openebs-ndm-node-exporter-service created
+deployment.apps/openebs-localpv-provisioner created
+storageclass.storage.k8s.io/openebs-hostpath created
+storageclass.storage.k8s.io/openebs-device created
+
+# 会创建一个OpenEBS的专用名称空间
+[root@master1 OpenEBS]#kubectl get ns openebs 
+NAME      STATUS   AGE
+openebs   Active   58s
+
+# 查看openebs-hostpath
+[root@master1 OpenEBS]#kubectl get sc openebs-hostpath -o yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    # 可以在下面添加一行，将其设置为默认的目录
+    storageclass.kubernetes.io/is-default-class: "true" # 是否设置为默认的storageClass
+    cas.openebs.io/config: "#hostpath type will create a PV by \n# creating a sub-directory
+      under the\n# BASEPATH provided below.\n- name: StorageType\n  value: \"hostpath\"\n#Specify
+      the location (directory) where\n# where PV(volume) data will be saved. \n# A
+      sub-directory with pv-name will be \n# created. When the volume is deleted,
+      \n# the PV sub-directory will be deleted.\n#Default value is /var/openebs/local\n-
+      name: BasePath\n  value: \"/var/openebs/local/\"\n"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"storage.k8s.io/v1","kind":"StorageClass","metadata":{"annotations":{"cas.openebs.io/config":"#hostpath type will create a PV by \n# creating a sub-directory under the\n# BASEPATH provided below.\n- name: StorageType\n  value: \"hostpath\"\n#Specify the location (directory) where\n# where PV(volume) data will be saved. \n# A sub-directory with pv-name will be \n# created. When the volume is deleted, \n# the PV sub-directory will be deleted.\n#Default value is /var/openebs/local\n- name: BasePath\n  value: \"/var/openebs/local/\"\n","openebs.io/cas-type":"local"},"name":"openebs-hostpath"},"provisioner":"openebs.io/local","reclaimPolicy":"Delete","volumeBindingMode":"WaitForFirstConsumer"}  # 可以看到会在每个节点上创建/var/openebs/local作为存储后端，
+    openebs.io/cas-type: local
+  creationTimestamp: "2025-03-30T03:37:03Z"
+  name: openebs-hostpath
+  resourceVersion: "284993"
+  uid: f67224f9-6542-4003-8c3d-ec4661b6465b
+provisioner: openebs.io/local
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+
+# 注意openebs-hostpath只支持单路读写，即ReadWriteOnce，不支持多路读写
+```
+
+
+
+###### 支持多路读写的解决方案
+
+```bash
+[root@master1 OpenEBS]#wget https://openebs.github.io/charts/nfs-operator.yaml
+
+# 启用
+[root@master1 OpenEBS]#kubectl apply -f nfs-operator.yaml 
+namespace/openebs unchanged
+serviceaccount/openebs-maya-operator unchanged
+clusterrole.rbac.authorization.k8s.io/openebs-maya-operator configured
+clusterrolebinding.rbac.authorization.k8s.io/openebs-maya-operator unchanged
+deployment.apps/openebs-nfs-provisioner created
+storageclass.storage.k8s.io/openebs-rwx created
+
+# 查看
+[root@master1 OpenEBS]#kubectl get sc openebs-rwx 
+NAME          PROVISIONER         RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+openebs-rwx   openebs.io/nfsrwx   Delete          Immediate           false                  50s
+
+# 测试
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: "openebs-rwx"
+  resources:
+    requests:
+      storage: 1Gi
 ```
 
 
@@ -19448,6 +20078,73 @@ spec:
 
 
 
+#### 补充：三种 `pathType` 及其含义与使用方式
+
+1️⃣ `Exact`
+
+- **含义**：完全匹配路径，只有请求路径与规则中的路径 **完全一致** 才会被匹配。
+- **场景**：适用于需要精确控制的 API 入口等情况。
+
+**示例：**
+
+```yaml
+path: /app
+pathType: Exact
+```
+
+| 请求路径  | 是否匹配 |
+| --------- | -------- |
+| `/app`    | ✅ 是     |
+| `/app/`   | ❌ 否     |
+| `/app/v1` | ❌ 否     |
+
+
+
+2️⃣ `Prefix`
+
+- **含义**：匹配以指定路径为前缀的请求路径，且路径分段（以 `/` 分隔）必须完整匹配。
+- **这是使用最广泛的类型**。
+
+**示例：**
+
+```yaml
+path: /app
+pathType: Prefix
+```
+
+| 请求路径       | 是否匹配 |
+| -------------- | -------- |
+| `/app`         | ✅ 是     |
+| `/app/`        | ✅ 是     |
+| `/app/page`    | ✅ 是     |
+| `/application` | ❌ 否     |
+
+注意：**`/app/page`** ✅ 是因为它是以 `/app` 这个段开头，而 `/application` ❌ 是因为整个段不匹配。
+
+
+
+3️⃣ `ImplementationSpecific`
+
+- **含义**：由 Ingress Controller 自己决定如何匹配路径，行为 **可能因控制器不同而异**。
+- **不推荐生产使用**，容易出现不一致行为。
+
+ **示例：**
+
+```
+path: /app
+pathType: ImplementationSpecific
+```
+
+| 请求路径    | 是否匹配 |
+| ----------- | -------- |
+| `/app`      | 可能是   |
+| `/app2`     | 可能也是 |
+| `/app/test` | 可能是   |
+
+取决于你用的是哪个 Ingress Controller，例如 NGINX、Traefik、HAProxy 等都实现略有不同。
+
+
+
 #### 补充：Ingress重定向实现
 
 `nginx.ingress.kubernetes.io/rewrite-target: /` 这个 annotation 用于 **URL 重写**，它的作用是 **将进入 Ingress 的请求路径“修改后”再转发给后端服务**。
@@ -21714,7 +22411,88 @@ spec:
 
 
 
-#### TCP routing
+#### HTTP 请求头部字段修改
+
+HTTP 标头修改是在传入请求中添加、删除或修改 HTTP 头部字段的过程。
+
+要配置 HTTP 标头修改，请使用一个或多个 HTTP 过滤器定义 Gateway 对象。每个过滤器指定对传入请求进行的特定修改，例如添加自定义标头或修改现有标头。
+
+要向 HTTP 请求添加标头，请使用 RequestHeaderModifier 类型的过滤器，并带有添加操作以及标头的名称和值：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: header-http-echo
+spec:
+  parentRefs:
+    - name: acme-gw
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /add-a-request-header
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            add:
+              - name: my-header-name
+                value: my-header-value
+      backendRefs:
+        - name: echo
+          port: 8080
+```
+
+要编辑现有标题，请使用设置操作并指定要修改的标题的值和要设置的新标题值。
+
+```yaml
+filters:
+    - type: RequestHeaderModifier
+      requestHeaderModifier:
+        set:
+          - name: my-header-name
+            value: my-new-header-value
+```
+
+Headers can also be removed, by using the `remove` keyword and a list of header names.
+
+```yaml
+ filters:
+    - type: RequestHeaderModifier
+      requestHeaderModifier:
+        remove: ["x-request-id"]
+```
+
+
+
+#### HTTP 响应头部字段修改
+
+就像编辑请求标头很有用一样，响应标头也很有用。例如，它允许团队仅为某个后端添加/删除 cookie，这有助于识别之前重定向到该后端的某些用户。
+
+另一个潜在的用例是，当你的前端需要知道它正在与后端服务器的稳定版本还是测试版本对话时，以便呈现不同的 UI 或相应地调整其响应解析
+
+修改 HTTP 标头响应利用与修改原始请求非常相似的语法，尽管使用了不同的过滤器（ResponseHeaderModifier）。
+
+可以添加、编辑和删除标题。可以添加多个标题，如下例所示：
+
+```yaml
+  filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        add:
+        - name: X-Header-Add-1
+          value: header-add-1
+        - name: X-Header-Add-2
+          value: header-add-2
+        - name: X-Header-Add-3
+          value: header-add-3
+```
+
+
+
+
+
+### TCP routing
 
 Gateway API 旨在与多种协议配合使用，而 TCPRoute 就是这样一种路由，它允许管理 TCP 流量。
 
@@ -21775,7 +22553,7 @@ spec:
 
 
 
-##### 补充：`allowedRoutes.kinds.kind` 可选值及使用场景
+#### `allowedRoutes.kinds.kind` 可选值及使用场景
 
 在 `Gateway` 资源中，`allowedRoutes.kinds.kind` 用于 **定义 `Gateway` 能接受的路由类型**，确保 `Gateway` 只能绑定特定类型的 `Route`（如 `HTTPRoute`、`TCPRoute`、`TLSRoute` 等）。
 
@@ -21874,7 +22652,9 @@ spec:
 
 
 
-##### 补充：TLSRoute 在 Downstream 端解密 和 Upstream 端加密详解
+### TLSRoute
+
+#### TLSRoute 在 Downstream 端解密 和 Upstream 端加密详解
 
 ###### Downstream 端解密 (TLS Termination)
 
@@ -22082,6 +22862,238 @@ spec:
 
 
 
+
+
+#### 跨命名空间引用证书
+
+在此示例中，网关配置为引用不同命名空间中的证书。这是通过在目标命名空间中创建的 **ReferenceGrant** 允许的。如果没有该 ReferenceGrant，跨命名空间引用将无效。
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: cross-namespace-tls-gateway
+  namespace: gateway-api-example-ns1
+spec:
+  gatewayClassName: example
+  listeners:
+  - name: https
+    protocol: HTTPS
+    port: 443
+    hostname: "*.example.com"
+    tls:
+      certificateRefs:
+      - kind: Secret
+        group: ""       # 这里可以省略，因为默认就是 core group
+        name: wildcard-example-com-cert
+        namespace: gateway-api-example-ns2
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant             # ReferenceGrant 和 Secret 创建在同一名称空间
+metadata:
+  name: allow-ns1-gateways-to-ref-secrets
+  namespace: gateway-api-example-ns2
+spec:
+  from:
+  # 上面的ReferenceGrant，不是针对某一个Gateway授权，而是针对Gateway所在的名称空间授权
+  - group: gateway.networking.k8s.io    # 非核心 API 组（比如 Gateway、HTTPRoute、ReferenceGrant 等），必须显式声                                           明 group，否则解析失败。
+    kind: Gateway
+    namespace: gateway-api-example-ns1
+  to:
+  - group: ""     # 这里可以省略，因为默认就是 core group
+    kind: Secret
+```
+
+
+
+##### 补充：`group` 字段的含义
+
+在 Kubernetes **Gateway API** 以及 **ReferenceGrant** 资源中，`group` 字段用于指定 Kubernetes API 资源的 **API 组** (API Group)，也就是该资源所属的 API 组。
+
+Kubernetes 资源的 **完整 API 组** 结构通常是：
+
+```php
+<kind>.<group>/<version>
+```
+
+**例如**：
+
+- `Gateway` 属于 `gateway.networking.k8s.io/v1`
+- `Secret` 属于 `core` API 组（`""` 代表 `core` 组）
+- `ReferenceGrant` 属于 `gateway.networking.k8s.io/v1beta1`
+
+
+
+**上述配置中的 `group` 的解释**
+
+```yaml
+tls:
+  certificateRefs:
+  - kind: Secret
+    group: ""
+    name: wildcard-example-com-cert
+    namespace: gateway-api-example-ns2
+```
+
+- **group: `""`**
+  - 这里 `""` 为空，表示 **Secret 资源** 来自 Kubernetes **Core API 组** (`v1`)。
+  - `Secret` 属于 Kubernetes **核心 API**，因此 **API 组为空** (`""`)。
+  - 完整路径：`Secret.v1` (即 `core/v1`)
+
+```yaml
+spec:
+  from:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    namespace: gateway-api-example-ns1
+```
+
+- **group: `gateway.networking.k8s.io`**
+  - 表示 **Gateway 资源**，它属于 `gateway.networking.k8s.io/v1` API 组。
+  - 允许 `gateway-api-example-ns1` 中的 **Gateway 访问** `gateway-api-example-ns2` 里的 Secret。
+
+```yaml
+  to:
+  - group: ""
+    kind: Secret
+```
+
+- group: `""`
+  - 表示目标资源是 **Secret**，属于 Kubernetes **核心 API 组** (`core/v1`)。
+
+
+
+**如何确定 `group` 值**
+
+可以使用 `kubectl api-resources` 命令，查看 API 组信息：
+
+```bash
+kubectl api-resources
+```
+
+
+
+#### TargetRefs and TLS
+
+`BackendTLSPolicy` 是 **Kubernetes Gateway API** 中的一种扩展资源，用于“**验证后端 TLS 服务是否可信**”的！
+
+```ABAP
+再强调一遍: BackendTLSPolicy 并不是用于“建立 TLS 通信”的，而是用于“验证后端 TLS 服务是否可信”的！
+也就是说：TLSRoute.backendRefs.tls 管“我怎么连过去”，BackendTLSPolicy 管“我信不信你”。
+```
+
+##### 示例 YAML 拆解说明
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1alpha3
+kind: BackendTLSPolicy
+metadata:
+  name: tls-upstream-dev
+spec:
+  targetRefs:
+    - kind: Service
+      name: dev
+      group: ""
+  validation:
+    wellKnownCACertificates: "System"
+    hostname: dev.example.com
+```
+
+**作用概述：**
+
+配置 Gateway 访问 `Service/dev` 时，使用 **HTTPS** 协议，**并信任系统根 CA**，**对服务端证书的域名进行校验**。
+
+
+
+##### 字段详细说明
+
+1. **`targetRefs`**
+
+指定此策略要应用在哪个**后端服务（Service）**上。
+
+```yaml
+targetRefs:
+  - kind: Service         # 应用于哪个类型的资源，必须是 Service
+    name: dev             # Service 的名称
+    group: ""             # group 为空表示 core 组（标准 Kubernetes 资源）
+```
+
+🔎 **用途**：指明是哪个 Service 使用 Upstream TLS。
+
+
+
+2. **`validation`**
+
+配置 TLS 的**验证规则**：
+
+```yaml
+validation:
+  wellKnownCACertificates: "System"
+  hostname: dev.example.com
+```
+
+**a) `wellKnownCACertificates: "System"`**
+
+- 表示信任系统默认的根证书（如 Ubuntu/RHEL 中 `/etc/ssl/certs` 中的根证书）。
+
+- 用于验证后端服务的 TLS 证书是合法颁发的。
+
+- 支持的值（当前阶段）：
+
+  | 值             | 含义                                                         |
+  | -------------- | ------------------------------------------------------------ |
+  | `"System"`     | 使用 **Gateway 所在节点操作系统** 的默认 CA 信任列表（通常是 `/etc/ssl/certs/ca-certificates.crt` 或等效路径） |
+  | `null`（不填） | 不启用默认信任 CA。你需要通过 `caCertRefs` 字段自己指定可信 CA 证书 Secret。 |
+
+​       作用：用于**验证后端服务证书是否被可信 CA 签发**，防止中间人攻击，确保你信任的服务才被通信。
+
+- 使用你自签的 CA 来校验后端证书：
+
+  ```yaml
+  validation:
+    caCertRefs:
+      - name: my-root-ca
+        kind: Secret
+        group: ""
+    hostname: dev.internal.svc
+  ```
+
+**b) `hostname: dev.example.com`**
+
+- 表示连接时需要校验后端服务器 TLS 证书中的 **CN/SAN 域名** 是否匹配 `dev.example.com`。
+
+- 它会被验证匹配 **证书的 SAN（Subject Alternative Name）字段**，如果 SAN 没有设置，才会 fallback 到证书的 **Subject 的 Common Name (CN)** 字段。
+
+  | 优先级                              | 匹配字段 |
+  | ----------------------------------- | -------- |
+  | 1️⃣ SAN (Subject Alternative Name)    |          |
+  | 2️⃣ CN (Common Name) – 已过时，但兼容 |          |
+
+- 你后端证书长这样（用 `openssl x509 -text` 查看）：
+
+  ```ruby
+  Subject: CN = dev.example.com
+  X509v3 Subject Alternative Name:
+      DNS:dev.example.com, DNS:*.example.com
+  ```
+
+  那么配置：
+
+  ```yaml
+  validation:
+    hostname: dev.example.com
+  ```
+
+  是 ✅ 匹配成功的。
+
+- 类似于 curl 中的 `--resolve` 或浏览器的证书校验行为。
+
+📌 如果证书的 SAN 字段中没有这个域名，会导致连接失败。
+
+
+
+
+
 ### 实战案例
 
 #### 把 HTTP 请求重定向为 HTTPS
@@ -22241,13 +23253,39 @@ spec:
           tls:
             mode: Simple  # ✅ 重新加密 TLS
             certificateRefs:
-              - name: backend-tls-secret  # 后端 TLS 证书
+              - name: backend-tls-secret  
+              
+---
+apiVersion: gateway.networking.k8s.io/v1alpha3
+kind: BackendTLSPolicy
+spec:
+  targetRefs:
+    - kind: Service
+      name: my-secure-service
+  validation:
+    wellKnownCACertificates: "System"
+    hostname: my-service.example.com
 ```
 
 **解释**
 
 - **`Gateway` 终结 TLS**，但后端 `Service` **仍然使用 HTTPS**。
 - **`mode: Simple`** → `Gateway` 重新加密 TLS，并发送给后端。
+- **目前支持的 `mode` 值（来自官方文档）：**
+
+  | 值            | 含义                                                         |
+  | ------------- | ------------------------------------------------------------ |
+  | `Terminate`   | Gateway 终止 TLS，向后端发送明文 HTTP（常用于 HTTPS Termination） |
+  | `Passthrough` | Gateway 不处理 TLS，**原样转发 TLS 流量**给后端              |
+  | `Simple`      | Gateway 会 **主动重新加密**，即与客户端和后端都用各自的 TLS 通信 |
+
+- 引用的 `backend-tls-secret` 是一个 **TLS 类型的 Kubernetes Secret**，里面一般包含这几个字段：
+
+  | 字段             | 内容                             | 说明                                                        |
+  | ---------------- | -------------------------------- | ----------------------------------------------------------- |
+  | `tls.crt`        | 客户端证书（Client Certificate） | Gateway 用来向后端 Pod 证明自己身份                         |
+  | `tls.key`        | 客户端证书对应的私钥             | Gateway 在与后端进行 TLS 握手时使用的私钥                   |
+  | `ca.crt`（可选） | 后端的根证书或中间证书           | 用于验证后端 Pod 的服务端证书是否合法（属于单向认证一部分） |
 
 
 
@@ -22374,7 +23412,7 @@ LISTEN 0      4096               *:10250            *:*    users:(("kubelet",pid
 | 用户种类        | 解析                                                         |
 | --------------- | ------------------------------------------------------------ |
 | User Account    | 用户账户，指非Pod类的客户端访问API Server时使用的身份标识，一般是现实中的 “人”<br />API Server没有为这类账户提供保存其信息的资源类型，**相关的信息通常保存于外部的文件或认证系统中**,由外部独立服务进行管理，所以用户不能通过集群内部的 API 来 进行管理。<br />身份核验操作可由API Server进行，也可能是由外部身份认证服务完成 作用域为整个集群级别,常见的管理方式，如： openssl等 |
-| Service Account | ervice Accounts（SA）在 Kubernetes 中是一种内建的、与 Pod 关联的账号类型。 它们主要是为了在Pod中运行的进程提供一个身份标识，以便访问 Kubernetes API 通过Kubernetes API 来管理的用户帐号，适用于集群中Pod内的进程访问API Server 时使用的身份信息，需要通过 API 来完成权限认证<br />API Server使用ServiceAccount类型的资源对象来保存该类账号<br />认证到API Server的认证信息称为**Service Account Token**，它们**保存于同名的专用类型的Secret对象中**<br />在集群内部进行权限操作，都需要使用到 ServiceAccount<br />**namespace 别级的资源类型,即帐号隶属于名称空间,但可以授予集群级别的权限** |
+| Service Account | Service Accounts（SA）在 Kubernetes 中是一种内建的、与 Pod 关联的账号类型。 它们主要是为了在Pod中运行的进程提供一个身份标识，以便访问 Kubernetes API 通过Kubernetes API 来管理的用户帐号，适用于集群中Pod内的进程访问API Server 时使用的身份信息，需要通过 API 来完成权限认证<br />API Server使用ServiceAccount类型的资源对象来保存该类账号<br />认证到API Server的认证信息称为**Service Account Token**，它们**保存于同名的专用类型的Secret对象中**<br />在集群内部进行权限操作，都需要使用到 ServiceAccount<br />**namespace 别级的资源类型,即帐号隶属于名称空间,但可以授予集群级别的权限** |
 | 匿名用 户       | 不能被识别为Service Account，也不能被识别为User Account的用户，即“匿名用户" |
 
 尽管无法通过 API 调用来添加普通用户， Kubernetes 仍然认为**能够提供**由集群的证书机构签名的**合法证书**的**用户**是**通过身份认证的用户**。 基于这样的配置**，Kubernetes 使用证书中的 'subject' 的通用名称** （Common Name）**字段** （例如，"/CN=bob"）**来确定用户名**。 接下来，**基于角色访问控制**（RBAC） 子系统会**确定用户是否有权针对某资源执行特定的操作**。
@@ -22392,7 +23430,7 @@ Kubernetes常见的内置用户组有以下四类：
 | 用户组                              | 解析                                                         |
 | ----------------------------------- | ------------------------------------------------------------ |
 | system:unauthenticated              | 未能通过任何一个授权插件检验的账号的所有未通过认证测试的用户 统一隶属的用户组 |
-| system:authenticated                | 认证成功后的用户自动加入的一个专用组，用于快捷引用所有正常通 过认证的用户账号 |
+| system:authenticated                | 认证成功后的用户自动加入的一个专用组，用于快捷引用所有正常通过认证的用户账号 |
 | system:serviceaccounts              | 所有名称空间中的所有ServiceAccount对象                       |
 | system:serviceaccounts: <namespace> | 特定名称空间内所有的ServiceAccount对象                       |
 
@@ -22494,7 +23532,7 @@ kubernetes提供了多种认证方式，可以同时使用一种或多种认证�
 
 | 认证方式            | 解析                                                         |
 | ------------------- | ------------------------------------------------------------ |
-| X509 客户端证书认证 | TLS双向认证，客户端持有数字证书,API Server信任客户端证书的颁发者.即服务器客户 端互相验证<br />**信任的CA**需要在kube-apiserver启动时,通过**--client-ca-file选项指定**.<br />证书中的Subject中的 **CN(CommonName)即被识别为用户名**，而**O（Organization） 被识别为组名**<br />对于这种客户的账号，k8s是无法管理的。为了使用这个方案，api-server需要用-- client-ca-file、--tls-private-key-file、--tls-cert-file选项来开启。<br />kubeadm部署的Kubernetes集群，默认使用 **/etc/kubernetes/pki/ca.crt** 进行客户端认证,此文件是kubeadm为Kubernetes各组件间颁发数字证书的**根CA** |
+| X509 客户端证书认证 | TLS双向认证，客户端持有数字证书,API Server信任客户端证书的颁发者.即服务器客户端互相验证<br />**信任的CA**需要在kube-apiserver启动时,通过**--client-ca-file选项指定**.<br />证书中的Subject中的 **CN(CommonName)即被识别为用户名**，而**O（Organization） 被识别为组名**<br />对于这种客户的账号，k8s是无法管理的。为了使用这个方案，api-server需要用-- client-ca-file、--tls-private-key-file、--tls-cert-file选项来开启。<br />kubeadm部署的Kubernetes集群，默认使用 **/etc/kubernetes/pki/ca.crt** 进行客户端认证,此文件是kubeadm为Kubernetes各组件间颁发数字证书的**根CA** |
 | 令牌认证 (Token)    | 在节点数量非常多的时候，大量手动配置TLS认证比较麻烦，可以**通过在api-server开 启 experimental-bootstrap-token-auth 特性**，**通过对客户端的和k8s平台预先定义的 token信息进行匹配**，**认证通过后，自动为节点颁发证书**，可以大大减轻工作量，而且 应用场景非常广。<br />包括: Service Account 令牌,静态令牌文件,Bootstrap令牌,OIDC(OpenID Connect)令 牌,Webhook 令牌 等 |
 | 代理认证            | 一般借助于中间代理的方式来进行统用的认证方式，样式不固定     |
 | 匿名                | 无法认证的其它请求                                           |
@@ -23175,8 +24213,7 @@ fd3e78.2a0395a1c58fb561,test,1002,dev
 .....
    volumeMounts:
    ......
-    - mountPath: /etc/kubernetes/auth                   #添加三行,实现数据卷的挂载配
-置
+    - mountPath: /etc/kubernetes/auth                   #添加三行,实现数据卷的挂载配置
      name: static-auth-token
      readOnly: true
  hostNetwork: true
@@ -25734,11 +26771,3458 @@ https://kubesphere.io             2025-02-11 13:35:25
 
 ## Kubernetes有状态服务管理
 
+**本章内容**
+
+- **StatefulSet**
+- **CRD**
+- **Operator**
+
+
+
+### StatefulSet
+
+#### StatefulSet 机制
+
+```http
+https://kubernetes.io/zh-cn/docs/tutorials/stateful-application/
+https://kubernetes.io/zh-cn/docs/tasks/run-application/run-single-instance-stateful-application/
+```
+
+
+
+##### 应用状态说明
+
+**无状态 和 有状态**
+
+- **无状态（Stateless）**
+
+  无状态的系统不会在多个请求之间保存任何状态信息。每个请求都独立处理，不考虑之前的请求或状态。
+
+  无状态的每次的请求都是独立的，它的执行情况和结果与前面的请求和之后的请求是无直接关系 的，它不会受前面的请求应答情况直接影响，也不会直接影响后面的请求应答情况
+
+  典型的无状态系统包括HTTP协议、RESTful API等。每个请求都包含了足够的信息来完成其处理， 服务器不需要保存任何客户端的状态信息。
+
+- **有状态（Statefulset）**
+
+  有状态的系统在处理请求或通信时会记住之前的状态信息。这意味着系统会存储客户端的历史信息 或状态，并基于这些信息进行处理
+
+  有状态应用会在其会话中保存客户端的数据，并且有可能会在客户端下一次的请求中使用这些数据
+
+  应用上常见的状态类型:会话状态、连接状态、配置状态、集群状态、持久性状态等
+
+  典型的有状态系统包括数据库系统、TCP连接等。这些系统需要在通信过程中维护状态信息，以确 保数据的可靠性和一致性。
+
+**无状态和有状态应用区别**
+
+- **复杂度**：有状态系统通常比无状态系统更复杂，因为它们需要维护和管理状态信息。无状态系统则 更简单，因为它们不需要处理状态信息。
+- **可伸缩性**：无状态系统通常更易于扩展，因为它们不需要考虑会话状态，可以更容易地实现负载均 衡和水平扩展。有状态系统可能需要更复杂的状态管理和同步机制，因此在大规模应用中可能需要 更多的资源和设计考虑。
+
+大型应用通常具有众多功能模块，这些模块通常会被设计为**有状态模块**和**无状态模块**两部分
+
+- 业务逻辑模块一般会被设计为无状态，这些模块需要将其状态数据保存在有状态的中间件服务上， 如消息队列、数据库或缓存系统等
+- 无状态的业务逻辑模块易于横向扩展，有状态的后端则存在不同的难题
+
+Http 协议是无状态的，对于http协议本身的每一次请求都是相互独立的，彼此之间没有关联关系。
+
+而 Http 相关的应用往往是有状态的。
+
+很多的 Web 程序是需要有大量的业务逻辑相互关联才可以实现最终的目标，也就是说基于http协议的 web应用程序是有状态的。
+
+只不过这个状态是需要借助于其他的机制来实现，比如 cookies、session、token以及其他辅助的机 制。
+
+为了实现http的会话有状态，基于 cookies、session、token等机制都涉及到文件的保存，要么保存到 客户端，要么保存到服务端。
+
+以session为例，就在服务端保存相关的信息，提高正常通信的效率。
+
+实际的生产环境中，web程序为了保证高可用，所以通过集群的方式实现，应用的访问分布式效果。
+
+在这种场景中，可以基于下面方法实现有状态的会话保持
+
+- **session sticky** - 根据用户的行为数据，找到上次响应请求的服务器，直接响应
+- **session cluster** - 通过服务集群之间的通信机制实现会话数据的同步
+- **session server** - 借助于一个专用的服务器来保存会话信息。
+
+
+
+生产中一些中间件业务集群，比如MySQL集群、Redis集群、ElasticSearch集群、MongoDB集群、 Nacos集群、MinIO集群、Zookeeper集群、Kafka集群、RabbitMQ集群等
+
+这些应用集群都有以下相同特点：
+
+- 每个节点都有固定的身份ID，集群成员通过身份ID进行通信
+- 集群的规模是比较固定的，一般不能随意变动
+- 节点都是由状态的，而且状态数据通常会做持久化存储
+- 集群中某个节点出现故障，集群功能肯定受到影响。
+
+像这种状态类型的服务，只要过程中存在一点问题，那么影响及范围都是不可预测。
+
+**应用编排工作负载型控制器**
+
+- 无状态应用编排:Deployment<--ReplicaSet
+- 系统级应用编排:DaemonSet
+- 有状态应用编排: StatefulSet
+- 作业类应用编排:CronJob <--job
+
+
+
+##### StatefulSet 工作机制
+
+###### StatefulSet 介绍
+
+Pod的管理对象有Deployment，RS、DaemonSet、RC这些都是面向无状态的服务，满足不了上述的有 状态集群的场景需求
+
+从Kubernetes-v1.4版本引入了集群状态管理的功能，v1.5版本更名为StatefulSet 有状态应用副本集
+
+StatefulSet 最早在 Kubernetes 1.5 版本中引入，作为一个 alpha 特性。经过几个版本的改进和稳定， 在 Kubernetes 1.9 版本中，StatefulSet 变成了一个稳定的、通用可用（GA，General Availability）的 特性。
+
+StatefulSet 旨在与有状态的应用及分布式系统一起使用。然而在 Kubernetes 上管理有状态应用和分布 式系统是一个宽泛而复杂的话题。
+
+由于每个有状态服务的特点，工作机制和配置方式都存在很大的不同，因此当前Kubernetes并没有提供 统一的具体的解决方案
+
+```ABAP
+而 Statefulset 只是为有状态应用提供了基础框架，而非完整的解决方案
+如果想实现具体的有状态应用，建议可以使用相应的专用 Operator 实现
+```
+
+
+
+###### StatefulSet 特点
+
+- 每个Pod 都有稳定、唯一的网络访问标识
+- 每个**Pod 彼此间的通信基于Headless Service实现**
+- StatefulSet 控制的Pod副本启动、扩展、删除、更新等操作都是有顺序的
+- StatefulSet里的每个Pod存储的数据不同，所以采用专用的稳定独立的持久化存储卷，用于存储 Pod的状态数据
+
+
+
+###### StatefulSet 对应Pod 的网络标识
+
+- 每个StatefulSet对象对应于一个专用的Headless Service 对象
+
+- 使用 Headless service 给每一个StatufulSet控制的Pod提供一个唯一的DNS域名来作为每个成员的 网络标识
+- 每个Pod都一个从0开始，从小到的序号的名称，创建和扩容时序号从小到大，删除，缩容和更新 镜像时从大到小
+- 通过ClusterDNS解析为Pod的地址，从而实现集群内部成员之间使用域名通信
+
+每个Pod对应的DNS域名格式：
+
+```bash
+$(statefulset_name)-$(orederID).$(headless_service_name).$(namespace_name).svc.cluster.local
+ 
+#示例
+mysql-0.mysql.wordpress.svc.cluster.local
+mysql-1.mysql.wordpress.svc.cluster.local
+mysql-2.mysql.wordpress.svc.cluster.local
+```
+
+
+
+###### StatefulSet的 Pod 管理策略 Pod Management Policy
+
+定义创建、删除及扩缩容等管理操作期间，在Pod副本上的创建两种模式
+
+- **OrderedReady**
+
+  创建或扩容时，**顺次**完成各Pod副本的创建，且要求只有前一个Pod转为Ready状态后，才能进行后一个Pod副本的创建
+
+  删除或缩容时，逆序、依次完成相关Pod副本的终止
+
+- **Parallel**
+
+  各Pod副本的创建或删除操作不存在顺序方面的要求，可同时进行
+
+
+
+###### StatefulSet 的存储方式
+
+- 基于podTempiate定义Pod模板
+- 在`podTemplate`上使用`volumeTemplate`为各Pod副本动态置备`PersistentVolume`
+- 因为每个Pod存储的状态数据不尽相同，所以在创建每一个Pod副本时绑定至专有的固定的PVC
+-  **PVC的名称遵循特定的格式，从而能够与StatefulSet控制器对象的Pod副本建立紧密的关联关系**
+- 支持从静态置备或动态置备的PV中完成绑定
+- 删除Pod(例如缩容)，并不会一并删除相关的PVC
+
+
+
+###### StatefulSet 组件
+
+| 组件                | 描述                                                         |
+| ------------------- | ------------------------------------------------------------ |
+| headless service    | 一般的Pod名称是随机的，而为了statefulset的唯一性，所以借用 headless service通过唯一的"网络标识"来直接指定的pod应用，所以它要求我们的**dns环境**是完好的。<br />当一个StatefulSet挂掉，新创建的StatefulSet会被赋予跟原来的Pod 一样的名字，通过这个名字来匹配到原来的存储，实现了状态保存。 |
+| volumeClaimTemplate | 有状态集群中的副本数据是不一样的(例：redis)，如果用共享存储的 话，会导致多副本间的数据被覆盖，为了statefulsed数据持久化，需要将pod和其申请的数据卷隔离开，**每一种pod都有其独立的对应的数据卷配置模板**，来满足该要求。 |
+
+
+
+###### StatefulSet 局限性
+
+根据对 StatefulSet的原理解析，如果实现一个通用的有状态应用的集群，那基本没有可能完成
+
+原因是不同的应用集群，其内部的状态机制几乎是完全不同的
+
+| 集群           | 解析                                                         |
+| -------------- | ------------------------------------------------------------ |
+| MySQL 主从集群 | 当向当前数据库集群添加从角色节点的时候，可不仅仅为添加一个唯一的节点标识及对 应的后端存储就完了。我们要提前知道，从角色节点的时间、数据复制的起始位置(日志文件名、日志位置、时间戳等)，然后才可以进行数据的同步。 |
+| Redis 主从集群 | 集群中，添加节点的时候，会自动根据slaveof设定的主角色节点上获取最新的数据， 然后直接在本地还原，然后借助于软件专用的机制进行数据的同步机制。 |
+
+- StatefulSet本身的代码无法考虑周全到所有的集群状态机制
+- StatefulSet 只是提供了一个基础的编排框架
+- 有状态应用所需要的管理操作，需要由用户自行编写代码完成
+
+这也是为什么早期的Kubernetes只能运行无状态的应用，为了实现所谓的状态集群效果，只能将所有的 有状态服务独立管理，然后以自建EndPoint或者ExternalName的方式引入到Kubernetes集群中，实现 所谓的类似状态效果.
+
+当前而这种方法仍然在很多企业中使用。
+
+
+
+##### StatefulSet 配置
+
+注意：StatefulSet除了需要定义自身的标签选择器和Pod模板等属性字段，StatefulSet必须要配置一个专用的Headless Service，而且还可能要根据需要，编写代码完成扩容、缩容等功能所依赖的必要操作步骤
+
+**属性解析**
+
+```yaml
+apiVersion: apps/v1                    # API群组及版本
+kind: StatefulSet                      # 资源类型的特有标识
+metadata:             
+  name: <string>                       # 资源名称，在作用域中要唯一
+  namespace: <string>                  # 名称空间：Statefulset隶属名称空间级别
+spec:
+  replicas: <integer>                  # 期望的pod副本数，默认为1
+  selector: <object>                   # 标签选择器，须匹配pod模版中的标签，必选字段
+  template: <object>                   # pod模版对象，必选字段
+  revisionHistoryLimit: <integer>      # 滚动更新历史记录数量，默认为10
+  updateStragegy: <Object>             # 滚动更新策略
+    type: <string>                     # 指定更新策略类型，可用值：OnDelete和Rollingupdate
+                                       # OnDelete 表示只有在手动删除旧 Pod 后才会触发更新
+                                       # RollingUpdate 表示会自动进行滚动更新
+    rollingUpdate: <Object>            # 滚动更新参数，专用于RollingUpdate类型
+      maxUnavailable: <integer>        # 更新期间可比期望的Pod数量缺少的数量或比例
+      partition: <integer>             # 分区值，表示只更新大于等于此索引值的Pod，默认为0,一般用于金丝雀场景，更新和                                              缩容时都是索引号的Pod从大到小进行，即按从大到小的顺序进行，比如：                                                       MySQL2,MySQL-1,MySQL-0
+  serviceName: <string>                # 相关的Headless Service的名称，必选字段
+    apiVersion: <string>               # PVC资源所属的API群组及版本，可省略
+    kind: <string>                     # PVC资源类型标识，可省略
+    metadata: <Object>                 # 卷申请模板元数据
+    spec: <Object>                     # 期望的状态，可用字段同PVC
+  podManagementPolicy: <string>        # Pod管理策略，默认“OrderedReady”表示顺序创建并逆序删除，“Parallel”表示并                                              行模式
+  volumeClaimTemplates: <[]Object>     # 指定PVC的模板.存储卷申请模板，实现数据持久化
+  - metadata:
+    name: <string>                     # 生成的PVC的名称格式为：<volumeClaimTemplates>. <StatefulSet>-<orederID>
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "sc-nfs"       #  如果有动态置备的StorageClass,可以指定名称
+      resources:
+        requests:
+          storage: 1Gi
+```
+
+范例:  简单 statefulset
+
+```bash
+[root@master1 yaml]# cat statefulset-demo.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  labels:
+    app: nginx
+spec:
+  ports:
+  - port: 80
+    name: http
+  clusterIP: None   # 可使用无头服务或有头服务,因为每个有状态服务的Pod功能不同,所以一般会使用无头服务,防止利用同一个Service                       名称随机解析到不同的Pod
+  selector:
+    app: nginx
+    
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+spec:
+  serviceName: "nginx"
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+        ports:
+        - containerPort: 80
+          name: http
+          
+[root@master1 yaml]# kubectl apply -f statefulset-demo.yaml
+
+# 观察到Pod按顺序创建
+[root@master1 ~]#kubectl get pod -w
+NAME                        READY   STATUS    RESTARTS       AGE
+web-0                       1/1     Running   0              11s
+web-1                       1/1     Running   0              7s
+
+# 测试名称解析
+[root@master1 ~]#kubectl exec pod-test1-cd487559d-cjmxk -- host nginx
+nginx.default.svc.cluster.local has address 192.168.123.19
+nginx.default.svc.cluster.local has address 192.168.22.162
+
+# 查看
+[root@master1 ~]#kubectl get pod -o wide 
+NAME                        READY   STATUS    RESTARTS       AGE    IP                NODE
+web-0                       1/1     Running   0              20m    192.168.123.19    node3.mystical.org   <none>           <none>
+web-1                       1/1     Running   0              20m    192.168.22.162    node1.mystical.org   <none>           <none>
+
+# 访问完整的service名称,注意最后的点号
+[root@master1 ~]#kubectl exec pod-test1-cd487559d-cjmxk -- host nginx.default.svc.cluster.local.
+nginx.default.svc.cluster.local has address 192.168.123.19
+nginx.default.svc.cluster.local has address 192.168.22.162
+
+# 访问测试
+[root@master1 ~]#kubectl exec -it pod-test1-cd487559d-cjmxk -- sh
+[root@pod-test1-cd487559d-cjmxk /]# curl nginx
+kubernetes pod-test v0.1!! ClientIP: 192.168.22.130, ServerName: web-1, ServerIP: 192.168.22.162!
+[root@pod-test1-cd487559d-cjmxk /]# curl nginx
+kubernetes pod-test v0.1!! ClientIP: 192.168.22.130, ServerName: web-0, ServerIP: 192.168.123.19!
+
+
+# 观察扩容和缩容都按顺序
+[root@master1 ~]#kubectl scale sts web --replicas 5
+statefulset.apps/web scaled
+[root@master1 ~]#kubectl get statefulsets.apps 
+NAME   READY   AGE
+web    3/5     4h38m
+[root@master1 ~]#kubectl get statefulsets.apps 
+NAME   READY   AGE
+web    4/5     4h38m
+[root@master1 ~]#kubectl get statefulsets.apps 
+NAME   READY   AGE
+web    5/5     4h38m
+
+# 查看扩容和缩容的过程,扩容是Pod编号从小到大,缩容正好反之
+# 观察到service为无头服务
+[root@master1 ~]#kubectl get svc nginx
+NAME    TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+nginx   ClusterIP   None         <none>        80/TCP    4h48m
+
+# 支持缩写
+[root@master1 ~]#kubectl get sts
+NAME   READY   AGE
+web    5/5     4h54m
+
+# 查看主机名和host解析
+[root@master1 ~]#kubectl exec -it web-0 -- hostname
+web-0
+[root@master1 ~]#kubectl exec -it web-1 -- hostname
+web-1
+[root@master1 ~]#kubectl exec -it web-2 -- hostname
+web-2
+
+[root@master1 ~]#kubectl exec -it web-1 -- cat /etc/hosts
+# Kubernetes-managed hosts file.
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+fe00::0	ip6-mcastprefix
+fe00::1	ip6-allnodes
+fe00::2	ip6-allrouters
+192.168.22.162	web-1.nginx.default.svc.cluster.local	web-1
+```
+
+范例: 级联删除和非级联删除
+
+```bash
+# 默认是级联删除,即删除 sts 同时删除 Pod
+[root@master1 ~]#kubectl delete sts web 
+statefulset.apps "web" deleted
+
+#非级联删除,即删除sts不同时删除Pod,选项--cascade=orphan(旧版false废弃)
+[root@master1 ~]#kubectl delete sts web --cascade=orphan
+statefulset.apps "web" deleted
+
+# 查看sts删除,Pod仍在,但Pod为孤儿状态,即删除Pod,将不会被重建
+[root@master1 ~]#kubectl get sts
+No resources found in default namespace.
+
+[root@master1 ~]#kubectl get pod
+web-0                       1/1     Running   0               2m50s
+web-1                       1/1     Running   0               2m46s
+
+# 删除Pod查看是否被重建
+[root@master1 ~]#kubectl delete pod web-0
+pod "web-0" deleted
+```
+
+
+
+##### StatefulSet 更新策略
+
+更新策略可以实现滚动更新发布
+
+```yaml
+  updateStrategy: <Object>         # 滚动策略
+    type: <string>                 # 滚动更新类型，可用值有OnDelete和RollingUpdate
+    rollingUpdate: <Object>        # 滚动更新参数，专用于RollingUpdate类型
+      partition: <integer>         # 分区指示索引值，默认为0,一般用于版本分区域更新场景
+```
+
+**快速对比表**：
+
+| 类型            | 含义                                        | 是否自动更新 Pod     | 使用场景                                 | 是否常用 |
+| --------------- | ------------------------------------------- | -------------------- | ---------------------------------------- | -------- |
+| `RollingUpdate` | 自动按顺序滚动更新 StatefulSet 中的 Pod     | ✅ 是                 | 版本更新、无状态或轻微有状态的服务       | 常用     |
+| `OnDelete`      | 仅当手动删除 Pod 后，才会用新的版本重新创建 | ❌ 否（需手动删 Pod） | 对升级控制要求严格的数据库、中间件等场景 | 次常用   |
+
+**结合 `rollingUpdate.partition` 使用（灰度升级）**
+
+```yaml
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    partition: 1
+```
+
+表示只有 `ordinal >= 1` 的 Pod 会被更新，比如：
+
+- `pod-1`, `pod-2` 会更新
+- `pod-0` 保持原样
+
+🎯 用于灰度或分批升级，比如先升级从节点，最后升级主节点。
+
+**范例: 更新策略**
+
+```bash
+# 查看更新策略
+[root@master1 ~]#kubectl get sts web -o yaml|grep -A5 -i UpdateStrategy
+  updateStrategy:
+    rollingUpdate:
+      partition: 0               #此编号表示更新时只更新大于等于此编号对应的Pod,小于此编号的Pod不会更新,0表示每次全部更                                     新,比如:共5个Pod: web{0..4},此处设为2,则从Web-2开始更新,可以通过不断从大到小的修改此                                   值,可以实现滚动更新策略
+    type: RollingUpdate
+......
+
+#升级image版本
+[root@master1 yaml]#kubectl edit sts web
+    - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2
+    
+#观察更新顺序,发现Pod编号从大到小更新
+[root@master1 ~]#kubectl get pod
+web-0                       1/1     Running       0               5m12s
+web-1                       1/1     Terminating   0               5m8s
+
+[root@master1 ~]#kubectl get pod
+web-0                       1/1     Running             0               5m16s
+web-1                       0/1     ContainerCreating   0               2s
+
+[root@master1 ~]#kubectl get pod
+web-0                       1/1     Terminating   0               5m37s
+web-1                       1/1     Running       0               23s
+
+[root@master1 ~]#kubectl get pod
+web-0                       1/1     Running   0               15s
+web-1                       1/1     Running   0               58s
+
+#扩容为5个Pod
+[root@master1 ~]#kubectl scale sts web --replicas 5
+
+#修改更新策略为4
+[root@master1 ~]#kubectl edit sts web
+.....
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.3  #修改镜像版本
+.....
+  updateStrategy:
+    rollingUpdate:
+      partition: 4  #将此处的0修改为4
+    type: RollingUpdate
+.....
+
+#确认web-4以下Pod不更新
+[root@master1 ~]#kubectl get pod web-4 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.3
+[root@master1 ~]#kubectl get pod web-3 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2
+[root@master1 ~]#kubectl get pod web-2 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2
+[root@master1 ~]#kubectl get pod web-1 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2
+[root@master1 ~]#kubectl get pod web-0 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2
+  
+# 修改更新策略为1
+[root@master1 ~]#kubectl edit sts web
+......
+  updateStrategy:
+    rollingUpdate:
+      partition: 1  #修改此处为1
+    type: RollingUpdate
+......
+
+#观察结果,发现web-1以上都更新
+[root@master1 ~]#kubectl get pod web-4 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.3
+[root@master1 ~]#kubectl get pod web-3 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.3
+[root@master1 ~]#kubectl get pod web-2 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.3
+[root@master1 ~]#kubectl get pod web-1 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.3
+[root@master1 ~]#kubectl get pod web-0 -o yaml|grep -m1  image
+  - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.2
+  
+# 修改更新策略为OnDelete,表示只有删除时才更新
+[root@master1 ~]#kubectl edit sts web
+.......
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.3  #修改版本
+      ....
+ updateStrategy:
+    type: OnDelete       # 修改更新策略
+.......
+
+# 观察到没有变化
+
+# 删除指定Pod
+[root@master1 ~]#kubectl delete pod web-0
+pod "web-0" deleted
+[root@master1 ~]#kubectl get pod
+NAME                        READY   STATUS               RESTARTS        AGE
+web-0                       0/1     ContainerCreating    0               43s
+web-1                       1/1     Running              0               79s
+web-2                       1/1     Running              0               115s
+
+#发现只有删除的Pod才更新镜像
+
+# 全部删除，删除后，则会按顺序从小到大创建Pod
+```
+
+
+
+#### 案例：StatefulSet 简单案例
+
+##### 准备NFS服务和动态置备
+
+```bash
+# 详情参考Kubernetes数据存储 -> StorageClass -> NFS StorageClass
+# 查看定义好的StorageClass
+[root@master1 ~]#kubectl get storageclasses.storage.k8s.io
+NAME               PROVISIONER                                   RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+sc-nfs (default)   k8s-sigs.io/nfs-subdir-external-provisioner   Delete          Immediate           false                  40d
+```
+
+##### 准备 Service资源
+
+```bash
+# 准备无头服务
+[root@master1 statefulset]#cat sts-headless.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+  name: statefulset-headless
+spec:
+  ports:
+  - port: 80
+  clusterIP: None
+  selector:
+    app: myapp-pod
+
+[root@master1 statefulset]#kubectl apply -f sts-headless.yaml 
+service/statefulset-headless created
+
+[root@master1 statefulset]#kubectl get svc statefulset-headless 
+NAME                   TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+statefulset-headless   ClusterIP   None         <none>        80/TCP    58s
+```
+
+##### 创建 statefulset 资源
+
+```bash
+#清单文件
+[root@master1 statefulset]#cat sts-test.yaml 
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: myapp
+spec:
+  serviceName: statefulset-headless
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp-pod
+  template:
+    metadata:
+      labels:
+        app: myapp-pod
+    spec:
+      containers:
+      - name: myapp
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+        volumeMounts:
+        - name: myappdata
+          mountPath: /usr/share/nginx/html
+  volumeClaimTemplates:
+  - metadata:
+      name: myappdata
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "sc-nfs"
+      resources:
+        requests:
+          storage: 1Gi
+
+[root@master1 statefulset]#kubectl apply -f sts-test.yaml 
+statefulset.apps/myapp created
+```
+
+**验证结果**
+
+```bash
+# 结果显示：所有的资源对象(pod+pv)都是按照顺序创建的，而且每个pv都有自己独有的标识符
+[root@master1 statefulset]#kubectl get pod
+NAME                        READY   STATUS    RESTARTS      AGE
+myapp-0                     1/1     Running   0             3m23s
+myapp-1                     1/1     Running   0             2m45s
+myapp-2                     1/1     Running   0             2m7s
+
+[root@master1 statefulset]#kubectl get pvc
+NAME                STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+myappdata-myapp-0   Bound    pvc-4affd28a-5835-4018-bb49-ad07f19b89c4   1Gi        RWO            sc-nfs         <unset>                 4m16s
+myappdata-myapp-1   Bound    pvc-d617b16a-112c-4355-b88f-d81bb699c2a7   1Gi        RWO            sc-nfs         <unset>                 3m38s
+myappdata-myapp-2   Bound    pvc-357b644a-5de5-4889-a9cb-40250d89d6f3   1Gi        RWO            sc-nfs         <unset>                 3m
+
+[root@ubuntu2204 default-myappdata-myapp-0-pvc-4affd28a-5835-4018-bb49-ad07f19b89c4]#echo myapp-0 > /data/sc-nfs/default-myappdata-myapp-0-pvc-4affd28a-5835-4018-bb49-ad07f19b89c4/index.html
+[root@ubuntu2204 default-myappdata-myapp-1-pvc-d617b16a-112c-4355-b88f-d81bb699c2a7]#echo myapp-1 > /data/sc-nfs/default-myappdata-myapp-1-pvc-d617b16a-112c-4355-b88f-d81bb699c2a7/index.html
+[root@ubuntu2204 default-myappdata-myapp-2-pvc-357b644a-5de5-4889-a9cb-40250d89d6f3]#echo myapp-2 > /data/sc-nfs/default-myappdata-myapp-2-pvc-357b644a-5de5-4889-a9cb-40250d89d6f3/index.html
+
+[root@master1 /]#kubectl get pod -o wide
+myapp-0                     1/1     Running   0             22m     192.168.123.49   node3.mystical.org   <none>           <none>
+myapp-1                     1/1     Running   0             21m     192.168.22.223   node1.mystical.org   <none>           <none>
+myapp-2                     1/1     Running   0             20m     192.168.253.40   node2.mystical.org   <none> 
+
+[root@master1 /]#curl 192.168.123.49
+myapp-0
+[root@master1 /]#curl 192.168.22.223
+myapp-1
+[root@master1 /]#curl 192.168.253.40
+myapp-2
+```
+
+
+
+##### 缩容和扩容
+
+缩容和扩容都是按一定的顺序进行的
+
+扩容是从编号为0到N的顺序创建Pod
+
+缩容正好相反, 是从编号N到0的顺序销毁Pod
+
+```bash
+# 缩容，从大到小删除
+[root@master1 /]#kubectl scale sts myapp --replicas=1; kubectl get pod -w
+statefulset.apps/myapp scaled
+NAME                        READY   STATUS        RESTARTS      AGE
+myapp-0                     1/1     Running       0             30m
+myapp-1                     1/1     Running       0             29m
+myapp-2                     1/1     Terminating   0             29m
+myapp-2                     0/1     Terminating   0             29m
+myapp-1                     1/1     Terminating   0             30m
+myapp-1                     0/1     Terminating   0             30m
+
+[root@master1 /]#kubectl get pvc
+NAME                STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+myappdata-myapp-0   Bound    pvc-4affd28a-5835-4018-bb49-ad07f19b89c4   1Gi        RWO            sc-nfs         <unset>                 32m
+myappdata-myapp-1   Bound    pvc-d617b16a-112c-4355-b88f-d81bb699c2a7   1Gi        RWO            sc-nfs         <unset>                 31m
+myappdata-myapp-2   Bound    pvc-357b644a-5de5-4889-a9cb-40250d89d6f3   1Gi        RWO            sc-nfs         <unset>                 31m
+
+# 可以看到：pod的删除不影响pv和pvc，说明pod的状态数据没有丢失，而且pvc指定的名称不变，只要是同一个statufulset创建的pod，会自动找到根据指定的pvc找到具体的pv
+# pvc 的名称是 <PVC_name>-<POD_name>的组合，所以pod可以直接找到绑定的pvc
+
+# 扩容，从小到大创建pod
+[root@master1 /]#kubectl scale sts myapp --replicas=4; kubectl get pod -w
+statefulset.apps/myapp scaled
+NAME                        READY   STATUS              RESTARTS      AGE 
+myapp-0                     1/1     Running             0             33m
+myapp-1                     0/1     ContainerCreating   0             1s
+myapp-1                     0/1     ContainerCreating   0             3s
+myapp-1                     1/1     Running             0             5s
+myapp-2                     0/1     Pending             0             0s
+myapp-2                     0/1     Pending             0             0s
+myapp-2                     0/1     ContainerCreating   0             0s
+myapp-2                     0/1     ContainerCreating   0             2s
+myapp-2                     1/1     Running             0             4s
+myapp-3                     0/1     Pending             0             0s
+myapp-3                     0/1     Pending             0             0s
+myapp-3                     0/1     Pending             0             2s
+myapp-3                     0/1     ContainerCreating   0             2s
+myapp-3                     0/1     ContainerCreating   0             4s
+myapp-3                     1/1     Running             0             6s
+
+# 只要是同一个statufulset创建的pod，会自动找到根据指定的pvc找到具体的pv
+[root@master1 /]#curl 192.168.253.72
+myapp-2
+```
+
+##### 名称访问
+
+自动创建pod的名称默认是可以解析的
+
+```bash
+[root@master1 /]#kubectl exec -it pod-test1-cd487559d-cjmxk -- sh
+[root@pod-test1-cd487559d-cjmxk /]# nslookup statefulset-headless
+Server:		10.96.0.10
+Address:	10.96.0.10#53
+
+Name:	statefulset-headless.default.svc.cluster.local
+Address: 192.168.123.47
+Name:	statefulset-headless.default.svc.cluster.local
+Address: 192.168.253.72
+Name:	statefulset-headless.default.svc.cluster.local
+Address: 192.168.123.49
+Name:	statefulset-headless.default.svc.cluster.local
+Address: 192.168.22.215
+
+# 注意：Pod可以直接解析自己的pod名称，解析其他pod的名称必须携带其无头服务的完整名称
+# 完整名称格式：
+# <statefulsetNmae>-<n>.<headless_name>.<ns_name>.svc.<k8s-clusterDoamin>
+[root@pod-test1-cd487559d-cjmxk /]# nslookup myapp-0.statefulset-headless.default.svc.clust
+er.local
+Server:		10.96.0.10
+Address:	10.96.0.10#53
+
+Name:	myapp-0.statefulset-headless.default.svc.cluster.local
+Address: 192.168.123.49
+
+[root@pod-test1-cd487559d-cjmxk /]# nslookup myapp-1.statefulset-headless.default.svc.clust
+er.local
+Server:		10.96.0.10
+Address:	10.96.0.10#53
+
+Name:	myapp-1.statefulset-headless.default.svc.cluster.local
+Address: 192.168.22.215
+
+[root@pod-test1-cd487559d-cjmxk /]# nslookup myapp-2.statefulset-headless.default.svc.clust
+er.local
+Server:		10.96.0.10
+Address:	10.96.0.10#53
+
+Name:	myapp-2.statefulset-headless.default.svc.cluster.local
+Address: 192.168.253.72
+
+# 直接访问svc-headless，则会自动轮询访问
+[root@pod-test1-cd487559d-cjmxk /]# curl statefulset-headless
+myapp-1
+[root@pod-test1-cd487559d-cjmxk /]# curl statefulset-headless
+myapp-2
+[root@pod-test1-cd487559d-cjmxk /]# curl statefulset-headless
+myapp-0
+
+# statefulset中，pod的主机名和pod名一致
+[root@master1 /]#kubectl exec myapp-0 -- hostname
+myapp-0
+```
+
+
+
+#### 案例：MySQL 主从复制集群
+
+注意: MySQL5.7.39失败,其它版本MySQL5.7.36，44 都成功
+
+```http
+https://kubernetes.io/zh-cn/docs/tasks/run-application/run-replicated-stateful-application/
+```
+
+架构设计
+
+```bash
+# 创建两个SVC实现读写分离
+# SVC：所有节点，读操作
+# SVC-headless：mysql-0 写操作
+```
+
+
+
+##### 准备 NFS 服务和 StorageClass 动态置备
+
+```bash
+# 详情参考Kubernetes数据存储 -> StorageClass -> NFS StorageClass
+# 查看定义好的StorageClass
+[root@master1 ~]#kubectl get storageclasses.storage.k8s.io
+NAME               PROVISIONER                                   RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+sc-nfs (default)   k8s-sigs.io/nfs-subdir-external-provisioner   Delete          Immediate           false                  40d
+```
+
+
+
+##### 创建 ConfigMap
+
+```bash
+# MySQL的配置
+[root@master1 statefulset]#cat sts-mysql-configmap.yaml 
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+    app.kubernetes.io/name: mysql
+data:
+  primary.cnf: |
+    [mysqld]
+    log-bin
+  replica.cnf: |
+    [mysqld]
+    super-read-only
+```
+
+
+
+##### 创建 Service
+
+```bash
+# 为 StatefulSet 成员提供稳定的 DNS 表项的无头服务（Headless Service）
+#  主节点的对应的Service
+
+[root@master1 statefulset]#cat sts-mysql-svc.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+    app.kubernetes.io/name: mysql
+spec:
+  ports:
+  - name: mysql
+    port: 3306
+  clusterIP: None
+  selector:
+    app: mysql
+---
+# 用于连接到任一 MySQL 实例执行读操作的客户端服务
+# 对于写操作，必须连接到主服务器：mysql-0.mysql
+# 从节点的对应的Service，注意：此处无需无头服务（Headless Service）
+# 下面的service可以不创建，直接使用无头服务mysql也可以
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-read
+  labels:
+    app: mysql
+    app.kubernetes.io/name: mysql
+    readonly: "true"
+spec:
+  ports:
+  - name: mysql
+    port: 3306
+  selector:
+    app: mysql
+```
+
+
+
+##### 创建 statefulset
+
+```bash
+[root@master1 statefulset]#cat sts-mysql-sts.yaml 
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+      app.kubernetes.io/name: mysql
+  serviceName: mysql
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: mysql
+        app.kubernetes.io/name: mysql
+    spec:
+      initContainers:
+      - name: init-mysql
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:5.7
+        command:
+        - bash
+        - "-c"
+        - |
+          # -e: 如果任何命令失败（返回非0），立即退出脚本
+          # -x: 输出执行的每一条命令（调试用），可以帮助追踪问题
+          # 目的是为了确保脚本执行时透明、可调试，并且失败即停。
+          set -ex
+          # 基于 Pod 序号生成 MySQL 服务器的 ID。
+          [[ $HOSTNAME =~ -([0-9]+)$ ]] || exit 1
+          # BASH_REMATCH 是 Bash Shell 的一个内置数组变量，专门用于 正则表达式匹配结果的
+          # 当你使用 [[ string =~ regex ]] 这种语法做 正则匹配 时
+          # BASH_REMATCH[0] 会包含完整匹配的字符串
+          # BASH_REMATCH[1] 开始依次是 每个括号捕获组（capture group）匹配到的内容
+          ordinal=${BASH_REMATCH[1]}
+          echo [mysqld] > /mnt/conf.d/server-id.cnf
+          # 添加偏移量以避免使用 server-id=0 这一保留值。
+          echo server-id=$((100 + $ordinal)) >> /mnt/conf.d/server-id.cnf
+          # 将合适的 conf.d 文件从 config-map 复制到 emptyDir
+          if [[ $ordinal -eq 0 ]]; then
+            cp /mnt/config-map/primary.cnf /mnt/conf.d/
+          else
+            cp /mnt/config-map/replica.cnf /mnt/conf.d/
+          fi
+        volumeMounts:
+        - name: conf
+          mountPath: /mnt/conf.d
+        - name: config-map
+          mountPath: /mnt/config-map
+      - name: clone-mysql
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/xtrabackup:1.0
+        command:
+        # 副本 Pod 启动时，从前一个副本（ordinal-1）克隆数据库数据，用于初始化数据目录。
+        # Pod 是有序启动的（如：mysql-0, mysql-1, mysql-2），且 mysql-1 从 mysql-0 取数据，mysql-2 从 mysql-1 取数据
+        - bash
+        - "-c"
+        - |
+          set -ex
+          # 如果已有数据，则跳过克隆
+          [[ -d /var/lib/mysql/mysql ]] && exit 0
+          # 跳过主实例（序号索引0）的克隆
+          [[ `hostname` =~ -([0-9]+)$ ]] || exit 1
+          ordinal=${BASH_REMATCH[1]}
+          [[ $ordinal -eq 0 ]] && exit 0
+          # 从原来的对等节点克隆数据
+          ncat --recv-only mysql-$(($ordinal-1)).mysql 3307 | xbstream -x -C /var/lib/mysql
+          # 准备备份
+          xtrabackup --prepare --target-dir=/var/lib/mysql
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+      containers:
+      - name: mysql
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/mysql:5.7 
+        env:
+        - name: MYSQL_ALLOW_EMPTY_PASSWORD
+          value: "1"
+        ports:
+        - name: mysql
+          containerPort: 3306
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        livenessProbe:
+          exec:
+            command: ["mysqladmin", "ping"]
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          exec:
+            # 检查我们是否可以通过 TCP 执行查询（skip-networking 是关闭的）
+            command: ["mysql", "-h", "127.0.0.1", "-e", "SELECT 1"]
+          initialDelaySeconds: 5
+          periodSeconds: 2
+          timeoutSeconds: 1
+      - name: xtrabackup
+        image: registry.cn-beijing.aliyuncs.com/wangxiaochun/xtrabackup:1.0
+        ports:
+        - name: xtrabackup
+          containerPort: 3307
+        command:
+        - bash
+        - "-c"
+        - |
+          set -ex
+          cd /var/lib/mysql
+
+          # 确定克隆数据的 binlog 位置（如果有的话）。
+          if [[ -f xtrabackup_slave_info && "x$(<xtrabackup_slave_info)" != "x" ]]; then
+            # XtraBackup 已经生成了部分的 “CHANGE MASTER TO” 查询
+            # 因为从一个现有副本进行克隆。(需要删除末尾的分号!)
+            cat xtrabackup_slave_info | sed -E 's/;$//g' > change_master_to.sql.in
+            #  在这里要忽略 xtrabackup_binlog_info （它是没用的）
+            rm -f xtrabackup_slave_info xtrabackup_binlog_info
+          elif [[ -f xtrabackup_binlog_info ]]; then
+            # 直接从主实例进行克隆。解析 binlog 位置
+            [[ `cat xtrabackup_binlog_info` =~ ^(.*?)[[:space:]]+(.*?)$ ]] || exit 1
+            rm -f xtrabackup_binlog_info xtrabackup_slave_info
+            echo "CHANGE MASTER TO MASTER_LOG_FILE='${BASH_REMATCH[1]}',\
+                  MASTER_LOG_POS=${BASH_REMATCH[2]}" > change_master_to.sql.in
+          fi
+
+          # 检查是否需要通过启动复制来完成克隆
+          if [[ -f change_master_to.sql.in ]]; then
+            echo "Waiting for mysqld to be ready (accepting connections)"
+            until mysql -h 127.0.0.1 -e "SELECT 1"; do sleep 1; done
+
+            echo "Initializing replication from clone position"
+            mysql -h 127.0.0.1 \
+                  -e "$(<change_master_to.sql.in), \
+                          MASTER_HOST='mysql-0.mysql', \
+                          MASTER_USER='root', \
+                          MASTER_PASSWORD='', \
+                          MASTER_CONNECT_RETRY=10; \
+                        START SLAVE;" || exit 1
+            # 如果容器重新启动，最多尝试一次
+            mv change_master_to.sql.in change_master_to.sql.orig
+          fi
+
+          # 当对等点请求时，启动服务器发送备份。
+          exec ncat --listen --keep-open --send-only --max-conns=1 3307 -c \
+            "xtrabackup --backup --slave-info --stream=xbstream --host=127.0.0.1 --user=root"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+          subPath: mysql
+        - name: conf
+          mountPath: /etc/mysql/conf.d
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+      volumes:
+      - name: conf
+        emptyDir: {} 
+      - name: config-map
+        configMap:
+          name: mysql
+  volumeClaimTemplates:
+  - metadata: 
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "sc-nfs"
+      resources:
+        requests:
+          storage: 10Gi
+```
+
+**验证**
+
+```bash
+[root@master1 statefulset]# kubectl apply -f sts-mysql-configmap.yaml
+[root@master1 statefulset]#kubectl apply -f sts-mysql-svc.yaml
+[root@master1 statefulset]#kubectl apply -f sts-mysql-sts.yaml
+
+# 跟踪查看
+[root@master1 statefulset]#kubectl get pod
+NAME                        READY   STATUS    RESTARTS        AGE
+mysql-0                     2/2     Running   0               15m
+mysql-1                     2/2     Running   1 (10m ago)     13m
+mysql-2                     2/2     Running   1 (7m23s ago)   10m
+
+
+[root@master1 statefulset]#kubectl get pvc
+NAME                STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+data-mysql-0        Bound    pvc-d5652db9-83f6-4cba-9948-41701ad1bf28   10Gi       RWO            sc-nfs         <unset>                 34m
+data-mysql-1        Bound    pvc-a01ad5de-f70b-44af-a076-676285143eb1   10Gi       RWO            sc-nfs         <unset>                 13m
+data-mysql-2        Bound    pvc-33d51af1-3ea0-4b90-afe9-e2ae0733517c   10Gi       RWO            sc-nfs         <unset>                 10m
+
+# 测试主从
+[root@master1 statefulset]#kubectl exec -it mysql-0 -- mysql
+Defaulted container "mysql" out of: mysql, xtrabackup, init-mysql (init), clone-mysql (init)
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 258
+Server version: 5.7.13-log MySQL Community Server (GPL)
+
+Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> show processlist;
++-----+------+----------------------+------+-------------+------+---------------------------------------------------------------+------------------+
+| Id  | User | Host                 | db   | Command     | Time | State                                                         | Info             |
++-----+------+----------------------+------+-------------+------+---------------------------------------------------------------+------------------+
+| 112 | root | 192.168.22.226:44306 | NULL | Binlog Dump |  250 | Master has sent all binlog to slave; waiting for more updates | NULL             |
+| 222 | root | 192.168.253.22:58180 | NULL | Binlog Dump |   67 | Master has sent all binlog to slave; waiting for more updates | NULL             |
+| 258 | root | localhost            | NULL | Query       |    0 | starting                                                      | show processlist |
++-----+------+----------------------+------+-------------+------+---------------------------------------------------------------+------------------+
+3 rows in set (0.00 sec)
+```
+
+
+
+### CRD 定制资源
+
+#### CRD 说明
+
+为了在k8s上能够正常的运行所需的服务，需要遵循以下方式来创建相关资源：
+
+- 合理的分析业务需求
+- 梳理业务需求的相关功能
+- 定制不同功能的资源配置文件
+- 应用资源配置文件，完善业务环境。
+
+当前所有的操作基本上都是在k8s内置的有限的资源对象中进行相关的操作，这些资源对象适用于通用的 业务场景，而在我们的业务场景中，多多少少的会涉及到特殊功能的资源对象。
+
+比如：监控场景需要监控的数据、日志场景需要收集的日志、流量场景需要传递的数据等等
+
+为了高效的定制我们需要的环境，那么需要拥有一些专用的资源方便我们来使用，而在k8s之上提供了一个专用的接口，可以方便我们自己来定制需要的资源。
+
+
+
+**扩展Kubernetes API常用方式：**
+
+- 二次开发 API Server 源码,适合在添加新的**核心类型**时采用
+- 开发自定义API Server并聚合至主API Server ,富于弹性但代码工作量大
+- 使用CRD( Custom Resource Definition )自定义资源类型 , 易用但限制较多，对应的控制器还需再自行开发
+
+![image-20250324173232195](../markdown_img/image-20250324173232195.png)
+
+示例: 查看calico 自定义的资源CRD
+
+```bash
+# calico环境创建的时候，就用到了很多CRD对象，而且我们为了让CRD能够生效，该软件还提供了一个controller的CRD控制器。这个控制器就是将CRD对象转换为真正有意义的现实的代码。
+[root@master1 statefulset]#kubectl get pod -n kube-system |grep -i calico
+calico-kube-controllers-77d59654f4-rwl4p       1/1     Running   22 (8h ago)   41d
+calico-node-7xpvt                              1/1     Running   25 (8h ago)   41d
+calico-node-8tn8p                              1/1     Running   22 (8h ago)   41d
+calico-node-qqmsz                              1/1     Running   24 (8h ago)   41d
+calico-node-wzdrm                              1/1     Running   24 (8h ago)   41d
+```
+
+
+
+##### CRD简介
+
+资源（Resource） 是 Kubernetes API 中的一个端点， 其中存储的是某个类别的 API 对象 的一个集合。 例如内置的 pods 资源包含一组 Pod 对象
+
+定制资源（Custom Resource） 是对 Kubernetes API 的扩展，不一定在默认的 Kubernetes 安装中就可用。定制资源所代表的是对特定 Kubernetes 安装的一种定制。 不过，很多 Kubernetes 核心功能现在都用定制资源来实现，这使得 Kubernetes 更加模块化。
+
+CRD( Custom Resource Definition ) 定制资源可以通过动态注册的方式在运行中的集群内或出现或消失，集群管理员可以独立于集群更新定制资源。一旦某定制资源被安装，用户可以使用 kubectl 来创建 和访问其中的对象，就像他们为 pods 这种内置资源所做的一样。
+
+CRD 功能是在 Kubernetes 1.7 版本被引入的，用户可以根据自己的需求添加自定义的 Kubernetes 对象资源。
+
+![image-20250324173658794](../markdown_img/image-20250324173658794.png)
+
+##### 定制CRD的控制器
+
+就定制资源本身而言，它只能用来存取结构化的数据。 当你将**定制资源**与**定制控制器**（Custom  Controller） 相结合时，定制资源就能够 提供真正的声明式 API（Declarative API）。
+
+使用声明式 API， 你可以声明或者设定你的资源的期望状态，并尝试让 Kubernetes 对象的当前状态同 步到其期望状态。控制器负责将结构化的数据解释为用户所期望状态的记录，并持续地维护该状态。
+
+**资源对象的定制方式:**
+
+- 在现有的控制器基础上，扩展资源对象
+- 从0开始定制资源对象和资源对象控制器，此方式需要具有编程语言的开发能力
+
+通常情况下，一个CRD会结合对应的Controller，并添加一些其它资源，组成一个专属应用的 **Operator**，来解决特定应用的功能
+
+
+
+#### CRD 配置解析
+
+```yaml
+apiVersion: apiextensions.k8s.io/v1          # API群组和版本
+kind: CustomResourceDefinition               # 资源类别
+metadata:
+  name: <string>                             # 资源名称
+spec:
+  conversion: <Object>                       # 定义不同版本间的格式转换方式
+    trategy: <string>                        # 不同版本间的自定义资源转换策略，有None和Webhook两种取值
+    webhook: <Object>                        # 如何调用用于进行格式转换的webhook
+  group: <string>                            # 资源所属的API群组
+  names: <Object>                            # 自定义资源的类型，即该CRD创建资源规范时使用的kind
+    categories: <[]string>                   # 资源所属的类别编目，例如”kubectl get all”中的all
+    kind: <string>                           # kind名称，必选字段
+    listkind: <string>                       # 资源列表名称，默认为"`kind`List"
+    plural: <string>                         # 用于API路径，/apis/<group>/<version>/.../<plural>
+    shortNames: <[]string>                   # 该资源的kind的缩写格式
+    singular: <string>                       # 资源kind的单数形式，必须使用全小写字母
+  preserveUnknownFields: <boolean>           # 预留的非知名字段，kind等都是知名的预留字段
+  scope: <string>                            # 作用域，可用值为Cluster和Namespaced
+  versions: <[]Object>                       # 版本号定义
+    additionalPrinterColumns: <[]Object>     # 需要返回的额外信息
+    name: <string>                           # 形如vM[alphaN|betaN]格式的版本名称，例如v1或v1alpha2
+    schema: <Object>                         # 该资源的数据格式（schema）定义，必选字段
+    openAPIV3Schame: <Object>                # 用于校验字段的schema对象，格式请参考相关手册
+  served: <boolean>                          # 是否允许通过RESTful API调度该版本，必选字段
+  storage: <boolean>                         # 将自定义资源存储于etcd中时是不是使用该版本
+  subresources: <Object>                     # 子资源定义
+    scale: <Object>                          # 启用scale子资源，通过autoscaling/v1.Scale发送负荷
+    status <map[string]>                     # 启用status子资源，为资源生成/status端点
+```
+
+
+
+#### CRD 案例
+
+范例: 定义CRD资源
+
+```bash
+[root@master1 statefulset]#cat crd-user.yaml 
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: users.auth.democrd.io
+spec:
+  group: auth.democrd.io
+  names:
+    kind: User
+    plural: users          # 复数
+    singular: user         # 单数
+    shortNames:
+    - u
+  scope: Namespaced
+  versions:
+  - served: true
+    storage: true
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              userID:
+                type: integer
+                minimum: 1
+                maximum: 65535
+              groups:
+                type: array
+                items:
+                  type: string
+              email:
+                type: string
+              password:
+                type: string
+                format: password
+            required: ["userID","groups"]
+            
+# 启用
+[root@master1 statefulset]#kubectl apply -f crd-user.yaml
+
+# 查看效果
+[root@master1 statefulset]#kubectl get crd|grep 'users'
+users.auth.democrd.io                                 2025-03-24T10:04:14Z
+```
+
+
+
+
+
+### Operator
+
+#### Operator 说明
+
+由于不同集群的特殊性，所以StatefulSet只能应用于通用的状态管理机制,用户自已实现应用的集群又比较麻烦
+
+一些热心的软件开发者利用Statefulset等技术将应用封装成各种应用程序专用的 Operator，以便于帮助 相关企业进行使用Kubernetes，并将这些做好的状态管理工具放到了 GitHub网站的awsomes operators项目中，当前迁移到了  https://operatorhub.io/
+
+因此如果涉及到一些状态集群场景，建议可以直接使用operatorhub提供好的工具，而无需自己编写实现
+
+
+
+##### Operator 工作机制
+
+Kubernetes中两个核心的理念：“声明式API”和“控制器模式”。
+
+“声明式API”的核心原理，就是当用户向Kubernetes提交了一个API对象描述之后，Kubernetes会负责为 你保证整个集群里各项资源的状态，都与你的API对象描述的需求保持一致
+
+Kubernetes通过启动一种叫做“控制器模式”的无限循环，watch这些API对象的变化，不断检查，然后调谐，最后确保整个集群的状态与这个API对象的描述一致。
+
+Operator就是基于以上原理工作，以Redis Operator为例，为了实现Operator，首先需要将自定义对 象CRD(Custom Resource Definition)的说明，注册到Kubernetes中，用于描述Operator控制的应用： Redis集群实例，这样当用户告诉Kubernetes想要一个redis集群实例后，Redis Operator就能通过控制 循环执行调谐逻辑达到用户定义状态。
+
+所以**Operator本质上是一个特殊应用的控制器**，其提供了一种在Kubernetes API之上构建应用程序， 并在Kubernetes上部署程序的方法，它允许开发者扩展Kubernetes API，增加新功能，像管理 Kubernetes原生组件一样管理自定义的资源。
+
+如果你想运行一个Redis哨兵模式的主从集群，或者TiDB集群，那么你只需要提交一个声明就可以了， 而不需要关心部署这些分布式的应用需要的相关领域的知识
+
+Operator本身就可以做到创建应用、监控应用状态、扩缩容、升级、故障恢复、及资源清理等，从而将 分布式应用的门槛降到最低。
+
+**基于专用的Operator编排运行某有状态应用的流程：**
+
+- 部署Operator及其专用的资源类型
+- 使用上面创建的专用的资源类型，来声明一个有状态应用的编排需求
+
+
+
+**Operator 链接：**
+
+```http
+https://operatorhub.io/
+https://github.com/operator-framework/awesome-operators
+```
+
+![image-20250324181448621](../markdown_img/image-20250324181448621.png)
+
 
 
 
 
 ## Kubernetes包管理Helm
+
+
+
+**内容**
+
+- **Helm 介绍**
+- **Helm 部署**
+- **Helm 命令用法**
+- **基于 Helm 部署**
+- **自定义 Chart 结构**
+- **自定义 Chart 语法说明**
+- **自定义 Chart 案例**
+
+
+
+### Helm 说明和部署
+
+#### Helm 说明
+
+**Helm 介绍**
+
+![image-20250324193356822](../markdown_img/image-20250324193356822.png)
+
+**传统的软件管理机制**
+
+传统的软件安装基于编译安装方式非常繁琐，所以会使用包管理方式简化软件安装的过程
+
+包管理器：
+
+- deb
+- rpm
+
+程序包仓库：维护有仓库内部各程序文件元数据，其中包含了包依赖关系 
+
+
+
+**将应用服务部署到 Kubernetes 集群的传统流程**
+
+- 拉取代码
+- 打包编译
+- 构建镜像
+- 准备一堆相关部署资源清单的 yaml 文件(如:deployment、statefulset、service、ingress等)
+- kubectl apply 部署
+
+
+
+**传统方式部署引发的问题**
+
+- 随着资源引用的增多，需要**维护大量的yaml文件**
+- 微服务场景下，每个微服务所需配置差别不大，但是众多的微服务的yaml文件**无法高效复用**
+- **无法**将相关yaml文件做为一个**整体管理**，并实现应用级别的升级和回滚等功能
+- 无法根据一套yaml文件来创建多个环境，需要手动进行修改，尤其是微服务众多的情况，效率低下 
+  例如: 部署的环境都分为开发、预生产、生产环境，在开发这套环境部署完了，后面再部署到预生产和生产环境，还需要重新复制出两套配置文件，并手动修改才能完成
+
+
+
+**Kubernetes 的软件管理器 Helm 介绍**
+
+```ABAP
+Helm is a tool for managing Charts. Charts are packages of pre-configured Kubernetes resources.
+```
+
+Kubernetes也提供了类似于包管理机制Helm 
+
+Helm 是一个用于简化和管理 Kubernetes 应用部署的包管理器。
+
+Helm 可以将部署应用所需要的所有配置清单文件YAML打包至一个**Chart**的包文件中，并支持针对多套环境的定制部署
+
+Helm 允许用户进行定义、安装和升级 Kubernetes 应用程序的资源，称为 Helm Charts。
+
+Helm 不是 Kubernetes 官方提供的工具，但它是由 Kubernetes 社区维护和支持的。
+
+Helm 在社区中得到了广泛的支持和采用，并成为 Kubernetes 生态系统中流行的部署工具之一
+
+**Helm 官网**
+
+```http
+https://helm.sh/
+https://github.com/helm/helm
+```
+
+ **Helm 文档**
+
+```http
+https://helm.sh/zh/docs/
+https://helm.sh/zh/docs/intro/quickstart/
+```
+
+
+
+**Helm 重要特性**
+
+- 将各种资源文件进行打包，基于包的方式安装，更加方便
+- 提供template功能，可以基于同一套template文件，但对于不同环境可以赋予不同的值从而实现的灵活部署
+- 提供版本管理功能，比如，升级，回滚等
+
+
+
+#### Helm 相关概念
+
+- **Helm**：Helm的客户端工具，负责和API Server 通信
+
+  Helm 和kubectl类似，也是Kubernetes API Server的命令行客户端工具
+
+  支持kubeconfig认证文件
+
+  需要事先从仓库或本地加载到要使用目标Chart，并基于Chart完成应用管理，Chart可缓存于Helm本地主机上
+  支持仓库管理和包管理的各类常用操作，例如Chart仓库的增、删、改、查，以及Chart包的制作、 发布、搜索、下载等
+
+- **Chart**：打包文件，将所有相关的资源清单文件YAML的打包文件
+
+  Chart  是一种打包格式，文件后缀为tar.gz或者 tgz，代表着可由Helm管理的有着特定格式的程序包，类似于RPM，DEB包格式
+
+  Chart 包含了应用所需的资源相关的各种yaml/json配置清单文件，比如：deployment,service 等，但不包含容器的镜像
+
+  Chart 可以使用默认配置，或者定制用户自已的配置进行安装应用
+
+  Chart 中的资源配置文件通常以模板(go template)形式定义，在部署时，用户可通过向模板参数赋值实现定制化安装的目的
+
+  Chart 中各模板参数通常也有**默认值**，这些默认值定义在Chart包里一个名为**`values.yml`**的文件中
+
+- **Release**：表示基于chart部署的一个实例。通过chart部署的应用都会生成一个唯一的Release,即使同一个chart部署多次也会产生多个Release.将这些release应用部署完成后，也会记录部署的一个版本，维护了一个release版本状态,基于此可以实现版本回滚等操作
+
+- **Repository**：chart包存放的仓库，相当于APT和YUM仓库
+
+
+
+#### Helm 版本
+
+##### Helm-v2
+
+**C/S 架构:**
+
+- **Client** : helm client，通过gRPC协议和Tiller通信
+- **Server**: 称为Tiller, 以Operator形式部署Kubernetes 集群内，表现为相应的一个Pod，还需要做 RBAC的授权
+
+**Tiller Server**
+
+Tiller Server是一个部署在Kubernetes集群内部的 server，其与 Helm client、Kubernetes API server  进行交互。
+
+Tiller server 主要负责如下：
+
+- 监听来自 Helm client 的请求
+- 通过 chart 及其配置构建一次发布
+- 安装 chart 到Kubernetes集群，并跟踪随后的发布
+- 通过与Kubernetes交互升级或卸载 chart
+
+**权限管理**
+
+- **Helm 客户端**配置 kubeconfig 文件，以便能够与 Kubernetes API 服务器通信。这个配置通常在  ~/.kube/config 文件中。加载认证配置文件的机制同kubectl
+- **Tiller 服务端**需要在其运行的命名空间中具有足够的权限来管理 Kubernetes 资源。这通常通过创 建一个服务账户（ServiceAccount）并绑定适当的角色（例如 ClusterRole 和  ClusterRoleBinding）来实现。
+
+
+
+#####  Helm-v3
+
+2019年11月发布Helm-v3版本
+
+![image-20250324204943199](../markdown_img/image-20250324204943199.png)
+
+**Helm 3 的变化**
+
+- Tiller 服务器端被废弃
+
+  仅保留helm客户端，helm 通过 kubeconfig 认证到 API Server ， 加载认证配置文件的机制同 kubectl
+
+-  Release 可以在不同名称空间重用，每个名称空间名称唯一即可
+
+- 支持将 Chart 推送至 Docker 镜像仓库
+
+- 支持更强大的 Chart templating 语法，包括 Go 模板和新的 templating 函数。
+
+  这使得 Helm 3 更灵活，可以用于更复杂的部署场景
+
+- Helm 3 默认使用secrets来存储发行信息，提供了更高的安全性。
+
+  Helm 2 默认使用configmaps存储发行信息。
+
+- 自动创建名称空间
+
+  在不存在的命名空间中创建发行版时，Helm 2 创建了命名空间。
+
+  Helm 3 遵循其他Kubermetes对象的行为，如果命名空间不存在则返回错误。
+
+  Helm 3 可以通过 `--create-namespace` 选项当名称空间不存在时自动创建
+
+- 不再需要requirements.yaml,依赖关系是直接在 Chart.yaml中定义
+
+- 命令变化
+
+  - 删除 release 命令变化
+
+    helm delete RELEASE_NAME --purge => helm uninstall RELEASE_NAME
+
+  - 查看 chart 信息命令变化
+
+    helm inspect RELEASE_NAME   => helm  show RELEASE_NAME
+
+  - 拉取 chart包命令变化
+
+    helm fetch CHART_NAME => helm pull CHART_NAME
+
+  - 生成release的随机名
+
+    helm-v3 必须指定release名，如果想使用随机名，必须通过--genrate-name 选项实现，
+
+    helm-v2 可以自动生成随机名
+
+    helo install ./mychart  --generate-name
+
+
+
+
+
+#### Chart 仓库
+
+**Chart 仓库**：用于实现Chart包的集中存储和分发,类似于Docker仓库Harbor
+
+**Chart 仓库**
+
+- **官方仓库**:  https://artifacthub.io/
+- **微软仓库**: 推荐使用，http://mirror.azure.cn/kubernetes/charts/
+- **阿里云仓库**：http://kubernetes.oss-cn-hangzhou.aliyuncs.com/charts
+- **项目官方仓库**：项目自身维护的Chart仓库
+- **Harbor 仓库**：新版支持基于 **OCI:// 协议**，将Chart 存放在公共的docker 镜像仓库
+
+**Chart 官方仓库Hub:**
+
+```http
+https://artifacthub.io/
+```
+
+![image-20250324210429688](../markdown_img/image-20250324210429688.png)
+
+可以搜索需要的应用，如下示例：redis
+
+![image-20250324223149745](../markdown_img/image-20250324223149745.png)
+
+
+
+#### 使用Helm部署应用流程
+
+- 安装 helm 工具
+
+- 查找合适的 chart 仓库
+
+- 配置 chart 仓库
+
+- 定位 chart
+
+- 通过向Chart中模板文件中字串赋值完成其实例化，即模板渲染， 实例化的结果就可以部署到目标 Kubernetes上
+
+  模板字串的定制方式三种：
+
+  - 默认使用 chart 中的 values.yaml 中定义的默认值
+  - 直接在helm install的命令行，通过--set选项进行
+  - 自定义values.yaml，由helm install -f values.yaml 命令加载该文件
+
+- 同一个chart 可以部署出来的多个不同的实例，每个实例称为一个release
+
+   Chart 和 Release 的关系，相当于OOP开发中的Class和对象的关系,相当于image和container
+
+  应用release 安装命令：helm install 
+
+
+
+### Helm 客户端安装
+
+#### 官方说明
+
+```http
+https://helm.sh/docs/intro/install/
+```
+
+**Helm 下载链接**
+
+```http
+https://github.com/helm/helm/releases
+```
+
+![image-20250324224641501](../markdown_img/image-20250324224641501.png)
+
+
+
+#### 范例：二进制安装 Helm
+
+```bash
+# 在kubernetes的管理节点部署
+[root@master1 ~]# wget -P /usr/local/src https://get.helm.sh/helm-v3.17.2-linux-amd64.tar.gz
+[root@master1 ~]# tar xf /usr/local/src/helm-v3.17.2-linux-amd64.tar.gz -C /usr/local/
+[root@master1 ~]# ls /usr/local/linux-amd64/
+helm  LICENSE  README.md
+[root@master1 ~]# ln -s /usr/local/linux-amd64/helm /usr/local/bin/
+
+# helm-v3版本显示效果如下
+[root@master1 ~]#helm version
+version.BuildInfo{Version:"v3.17.2", GitCommit:"cc0bbbd6d6276b83880042c1ecb34087e84d41eb", GitTreeState:"clean", GoVersion:"go1.23.7"}
+
+# Helm命令补会,重新登录生效
+# 方法1
+[root@master1 ~]# echo 'source <(helm completion bash)' >> .bashrc && exit
+
+# 方法2
+[root@master1 ~]# helm completion bash > /etc/bash_completion.d/helm  && exit
+```
+
+
+
+### Helm 命令用法
+
+```http
+https://v3.helm.sh/zh/docs/helm/
+https://docs.helm.sh/docs/helm/helm/
+```
+
+
+
+#### Helm 命令用法说明
+
+**常用的 helm命令分类**
+
+- **Repostory 管理**
+
+  repo 命令，支持 repository 的`add`、`list`、`remove`、`update` 和 `index` 等子命令
+
+- **Chart 管理**
+
+  `create`、`package`、`pull`、`push`、`dependency`、`search`、`show` 和 `verify` 等操作
+
+- **Release 管理**
+
+  `install`、`upgrade`、`get`、`list`、`history`、`status`、`rollback `和 `uninstall` 等操作
+
+
+
+**Helm常见子命令**
+
+```bash
+version          # 查看helm客户端版本
+repo             # 添加、列出、移除、更新和索引chart仓库，相当于apt/yum仓库,可用子命令:add、index、list、remove、update
+search           # 根据关键字搜索chart包
+show             # 查看chart包的基本信息和详细信息，可用子命令:all、chart、readme、values
+pull             # 从远程仓库中拉取chart包并解压到本地，通过选项 --untar 解压,默认不解压
+create           # 创建一个chart包并指定chart包名字
+install          # 通过chart包安装一个release实例
+list             # 列出release实例名
+upgrade          # 更新一个release实例
+rollback         # 从之前版本回滚release实例，也可指定要回滚的版本号
+uninstall        # 卸载一个release实例
+history          # 获取release历史，用法:helm history release实例名
+package          # 将chart目录打包成chart存档文件.tgz中
+get              # 下载一个release,可用子命令:all、hooks、manifest、notes、values
+status           # 显示release实例的状态，显示已命名版本的状态
+```
+
+
+
+**Helm 常见命令用法**
+
+```bash
+# 仓库管理
+helm repo list    # 列出已添加的仓库
+helm repo add [REPO_NAME] [URL]  # 添加远程仓库并命名,如下示例
+helm repo add myharbor https://harbor.wangxiaochun.com/chartrepo/myweb --username admin --password 123456
+helm repo remove [REPO1 [REPO2 ...]]   # 删除仓库
+helm repo update                       # 更新仓库,相当于apt update
+helm search hub  [KEYWORD]             # 从artifacthub网站搜索,无需配置本地仓库,相当于docker search
+helm search repo [KEYWORD]             # 本地仓库搜索,需要配置本地仓库才能搜索,相当于apt search
+helm search repo [KEYWORD] --versions  # 显示所有版本
+helm show chart [CHART]                # 查看chart包的信息,类似于apt info
+helm show values [CHART]               # 查看chart包的values.yaml文件内容
+
+# 拉取chart到本地
+helm pull repo/chartname               # 下载charts到当前目录下，表现为tgz文件,默认最新版本，相当于wget  
+helm pull chart_URL                    # 直接下载，默认为.tgz文件
+helm pull myrepo/myapp --version 1.2.3 --untar      # 直接下载指定版本的chart包并解压缩
+
+# 创建chart目录结构
+helm create NAME
+
+# 检查语法
+helm lint [PATH]  #默认检查当前目录
+
+# 安装
+helm install [NAME] [CHART] [--version <string> ]    # 安装指定版本的chart
+helm install [CHART] --generate-name                 # 自动生成  RELEASE_NAME
+helm install --set KEY1=VALUE1 --set KEY2=VALUE2  RELEASE_NAME CHART ...    #指定属性实现定制配置
+helm install -f values.yaml  RELEASE_NAME CHART..... # 引用文件实现定制配置
+helm install --debug --dry-run RELEASE_NAME CHART    # 调试并不执行，可以查看到执行的渲染结果
+
+# 删除
+helm uninstall RELEASE_NAME                          # 卸载RELEASE
+
+
+# 查看
+helm list                                            # 列出安装的release
+helm status RELEASE_NAME                             # 查看RELEASE的状态
+helm get notes RELEASE_NAME -n NAMESPACE             # 查看RELEASE的说明
+helm get values RELEASE_NAME -n NAMESPACE > values.yaml   # 查看RELEASE的生成值，可以导出方便以后使用
+helm get manifest RELEASE_NAME -n NAMESPACE          # 查看RELEASE的生成的资源清单文件
+
+# 升价和回滚
+helm upgrade RELEASE_NAME CHART --set key=newvalue       # release 更新
+helm upgrade RELEASE_NAME CHART -f mychart/values.yaml   # release 更新
+helm rollback RELEASE_NAME [REVISION]                    # release 回滚到指定版本，如果不指定版本，默认回滚至上一版本
+helm history RELEASE_NAME                                # 查看历史
+
+# 打包
+helm package mychart/ #将指定目录的chart打包为.tgz到当前目录下
+```
+
+
+
+#### Helm 命令范例
+
+范例：添加仓库并下载MySQL chart
+
+```bash
+# 默认没有仓库
+[root@master1 ~]#helm repo list
+Error: no repositories to show
+
+# 默认没有通过Helm安装的release
+[root@master1 ~]#helm list
+NAME	NAMESPACE	REVISION	UPDATED	STATUS	CHART	APP VERSION
+
+# 从官方仓库搜索MySQL
+[root@master1 ~]#helm search hub mysql|head -n 5
+URL                                               	CHART VERSION	APP VERSION            	DESCRIPTION                                       
+https://artifacthub.io/packages/helm/bitnami/mysql	12.3.2       	8.4.4                  	MySQL is a fast, reliable, scalable, and easy t...
+https://artifacthub.io/packages/helm/dify-tidb/...	11.1.17      	8.4.2                  	MySQL is a fast, reliable, scalable, and easy t...
+https://artifacthub.io/packages/helm/kubesphere...	1.0.2        	5.7.33                 	High Availability MySQL Cluster, Open Source.     
+https://artifacthub.io/packages/helm/cloudnativ...	5.0.1        	8.0.16                 	Chart to create a Highly available MySQL cluster 
+
+# 添加仓库
+[root@master1 ~]#helm repo add bitnami https://charts.bitnami.com/bitnami
+"bitnami" has been added to your repositories
+
+# 添加第二个仓库
+[root@master1 ~]#helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+"ingress-nginx" has been added to your repositories
+
+# 查看本地配置的仓库
+[root@master1 ~]#helm repo list
+NAME         	URL                                       
+bitnami      	https://charts.bitnami.com/bitnami        
+ingress-nginx	https://kubernetes.github.io/ingress-nginx
+
+# 查看配置的仓库，但没有安装的release
+[root@master1 ~]#helm list 
+NAME	NAMESPACE	REVISION	UPDATED	STATUS	CHART	APP VERSION
+
+# 新版路径支持OCI，无需先创建仓库，可以拉取互联网上的chart
+[root@master1 ~]#helm pull oci://registry-1.docker.io/bitnamicharts/mysql
+Pulled: registry-1.docker.io/bitnamicharts/mysql:12.3.2
+Digest: sha256:ba0fd39f3d592c08e90f7c6fe86ea499df5810be3f296546f9eb27f6c51ba24b
+
+# 查看
+[root@master1 ~]#ll mysql-12.3.2.tgz 
+-rw-r--r-- 1 root root 64599  3月 25 10:14 mysql-12.3.2.tgz
+
+
+# 解压chart文件，并查看目录结构
+[root@master1 ~]#tree mysql
+mysql
+├── Chart.lock
+├── charts
+│   └── common
+│       ├── Chart.yaml
+│       ├── README.md
+│       ├── templates
+│       │   ├── _affinities.tpl
+│       │   ├── _capabilities.tpl
+│       │   ├── _compatibility.tpl
+│       │   ├── _errors.tpl
+│       │   ├── _images.tpl
+│       │   ├── _ingress.tpl
+│       │   ├── _labels.tpl
+│       │   ├── _names.tpl
+│       │   ├── _resources.tpl
+│       │   ├── _secrets.tpl
+│       │   ├── _storage.tpl
+│       │   ├── _tplvalues.tpl
+│       │   ├── _utils.tpl
+│       │   ├── validations
+│       │   │   ├── _cassandra.tpl
+│       │   │   ├── _mariadb.tpl
+│       │   │   ├── _mongodb.tpl
+│       │   │   ├── _mysql.tpl
+│       │   │   ├── _postgresql.tpl
+│       │   │   ├── _redis.tpl
+│       │   │   └── _validations.tpl
+│       │   └── _warnings.tpl
+│       └── values.yaml
+├── Chart.yaml
+├── README.md
+├── templates
+│   ├── ca-cert.yaml
+│   ├── cert.yaml
+│   ├── extra-list.yaml
+│   ├── _helpers.tpl
+│   ├── metrics-svc.yaml
+│   ├── networkpolicy.yaml
+│   ├── NOTES.txt
+│   ├── primary
+│   │   ├── configmap.yaml
+│   │   ├── initialization-configmap.yaml
+│   │   ├── pdb.yaml
+│   │   ├── startdb-configmap.yaml
+│   │   ├── statefulset.yaml
+│   │   ├── svc-headless.yaml
+│   │   └── svc.yaml
+│   ├── prometheusrule.yaml
+│   ├── rolebinding.yaml
+│   ├── role.yaml
+│   ├── secondary
+│   │   ├── configmap.yaml
+│   │   ├── pdb.yaml
+│   │   ├── statefulset.yaml
+│   │   ├── svc-headless.yaml
+│   │   └── svc.yaml
+│   ├── secrets.yaml
+│   ├── serviceaccount.yaml
+│   ├── servicemonitor.yaml
+│   ├── tls-secret.yaml
+│   └── update-password
+│       ├── job.yaml
+│       ├── new-secret.yaml
+│       └── previous-secret.yaml
+├── values.schema.json
+└── values.yaml
+
+8 directories, 58 files
+```
+
+
+
+### Helm 案例
+
+#### 案例：部署 MySQL
+
+```http
+https://artifacthub.io/packages/helm/bitnami/mysql
+```
+
+![image-20250325102118866](../markdown_img/image-20250325102118866.png)
+
+
+
+##### 案例：添加仓库并使用默认配置安装 MySQL8.0
+
+```bash
+# 添加仓库
+[root@master1 ~]#helm repo add bitnami https://charts.bitnami.com/bitnami
+"bitnami" has been added to your repositories
+
+[root@master1 ~]#helm search repo mysql
+NAME                  	CHART VERSION	APP VERSION	DESCRIPTION                                       
+bitnami/mysql         	12.3.2       	8.4.4      	MySQL is a fast, reliable, scalable, and easy t...
+bitnami/phpmyadmin    	18.1.5       	5.2.2      	phpMyAdmin is a free software tool written in P...
+bitnami/mariadb       	20.4.2       	11.4.5     	MariaDB is an open source, community-developed ...
+bitnami/mariadb-galera	14.2.1       	11.4.5     	MariaDB Galera is a multi-primary database clus...
+
+# 查看版本
+[root@master1 ~]#helm search repo mysql --versions
+NAME                  	CHART VERSION	APP VERSION	DESCRIPTION                                       
+bitnami/mysql         	12.3.2       	8.4.4      	MySQL is a fast, reliable, scalable, and easy t...
+bitnami/mysql         	12.3.1       	8.4.4      	MySQL is a fast, reliable, scalable, and easy t...
+bitnami/mysql         	12.3.0       	8.4.4      	MySQL is a fast, reliable, scalable, and easy t...
+bitnami/mysql         	12.2.4       	8.4.4      	MySQL is a fast, reliable, scalable, and easy t...
+bitnami/mysql         	12.2.2       	8.4.4      	MySQL is a fast, reliable, scalable, and easy t...
+......
+
+# 查看详细信息
+[root@master1 ~]#helm show values bitnami/mysql --version 12.3.2
+# Copyright Broadcom, Inc. All Rights Reserved.
+# SPDX-License-Identifier: APACHE-2.0
+
+## @section Global parameters
+## Global Docker image parameters
+## Please, note that this will override the image parameters, including dependencies, configured to use the global value
+## Current available global Docker image parameters: imageRegistry, imagePullSecrets and storageClass
+##
+
+## @param global.imageRegistry Global Docker image registry
+## @param global.imagePullSecrets Global Docker registry secret names as an array
+## @param global.defaultStorageClass Global default StorageClass for Persistent Volume(s)
+## @param global.storageClass DEPRECATED: use global.defaultStorageClass instead
+......
+
+#安装时必须指定存储卷，否则会处于Pending状态
+[root@master1 statefulset]#helm install mysql bitnami/mysql --version 12.3.2 --set primary.persistence.storageClass=sc-nfs
+NAME: mysql
+LAST DEPLOYED: Tue Mar 25 10:44:22 2025
+NAMESPACE: default
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+CHART NAME: mysql
+CHART VERSION: 12.3.2
+APP VERSION: 8.4.4
+
+Did you know there are enterprise versions of the Bitnami catalog? For enhanced secure software supply chain features, unlimited pulls from Docker, LTS support, or application customization, see Bitnami Premium or Tanzu Application Catalog. See https://www.arrow.com/globalecs/na/vendors/bitnami for more information.
+
+** Please be patient while the chart is being deployed **
+
+Tip:
+
+  Watch the deployment status using the command: kubectl get pods -w --namespace default
+
+Services:
+
+  echo Primary: mysql.default.svc.cluster.local:3306
+
+Execute the following to get the administrator credentials:
+
+  echo Username: root
+  MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace default mysql -o jsonpath="{.data.mysql-root-password}" | base64 -d)
+
+To connect to your database:
+
+  1. Run a pod that you can use as a client:
+
+      kubectl run mysql-client --rm --tty -i --restart='Never' --image  docker.io/bitnami/mysql:8.4.4-debian-12-r7 --namespace default --env MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD --command -- bash
+
+  2. To connect to primary service (read/write):
+
+      mysql -h mysql.default.svc.cluster.local -uroot -p"$MYSQL_ROOT_PASSWORD"
+
+
+
+WARNING: There are "resources" sections in the chart not set. Using "resourcesPreset" is not recommended for production. For production installations, please set the following values according to your workload needs:
+  - primary.resources
+  - secondary.resources
++info https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+
+# 查看
+[root@master1 statefulset]#helm list 
+NAME 	NAMESPACE	REVISION	UPDATED                                	STATUS    CHART       	APP VERSION
+mysql	default  	1       	2025-03-25 10:44:22.868931866 +0800 CST	deployed  mysql-12.3.2	8.4.4 
+
+# 按照上述的提示操作
+[root@master1 ~]# MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace default mysql -o jsonpath="{.data.mysql-root-password}" | base64 -d)
+
+# 创建一个用于访问的客户端pod
+[root@master1 ~]# kubectl run mysql-client --rm --tty -i --restart='Never' --image  docker.io/bitnami/mysql:8.4.4-debian-12-r7 --namespace default --env MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD --command -- bash
+
+# 访问mysql
+I have no name!@mysql-client:/$ mysql -h mysql.default.svc.cluster.local -uroot -p"$MYSQL_ROOT_PASSWORD"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 122
+Server version: 8.4.4 Source distribution
+
+Copyright (c) 2000, 2025, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> 
+
+# 卸载mysql
+[root@master1 ~]#helm uninstall mysql 
+release "mysql" uninstalled
+
+# 拉取chart包
+[root@master1 ~]# helm pull oci://registry-1.docker.io/bitnamicharts/mysql
+Pulled: registry-1.docker.io/bitnamicharts/mysql:12.3.2
+Digest: sha256:ba0fd39f3d592c08e90f7c6fe86ea499df5810be3f296546f9eb27f6c51ba24b
+
+# 使用本地pull下来的chart进行离线安装
+[root@master1 ~]#helm install mysql ./mysql-12.3.2.tgz --set primary.persistence.storageClass=sc-nfs
+```
+
+
+
+##### helm install 说明
+
+```bash
+# 安装的CHART有六种形式
+
+1. By chart reference: helm install mymaria example/mariadb  #在线安装,先通过helm repo add添加仓库，才能在线安装
+2. By path to a packaged chart: helm install myweb ./nginx-1.2.3.tgz  #离线安装
+3. By path to an unpacked chart directory: helm install myweb ./nginx #离线安装
+4. By absolute URL: helm install myweb https://example.com/charts/nginx-1.2.3.tgz #在线安装
+5. By chart reference and repo url: helm install --repo https://example.com/charts/ myweb nginx #在线安装
+6. By OCI registries: helm install myweb --version 1.2.3 oci://example.com/charts/nginx #在线安装。
+```
+
+
+
+##### 案例：指定值文件values.yaml内容实现定制Release
+
+```bash
+[root@master1 ~]# helm show values bitnami/mysql --version 10.3.0 > value.yaml
+
+# 定制内容
+[root@master1 ~]# vim values.yaml
+image:
+  registry: docker.io
+  repository: bitnami/mysql
+  tag: 8.0.37-debian-12-r2
+  
+auth:
+  rootPassword: "123456"
+  database: mysticaldb
+  username: mystical
+  password: "654321"
+  
+primary:
+  persistence:
+    storageClass: "sc-nfs"
+    
+persistence:
+  enabled: true
+  storageClass: "sc-nfs"
+  accessMode: ReadWrite0nce
+  size: 8Gi
+  
+[root@master1 ~]#helm install mysql bitnami/mysql -f values.yaml
+
+# 测试访问
+[root@master1 ~]# MYSQL_ROOT_PASSWORD=$(kubectl get secret --namespace default mysql -o jsonpath="{.data.mysql-root-password}" | base64 -d)
+[root@master1 ~]# kubectl run mysql-client --rm --tty -i --restart='Never' --image  docker.io/bitnami/mysql:8.0.37-debian-12-r2 --namespace default --env MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD --command -- bash
+I have no name!@mysql-client:/$ mysql -h mysql.default.svc.cluster.local -uroot -p"$MYSQL_ROOT_PASSWORD"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 22
+Server version: 8.0.37 Source distribution
+
+Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| mysticaldb         |
+| performance_schema |
+| sys                |
++--------------------+
+5 rows in set (0.03 sec)
+
+# 更改mystical用户登录
+I have no name!@mysql-client:/$ mysql -h mysql.default.svc.cluster.local -u mystical -p"654321"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 83
+Server version: 8.0.37 Source distribution
+
+Copyright (c) 2000, 2024, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysticaldb         |
+| performance_schema |
++--------------------+
+3 rows in set (0.01 sec)
+```
+
+
+
+##### 案例：MySQL 主从复制
+
+```bash
+# 方法1：通过仓库
+[root@master1 ~]#helm repo add bitnami https://charts.bitnami.com/bitnami
+"bitnami" has been added to your repositories
+
+# 注意：\ 后面不能有任何字符（包括空格、Tab）
+[root@master1 ~]# helm install mysql bitnami/mysql  \
+    --set 'auth.rootPassword=Zyf646130' \
+    --set 'auth.replicationPassword=Zyf646130' \
+    --set global.storageClass=sc-nfs \
+    --set auth.database=wordpress \
+    --set auth.username=wordpress \
+    --set 'auth.password=Zyf646130' \
+    --set architecture=replication \
+    --set secondary.replicaCount=1 \
+    -n wordpress --create-namespace
+    
+# 方法2：通过OCI协议
+[root@master1 ~]# helm install mysql  \
+    --set auth.rootPassword='P@ssw0rd' \
+    --set global.storageClass=sc-nfs \
+    --set auth.database=wordpress \
+    --set auth.username=wordpress \
+    --set auth.password='P@ssw0rd' \
+    --set architecture=replication \
+    --set secondary.replicaCount=1 \
+    --set auth.replicationPassword='P@ssw0rd' \
+    oci://registry-1.docker.io/bitnamicharts/mysql \
+    -n wordpress --create-namespace
+```
+
+主从复制更新副本数为2
+
+```bash
+[root@master1 ~]# helm upgrade mysql \
+    --set auth.rootPassword='Zyf646130' \
+    --set global.storageClass=sc-nfs \
+    --set auth.database=wordpress \
+    --set auth.username=wordpress \
+    --set auth.password='Zyf646130' \
+    --set architecture=replication \
+    --set secondary.replicaCount=2 \
+    --set auth.replicationPassword='Zyf646130' \
+    bitnami/mysql \
+    -n wordpress
+    
+# 查看
+[root@master1 ~]# kubectl get pod -n wordpress 
+NAME                READY   STATUS     RESTARTS   AGE
+mysql-primary-0     1/1     Running    0          7m7s
+mysql-secondary-0   1/1     Running    0          7m7s
+mysql-secondary-1   0/1     Init:0/1   0          6s
+
+# 三分钟，有点慢
+[root@master1 ~]# kubectl get pod -n wordpress 
+NAME                READY   STATUS    RESTARTS   AGE
+mysql-primary-0     1/1     Running   0          10m
+mysql-secondary-0   1/1     Running   0          10m
+mysql-secondary-1   1/1     Running   0          3m30s
+```
+
+
+
+#### 案例：部署 WordPress
+
+```http
+https://artifacthub.io/packages/helm/bitnami/wordpress
+```
+
+##### 使用外部MySQL主从复制和并实现Ingress暴露服务
+
+```bash
+[root@master1 ~]# helm install wordpress \
+    --version 22.4.20 \
+    --set mariadb.enabled=false \
+    --set externalDatabase.host=mysql-primary.wordpress.svc.cluster.local \
+    --set externalDatabase.user=wordpress \
+    --set externalDatabase.password='Zyf646130' \
+    --set externalDatabase.port=3306 \
+    --set wordpressUsername=admin \
+    --set wordpressPassword='Zyf646130' \
+    --set persistence.storageClass=sc-nfs \
+    --set ingress.enabled=true \
+    --set ingress.ingressClassName=nginx \
+    --set ingress.hostname=wordpress.mystical.org \
+    --set ingress.pathType=Prefix \
+    --set externalDatabase.database=wordpress \
+    --set volumePermissions.enabled=true \
+    --set livenessProbe.enabled=false \
+    --set readinessProbe.enabled=false \
+    --set startupProbe.enabled=false \
+    bitnami/wordpress \
+    -n wordpress --create-namespace
+    
+# 全过程：15分钟左右，其中数据下载：10分钟左右
+# NFS上的wordpress数据大小
+[root@ubuntu2204 wordpress-wordpress-pvc-7704d2ef-3f52-4fd7-9c1f-add88dd30c1f]#du -sh wordpress/
+256M	wordpress/
+```
+
+![image-20250325161641974](../markdown_img/image-20250325161641974.png)
+
+![image-20250325190744228](../markdown_img/image-20250325190744228.png)
+
+
+
+#### 案例：部署 Harbor
+
+```http
+https://artifacthub.io/packages/helm/harbor/harbor
+```
+
+![image-20250325193832806](../markdown_img/image-20250325193832806.png)
+
+​        
+
+**实现流程**
+
+- 使用 `helm` 将 `harbor` 部署到 `kubernetes` 集群
+- 使用ingress发布到集群外部
+- 使用 PVC 持久存储
+
+范例
+
+```bash
+# 安装前准备
+# ingress controller 基于nginx实现
+# SC名称为sc-nfs
+
+# 添加仓库配置
+[root@master1 ~]#helm repo add harbor https://helm.goharbor.io
+"harbor" has been added to your repositories
+
+# 查看
+[root@master1 ~]#helm search repo harbor
+NAME          	CHART VERSION	APP VERSION	DESCRIPTION                                       
+bitnami/harbor	24.4.1       	2.12.2     	Harbor is an open source trusted cloud-native r...
+harbor/harbor 	1.16.2       	2.12.2     	An open source trusted cloud native registry th...
+
+
+# 定制配置
+[root@master1 ~]#helm show values bitnami/harbor > harbor.values.yaml
+
+[root@master1 ~]#cat harbor.values.yaml |grep -Pv "^\s*#"
+expose:
+  type: ingress
+  tls:
+    enabled: true                                       # 开启tls
+    certSource: auto                                    # 自动配置ca
+    auto:
+      commonName: ""
+    secret:
+      secretName: ""
+  ingress:
+    hosts:
+      core: harbor.mystical.org                          # 指定harbor访问的域名
+    controller: default
+    kubeVersionOverride: ""
+    className: "nginx"                                   # 指定ingress
+    annotations:
+      ingress.kubernetes.io/ssl-redirect: "true"
+      ingress.kubernetes.io/proxy-body-size: "0"
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/proxy-body-size: "0"
+      kubernetes.io/ingress.class: "nginx"               # 指定ingress，旧版用法
+......
+externalURL: https://harbor.mystical.org                 # 指定harbor访问的域名
+
+persistence:
+  enabled: true
+  resourcePolicy: "keep"
+  persistentVolumeClaim:
+    registry:
+      existingClaim: ""
+      storageClass: "sc-nfs"
+      subPath: ""
+      accessMode: ReadWriteOnce
+      size: 5Gi
+      annotations: {}
+    jobservice:
+      jobLog:
+        existingClaim: ""
+        storageClass: "sc-nfs"
+        subPath: ""
+        accessMode: ReadWriteOnce
+        size: 1Gi
+        annotations: {}
+    database:                                       # PostgreSQl数据库组件
+      existingClaim: ""
+      storageClass: "sc-nfs"
+      subPath: ""
+      accessMode: ReadWriteOnce
+      size: 1Gi
+      annotations: {}
+    redis:
+      existingClaim: ""
+      storageClass: "sc-nfs"
+      subPath: ""
+      accessMode: ReadWriteOnce
+      size: 1Gi
+      annotations: {}
+    trivy:
+      existingClaim: ""
+      storageClass: "sc-nfs"
+      subPath: ""
+      accessMode: ReadWriteOnce
+      size: 5Gi
+      annotations: {}
+......
+
+existingSecretAdminPasswordKey: HARBOR_ADMIN_PASSWORD
+harborAdminPassword: "123456"                           # 更改密码
+    
+#创建名称空间(可选)
+[root@master1 ~]# kubectl create namespace harbor    
+
+[root@master1 ~]#helm install myharbor -f harbor.values.yaml harbor/harbor -n harbor --create-namespace
+
+# 查看生成的值
+[root@master1 ~]#helm get values -n harbor myharbor
+
+# 查看生成的资源清单文件
+[root@master1 ~]#helm get manifest -n harbor myharbor
+
+# 查看ingress
+[root@master1 ~]#kubectl get ingress -n harbor 
+NAME               CLASS   HOSTS                 ADDRESS         PORTS     AGE
+myharbor-ingress   nginx   harbor.mystical.org   172.22.200.10   80, 443   15m
+
+# 查看pod
+[root@master1 ~]#kubectl get pod -n harbor 
+NAME                                   READY   STATUS    RESTARTS      AGE
+myharbor-core-65876d6984-c8j6w         1/1     Running   2 (13m ago)   15m
+myharbor-database-0                    1/1     Running   0             15m
+myharbor-jobservice-5cfbf75f96-8zv2g   1/1     Running   6 (12m ago)   15m
+myharbor-portal-9884f7648-4dwhc        1/1     Running   0             15m
+myharbor-redis-0                       1/1     Running   0             15m
+myharbor-registry-784898f8cb-xq8bw     2/2     Running   0             15m
+myharbor-trivy-0                       1/1     Running   0             15m
+
+# 在宿主机配置域名解析
+# 访问浏览器：https://harbor.mystical.org
+# 账号/密码：admin/123456
+```
+
+![image-20250325222106027](../markdown_img/image-20250325222106027.png)
+
+
+
+
+
+### 自定义 Chart
+
+#### Chart 目录结构
+
+```http
+https://docs.helm.sh/docs/chart_template_guide/getting_started/
+```
+
+```bash
+# 创建chart文件结构
+[root@master1 ~]#helm create mychart
+Creating mychart
+
+[root@master1 ~]#tree mychart/
+mychart/
+├── charts
+├── Chart.yaml                        # 必须项，包含了该chart的描述，helm show chart [CHART] 查看到即此文件内容
+├── templates                         # 包括了各种资源清单的模板文件
+│   ├── deployment.yaml
+│   ├── _helpers.tpl
+│   ├── hpa.yaml
+│   ├── ingress.yaml
+│   ├── NOTES.txt
+│   ├── serviceaccount.yaml
+│   ├── service.yaml
+│   └── tests
+│       └── test-connection.yaml
+└── values.yaml                       # 如果templates/目录中包含变量时,可以通过此文件提供变量的默认值
+                                      # 这些值可以在用户执行 helm install 或 helm upgrade 时被覆盖
+                                      # helm show values  [CHART]  查看到即此文件内容
+3 directories, 10 files
+```
+
+**Chart.yaml 文件**
+
+```bash
+# harbor的chart.yaml示例
+[root@master1 harbor]#cat Chart.yaml 
+apiVersion: v1
+appVersion: 2.12.2
+description: An open source trusted cloud native registry that stores, signs, and
+  scans content
+home: https://goharbor.io
+icon: https://raw.githubusercontent.com/goharbor/website/main/static/img/logos/harbor-icon-color.png
+keywords:
+- docker
+- registry
+- harbor
+maintainers:
+- email: yan-yw.wang@broadcom.com
+  name: Yan Wang
+- email: stone.zhang@broadcom.com
+  name: Stone Zhang
+- email: miner.yang@broadcom.com
+  name: Miner Yang
+name: harbor
+sources:
+- https://github.com/goharbor/harbor
+- https://github.com/goharbor/harbor-helm
+version: 1.16.2
+
+[root@master1 harbor]#helm list -n harbor
+NAME    	NAMESPACE	REVISION	UPDATED                     STATUS  	CHART        	APP VERSION
+myharbor	harbor   	1       	2025-03-25 22... +0800 CST	deployed	harbor-1.16.2	2.12.2
+```
+
+**templates/ 目录**
+
+包括了各种资源清单的模板文件。比如: `deployment` ,`service` ,`ingress` , `configmap` , `secret` 等
+
+可以是固定内容的文本,也可以包含一些变量,函数等模板语法
+
+当Helm评估chart时，会通过模板渲染引擎将所有文件发送到 `templates/` 目录中。 然后收集模板的结果并发送给Kubernetes。
+
+```bash
+# 以harbor的chart中，template/nginx/secret为例
+[root@master1 templates]#cat nginx/secret.yaml 
+{{- if eq (include "harbor.autoGenCertForNginx" .) "true" }}
+{{- $ca := genCA "harbor-ca" 365 }}
+{{- $cn := (required "The \"expose.tls.auto.commonName\" is required!" .Values.expose.tls.auto.commonName) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ template "harbor.nginx" . }}
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+{{ include "harbor.labels" . | indent 4 }}
+type: Opaque
+data:
+  {{- if regexMatch `^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$` $cn }}
+  {{- $cert := genSignedCert $cn (list $cn) nil 365 $ca }}
+  tls.crt: {{ $cert.Cert | b64enc | quote }}
+  tls.key: {{ $cert.Key | b64enc | quote }}
+  ca.crt: {{ $ca.Cert | b64enc | quote }}
+  {{- else }}
+  {{- $cert := genSignedCert $cn nil (list $cn) 365 $ca }}
+  tls.crt: {{ $cert.Cert | b64enc | quote }}
+  tls.key: {{ $cert.Key | b64enc | quote }}
+  ca.crt: {{ $ca.Cert | b64enc | quote }}
+  {{- end }}
+{{- end }}
+```
+
+**values.yaml 文件（可选项）**
+
+如果 `templetes/` 目录下文件都是固定内容,此文件无需创建
+
+如果 `templates/` 目录中包含变量时,可以通过此文件提供变量的默认值
+
+这些值可以在用户执行 `helm install` 或 `helm upgrade` 时被覆盖
+
+`helm show values  [CHART]`  查看到即此文件内容
+
+**charts/ 目录（可选项）**
+
+可以包含依赖的其他的chart, 称之为 子chart
+
+
+
+#### 常用的内置对象
+
+Chart 中支持多种内置对象,即相关内置的相关变量,可以通过对这些变量进行定义和引用,实现定制 Chart 的目的
+
+- **Release 对象**
+- **Values 对象**
+- **Chart 对象**
+- **Capabilities 对象**
+- **Template 对象**
+
+
+
+##### helm3 的内置对象详解
+
+**Release对象**
+
+描述应用发布自身的一些信息,主要包括如下对象
+
+```bash
+.Release.Name              # release 的名称
+.Release.Namespace         # release 的命名空间
+.Release.Revision          # 获取此次修订的版本号。初次安装时为1，每次升级或回滚都会递增
+.Release.Service           # 获取渲染当前模板的服务名称。一般都是 Helm
+.Release.IsInstall         # 如果当前操作是安装，该值为 true
+.Release.IsUpgrade         # 如果当前操作是升级或回滚，该值为true
+.Release.Time              # Chart发布时间
+
+#引用
+{{ .Release.Name }}
+```
+
+
+
+**Values 对象**
+
+描述 values.yaml 文件(用于定义默认变量的值文件)中的内容，默认为空。
+
+使用 Values 对象可以获取到 values.yaml 文件中已定义的任何变量数值
+
+形式为 `key/value` 对
+
+示例
+
+```bash
+# 变量赋值
+key1: value1
+
+info:
+  key2: value2
+
+# 变量引用
+# 注意: 大写字母V
+{{ .Value.key1 }}
+{{ .Value.info.key2 }}
+```
+
+**定制值的两种方法**
+
+| values.yaml 文件                                  | --set 选项                                     |
+| ------------------------------------------------- | ---------------------------------------------- |
+| name: mystical                                    | --set name=mystical                            |
+| name: "mystical,recluse"                          | --set name=mystical\,recluse                   |
+| name: mystical<br />age: 18                       | --set name=mystical, age=18                    |
+| info:<br />  name: mystical                       | --set info.name=mystical                       |
+| name:<br />- mystical<br />- recluse<br />- curry | --set name={mystical,recluse,curry}            |
+| info:<br />- name: mystical                       | --set info[0].name=mystical                    |
+| info:<br />- name: mystical<br />  age: 18        | --set info[0].name=mystical, info[0].age=18    |
+| nodeSelector:<br />  kubernetes.io/role: worker   | --set nodeSelector."kubernetes.io/role"=worker |
+
+
+
+ **Chart 对象**
+
+用于获取Chart.yaml 文件中的内容
+
+```bash
+.Chart.Name                # 引用Chart.yaml文件定义的chart的名称
+.Chart.Version             # 引用Chart.yaml文件定义的Chart的版本
+
+#引用
+{{ .Chart.Name }}
+```
+
+
+
+**Capabilities 对象**
+
+提供了关于kubernetes 集群相关的信息。该对象有如下对象
+
+```bash
+.Capabilities.APIVersions               # 返回kubernetes集群 API版本信息集合
+.Capabilities.APIVersions.Has $version  # 检测指定版本或资源在k8s中是否可用，例如:apps/v1/Deployment,可用为true
+.Capabilities.KubeVersion和.Capabilities.KubeVersion.Version  # 都用于获取kubernetes 的版本,包括Major和Minor
+.Capabilities.KubeVersion.Major         # 引用kubernetes 的主版本号,第一位的版本号,比如:v1.18.2中为1
+.Capabilities.KubeVersion.Minor         # 引用kubernetes 的小版本号,第二位版本号,比如:v1.18.2中为18
+
+# 引用
+{{ .Capabilities.APIVersions }}
+```
+
+
+
+**Template 对象**
+
+用于获取当前模板的信息，它包含如下两个对象
+
+```bash
+.Template.BasePath  # 引用当前模板的名称和路径(示例:mychart/templates/configmap.yaml)
+.Template.Name      # 引用当前模板的目录路径(示例:mychart/templates)
+
+# 引用
+{{ .Template.Name }}c
+```
+
+
+
+##### 函数
+
+```http
+https://helm.sh/zh/docs/chart_template_guide/function_list/
+```
+
+到目前为止，我们已经知道了如何将信息传到模板中。 但是传入的信息并不能被修改。
+
+有时我们希望以一种更有用的方式来转换所提供的数据。
+
+比如: 可以通过调用模板指令中的 quote 函数把 `.Values` 对象中的字符串属性用双引号引起来，然后放到模板中。
+
+```bash
+apiVersion: v1
+kind: ConfigMap
+metadata: 
+  name: {{ .Release.Name }}-configmap
+data:
+  myvalue: "Hello World"
+  # 格式1
+  drink: {{ quote .Values.favorite.drink }}
+  food: {{ squote .Values.favorite.food }}
+  # 格式2
+  #drink: {{ .Value.favorite.drink | quote }}   # 双引号函数quote
+  #food: {{ .Value.favorite.food | squote }}    # 单引号函数squote
+```
+
+模板函数的语法是
+
+```bash
+# 格式1
+function arg1 arg2...
+# 格式2： 多次函数处理
+arg1 | functionName1 | functionName2 ...
+```
+
+在上面的代码片段中， `quote .Values.favorite.drink` 调用了 `quote` 函数并传递了一个参数 `(.Values.favorite.drink)`。
+
+Helm 有超过60个可用函数。其中有些通过  Go模板语言 本身定义。其他大部分都是`Sprig 模版库`  可以在示例看到其中很多函数。
+
+Helm 包含了很多可以在模板中利用的模板函数。以下列出了具体分类：
+
+```ABAP
+Cryptographic and Security
+Date
+Dictionaries
+Encoding
+File Path
+Kubernetes and Chart
+Logic and Flow Control
+Lists
+Math
+Float Math
+Network
+Reflection
+Regular Expressions
+Semantic Versions
+String
+Type Conversion
+URL
+UUID
+```
+
+
+
+##### 常用语法
+
+###### `with` 语法
+
+**作用**：进入某个值的上下文，简化访问路径
+
+```yaml
+# values.yaml
+image:
+  repository: nginx
+  tag: 1.21.6
+  pullPolicy: IfNotPresent
+```
+
+```yaml
+# templates/deployment.yaml
+spec:
+  containers:
+    - name: nginx
+      {{- with .Values.image }}
+      image: {{ .repository }}:{{ .tag }}
+      imagePullPolicy: {{ .pullPolicy }}
+      {{- end }}
+```
+
+**等价于**
+
+```yaml
+image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+```
+
+但 `with` 会把 `image` 当作当前上下文，写法更清晰。
+
+**适合场景**：
+
+- 多次使用 `.Values.xxx` 结构体的子字段
+- 条件存在时才进入使用（避免空指针）
+
+**注意**：
+
+- `with` 只在值非空时执行其内部代码块
+
+
+
+###### `range` 语句
+
+**作用**：**迭代数组、列表、字典**
+
+示例 1：迭代列表
+
+```yaml
+# values.yaml
+tolerations:
+  - key: "node-type"
+    operator: "Equal"
+    value: "gpu"
+    effect: "NoSchedule"
+```
+
+```yaml
+# templates/deployment.yaml
+spec:
+  tolerations:
+    {{- range .Values.tolerations }}
+    - key: {{ .key }}
+      operator: {{ .operator }}
+      value: {{ .value }}
+      effect: {{ .effect }}
+    {{- end }}
+```
+
+示例 2：迭代字典（map）
+
+```yaml
+# values.yaml
+config:
+  A: "value-a"
+  B: "value-b"
+```
+
+```yaml
+env:
+{{- range $key, $val := .Values.config }}
+  - name: {{ $key }}
+    value: {{ $val | quote }}
+{{- end }}
+```
+
+- `$key` 和 `$val` 是自定义变量名
+
+- `quote` 用于给字符串加引号
+
+
+
+###### `with` 和 `range` 组合用法
+
+```yaml
+# values.yaml
+service:
+  ports:
+    - name: http
+      port: 80
+    - name: https
+      port: 443
+```
+
+```yaml
+{{- with .Values.service }}
+  ports:
+    {{- range .ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+    {{- end }}
+{{- end }}
+```
+
+先进入 `service` 再遍历 `ports`，更结构化。
+
+
+
+###### 空白控制（whitespace control）语法
+
+**写法说明**
+
+| 写法          | 作用                             |
+| ------------- | -------------------------------- |
+| `{{ ... }}`   | 默认渲染，前后保留空格和换行     |
+| `{{- ... }}`  | 去除左侧的所有空白符（包括换行） |
+| `{{ ... -}}`  | 去除右侧的所有空白符（包括换行） |
+| `{{- ... -}}` | 同时去除左右两侧空白符           |
+
+**示例对比**
+
+**普通写法（保留空行）**
+
+```yaml
+containers:
+  - name: nginx
+    image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+
+    imagePullPolicy: {{ .Values.image.pullPolicy }}
+```
+
+可能多出一个空行或多余缩进。
+
+**加 `-` 控制空白**
+
+```yaml
+{{- with .Values.image }}
+image: {{ .repository }}:{{ .tag }}
+imagePullPolicy: {{ .pullPolicy }}
+{{- end }}
+```
+
+会去掉前后多余的空格和空行，输出更紧凑。
+
+
+
+**使用建议**
+
+| 情况                                      | 是否加 `-`                              |
+| ----------------------------------------- | --------------------------------------- |
+| 在逻辑语句块前后（`with`, `if`, `range`） | ✅建议加                                 |
+| 在内容行中间                              | ❌避免用，否则会破坏 YAML 格式           |
+| 代码缩进很重要的地方                      | 👀需小心使用，确认不会破坏 YAML 缩进结构 |
+
+
+
+**实战总结**
+
+```yaml
+# 推荐
+{{- if .Values.enabled }}
+spec:
+  containers:
+    - name: my-app
+      {{- with .Values.image }}
+      image: {{ .repository }}:{{ .tag }}
+      imagePullPolicy: {{ .pullPolicy }}
+      {{- end }}
+{{- end }}
+```
+
+这样可以保持生成的 YAML **干净、无多余空行、缩进整齐**。
+
+
+
+
+
+
+
+##### 变量
+
+在 helm3 中，变量通常是搭配 `with` 语句 和 `range` 语句使用，这样能有效的简化代码。
+
+变量的定义格式如下: 
+
+```bash
+$name :=  value
+# :=  为赋值运算符，将后面值赋值给前面的变量 name
+```
+
+使用变量解决对象作用域问题
+
+因为with语句里不能调用父级别的变量，所以如果需要调用父级别的变量，需要声明一个变量名，将父级别的变量值赋值给声明的变量
+
+helm流控制结构中使用with 更改当前作用域的用法，当时存在一个问题是在with 语句中，无法使用父作用域中的对象，需要使用$符号或者将语句移到 `{{-end }}` 的外面才可以。现在使用变量也可以解决这个问题。
+
+```yaml
+# values.yaml
+people:
+  info:
+    name: mystical
+    age: 18
+    sex: boy
+    
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  data:
+    {{ - $releaseName := .Release.Name }}
+    {{ - with .Values.people.info }}       # 指定作用域
+    name: {{ .name }}
+    age: {{ .age }}
+    # release1: {{ .Release.Name }} # 在with语句内(因为改变了变量作用域)，不能调用父级别的变量,且会报错
+    release2: {{ $releaseName }}    # 通过变量名解决调用父级别的变量
+    release3: {{ - Release.Name }}  # 在with语句外，可以调用父级别的变量
+```
+
+
+
+**变量在列表或元组中的使用**
+
+变量也常用在遍历列表或元组中，可以获取到索引和值
+
+```yaml
+# values.yaml
+address:
+- beijing
+- shanghai
+- guangzhou
+
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace }}
+data:
+  address: |-
+    {{ - range $index,$add := .Values.address }}  # 将遍历的列表元素赋值给两个变量,一个是索引号，一个是元素值,并且通过                                                     range语句循环遍历出来
+    {{ $index }}:{{ $add }}
+    {{ - end }}
+
+# 结果：
+address: |-
+  0: beijing
+  1: shanghai
+  2: guangzhou
+```
+
+**变量在字典中的使用**
+
+变量也能用于变量字典，获取每个键值对 `key/value`
+
+对于字典类型的结构，可以使用 range 获取到每个键值对的 `key` 和 `value`
+
+注意，字典是无序的，所以遍历出来的结果也是无序的。
+
+示例：
+
+```yaml
+# values.yaml 定义变量和赋值
+person:
+  info:
+    name: mystical
+    sex: boy
+    address: beijing
+    age: 18
+    
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+data:
+  info: |-
+    {{ - range $key, $value := .Values.person.info }}
+    {{ $key }}:{{ $value }}
+    {{ - end }}
+
+# 结果
+info: |-
+  address: beijing
+  age: 18
+  name: mystical
+  sex: boy
+```
+
+
+
+##### 调用子模版
+
+###### 定义并调用子模板说明
+
+定义子模板的两个位置
+
+- 主模板中
+- `helpers.tp`l 文件内, `helpers.tpl` 是专门提供的定义子模板的文件，实际使用中，通常建议放在  `helpers.tpl` 文件内
+
+子模板的定义和调用
+
+- 定义子模板: 通过define定义
+- 调用子模板: 通过template或者include调用(推荐),template和include 用法一样，稍微有点区别 
+
+
+
+###### 演示案例
+
+使用define在主模板中定义子模板的语句块，使用template进行调用子模板
+
+注意: define定义的子模板，需要通过调用才能输出，如果不调用是不会有输出的。
+
+```yaml
+# 格式：
+{{ - define "mychart.labels" }}
+  labels:
+    author: mystical
+    date: {{ now | htmlDate }}
+{{ - end }}
+```
+
+示例
+
+```yaml
+# 编写一个自己需要的模板文件
+# ./mychart/templates/configmap.yaml
+{{ - define "mychart.labels" }}
+  labels:
+    author: mystical
+    date: {{ now | htmlDate }}
+{{ - end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  {{ - template "mychart.labels" }}
+data:
+  message: "hello"
+  
+# 说明
+# define 定义一个子模板,子模板的名称是: mychart.labels
+# template 调用子模板,通过子模板的名称调用,输出子模板的内容
+```
+
+
+
+##### 流控制
+
+```http
+https://helm.sh/zh/docs/chart_template_guide/control_structures/
+```
+
+控制结构(在模板语言中称为"actions")提供给你和模板作者控制模板迭代流的能力。 Helm的模板语言提供了以下控制结构：
+
+- `if / else` ， 用来创建条件语句
+- `with` ， 主要是用来控制变量的范围，也就是修改查找变量的作用域
+- `range` ， 提供"for each"类型的循环
+
+
+
+######  If/Else
+
+第一个控制结构是在按照条件在一个模板中包含一个块文本。即 `if/else`块
+
+基本的条件结构看起来像这样：
+
+```bash
+{{ if PIPELINE }}
+  # Do something
+{{ else if OTHER PIPELINE }}
+  # DO somehting
+{{ else }}
+  # Default case
+{{ end }}
+```
+
+注意我们讨论的是 PIPELINE 而不是值。这样做的原因是要清楚地说明控制结构可以执行整个管道，而不仅仅是计算一个值。
+
+如果是以下值时，PIPELINE会被设置为 false
+
+- 布尔 false
+- 数字 0
+- 空字符串
+- nil ( 空 或 null )
+- 空集合( map ,  slice ,  tuple ,  dict ,  array )
+
+在所有其他条件下，条件都为true。
+
+让我们先在配置映射中添加一个简单的条件。如果饮品是coffee会添加另一个配置：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+data:
+  myvalue: "Hello World"
+  drink: {{ .Values.favorite.drink | default "tea" | quote }}
+  food: {{ .Values.favorite.food | upper | quote }}
+  {{ if eq .Values.favorite.drink "coffee" }}mug: "true" {{ end }}
+```
+
+由于我们在最后一个例子中注释了 `drink: coffee` ，输出中就不会包含 `mug: "true"` 标识。但如果将 这行添加到 values.yaml 文件中，输入就会是这样：
+
+```yaml
+# Source: mychart/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eyewitness-elk-configmap
+data:
+  myvalue: "Hello World"
+  drink: "coffee"
+  food: "PIZZA"
+  mug: "true"
+```
+
+范例
+
+```yaml
+# mychart/values.yaml #定义变量和赋值
+person:
+  name: mystical
+  age: 18
+  sex: boy
+  address: beijing
+ingress:
+  enabled: true
+  
+# 编写一个需要的模板文件
+#./mychart/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-configmap
+  namespace: {{ .Release.Namespace }}
+data:
+  name: {{ .Values.person.name | default "mystical" | quote }}
+  sex: {{ .Values.person.sex | upper quote }}
+  {{- if .Value.ingress.enabled }}
+  ingress: "配置ingress..."    # 若ingress开关开启,做ingress相关配置
+  {{- else }}
+  ingress: "不配置ingress..."  #否则ingress开关没开启,不配置ingress
+  {{- end }}
+  {{- if eq .Values.person.address "beijing" }}
+  address: {{ .Values.person.address | quote }}
+  {{- else }}
+  address: "other city"
+  {{- end }}
+  
+# 注意:执行报错时候，去掉下面注释
+# {{- }} 表示向左删除空白包括删除空格和换行,不加可能会增加一个换行,前面加横线是为了去掉该行的空格,如果不加,该行渲染时会形成空格
+# {{ -}} 表示向右删除空白,并且会删除换行,一般慎用,因为删除换行时候，打印内容就乱了,还可能语法报错
+```
+
+
+
+
+
+#### 案例：自定义 Chart 实现部署升级回滚版本管理
+
+##### 固定配置的 Chart
+
+```bash
+[root@master1 helm]# helm create myapp-chart
+Creating myapp-chart
+
+[root@master1 helm]# tree myapp-chart/
+myapp-chart/
+├── charts
+├── Chart.yaml
+├── templates
+│   ├── deployment.yaml
+│   ├── _helpers.tpl
+│   ├── hpa.yaml
+│   ├── ingress.yaml
+│   ├── NOTES.txt
+│   ├── serviceaccount.yaml
+│   ├── service.yaml
+│   └── tests
+│       └── test-connection.yaml
+└── values.yaml
+
+3 directories, 10 files
+
+# 删除不需要的文件
+[root@master1 helm]# rm -rf myapp-chart/templates/* myapp-chart/values.yaml myapp-chart/charts/
+[root@master1 helm]# tree .
+.
+└── myapp-chart
+    ├── Chart.yaml
+    └── templates
+
+2 directories, 1 file
+
+# 生成相关的资源清单文件
+[root@master1 helm]# kubectl create deployment myapp --image registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas 3 --dry-run=client -o yaml > myapp-chart/templates/myapp-deployment.yaml
+[root@master1 helm]# kubectl create service nodeport myapp --tcp 80:80 --dry-run=client -o yaml > myapp-chart/templates/myapp-service.yaml
+[root@master1 helm]# tree myapp-chart/
+myapp-chart/
+├── Chart.yaml
+└── templates
+    ├── myapp-deployment.yaml
+    └── myapp-service.yaml
+
+1 directory, 3 files
+
+# 修改清单文件
+[root@master1 helm]#vim myapp-chart/templates/myapp-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: myapp
+  name: myapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1
+        name: pod-test
+
+[root@master1 helm]# vim myapp-chart/templates/myapp-service.yaml 
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: myapp
+  name: myapp
+spec:
+  ports:
+  - name: 80-80
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    app: myapp
+  type: NodePort
+
+# 修改配置
+[root@master1 helm]# vim myapp-chart/Chart.yaml
+apiVersion: v2
+name: myapp-chart
+description: A Helm chart for Kubernetes
+type: application
+version: 0.0.1
+appVersion: "0.1.0"
+
+# 检查语法
+[root@master1 helm]#helm lint myapp-chart/
+==> Linting myapp-chart/
+[INFO] Chart.yaml: icon is recommended
+[INFO] values.yaml: file does not exist
+
+1 chart(s) linted, 0 chart(s) failed
+
+# 部署应用
+[root@master1 helm]#helm install myapp ./myapp-chart/ --create-namespace --namespace helmdemo
+NAME: myapp
+LAST DEPLOYED: Wed Mar 26 13:44:00 2025
+NAMESPACE: helmdemo
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+
+[root@master1 helm]#kubectl get pod -n helmdemo 
+NAME                     READY   STATUS    RESTARTS   AGE
+myapp-547df679bb-cj4hh   1/1     Running   0          10s
+myapp-547df679bb-nz52d   1/1     Running   0          10s
+myapp-547df679bb-z6978   1/1     Running   0          10s
+
+[root@master1 helm]#kubectl get svc -n helmdemo 
+NAME    TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+myapp   NodePort   10.105.237.73   <none>        80:30503/TCP   20s
+
+# 查看
+[root@master1 helm]#helm list -n helmdemo 
+NAME 	NAMESPACE	REVISION	UPDATED                                	STATUS    CHART            	APP VERSION
+myapp	helmdemo 	1       	2025-03-26 13:44:00.261990749 +0800 CST	deployed  myapp-chart-0.0.1	0.1.0
+
+# 卸载
+[root@master1 helm]#helm uninstall -n helmdemo myapp 
+release "myapp" uninstalled
+
+[root@master1 helm]#kubectl get pod -n helmdemo 
+NAME                     READY   STATUS        RESTARTS   AGE
+myapp-547df679bb-cj4hh   1/1     Terminating   0          5m17s
+myapp-547df679bb-nz52d   1/1     Terminating   0          5m17s
+myapp-547df679bb-z6978   1/1     Terminating   0          5m17s
+
+# 将目录打包至文件
+[root@master1 ~]# helm package ./myapp-chart/
+Successfully packaged chart and saved it to: /root/myapp-chart-0.1.0.tgz
+[root@master1 helm]#ll myapp-chart-0.0.1.tgz 
+-rw-r--r-- 1 root root 774  3月 26 14:10 myapp-chart-0.0.1.tgz
+```
+
+
+
+##### 可变配置的 Chart
+
+```bash
+[root@master1 helm]#helm create myweb-chart
+Creating myweb-chart
+[root@master1 helm]#tree myweb-chart/
+myweb-chart/
+├── charts
+├── Chart.yaml
+├── templates
+│   ├── deployment.yaml
+│   ├── _helpers.tpl
+│   ├── hpa.yaml
+│   ├── ingress.yaml
+│   ├── NOTES.txt
+│   ├── serviceaccount.yaml
+│   ├── service.yaml
+│   └── tests
+│       └── test-connection.yaml
+└── values.yaml
+
+3 directories, 10 files
+
+# 删除多余的文件
+[root@master1 helm]#rm -rf myweb-chart/templates/*
+[root@master1 helm]#tree myweb-chart/
+myweb-chart/
+├── charts
+├── Chart.yaml
+├── templates
+└── values.yaml
+
+2 directories, 2 files
+
+# 创建资源清单文件
+[root@master1 helm]##kubectl create deployment myweb --image nginx:1.22.0 --replicas=3 --dry-run=client -o yaml > myweb-chart/templates/myweb-deployment.yaml
+
+[root@master1 helm]#kubectl create service nodeport myweb --tcp 80:80  --dry-run=client -o yaml > myweb-chart/templates/myweb-service.yaml
+
+# 修改清单文件为动态模版文件
+[root@master1 helm]#vim myweb-chart/templates/myweb-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.deployment_name }}
+  #namespace: {{ .Values.namespace }} 
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.pod_label }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.pod_label }}
+    spec:
+      containers:
+      - image: {{ .Values.image }}:{{ .Values.imageTag }}
+        name: {{ .Values.container_name }}
+        ports:
+        - containerPort: {{ .Values.containerport }}
+        
+[root@master1 helm]#vim myweb-chart/templates/myweb-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service_name }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  ports:
+  - port: {{ .Values.port }}
+    protocol: TCP
+    targetPort: {{ .Values.targetport }}
+  selector:
+    app: {{ .Values.pod_label }}
+  type: NodePort
+  
+# 编辑values.yaml文件
+[root@master1 helm]#vim myweb-chart/values.yaml
+#namespace: default
+deployment_name: myweb-deployment
+replicas: 3
+pod_label: myweb-pod-label
+image: registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test
+imageTag: v0.1
+container_name: myweb-container
+service_name: myweb-service
+port: 80targetport: 80
+containerport: 80
+
+# 查看Chart.yaml
+[root@master1 helm]#grep -v "#" myweb-chart/Chart.yaml
+apiVersion: v2
+name: myweb-chart
+description: A Helm chart for Kubernetes
+
+type: application
+
+version: 0.1.0
+
+appVersion: "1.16.0"
+
+[root@master1 helm]#tree myweb-chart/
+myweb-chart/
+├── charts
+├── Chart.yaml
+├── templates
+│   ├── myweb-deployment.yaml
+│   └── myweb-service.yaml
+└── values.yaml
+
+2 directories, 4 files
+
+[root@master1 helm]#helm install myweb ./myweb-chart/ --create-namespace --namespace helmdemo
+NAME: myweb
+LAST DEPLOYED: Wed Mar 26 16:27:23 2025
+NAMESPACE: helmdemo
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+
+# 查看
+[root@master1 helm]# kubectl get pod -n helmdemo 
+NAME                                READY   STATUS    RESTARTS   AGE
+myweb-deployment-745dc5b6c5-2zgn5   1/1     Running   0          16s
+myweb-deployment-745dc5b6c5-rmgx5   1/1     Running   0          16s
+myweb-deployment-745dc5b6c5-z5js4   1/1     Running   0          16s
+
+[root@master1 helm]# kubectl get svc -n helmdemo 
+NAME            TYPE       CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+myweb-service   NodePort   10.105.117.141   <none>        80:30814/TCP   32s
+
+#打包
+[root@master1 helm]#helm package ./myweb-chart/
+Successfully packaged chart and saved it to: /root/helm/myweb-chart-0.1.0.tgz
+```
+
+
+
+
+
+##### 上传至harbor
+
+从 **Harbor v2.2 起（尤其是 v2.5+）**，官方推荐 **全面使用 OCI（Open Container Initiative）标准** 来管理 Helm Charts，而不再推荐使用老旧的 **ChartMuseum 插件**。
+
+**ChartMuseum 在新版 Harbor 的现状**
+
+| 项目        | 说明                                                         |
+| ----------- | ------------------------------------------------------------ |
+| ChartMuseum | 已从 Harbor 默认组件中移除（但仍支持通过 Helm 自定义启用）   |
+| 支持情况    | 仍支持兼容，但不推荐新项目再使用 ChartMuseum                 |
+| 原因        | ChartMuseum 是老式非 OCI 协议的仓库，功能有限、安全性弱      |
+| 官方建议    | 使用 Harbor 本身作为 **OCI Helm Chart 仓库**，更简洁、更标准、更安全 |
+
+```bash
+# 使用 OCI协议上传helm包
+# Helm 的 OCI 模式 强制要求使用 HTTPS 协议，不支持 HTTP！
+# 前置要求，导出harbor的自签CA证书，并将其加入信任链，同时放入helm的信任路径
+
+# 导出自签证书
+[root@master1 helm]# kubectl get secret myharbor-ingress -n harbor -o jsonpath="{.data['tls\.crt']}"|base64 -d > harbor-ca.crt
+
+# 然后将其放入 Helm 使用的目录：
+[root@master1 helm]# mkdir -p ~/.config/helm/registry/certs
+[root@master1 helm]# cp harbor-ca.crt ~/.config/helm/registry/certs/harbor.mystical.org.crt
+
+# 【重点】还要把 CA 证书加入到 系统信任链中
+# 虽然 Helm 支持本地 certs/，但某些版本（尤其老版本或 go 模块编译时未启用自定义 CA 路径）还是会依赖系统 CA。
+
+# 拷贝证书到系统信任目录
+[root@master1 helm]# cp harbor.mystical.org.crt /etc/pki/ca-trust/source/anchors/
+
+# 或者对于 Debian/Ubuntu 系统
+[root@master1 helm]#  cp harbor.mystical.org.crt /usr/local/share/ca-certificates/harbor.crt
+
+# 更新信任链
+[root@master1 helm]# update-ca-trust extract
+# Ubuntu 用这个：
+[root@master1 helm]# update-ca-certificates
+
+# 重启shell，再重新登陆
+[root@master1 ~]#helm registry login harbor.mystical.org
+Username: admin
+Password: 
+Login Succeeded
+
+# 将打好的包上传至harbor
+[root@master1 helm]#helm push myapp-chart-0.0.1.tgz oci://harbor.mystical.org/myhelm
+Pushed: harbor.mystical.org/myhelm/myapp-chart:0.0.1
+Digest: sha256:02d3f2b5ecdb89369284d8fdb34813a9a6e7bab910e98c36febc78c478bd86e4
+
+# 可以运行以下命令查看 Helm 的注册表登录信息
+[root@master1 helm]#cat ~/.config/helm/registry/config.json 
+{
+	"auths": {
+		"harbor.mystical.org": {
+			"auth": "YWRtaW46MTIzNDU2"
+		}
+	}
+}
+
+# auth 字段是 Base64 编码的 username:password。
+[root@master1 helm]#echo "YWRtaW46MTIzNDU2" |base64 -d
+admin:123456
+```
+
+![image-20250326154011722](../markdown_img/image-20250326154011722.png)
 
 
 
@@ -25900,7 +30384,7 @@ $ etcdctl ls /coreos.com/network/subnets
 **当container-1发起对container-2的访问请求时，数据包的通信过程如下**
 
 - container-1发出一个IP包，源地址为`10.244.2.20`，目的地址为`10.244.3.27`
-- 这个IP包首先到达Node 1的docker0网桥**（这里进行一次判断）**。由于目的地址`10.244.3.37`不在docker0网桥的网段内，所以这个IP包会被转发给默认路由**。(此时进行第一次用户态和内核态的切换)**
+- 这个IP包首先到达Node 1的docker0网桥**（这里进行一次判断）**。由于目的地址`10.244.3.37`不在docker0网桥的网段内，所以这个IP包会被转发给默认路由**。(应用进程发出数据包给到网桥设备，此时进行第一次用户态和内核态的切换)**
 - 根据Node 1上的路由规则，这个IP包会被送往一个名为flannel0的设备。flannel0是一个TUN设备，它在三层网络上工作。
 - flannel0设备会将这个IP包交给用户态的flanneld进程处理。**(此时进行第二次用户态和内核态的切换)**
 - flanneld进程通过查询Etcd（或者**Kubernetes API**），得知目的IP地址10.244.3.27所在的子网对应的宿主机是Node 2，其IP地址为`10.0.0.202`。
@@ -25909,6 +30393,10 @@ $ etcdctl ls /coreos.com/network/subnets
 - Node 2的flanneld将还原出的IP包交给本机的flannel0设备。**(此时另一台主机进行二次用户态和内核态的切换)**
 - flannel0设备将IP包转发给docker0网桥。
 - docker0网桥根据目的IP地址，将包转发给container-2。**(此时另一台主机进行三次用户态和内核态的切换)**
+
+
+
+![image-20250326164947210](../markdown_img/image-20250326164947210.png)
 
 
 
@@ -25931,7 +30419,7 @@ $ etcdctl ls /coreos.com/network/subnets
   - Linux内核接收到这个IP包，根据路由规则将其转发给docker0网桥。
   - docker0网桥根据IP包的目的地址，将包转发给目标容器。
 
-
+![image-20250326165552416](../markdown_img/image-20250326165552416.png)
 
 
 
@@ -25945,7 +30433,7 @@ $ etcdctl ls /coreos.com/network/subnets
 
 
 
-正是由于这些性能问题，UDP模式在实际生产环境中很少被使用。 相比之下，VXLAN模式通过在内核态实现封装和解封装，大大减少了用户态和内核态的切换，同时也减少了数据拷贝的次数，因此能够提供更好的性能
+我们在进行系统级编程的时候，有一个非常重要的优化原则，就是要减少用户态到内核态的切换次数，并且把核心的处理逻辑都放在内核态进行。这也是为什么，Flannel 后来支持的VXLAN 模式，逐渐成为了主流的容器网络方案的原因。
 
 
 
@@ -25953,17 +30441,920 @@ $ etcdctl ls /coreos.com/network/subnets
 
 VXLAN，即 Virtual Extensible LAN（虚拟可扩展局域网），是 Linux 内核本身就支持的一种网络虚似化技术。所以说，VXLAN 可以完全在内核态实现上述封装和解封装的工作，从而通过与前面相似的“隧道”机制，构建出覆盖网络（Overlay Network）。
 
+VXLAN 的覆盖网络的设计思想是：在现有的三层网络之上，“覆盖”一层虚拟的、由内核 VXLAN 模块负责维护的**二层网络**，使得连接在这个 VXLAN 二层网络上的“主机”（虚拟机或者容器都可以）之间，可以像在同一个局域网（LAN）里那样自由通信。当然，实际上，这些“主机”可能分布在不同的宿主机上，甚至是分布在不同的物理机房里。
+
+而为了能够在二层网络上打通“隧道”，VXLAN 会在宿主机上设置一个特殊的网络设备作为“隧道”的两端。这个设备就叫作 **VTEP**，即：**VXLAN Tunnel End Point（虚拟隧道端点）**。
+
+而 VTEP 设备的作用，其实跟前面的 flanneld 进程非常相似。只不过，**它进行封装和解封装的对象，是二层数据帧（Ethernet frame）；而且这个工作的执行流程，全部是在内核里完成的（因为 VXLAN 本身就是 Linux 内核中的一个模块）**
+
+
+
+![image-20250326165451015](../markdown_img/image-20250326165451015.png)
+
+
+
+图中每台宿主机上名叫 flannel.1 的设备，就是 VXLAN 所需的 VTEP 设备，它既有 IP 地址，也有 MAC 地址
+
+container-1 的 IP 地址是 10.1.15.2，要访问的 container-2 的 IP 地址是 10.1.16.3。
+
+那么，与前面 UDP 模式的流程类似，当 container-1 发出请求之后，这个目的地址是 10.1.16.3 的 IP 包，会先出现在 cni0 网桥，然后被路由到本机 flannel.1 设备进行处理。也就是说，来到了“隧道”的入口。为了方便叙述，我接下来会把这个 IP 包称为“原始 IP 包”。
+
+**补充：从cni0到flannel.1是如何路由的**
+
+```bash
+[root@master1 ~]# kubectl get pod -o wide
+NAME                     READY   STATUS    RESTARTS   AGE     IP           NODE             NOMINATED NODE   READINESS GATES
+myweb-565cb68445-49fqg   1/1     Running   0          2m14s   10.244.1.3   node1.feng.org   <none>           <none>
+myweb-565cb68445-7fv5x   1/1     Running   0          2m14s   10.244.2.2   node2.feng.org   <none>           <none>
+myweb-565cb68445-tgnvw   1/1     Running   0          2m14s   10.244.1.2   node1.feng.org   <none>           <none>
+
+[root@mystical ~]# kubectl exec -it myweb-565cb68445-49fqg -- sh
+[root@myweb-565cb68445-49fqg /]# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         10.244.1.1      0.0.0.0         UG    0      0        0 eth0
+10.244.0.0      10.244.1.1      255.255.0.0     UG    0      0        0 eth0
+10.244.1.0      0.0.0.0         255.255.255.0   U     0      0        0 eth0
+
+[root@master1 ~]# kubectl exec myweb-565cb68445-7fv5x -- route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         10.244.2.1      0.0.0.0         UG    0      0        0 eth0
+10.244.0.0      10.244.2.1      255.255.0.0     UG    0      0        0 eth0
+10.244.2.0      0.0.0.0         255.255.255.0   U     0      0        0 eth0
+
+# 每个pod里面会生成指向所在宿主机虚拟网络设备cni0虚拟网桥的默认路由
+
+[root@node1 ~]# ip a show flannel.1
+[root@node1 ~]# ip a show cni0
+5: cni0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UP group default qlen 1000
+    link/ether ca:d6:5b:9c:59:c7 brd ff:ff:ff:ff:ff:ff
+    inet 10.244.1.1/24 brd 10.244.1.255 scope global cni0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::c8d6:5bff:fe9c:59c7/64 scope link 
+       valid_lft forever preferred_lft forever
+       
+# 数据进入cni0后，会根据宿主机的路由表，从而进入flannel1.1
+[root@node1 ~]# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         11.0.1.2        0.0.0.0         UG    0      0        0 eth0
+10.244.0.0      10.244.0.0      255.255.255.0   UG    0      0        0 flannel.1
+10.244.1.0      0.0.0.0         255.255.255.0   U     0      0        0 cni0
+10.244.2.0      10.244.2.0      255.255.255.0   UG    0      0        0 flannel.1
+11.0.1.0        0.0.0.0         255.255.255.0   U     0      0        0 eth0
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+```
+
+为了能够将“原始 IP 包”封装并且发送到正确的宿主机，VXLAN 就需要找到这条“隧道”的出口，即：目的宿主机的 VTEP 设备。
+
+而这个设备的信息，正是每台宿主机上的 flanneld 进程负责维护的。
+
+比如，当 Node 2 启动并加入 Flannel 网络之后，在 Node 1（以及所有其他节点）上，flanneld 就会添加一条如下所示的路由规则：
+
+```bash
+$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+...
+10.1.16.0       10.1.16.0       255.255.255.0   UG    0      0        0 flannel.1
+```
+
+这条规则的意思是：凡是发往 10.1.16.0/24 网段的 IP 包，都需要经过 flannel.1 设备发出，并且，它最后被发往的网关地址是：10.1.16.0。
+
+从上图 的 Flannel VXLAN 模式的流程图中我们可以看到，10.1.16.0 正是 Node 2 上的 VTEP 设备（也就是 flannel.1 设备）的 IP 地址。
+
+为了方便叙述，接下来我会把 Node 1 和 Node 2 上的 flannel.1 设备分别称为“**源 VTEP 设备**”和“**目的 VTEP 设备**”。
+
+而这些 VTEP 设备之间，就需要想办法组成一个虚拟的二层网络，即：**通过二层数据帧进行通信**。
+
+所以在我们的例子中，“源 VTEP 设备”收到“原始 IP 包”后，就要想办法把“原始 IP 包”加上一个目的 MAC 地址，封装成一个二层数据帧，然后发送给“目的 VTEP 设备”（当然，这么做还是因为这个 IP 包的目的地址不是本机）。
+
+这里需要解决的问题就是：**目的 VTEP 设备”的 MAC 地址是什么**
+
+此时，根据前面的路由记录，我们已经知道了“目的 VTEP 设备”的 IP 地址。而要根据三层 IP 地址查询对应的二层 MAC 地址，这正是 ARP（Address Resolution Protocol ）表的功能。
+
+而这里要用到的 ARP 记录，也是 flanneld 进程在 Node 2 节点启动时，自动添加在 Node 1 上的。我们可以通过 ip 命令看到它，如下所示：
+
+```bash
+# 在Node 1上
+$ ip neigh show dev flannel.1
+10.1.16.0 lladdr 5e:f8:4f:00:e3:37 PERMANENT
+# PERMANENT: 表示这个邻居项是手动或通过某种机制写入的，不会被系统自动清除
+# 如果是动态学习到的，会是 REACHABLE / STALE / DELAY / FAILED 等状态
+```
+
+这条记录的意思非常明确，即：IP 地址 10.1.16.0，对应的 MAC 地址是 5e:f8:4f:00:e3:37。
+
+```ABAP
+可以看到，最新版本的 Flannel 并不依赖 L3 MISS 事件和 ARP 学习，而会在每台节点启动时把它的 VTEP 设备对应的 ARP 记录，直接下放到其他每台宿主机上。
+```
+
+**延伸知识**
+
+可以通过以下命令手动添加一个 PERMANENT 条目：
+
+```bash
+ip neigh add 192.168.1.100 lladdr aa:bb:cc:dd:ee:ff dev eth0 nud permanent
+# nud permanent: 表示这个邻居项永远有效（即使不在线也不会消失）
+# lladdr: 映射的 MAC 地址
+```
+
+有了这个“目的 VTEP 设备”的 MAC 地址，Linux 内核就可以开始二层封包工作了。这个二层帧的格式，如下所示：
+
+![image-20250326171508850](../markdown_img/image-20250326171508850.png)
+
+
+
+可以看到，Linux 内核会把“目的 VTEP 设备”的 MAC 地址，填写在图中的 Inner Ethernet Header 字段，得到一个二层数据帧
+
+需要注意的是，上述封包过程只是加一个二层头，不会改变“原始 IP 包”的内容。所以图中的 Inner IP Header 字段，依然是 container-2 的 IP 地址，即 10.1.16.3。
+
+但是，上面提到的这些 VTEP 设备的 MAC 地址，对于宿主机网络来说并没有什么实际意义。所以上面封装出来的这个数据帧，并不能在我们的宿主机二层网络里传输。为了方便叙述，我们把它称为“内部数据帧”（Inner Ethernet Frame）。
+
+所以接下来，Linux 内核还需要再把“内部数据帧”进一步封装成为宿主机网络里的一个普通的数据帧，好让它“载着”“内部数据帧”，通过宿主机的 eth0 网卡进行传输。
+
+我们把这次要封装出来的、宿主机对应的数据帧称为“外部数据帧”（Outer Ethernet Frame）。
+
+为了实现这个“搭便车”的机制，Linux 内核会在“内部数据帧”前面，加上一个特殊的 VXLAN 头，用来表示这个“乘客”实际上是一个 VXLAN 要使用的数据帧。
+
+而这个 VXLAN 头里有一个重要的标志叫作 **VNI**，它是 VTEP 设备识别某个数据帧是不是应该归自己处理的重要标识。而在 Flannel 中，**VNI 的默认值是 1**，这也是为何，宿主机上的 VTEP 设备都叫作 flannel.1 的原因，这里的“1”，其实就是 VNI 的值。
+
+所以，跟 UDP 模式类似，在宿主机看来，它会以为自己的 flannel.1 设备只是在向另外一台宿主机的 flannel.1 设备，发起了一次普通的 UDP 链接。它哪里会知道，这个 UDP 包里面，其实是一个完整的二层数据帧
+
+不过，不要忘了，一个 flannel.1 设备只知道另一端的 flannel.1 设备的 MAC 地址，却不知道对应的宿主机地址是什么
+
+也就是说，这个 UDP 包该发给哪台宿主机呢？
+
+在这种场景下，flannel.1 设备实际上要扮演一个“网桥”的角色，在二层网络进行 UDP 包的转发。而在 Linux 内核里面，“网桥”设备进行转发的依据，来自于一个叫作 **FDB（Forwarding Database）的转发数据库**。
+
+不难想到，这个 flannel.1“网桥”对应的 FDB 信息，也是 flanneld 进程负责维护的。它的内容可以通过 bridge fdb 命令查看到，如下所示：
+
+```bash
+# 在Node 1上，使用“目的VTEP设备”的MAC地址进行查询
+$ bridge fdb show flannel.1 | grep 5e:f8:4f:00:e3:37
+5e:f8:4f:00:e3:37 dev flannel.1 dst 10.168.0.3 self permanent
+```
+
+可以看到，在上面这条 FDB 记录里，指定了这样一条规则，即：
+
+发往我们前面提到的“目的 VTEP 设备”（MAC 地址是 5e:f8:4f:00:e3:37）的二层数据帧，应该通过 flannel.1 设备，发往 IP 地址为 10.168.0.3 的主机。显然，这台主机正是 Node 2，UDP 包要发往的目的地就找到了。
+
+所以接下来的流程，就是一个正常的、宿主机网络上的封包工作
+
+我们知道，UDP 包是一个四层数据包，所以 Linux 内核会在它前面加上一个 IP 头，即原理图中的 Outer IP Header，组成一个 IP 包。并且，在这个 IP 头里，会填上前面通过 FDB 查询出来的目的主机的 IP 地址，即 Node 2 的 IP 地址 10.168.0.3
+
+然后，Linux 内核再在这个 IP 包前面加上二层数据帧头，即原理图中的 Outer Ethernet Header，并把 Node 2 的 MAC 地址填进去。这个 MAC 地址本身，是 Node 1 的 ARP 表要学习的内容，无需 Flannel 维护。这时候，我们封装出来的“外部数据帧”的格式，如下所示：
+
+
+
+![image-20250326172315923](../markdown_img/image-20250326172315923.png)
+
+
+
+这样，封包工作就宣告完成了。
+
+```bash
+UDP 8472
+# IANA 官方注册 的 VXLAN 端口
+# Flannel 使用的默认端口
+```
+
+接下来，Node 1 上的 flannel.1 设备就可以把这个数据帧从 Node 1 的 eth0 网卡发出去。显然，这个帧会经过宿主机网络来到 Node 2 的 eth0 网卡。
+
+这时候，Node 2 的内核网络栈会发现这个数据帧里有 VXLAN Header，并且 VNI=1。所以 Linux 内核会对它进行拆包，拿到里面的内部数据帧，然后根据 VNI 的值，把它交给 Node 2 上的 flannel.1 设备。
+
+而 flannel.1 设备则会进一步拆包，取出“原始 IP 包”。最终，IP 包就进入到了 container-2 容器的 Network Namespace 里
+
+以上，就是 Flannel VXLAN 模式的具体工作原理了。
+
+**延伸知识**
+
+大部分支持VXLAN的交换机都是三层交换机
+
+```ABAP
+三层交换机 = “能路由的交换机”
+路由器 = “更智能、功能更丰富的网络决策中心”
+```
+
+**功能对比表格**
+
+| 对比维度            | 三层交换机 (L3 Switch)                         | 路由器 (Router)                                              |
+| ------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| **核心功能**        | 基于 IP 进行高速转发，注重交换+路由            | 网络层协议处理、路径选择、NAT、防火墙、QoS 等全套功能        |
+| **目标场景**        | 高性能同构网络内部通信（如：数据中心、园区网） | 不同网络/不同协议之间的连接（如：公网/私网、广域网）         |
+| **性能**            | 高（硬件ASIC芯片处理，转发线速）**硬件处理**   | 相对低（主要基于CPU处理即 **软件处理**，转发性能取决于型号） |
+| **功能丰富性**      | 一般功能少（重点是转发快）                     | 功能非常全，如动态路由协议、VPN、ACL、QoS、流量策略等        |
+| **协议支持**        | 支持部分路由协议（如 OSPF、静态路由）          | 支持多种路由协议（OSPF、BGP、RIP、IS-IS、EIGRP 等）          |
+| **NAT/防火墙**      | 通常不支持                                     | 原生支持                                                     |
+| **价格成本**        | 较低（用于局域网）                             | 高（适用于广域网、边界网络）                                 |
+| **扩展性/灵活性**   | 一般                                           | 很强（更适合作为网络“边界设备”）                             |
+| **可视化/监控能力** | 有限                                           | 更强，适合做策略、日志、监控中心                             |
+
+```ABAP
+/etc/cni/net.d/ 是 Kubernetes 或其他使用 CNI（Container Network Interface）的容器平台中用于存放 CNI 网络配置文件的目录。删除该目录下的内容会导致没有配置文件，从而导致网络失效
+在实际生产环境中，/etc/cni/net.d/ 这个目录基本上是“高危区”，通常不会轻易动它。
+一般只有初次安装网络插件（如 flannel、calico）或者 更换 CNI 插件才可能动它
+```
+
+![image-20250328133758938](../markdown_img/image-20250328133758938.png)
+
+#### Flannel VXLAN 通信过程总结
+
+- Container-1（10.244.1.2）发送数据给 Container-2（10.244.2.2）
+
+- 基于Container-1内的路由表，数据发给 `Container-1` 所在节点的 `cni0`
+
+  ```bash
+  # Container-1里的路由表
+  [root@myweb-565cb68445-49fqg /]# route -n
+  Kernel IP routing table
+  Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+  0.0.0.0         10.244.1.1      0.0.0.0         UG    0      0        0 eth0
+  10.244.0.0      10.244.1.1      255.255.0.0     UG    0      0        0 eth0
+  10.244.1.0      0.0.0.0         255.255.255.0   U     0      0        0 eth0
+  
+  #所在节点的ip
+  [root@node1 ~]# ip a show cni0
+  5: cni0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1450 qdisc noqueue state UP group default qlen 1000
+      link/ether ca:d6:5b:9c:59:c7 brd ff:ff:ff:ff:ff:ff
+      inet 10.244.1.1/24 brd 10.244.1.255 scope global cni0
+         valid_lft forever preferred_lft forever
+      inet6 fe80::c8d6:5bff:fe9c:59c7/64 scope link 
+         valid_lft forever preferred_lft forever
+  ```
+
+- 数据包到达CNI0后，此时进入**宿主机网络名称空间**，根据宿主机上的路由，将数据发给flannel.1处理
+
+  ```bash
+  [root@node1 ~]# route -n
+  Kernel IP routing table
+  Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+  0.0.0.0         11.0.1.2        0.0.0.0         UG    0      0        0 eth0
+  10.244.0.0      10.244.0.0      255.255.255.0   UG    0      0        0 flannel.1
+  10.244.1.0      0.0.0.0         255.255.255.0   U     0      0        0 cni0
+  10.244.2.0      10.244.2.0      255.255.255.0   UG    0      0        0 flannel.1   # 命中
+  11.0.1.0        0.0.0.0         255.255.255.0   U     0      0        0 eth0
+  172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+  
+  # 注意：这里的 10.244.2.0 作为 下一跳 的写法是 flannel 特有，它不是标准网关地址，而是 Flannel 自己识别使用的“假网关”。
+  ```
+
+- 数据到达flannel.1后，根据ARP表，找到目的VETP设备对应的MAC地址(这个邻居表项是被flanneld进程写入的)，然后封装在目的容器IP地址前面，并在前面封装VXLAN的Header（带固定的 VNI=1），然后再最前面封装UDPHeader（UDP端口为8472）
+
+  ```bash
+  [root@master2 ~]# ip neigh show dev flannel.1
+  10.244.2.0 lladdr 72:10:86:1f:57:18 PERMANENT
+  10.244.0.0 lladdr 8e:1b:9f:a8:26:96 PERMANENT    # 表示这个邻居项是手动或通过某种机制写入的，不会被系统自动清除
+  
+  [root@master2 ~]# ss -unlp|grep 8472
+  UNCONN 0      0            0.0.0.0:8472      0.0.0.0:* 
+  ```
+
+  ```ABAP
+  在 Flannel 这类只支持单租户、无隔离需求的场景中，这里VXLANHeader中的 VNI 没有实际用途，但为了满足 VXLAN 协议格式，必须填写（即使它一直是固定的，比如 VNI=1）
+  ```
+
+- 封装完UDPHeader后，根据FDB，找到目的 VETP flannel.1 的 MAC 地址  对应的 所在节点的 IP
+
+  ```bash
+  [root@node1 ~]$ bridge fdb show flannel.1|grep 72:10:86:1f:57:18
+  72:10:86:1f:57:18 dev flannel.1 dst 11.0.1.103 self permanent      # 根据这条记录找到正确的节点地址11.0.1.103
+  ```
+
+- 找到目的IP所在节点的IP后，将其封装在最外层，后续根据正常的路由发送到目的节点，也就是在最外层封装下一条网关的MAC地址
+
+![image-20250326172315923](../markdown_img/image-20250326172315923.png)
+
+- 在封装目节点IP的时候，**源 IP 会被替换成宿主机节点的 IP**，因为**源地址 IP 会影响数据包的“返回路径”和“中间网络设备的行为”，这是必须替换成宿主机 IP 的根本原因之一。**
+
+  ```css
+  ''' 数据包封装结构图（从内到外）'''
+  ┌──────────────────────────────────────┐
+  │          原始Pod数据包               │
+  │  Src IP: 10.244.1.2 (Pod1)           │
+  │  Dst IP: 10.244.2.2 (Pod2)           │
+  └──────────────────────────────────────┘
+            ↓  封装在 VXLAN payload 中
+  
+  ┌──────────────────────────────────────┐
+  │             VXLAN Header             │
+  │         VNI = 1（固定值）            │
+  └──────────────────────────────────────┘
+            ↓  封装在 UDP 中
+  
+  ┌──────────────────────────────────────┐
+  │             UDP Header               │
+  │  Src Port: 随机                      │
+  │  Dst Port: 8472（VXLAN标准端口）    │
+  └──────────────────────────────────────┘
+            ↓  封装在 IP 包中
+  
+  ┌──────────────────────────────────────┐
+  │             Outer IP Header          │
+  │  Src IP: 11.0.1.101（宿主机1）       │
+  │  Dst IP: 11.0.1.103（宿主机2）       │
+  └──────────────────────────────────────┘
+  ```
+
+  
+
+
+
+### Kubernetes 网络模型 与 CNI 网络插件
+
+在上述的讲解中，这些例子有一个共性，那就是用户的容器都连接在 docker0 网桥上。而网络插件则在宿主机上创建了一个特殊的设备（UDP 模式创建的是 TUN 设备，VXLAN 模式创建的则是 VTEP 设备），docker0 与这个设备之间，通过 IP 转发（路由表）进行协作
+
+然后，网络插件真正要做的事情，则是通过某种方法，把不同宿主机上的特殊设备连通，从而达到容器跨主机通信的目的
+
+上面这个流程，也正是 Kubernetes 对容器网络的主要处理方法。只不过，Kubernetes 是通过一个叫作 CNI 的接口，维护了一个单独的网桥来代替 docker0。这个网桥的名字就叫作：CNI 网桥，它在宿主机上的设备名称默认是：**cni0。**
+
+以 Flannel 的 VXLAN 模式为例，在 Kubernetes 环境里，它的工作方式只不过，docker0 网桥被替换成了 CNI 网桥而已，如下所示：
+
+
+
+![image-20250327091544986](../markdown_img/image-20250327091544986.png)
+
+
+
+在这里，Kubernetes 为 Flannel 分配的子网范围是 10.244.0.0/16。这个参数可以在部署的时候指定，比如：
+
+```bash
+$ kubeadm init --pod-network-cidr=10.244.0.0/16
+```
+
+也可以在部署完成后，通过修改 kube-controller-manager 的配置文件来指定。
+
+这时候，假设 Infra-container-1 要访问 Infra-container-2（也就是 Pod-1 要访问 Pod-2），这个 IP 包的源地址就是 10.244.0.2，目的 IP 地址是 10.244.1.3。而此时，Infra-container-1 里的 eth0 设备，同样是以 Veth Pair 的方式连接在 Node 1 的 cni0 网桥上。所以这个 IP 包就会经过 cni0 网桥出现在宿主机上。
+
+此时，Node 1 上的路由表，如下所示：
+
+```bash
+# 在Node 1上
+$ route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+...
+10.244.0.0      0.0.0.0         255.255.255.0   U     0      0        0 cni0
+10.244.1.0      10.244.1.0      255.255.255.0   UG    0      0        0 flannel.1
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+```
+
+为我们的 IP 包的目的 IP 地址是 10.244.1.3，所以它只能匹配到第二条规则，也就是 10.244.1.0 对应的这条路由规则。
+
+可以看到，这条规则指定了本机的 flannel.1 设备进行处理。并且，flannel.1 在处理完后，要将 IP 包转发到的网关（Gateway），正是“隧道”另一端的 VTEP 设备，也就是 Node 2 的 flannel.1 设备。所以，接下来的流程就跟Flannel VXLAN 模式完全一样了。
+
+需要注意的是，CNI 网桥只是接管所有 CNI 插件负责的、即 Kubernetes 创建的容器（Pod）。而此时，如果你用 docker run 单独启动一个容器，那么 Docker 项目还是会把这个容器连接到 docker0 网桥上。所以这个容器的 IP 地址，一定是属于 docker0 网桥的 172.17.0.0/16 网段。
+
+Kubernetes 之所以要设置这样一个与 docker0 网桥功能几乎一样的 CNI 网桥，主要原因包括两个方面：
+
+- 一方面，Kubernetes 项目并没有使用 Docker 的网络模型（CNM），所以它并不希望、也不具备配置 docker0 网桥的能力；
+- 另一方面，这还与 Kubernetes 如何配置 Pod，也就是 Infra 容器的 Network Namespace 密切相关。
+
+我们知道，Kubernetes 创建一个 Pod 的第一步，就是创建并启动一个 Infra 容器，用来“hold”住这个 Pod 的 Network Namespace
+
+所以，CNI 的设计思想，就是：**Kubernetes 在启动 Infra 容器之后，就可以直接调用 CNI 网络插件，为这个 Infra 容器的 Network Namespace，配置符合预期的网络栈**
+
+```ABAP
+一个 Network Namespace 的网络栈包括：
+网卡（Network Interface）、回环设备（Loopback Device）、路由表（Routing Table）和 iptables 规则。
+```
+
+
+
+##### CNI 插件的部署方式
+
+那么，这个网络栈的配置工作又是如何完成的呢？
+
+为了回答这个问题，我们就需要从 CNI 插件的部署和实现方式谈起了。
+
+我们在部署 Kubernetes 的时候，有一个步骤是安装 kubernetes-cni 包，它的目的就是在宿主机上安装 CNI 插件所需的基础可执行文件
+
+```ABAP
+在使用 kubeadm 安装 Kubernetes 集群的过程中，kubernetes-cni 包作为它们的依赖项自动安装的。
+```
+
+验证
+
+```bash
+[root@node1 ~]#apt-cache depends kubelet | grep kubernetes-cni
+  依赖: kubernetes-cni
+```
+
+在安装完成后，你可以在宿主机的 /opt/cni/bin 目录下看到它们，如下所示：
+
+```bash
+[root@node1 ~]#ls -al /opt/cni/bin/
+总计 209428
+-rwxr-xr-x 1 root root  4141145  3月 26 21:44 bandwidth
+-rwxr-xr-x 1 root root  4652757  1月 11  2024 bridge
+-rwxr-xr-x 1 root root 65288440  3月 26 21:44 calico
+-rwxr-xr-x 1 root root 65288440  3月 26 21:44 calico-ipam
+-rwxr-xr-x 1 root root 11050013  1月 11  2024 dhcp
+-rwxr-xr-x 1 root root  4297556  1月 11  2024 dummy
+-rwxr-xr-x 1 root root  4736299  1月 11  2024 firewall
+-rwxr-xr-x 1 root root  2586700  3月 26 21:44 flannel
+-rwxr-xr-x 1 root root  4191837  1月 11  2024 host-device
+-rwxr-xr-x 1 root root  3637994  3月 26 21:44 host-local
+-rwxr-xr-x 1 root root  4315686  1月 11  2024 ipvlan
+-rwxr-xr-x 1 root root  3705893  3月 26 21:44 loopback
+-rwxr-xr-x 1 root root  4349395  1月 11  2024 macvlan
+-rwxr-xr-x 1 root root  4178588  3月 26 21:44 portmap
+-rwxr-xr-x 1 root root  4470977  1月 11  2024 ptp
+-rwxr-xr-x 1 root root  3851218  1月 11  2024 sbr
+-rwxr-xr-x 1 root root  3110828  1月 11  2024 static
+-rwxr-xr-x 1 root root  4371897  1月 11  2024 tap
+-rwxr-xr-x 1 root root  3861557  3月 26 21:44 tuning
+-rwxr-xr-x 1 root root  4310173  1月 11  2024 vlan
+-rwxr-xr-x 1 root root  4001842  1月 11  2024 vrf
+```
+
+这些 CNI 的基础可执行文件，按照功能可以分为三类：
+
+**第一类，叫作 Main 插件，它是用来创建具体网络设备的二进制文件**。比如，bridge（网桥设备）、ipvlan、loopback（lo 设备）、macvlan、ptp（Veth Pair 设备），以及 vlan。
+
+Flannel、Weave 等项目，都属于“网桥”类型的 CNI 插件。所以在具体的实现中，它们往往会调用 bridge 这个二进制文件。
+
+**第二类，叫作 IPAM（IP Address Management）插件，它是负责分配 IP 地址的二进制文件。**比如，dhcp，这个文件会向 DHCP 服务器发起请求；host-local，则会使用预先配置的 IP 地址段来进行分配。
+
+**第三类，是由 CNI 社区维护的内置 CNI 插件。**比如：flannel，就是专门为 Flannel 项目提供的 CNI 插件；tuning，是一个通过 sysctl 调整网络设备参数的二进制文件；portmap，是一个通过 iptables 配置端口映射的二进制文件；bandwidth，是一个使用 Token Bucket Filter (TBF) 来进行限流的二进制文件。
+
+从这些二进制文件中，我们可以看到，如果要实现一个给 Kubernetes 用的容器网络方案，其实需要做两部分工作，以 Flannel 项目为例：
+
+**首先，实现这个网络方案本身。**这一部分需要编写的，其实就是 flanneld 进程里的主要逻辑。比如，创建和配置 flannel.1 设备、配置宿主机路由、配置 ARP 和 FDB 表里的信息等等。
+
+**然后，实现该网络方案对应的 CNI 插件**。这一部分主要需要做的，就是配置 Infra 容器里面的网络栈，并把它连接在 CNI 网桥上。
+
+由于 Flannel 项目对应的 CNI 插件已经被内置了，所以它无需再单独安装。
+
+接下来，你就需要在宿主机上安装 flanneld（网络方案本身）。而在这个过程中，flanneld 启动后会在每台宿主机上生成它对应的 **CNI 配置文件（它其实是一个 ConfigMap）**，从而告诉 Kubernetes，这个集群要使用 Flannel 作为容器网络方案。
+
+这个 CNI 配置文件的内容如下所示：
+
+```bash
+$ cat /etc/cni/net.d/10-flannel.conflist 
+{
+  "name": "cbr0",
+  "plugins": [
+    {
+      "type": "flannel",
+      "delegate": {
+        "hairpinMode": true,
+        "isDefaultGateway": true
+      }
+    },
+    {
+      "type": "portmap",
+      "capabilities": {
+        "portMappings": true
+      }
+    }
+  ]
+}
+```
+
+需要注意的是，在 Kubernetes 中，处理容器网络相关的逻辑并不会在 kubelet 主干代码里执行，而是会在具体的 CRI（Container Runtime Interface，容器运行时接口）实现里完成。对于 Docker 项目来说，要继续使用 Docker 作为运行时，必须用社区维护的 [**cri-dockerd**](https://github.com/Mirantis/cri-dockerd) 适配器
+
+所以，接下来cri-dockerd会加载上述的CNI配置文件
+
+需要注意，Kubernetes 目前不支持多个 CNI 插件混用。如果你在 CNI 配置目录（/etc/cni/net.d）里放置了多个 CNI 配置文件的话，cri-dockerd 只会加载按字母顺序排序的第一个插件。
+
+但另一方面，CNI 允许你在一个 CNI 配置文件里，通过 plugins 字段，定义多个插件进行协作。
+
+比如，在我们上面这个例子里，Flannel 项目就指定了 flannel 和 portmap 这两个插件。
+
+**这时候，cri-dockerd 会把这个 CNI 配置文件加载起来，并且把列表里的第一个插件、也就是 flannel 插件，设置为默认插件。**而在后面的执行过程中，flannel 和 portmap 插件会按照定义顺序被调用，从而依次完成“配置容器网络”和“配置端口映射”这两步操作
+
+
+
+##### CNI 插件的工作原理
+
+当 kubelet 组件需要创建 Pod 的时候，它第一个创建的一定是 Infra 容器。所以在这一步，cri-dockerd 就会先调用 Docker API 创建并启动 Infra 容器，紧接着执行一个叫作 SetUpPod 的方法。这个方法的作用就是：为 CNI 插件准备参数，然后调用 CNI 插件为 Infra 容器配置网络。
+
+这里要调用的 CNI 插件，就是 `/opt/cni/bin/flannel`；而调用它所需要的参数，分为两部分。
+
+**第一部分，是由 cri-dockerd 设置的一组 CNI 环境变量**
+
+其中，最重要的环境变量参数叫作：CNI_COMMAND。它的取值只有两种：ADD 和 DEL。
+
+**这个 ADD 和 DEL 操作，就是 CNI 插件唯一需要实现的两个方法。**
+
+其中 ADD 操作的含义是：把容器添加到 CNI 网络里；DEL 操作的含义则是：把容器从 CNI 网络里移除掉。
+
+而对于网桥类型的 CNI 插件来说，这两个操作意味着把容器以 Veth Pair 的方式“插”到 CNI 网桥上，或者从网桥上“拔”掉。
+
+
+
+接下来，**以 ADD 操作为重点进行讲解**。
+
+CNI 的 ADD 操作需要的参数包括：
+
+- 容器里网卡的名字 eth0（CNI_IFNAME）
+- Pod 的 Network Namespace 文件的路径（CNI_NETNS）
+- 容器的 ID（CNI_CONTAINERID）等
+
+这些参数都属于上述环境变量里的内容。其中，Pod（Infra 容器）的 Network Namespace 文件的路径，我在前面讲解容器基础的时候提到过，即：`/proc/< 容器进程的 PID>/ns/net`
+
+除此之外，在 CNI 环境变量里，还有一个叫作 CNI_ARGS 的参数。通过这个参数，CRI 实现（比如 cri-dockerd）就可以以 Key-Value 的格式，传递自定义信息给网络插件。这是用户将来自定义 CNI 协议的一个重要方法。
+
+```bash
+# 如果你是调试 CNI 插件或自己写插件，可以通过设置环境变量来测试执行：
+CNI_COMMAND=ADD \
+CNI_CONTAINERID=dummy \
+CNI_NETNS=/var/run/netns/test \
+CNI_IFNAME=eth0 \
+CNI_PATH=/opt/cni/bin \
+/opt/cni/bin/bridge < /etc/cni/net.d/10-bridge.conf
+```
+
+```ABAP
+在 Kubernetes 中，cri-dockerd 调用 CNI 插件时所需的环境变量确实是由 kubelet 传递给它的。
+```
+
+**详细解释如下：**
+
+🌐 1. **Kubelet 决定网络插件和参数**
+
+当 kubelet 启动时，它的参数中会包含如下与 CNI 相关的配置
+
+```bash
+# 下面参数为默认值
+--network-plugin=cni
+--cni-bin-dir=/opt/cni/bin
+--cni-conf-dir=/etc/cni/net.d
+```
+
+这些参数告诉 kubelet
+
+- 要使用 CNI 作为网络插件；
+- 去哪里找插件二进制；
+- 去哪里找 CNI 网络配置文件（JSON 格式）
+
+🔗 2. **kubelet 通过 CRI 与 cri-dockerd 通信**
+
+- kubelet 不直接调用 Docker，而是通过 CRI 与 **cri-dockerd** 通信；
+- 当 kubelet 需要创建一个 Pod，它先让 cri-dockerd 创建 **infra 容器（Pause 容器）**；
+- 然后调用 `SetUpPod()`，cri-dockerd 内部就会根据配置，执行对应的 CNI 插件；
+
+🧠 3. **cri-dockerd 调用 CNI 插件时使用的环境变量**
+
+当 cri-dockerd 调用某个 CNI 插件（如 `bridge`、`flannel`）时，它会自动设置以下环境变量 —— **这些变量的值就是由 kubelet 传递给 cri-dockerd 的：**
+
+| 环境变量          | 含义                              |
+| ----------------- | --------------------------------- |
+| `CNI_COMMAND`     | 操作类型（如 ADD、DEL）           |
+| `CNI_CONTAINERID` | 容器 ID（即 infra 容器）          |
+| `CNI_NETNS`       | 容器网络命名空间路径              |
+| `CNI_IFNAME`      | 网络接口名称，通常是 eth0         |
+| `CNI_PATH`        | 插件路径，来自 `--cni-bin-dir`    |
+| `CNI_ARGS`        | 附加信息，如 pod 名、namespace 等 |
+
+这些变量会传递给插件，插件再依据 `/etc/cni/net.d/` 下的 JSON 文件执行具体的网络操作
+
+
+
+**第二部分，则是 cri-dockerd 从 CNI 配置文件里加载到的、默认插件的配置信息。**
+
+
+
+**上述的整体流程梳理如下**
+
+1. **Pod 要创建了，kubelet 发起网络初始化**
+
+- kubelet 负责调用容器运行时（比如 `cri-dockerd`）来创建 Pod。
+- kubelet 会使用如下参数告诉运行时应该使用哪种网络插件：
+
+```bash
+--network-plugin=cni
+--cni-conf-dir=/etc/cni/net.d
+--cni-bin-dir=/opt/cni/bin
+```
+
+2. **kubelet 通过 cri-dockerd 调用 CNI 插件**
+
+- kubelet 通过 `--container-runtime-endpoint=unix:///run/cri-dockerd.sock` 连接到 `cri-dockerd`
+- 然后，cri-dockerd 会调用 `/opt/cni/bin` 目录下的 CNI 插件（如 flannel、bridge、calico）
+- 并 **传递必要的环境变量和参数**（如下 👇）
+
+3. **传入给 CNI 插件的典型环境变量**
+
+```bash
+CNI_COMMAND=ADD
+CNI_CONTAINERID=<容器ID>
+CNI_IFNAME=eth0
+CNI_NETNS=/proc/<pid>/ns/net
+CNI_PATH=/opt/cni/bin
+```
+
+这些环境变量 + 配置文件（如 `/etc/cni/net.d/10-flannel.conflist`）会一起交给插件执行
+
+4. **如果 `.conflist` 使用 `delegate`**
+
+- 如你看到的 Flannel 示例，它不会直接设置网络
+- 它根据 Pod 的信息和 flannel 自己的状态（如 `subnet.env`）生成新的配置：
+  - 把 bridge 类型、IPAM 分配等字段写入
+- 然后调用内置的 bridge 插件、host-local 插件执行网络创建
+
+```ABAP
+总结一句话：
+kubelet → cri-dockerd → 加载 /etc/cni/net.d/*.conflist → 调用插件（比如 flannel）→ flannel 内部通过 delegate 再调用 bridge 插件等 → 网络完成配置
+```
+
+
+
+**flannel 收到上述两部分参数后，网络配置的实际执行过程** 
+
+首先，CNI bridge 插件会在宿主机上检查 CNI 网桥是否存在。如果没有的话，那就创建它。这相当于在宿主机上执行：
+
+```bash
+# 在宿主机上
+$ ip link add cni0 type bridge
+$ ip link set cni0 up
+```
+
+接下来，CNI bridge 插件会通过 Infra 容器的 Network Namespace 文件，进入到这个 Network Namespace 里面，然后创建一对 Veth Pair 设备。
+
+紧接着，它会把这个 Veth Pair 的其中一端，“移动”到宿主机上。这相当于在容器里执行如下所示的命令：
+
+```bash
+#在容器里
+
+# 创建一对Veth Pair设备。其中一个叫作eth0，另一个叫作vethb4963f3
+$ ip link add eth0 type veth peer name vethb4963f3
+
+# 启动eth0设备
+$ ip link set eth0 up 
+
+# 将Veth Pair设备的另一端（也就是vethb4963f3设备）放到宿主机（也就是Host Namespace）里
+$ ip link set vethb4963f3 netns $HOST_NS
+
+# 通过Host Namespace，启动宿主机上的vethb4963f3设备
+$ ip netns exec $HOST_NS ip link set vethb4963f3 up 
+```
+
+这样，vethb4963f3 就出现在了宿主机上，而且这个 Veth Pair 设备的另一端，就是容器里面的 eth0。
+
+当然，你可能已经想到，上述创建 Veth Pair 设备的操作，其实也可以先在宿主机上执行，然后再把该设备的一端放到容器的 Network Namespace 里，这个原理是一样的。
+
+不过，CNI 插件之所以要“反着”来，是因为 CNI 里对 Namespace 操作函数的设计就是如此，如下所示：
+
+```bash
+err := containerNS.Do(func(hostNS ns.NetNS) error {
+  ...
+  return nil
+})
+```
+
+这个设计其实很容易理解。在编程时，容器的 Namespace 是可以直接通过 Namespace 文件拿到的；而 Host Namespace，则是一个隐含在上下文的参数。所以，像上面这样，先通过容器 Namespace 进入容器里面，然后再反向操作 Host Namespace，对于编程来说要更加方便。
+
+接下来，CNI bridge 插件就可以把 vethb4963f3 设备连接在 CNI 网桥上。这相当于在宿主机上执行：
+
+```bash
+# 在宿主机上
+$ ip link set vethb4963f3 master cni0
+```
+
+在将 vethb4963f3 设备连接在 CNI 网桥之后，CNI bridge 插件还会为它设置 Hairpin Mode（发夹模式）。这是因为，在默认情况下，网桥设备是不允许一个数据包从一个端口进来后，再从这个端口发出去的。但是，它允许你为这个端口开启 Hairpin Mode，从而取消这个限制。
+
+这个特性，主要用在容器需要通过NAT（即：端口映射）的方式，“自己访问自己”的场景下。
+
+举个例子，比如我们执行 docker run -p 8080:80，就是在宿主机上通过 iptables 设置了一条DNAT（目的地址转换）转发规则。这条规则的作用是，当宿主机上的进程访问“< 宿主机的 IP 地址 >:8080”时，iptables 会把该请求直接转发到“< 容器的 IP 地址 >:80”上。也就是说，这个请求最终会经过 docker0 网桥进入容器里面。
+
+但如果你是在容器里面访问宿主机的 8080 端口，那么这个容器里发出的 IP 包会经过 vethb4963f3 设备（端口）和 docker0 网桥，来到宿主机上。此时，根据上述 DNAT 规则，这个 IP 包又需要回到 docker0 网桥，并且还是通过 vethb4963f3 端口进入到容器里。所以，这种情况下，我们就需要开启 vethb4963f3 端口的 Hairpin Mode 了。
+
+所以说，Flannel 插件要在 CNI 配置文件里声明 hairpinMode=true。这样，将来这个集群里的 Pod 才可以通过它自己的 Service 访问到自己
+
+接下来，CNI bridge 插件会调用 CNI ipam 插件，从 ipam.subnet 字段规定的网段里为容器分配一个可用的 IP 地址。然后，CNI bridge 插件就会把这个 IP 地址添加在容器的 eth0 网卡上，同时为容器设置默认路由。这相当于在容器里执行：
+
+```bash
+# 在容器里
+$ ip addr add 10.244.0.2/24 dev eth0
+$ ip route add default via 10.244.0.1 dev eth0
+```
+
+最后，CNI bridge 插件会为 CNI 网桥添加 IP 地址。这相当于在宿主机上执行：
+
+```bash
+# 在宿主机上
+$ ip addr add 10.244.0.1/24 dev cni0
+```
+
+在执行完上述操作之后，CNI 插件会把容器的 IP 地址等信息返回给 dockershim，然后被 kubelet 添加到 Pod 的 Status 字段
+
+至此，CNI 插件的 ADD 方法就宣告结束了。接下来的流程，就跟我们上一篇文章中容器跨主机通信的过程完全一致了。
+
+```ABAP
+需要注意的是，对于非网桥类型的 CNI 插件，上述“将容器添加到 CNI 网络”的操作流程，以及网络方案本身的工作原理，就都不太一样了
+```
 
 
 
 
 
+### 解读 Kubernetes 三层网络方案
+
+#### Flannel 的 host-gw 模式
+
+![image-20250327140420571](../markdown_img/image-20250327140420571.png)
+
+​                        
+
+假设现在，Node 1 上的 Infra-container-1，要访问 Node 2 上的 Infra-container-2
+
+当你设置 Flannel 使用 host-gw 模式之后，flanneld 会在宿主机上创建这样一条规则，以 Node 1 为例：
+
+```bash
+$ ip route
+...
+10.244.1.0/24 via 10.168.0.3 dev eth0
+```
+
+这条路由规则的含义是：目的 IP 地址属于 10.244.1.0/24 网段的 IP 包，应该经过本机的 eth0 设备发出去（即：dev eth0）；并且，它下一跳地址（next-hop）是 10.168.0.3（即：via 10.168.0.3）。
+
+所谓下一跳地址就是：如果 IP 包从主机 A 发到主机 B，需要经过路由设备 X 的中转。那么 X 的 IP 地址就应该配置为主机 A 的下一跳地址。
+
+而从 host-gw 示意图中我们可以看到，这个下一跳地址对应的，正是我们的目的宿主机 Node 2。
+
+一旦配置了下一跳地址，那么接下来，当 IP 包从网络层进入链路层封装成帧的时候，eth0 设备就会使用下一跳地址对应的 MAC 地址，作为该数据帧的目的 MAC 地址。显然，这个 MAC 地址，正是 Node 2 的 MAC 地址。
+
+这样，这个数据帧就会从 Node 1 通过宿主机的二层网络顺利到达 Node 2 上。
+
+可以看到，**host-gw 模式的工作原理，其实就是将每个 Flannel 子网（Flannel Subnet，比如：10.244.1.0/24）的“下一跳”，设置成了该子网对应的宿主机的 IP 地址。**
+
+ ```ABAP
+ 也就是说，这台“主机”（Host）会充当这条容器通信路径里的“网关”（Gateway）。这也正是“host-gw”的含义。
+ ```
+
+当然，Flannel 子网和主机的信息，都是保存在 Etcd 当中的。flanneld 只需要 WACTH 这些数据的变化，然后实时更新路由表即可。
+
+```ABAP
+注意：在 Kubernetes v1.7 之后，类似 Flannel、Calico 的 CNI 网络插件都是可以直接连接 Kubernetes 的 APIServer 来访问 Etcd 的，无需额外部署 Etcd 给它们使用。
+```
+
+而在这种模式下，容器通信的过程就免除了额外的封包和解包带来的性能损耗。根据实际的测试，**host-gw 的性能损失大约在 10% 左右**，而**其他所有基于 VXLAN“隧道”机制的网络方案，性能损失都在 20%~30% 左右。**
+
+当然，通过上面的叙述，你也应该看到，host-gw 模式能够正常工作的核心，就在于 IP 包在封装成帧发送出去的时候，会使用路由表里的“下一跳”来设置目的 MAC 地址。这样，它就会经过二层网络到达目的宿主机。
+
+```ABAP
+所以说，Flannel host-gw 模式必须要求集群宿主机之间是二层连通的。
+```
+
+需要注意的是，宿主机之间二层不连通的情况也是广泛存在的。比如，宿主机分布在了不同的子网（VLAN）里。但是，在一个 Kubernetes 集群里，宿主机之间必须可以通过 IP 地址进行通信，也就是说至少是三层可达的。否则的话，你的集群将不满足上一篇文章中提到的宿主机之间 IP 互通的假设（Kubernetes 网络模型）。当然，“三层可达”也可以通过为几个子网设置三层转发来实现。            
+
+```ABAP
+而在容器生态中，要说到像 Flannel host-gw 这样的三层网络方案，我们就不得不提到这个领域里的“龙头老大”Calico 项目了。
+```
+
+实际上，Calico 项目提供的网络解决方案，与 Flannel 的 host-gw 模式，几乎是完全一样的。也就是说，Calico 也会在每台宿主机上，添加一个格式如下所示的路由规则：
+
+```bash
+<目的容器IP地址段> via <网关的IP地址> dev eth0
+```
+
+正如前所述，**这个三层网络方案得以正常工作的核心，是为每个容器的 IP 地址，找到它所对应的、“下一跳”的网关。**
+
+```ABAP
+不同于 Flannel 通过 Etcd 和宿主机上的 flanneld 来维护路由信息的做法，Calico 项目使用了一个“重型武器”来自动地在整个集群中分发路由信息。
+这个“重型武器”，就是 BGP。
+```
+
+**BGP 的全称是 Border Gateway Protocol，即：边界网关协议**。它是一个 Linux 内核原生就支持的、专门用在大规模数据中心里维护不同的“自治系统”之间路由信息的、无中心的路由协议。
 
 
 
+#### BGP简述
 
+![image-20250327141505381](../markdown_img/image-20250327141505381.png)
 
+​                       
 
+在这个图中，我们有两个自治系统（Autonomous System，简称为 AS）：AS 1 和 AS 2。而所谓的一个自治系统，指的是一个组织管辖下的所有 IP 网络和路由器的全体。你可以把它想象成一个小公司里的所有主机和路由器。在正常情况下，自治系统之间不会有任何“来往”。
+
+但是，如果这样两个自治系统里的主机，要通过 IP 地址直接进行通信，我们就必须使用路由器把这两个自治系统连接起来
+
+如，AS 1 里面的主机 10.10.0.2，要访问 AS 2 里面的主机 172.17.0.3 的话。它发出的 IP 包，就会先到达自治系统 AS 1 上的路由器 Router 1。
+
+而在此时，Router 1 的路由表里，有这样一条规则，即：目的地址是 172.17.0.2 包，应该经过 Router 1 的 C 接口，发往网关 Router 2（即：自治系统 AS 2 上的路由器）。
+
+所以 IP 包就会到达 Router 2 上，然后经过 Router 2 的路由表，从 B 接口出来到达目的主机 172.17.0.3。
+
+但是反过来，如果主机 172.17.0.3 要访问 10.10.0.2，那么这个 IP 包，在到达 Router 2 之后，就不知道该去哪儿了。因为在 Router 2 的路由表里，并没有关于 AS 1 自治系统的任何路由规则。
+
+所以这时候，网络管理员就应该给 Router 2 也添加一条路由规则，比如：目标地址是 10.10.0.2 的 IP 包，应该经过 Router 2 的 C 接口，发往网关 Router 1。
+
+上面这样负责把自治系统连接在一起的路由器，我们就把它形象地称为：**边界网关**。它跟普通路由器的不同之处在于，它的路由表里拥有其他自治系统里的主机路由信息。
+
+上面的这部分原理，相信你理解起来应该很容易。毕竟，路由器这个设备本身的主要作用，就是连通不同的网络。
+
+但是，你可以想象一下，假设我们现在的网络拓扑结构非常复杂，每个自治系统都有成千上万个主机、无数个路由器，甚至是由多个公司、多个网络提供商、多个自治系统组成的复合自治系统呢？
+
+这时候，如果还要依靠人工来对边界网关的路由表进行配置和维护，那是绝对不现实的
+
+而这种情况下，BGP 大显身手的时刻就到了。
+
+在使用了 BGP 之后，你可以认为，在每个边界网关上都会运行着一个小程序，它们会将各自的路由表信息，通过 TCP 传输给其他的边界网关。而其他边界网关上的这个小程序，则会对收到的这些数据进行分析，然后将需要的信息添加到自己的路由表里。
+
+这样，图 2 中 Router 2 的路由表里，就会自动出现 10.10.0.2 和 10.10.0.3 对应的路由规则了。
+
+所以说，**所谓 BGP，就是在大规模网络中实现节点路由信息共享的一种协议。**
+
+**关于BGP的详细知识，详情见知识扩展**
+
+在了解了 BGP 之后，Calico 项目的架构就非常容易理解了。它由三个部分组成：
+
+- **Calico 的 CNI 插件**。这是 Calico 与 Kubernetes 对接的部分。我已经在上一篇文章中，和你详细分享了 CNI 插件的工作原理，这里就不再赘述了。
+- **Felix**。它是一个 DaemonSet，负责在宿主机上插入路由规则（即：写入 Linux 内核的 FIB 转发信息库），以及维护 Calico 所需的网络设备等工作。
+- **BIRD**。它就是 BGP 的客户端，专门负责在集群里分发路由规则信息。
+
+**除了对路由信息的维护方式之外，Calico 项目与 Flannel 的 host-gw 模式的另一个不同之处，就是它不会在宿主机上创建任何网桥设备。**这时候，Calico 的工作方式，可以用一幅示意图来描述，如下所示（在接下来的讲述中，我会统一用“BGP 示意图”来指代它）：
+
+![image-20250327142246955](../markdown_img/image-20250327142246955.png)
+
+其中的绿色实线标出的路径，就是一个 IP 包从 Node 1 上的 Container 1，到达 Node 2 上的 Container 4 的完整路径
+
+可以看到，Calico 的 CNI 插件会为每个容器设置一个 Veth Pair 设备，然后把其中的一端放置在宿主机上（它的名字以 cali 前缀开头）。
+
+此外，由于 Calico 没有使用 CNI 的网桥模式，Calico 的 CNI 插件还需要在宿主机上为每个容器的 Veth Pair 设备配置一条路由规则，用于接收传入的 IP 包。比如，宿主机 Node 2 上的 Container 4 对应的路由规则，如下所示：
+
+```bash
+10.233.2.3 dev cali5863f3 scope link
+# 即：发往 10.233.2.3 的 IP 包，应该进入 cali5863f3 设备。
+```
+
+有了这样的 Veth Pair 设备之后，容器发出的 IP 包就会经过 Veth Pair 设备出现在宿主机上。然后，宿主机网络栈就会根据路由规则的下一跳 IP 地址，把它们转发给正确的网关。接下来的流程就跟 Flannel host-gw 模式完全一致了。
+
+其中，**这里最核心的“下一跳”路由规则，就是由 Calico 的 Felix 进程负责维护的。**这些路由规则信息，则是通过 BGP Client 也就是 BIRD 组件，使用 BGP 协议传输而来的。
+
+而这些通过 BGP 协议传输的消息，你可以简单地理解为如下格式：
+
+```bash
+[BGP消息]
+我是宿主机192.168.1.3
+10.233.2.0/24网段的容器都在我这里
+这些容器的下一跳地址是我
+```
+
+不难发现，Calico 项目实际上将集群里的所有节点，都当作是边界路由器来处理，它们一起组成了一个全连通的网络，互相之间通过 BGP 协议交换路由规则。这些节点，我们称为 **BGP Peer**。
+
+需要注意的是，Calico 维护的网络在默认配置下，是一个被称为“Node-to-Node Mesh”的模式。这时候，每台宿主机上的 BGP Client 都需要跟其他所有节点的 BGP Client 进行通信以便交换路由信息。但是，随着节点数量 N 的增加，这些连接的数量就会以 N²的规模快速增长，从而给集群本身的网络带来巨大的压力。
+
+所以，Node-to-Node Mesh 模式一般推荐用在少于 100 个节点的集群里。而在更大规模的集群中，你需要用到的是一个叫作 **Route Reflector** 的模式。
+
+在这种模式下，Calico 会指定一个或者几个专门的节点，来负责跟所有节点建立 BGP 连接从而学习到全局的路由规则。而其他节点，只需要跟这几个专门的节点交换路由信息，就可以获得整个集群的路由规则信息了。
+
+这些专门的节点，就是所谓的 Route Reflector 节点，它们实际上扮演了“中间代理”的角色，从而把 BGP 连接的规模控制在 N 的数量级上。
+
+```ABAP
+Flannel host-gw 模式最主要的限制，就是要求集群宿主机之间是二层连通的。而这个限制对于 Calico 来说，也同样存在。
+```
+
+举个例子，假如我们有两台处于不同子网的宿主机 Node 1 和 Node 2，对应的 IP 地址分别是 192.168.1.2 和 192.168.2.2。需要注意的是，这两台机器通过路由器实现了三层转发，所以这两个 IP 地址之间是可以相互通信的。
+
+而我们现在的需求，还是 Container 1 要访问 Container 4。
+
+按照我们前面的讲述，Calico 会尝试在 Node 1 上添加如下所示的一条路由规则：
+
+```bash
+10.233.2.0/16 via 192.168.2.2 eth0
+```
+
+但是，这时候问题就来了。
+
+上面这条规则里的下一跳地址是 192.168.2.2，可是它对应的 Node 2 跟 Node 1 却根本不在一个子网里，没办法通过二层网络把 IP 包发送到下一跳地址。
+
+**在这种情况下，你就需要为 Calico 打开 IPIP 模式。**
+
+我把这个模式下容器通信的原理，总结成了一张图片，如下所示（接下来我会称之为：IPIP 示意图）：
+
+![image-20250327143350887](../markdown_img/image-20250327143350887.png)
+
+在 Calico 的 IPIP 模式下，Felix 进程在 Node 1 上添加的路由规则，会稍微不同，如下所示：
+
+```bash
+10.233.2.0/24 via 192.168.2.2 tunl0
+```
+
+可以看到，尽管这条规则的下一跳地址仍然是 Node 2 的 IP 地址，但这一次，要负责将 IP 包发出去的设备，变成了 tunl0。注意，是 T-U-N-L-0，而不是 Flannel UDP 模式使用的 T-U-N-0（tun0），这两种设备的功能是完全不一样的。
+
+**Calico 使用的这个 tunl0 设备，是一个 IP 隧道（IP tunnel）设备。**    
+
+在上面的例子中，IP 包进入 IP 隧道设备之后，就会被 Linux 内核的 IPIP 驱动接管。IPIP 驱动会将这个 IP 包直接封装在一个宿主机网络的 IP 包中，如下所示：
+
+![image-20250327143630044](../markdown_img/image-20250327143630044.png)
+
+ 其中，经过封装后的新的 IP 包的目的地址（图 5 中的 Outer IP Header 部分），正是原 IP 包的下一跳地址，即 Node 2 的 IP 地址：192.168.2.2。
+
+而原 IP 包本身，则会被直接封装成新 IP 包的 Payload。
+
+这样，原先从容器到 Node 2 的 IP 包，就被伪装成了一个从 Node 1 到 Node 2 的 IP 包。
+
+由于宿主机之间已经使用路由器配置了三层转发，也就是设置了宿主机之间的“下一跳”。所以这个 IP 包在离开 Node 1 之后，就可以经过路由器，最终“跳”到 Node 2 上。
+
+这时，Node 2 的网络内核栈会使用 IPIP 驱动进行解包，从而拿到原始的 IP 包。然后，原始 IP 包就会经过路由规则和 Veth Pair 设备到达目的容器内部。
+
+不难看到，当 Calico 使用 IPIP 模式的时候，集群的网络性能会因为额外的封包和解包工作而下降。在实际测试中，Calico IPIP 模式与 Flannel VXLAN 模式的性能大致相当。所以，在实际使用时，如非硬性需求，**建议将所有宿主机节点放在一个子网里，避免使用 IPIP。**
+
+​                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
 
 ## Kubernetes网络插件详解
 
@@ -25983,6 +31374,12 @@ VXLAN，即 Virtual Extensible LAN（虚拟可扩展局域网），是 Linux 内
     - 默认网段：192.168.0.0/16
   - Cilium
     - 默认网段：192.168.0.0/16
+
+```ABAP
+Tip:正常情况下，节点的网络配置在节点的网络接口上，Service网络配置在节点的内核上，Pod网络节点上的虚拟的网络名称空间中。
+对于任何一个节点来讲，它的内核，就是这三个网络交汇的位置，因此对于任何一个节点上，从任何一个网络发出的请求，到达另外一个网络，只要位于集群的任意节点，都是可达的。
+这里可以抽象的将每个节点内核看做是一个路由，只要开启ip_forward转发，集群内和网络之间就是可达的
+```
 
 
 
@@ -26042,7 +31439,2351 @@ VXLAN，即 Virtual Extensible LAN（虚拟可扩展局域网），是 Linux 内
 **Calico解决方案**
 
 - 总的子网是192.168.0.0/16
-- 默认使用**26bits**掩码，进行子网划分
+- 默认使用**26bits**掩码，进行子网划分，因此子网数量：2 ^ 10 = 24，每个节点上的可用地址：2 ^ 6 - 2 = 62
+
+
+
+### Flannel网络插件
+
+由CoreOS研发，兼容CNI插件API，支持Kubernetes，OpenShift，Cloud Foundry，Mesos，Amazon ECS，Singularity和OPenSVC等平台。
+
+使用 “ 虚拟网桥 和 veth设备 ” 的方式为Pod创建虚拟网络接口，通过可配置的 “后端” 定义Pod间的通信网络，支持基于VXLAN 和 UDP 的 Overlay 网络，以及基于三层路由的Underlay网络
+
+- 虚拟网桥 cni
+- 隧道接口通常为 flannel.1
+
+在IP地址分配方面，它将预留的一个专用网络（默认为10.244.0.0/16）切分成多个子网后作为每个节点的 podCIDR，而后由节点已IPAM插件host-local进行地址分配，并将子网分配信息保存于etcd之中。
+
+
+
+#### Flannel 支持的“后端”
+
+**Flanneld**
+
+- Flannel在每个主机上运行一个名为flanneld的二进制代理程序
+
+  ```bash
+  [root@mystical ~]# ps -ef|grep flannel
+  root       30446   30426  0 10:04 ?        00:00:00 /opt/bin/flanneld --ip-masq --kube-subnet-mg
+  ```
+
+- 该程序负载从预留的网络中按照指定或默认的掩码长度为当前节点申请分配一个子网，并将网络配置，已分配的子网和辅助数据（例如主机的公网IP等）存储于Kubernetes API 或 etcd 中
+
+
+
+Flannel使用称为后端（backend）的容器网络机制转发跨节点的Pod报文，它目前支持的主流 backend 如下
+
+- **vxlan**
+  - 使用Linux内核中Vxlan模块封装隧道报文，以叠加网络模型支持跨节点的Pod间互联通信
+  - **额外支持直接路由（Direct Routing）模式，即混合模式**，该模式下位于同二层网络内的节点上的Pod间通信可通过路由模式直接发送，而跨网络的节点之上的Pod间通信仍要使用VXLAN隧道协议转发
+  - vxlan后端模式中，Flannel监听于**8472/UDP**发送封装的数据包
+- **host-gw**
+  - 类似于VXLAN中的直接路由模式，但不支持跨网络的节点，因此这种方式强制要求各节点本身必须在同一个二层网络中，不太适用于较大的网络规模
+  - 有着较好的转发性能，且易于设定，推荐对报文转发性能要求较高的场景使用
+- **udp**
+  - 使用常规UDP报文封装完成隧道转发，性能较前两种方式低很多，它仅应该用在不支持前两种后端的环境中使用
+  - UDP后端模式中，Flannel监听于**8285/UDP**发送封装的报文
+
+
+
+#### Flannel更改后端网络模式
+
+```bash
+[root@mystical ~]# kubectl get cm -n kube-flannel 
+NAME               DATA   AGE
+kube-flannel-cfg   2      19m
+kube-root-ca.crt   1      19m
+
+[root@mystical ~]# kubectl edit cm -n kube-flannel kube-flannel-cfg
+......
+  net-conf.json: |
+    {
+      "Network": "10.244.0.0/16",
+      "EnableNFTables": false,
+      "Backend": {
+        # "Type": "vxlan"   # 更改这里
+        "Type": "host-gw"
+      }
+    }
+    
+# 重启DeamonSet
+[root@mystical ~]# kubectl rollout restart daemonset kube-flannel-ds -n kube-flannel
+
+# 查看 
+[root@master2 ~]# route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         11.0.1.2        0.0.0.0         UG    0      0        0 eth0 
+10.244.0.0      11.0.1.101      255.255.255.0   UG    0      0        0 eth0      # 新生成的路由
+10.244.1.0      0.0.0.0         255.255.255.0   U     0      0        0 cni0
+10.244.2.0      11.0.1.103      255.255.255.0   UG    0      0        0 eth0      # 新生成的路由
+11.0.1.0        0.0.0.0         255.255.255.0   U     0      0        0 eth0
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+
+
+# 更改为混合模式，即跨网段使用vxlan，不跨网段，使用host-gw
+[root@mystical ~]# kubectl edit cm -n kube-flannel kube-flannel-cfg
+......
+  net-conf.json: |
+    {
+      "Network": "10.244.0.0/16",
+      "EnableNFTables": false,
+      "Backend": {
+        "Type": "vxlan"
+        "Directrouting": "true"   # 添加这行
+      }
+    }
+......
+
+# 重启DeamonSet
+[root@mystical ~]# kubectl rollout restart daemonset kube-flannel-ds -n kube-flannel
+```
+
+
+
+
+
+### Calico 网络插件
+
+#### calico简介
+
+- calico被称作是纯三层网络插件，为什么
+  - 对比flannel，flannel使用的是虚拟网路接口是veth-pair，一段连接容器pod，另一端连接虚拟网桥cni0上，同一节点上的两个pod通信，可以直接通过网桥cni0进行通信，而网桥是二层设备，因此这里是基于二层网络的通信
+  - 而calico一样使用veth-pair（虚拟以太网接口对），一端注入到pod内部，另一端驻留在节点上，不会添加到某虚拟网桥上，而是直接保留在宿主机上，因此同一节点上的两个pod通信，相当于两个pod被内核链接起来，而内核相当于路由设备，因此同节点间的pod通信需要路由，因为没有网桥了，所以要指网关，最起码要指下一跳的地址，因此必须在通信前生成路由表条目
+  - 就因为哪怕是同一节点的pod要通信，也必须需要路由表进行路由，所以是纯三层网络
+
+- calico把每个节点都当做虚拟路由器(vrouter)，把每个节点上的pod都当做是“节点路由器”后的一个终端设备并为其分配一个ip地址
+
+- 各节点路由器通过bgp(border gateway protocol)协议学习生成路由规则，从而实现不同节点上pod间的互联互通
+
+- calico在每一个计算节点利用linux内核实现了一个高效的vrouter（虚拟路由器）进行报文转发，而每个 vrouter 通过 bgp协议 负责把自身所属的节点上的运行的pod资源的ip地址信息**基于节点的agent程序 (felix) 直接由vrouter生成路由规则**向整个calico网络内传播
+
+
+
+#### Calico 系统组件
+
+![image-20250328155236970](../markdown_img/image-20250328155236970.png)
+
+概括来说，calico主要由felix、orchestrator、etcd、bird和bgprouterreflector等组件组成
+
+- **Felix**：核心 agent，负责配置本地节点，维护本节点的路由、iptables、安全策略
+
+  - 读取 etcd 或 K8s API 中的数据（例如：Pod 信息、NetworkPolicy、IPPool 等）
+  - 根据这些信息
+    - 设置 iptables（用于网络策略），**通常都是修改Filter表**
+    - 添加本节点的 `cali*` 接口（veth 对端）
+    - 写入本节点的路由表（让本地内核知道怎么转发流量）
+
+  ```ABAP
+  重点：Felix 只配置本地内核，不负责跨节点通告。
+  ```
+
+- **Orchestrator Plugin**：编排系统（比如k8s，openstack等）用于将calico整合进行系统中的插件，例如k8s的cni
+
+- **etcd**：持久存储calico数据的存储管理系统
+
+- **BIRD**：进行 BGP 路由通告，告知其他节点我有哪些 Pod 网络
+
+  - 从本地内核读取已经添加的路由（例如：某个 Pod CIDR 在我这里）
+  - 通过 BGP 协议，将这些路由广播给 BGP peer（也就是其他节点或路由器）
+  - 同时接收其他节点通告来的路由，更新本地路由表（使得跨节点通信可达）
+
+  ```ABAP
+  重点：BIRD 不负责路由添加，只负责“通告”和“接收”路由。
+  ```
+
+- **BGPRoute Reflector**：BGP路由反射器，可选组件，用于较大规模的网络场景
+
+
+
+##### Felix 和 BIRD 的关系
+
+**Felix 负责 IGP，BIRD 负责 BGP**
+
+| 组件      | 类比                | 职责                                                         |
+| --------- | ------------------- | ------------------------------------------------------------ |
+| **Felix** | IGP（内部网关协议） | 配置本地路由表（Interface + 路由），就像传统 IGP 维护本地节点的邻接关系、接口信息 |
+| **BIRD**  | BGP（边界网关协议） | 跨节点进行路由通告和学习，让所有节点知道彼此有哪些 Pod 网络段 |
+
+
+
+![image-20250328164803605](../markdown_img/image-20250328164803605.png)
+
+
+
+##### Calico-kube-controller
+
+`calico-kube-controllers` 是一个 **控制器组件**，部署在 Kubernetes 集群中，负责 **监听 Kubernetes 的资源变化（如 NetworkPolicy、Namespace、ServiceAccount 等）**，然后 **将它们同步为 Calico 所使用的自定义资源（CRD）**，并触发网络策略生效。
+
+
+
+**🔹Calico-kube-controller 的作用**
+
+Kubernetes 支持原生的 `NetworkPolicy` 资源，但它只定义了 API，对实际如何实现并不负责。
+
+**Calico 的网络策略功能**非常强大，但它使用的是自己定义的一套 CRD，比如：
+
+- `GlobalNetworkPolicy`
+- `NetworkPolicy`
+- `HostEndpoint`
+- `NetworkSet`
+
+所以我们需要一个组件来：
+
+1. **监听 Kubernetes 原生的资源变化**
+2. **将它们转换为 Calico 的 CRD 资源**
+3. **驱动策略在节点上落地（例如通过 Felix）**
+
+这就是 `calico-kube-controllers` 的职责。
+
+
+
+🔹**它都包含了哪些 Controller**
+
+这是一个控制器集合（controller set），包含多个子控制器，比如：
+
+| 控制器名称                   | 功能说明                                                     |
+| ---------------------------- | ------------------------------------------------------------ |
+| `PolicyController`           | 监听 K8s 的 `NetworkPolicy`，并转换为 Calico 的策略          |
+| `NamespaceController`        | 将 namespace 中的 labels 同步到 Calico 的策略域（便于策略使用 namespace selector） |
+| `ServiceAccountController`   | 同步 K8s ServiceAccount 作为 Calico 策略的 selector 条件     |
+| `NodeController`             | 将 K8s Node 的状态同步到 Calico 中（用于路由信息）           |
+| `WorkloadEndpointController` | 维护每个 Pod 的网络端点资源                                  |
+| `ServiceController`          | 管理 `Service` 资源相关的策略（例如 egress）                 |
+
+可以通过 deployment 的 `--controllers` 参数启用/关闭其中某些 controller。
+
+
+
+🔹**Calico-kube-controller 和 Felix 的关系**
+
+- `calico-kube-controllers` 负责“翻译”K8s原生命令，并存入（API Server 或 etcd）
+
+- 而 `Felix` 负责“执行”这些策略，且是直接从存储层（API Server 或 etcd）中读取翻译后的 CRD 数据。
+
+```gfm
+[Kubernetes 原生资源]
+     │
+     ▼
+[calico-kube-controllers]
+     │      （转换为 CRD）
+     ▼
+[CRD 存储：K8s API Server 或 etcd]
+     │
+     ▼
+[Felix] —— 读取这些 CRD，生成网络策略和路由
+```
+
+
+
+##### Typha
+
+**🔹 Typha 是什么？**
+
+**Typha** 是 Calico 的一个组件，**用于优化大规模 Kubernetes 集群中 Felix 与 Kubernetes API Server（或 etcd）之间的数据同步效率**。
+
+```ABAP
+在一个大型集群中，每个节点上的 Felix 进程都需要 watch 来自 API Server 或 etcd 的资源更新（比如 Pod、NetworkPolicy、Node 等），当节点数量一多（比如 100+ 节点），Kubernetes API Server 会被大量连接压垮
+```
+
+
+
+**🔹Typha 的作用**
+
+Typha 作为一个 **“中间代理”**，在 API Server 和大量 Felix 之间起到了中转作用：
+
+```css
+[API Server]
+     ↑
+     │  （少量连接）
+ [Typha Server]
+   ↑     ↑     ↑
+ [Felix] [Felix] [Felix]   ← 每个节点上的 agent
+```
+
+🌟 **优点**
+
+- 减少对 API Server 的压力（只需要 Typha 连接）
+- 更高效的事件分发（Typha 将同样的事件“广播”给 Felix）
+- 更适合 **大规模集群（>50节点）**
+
+
+
+🔹**Typha 的部署方式**
+
+- **使用 Tigera Operator 或 Helm 安装 Calico 时** 👉 **会自动配置 `calico-node` 指向 Typha**
+- **使用 `calico.yaml` 手动安装时** 👉 **你需要手动修改 DaemonSet 中 `calico-node` 的环境变量来指定 Typha 的地址**。
+
+
+
+###### 自动配置的情况（使用 Operator 或 Helm）
+
+```bash
+helm install calico projectcalico/tigera-operator \
+  --set installation.typha.replicaCount=3
+```
+
+或者你使用的是包含 `operator.tigera.io` 的 manifest 文件安装（即 Tigera Operator），**Typha 会自动部署好并自动配置好 `calico-node` 连接 Typha**，你无需手动更改。
+
+在 `calico-node` 的容器中，会自动有如下环境变量：
+
+```yaml
+- name: FELIX_TYPHAADDR
+  valueFrom:
+    fieldRef:
+      fieldPath: status.podIP
+```
+
+或者直接是
+
+```yaml
+- name: FELIX_TYPHAADDR
+  value: "typha.calico.svc.cluster.local:5473"
+```
+
+
+
+###### 手动部署时需要手动配置
+
+如果你使用了官方的 `calico.yaml` 
+
+```bash
+curl https://docs.projectcalico.org/manifests/calico.yaml -O
+```
+
+然后又手动添加了 Typha 的部署，那么你还需要去手动编辑 `calico-node` 的 DaemonSet，在容器环境变量中添加：
+
+```yaml
+- name: FELIX_TYPHAADDR
+  value: "typha.calico.svc.cluster.local:5473"
+```
+
+这一步是手动配置！否则 Felix 还是会默认去连 Kubernetes API Server。
+
+**修改方式举例**
+
+```bash
+kubectl edit daemonset calico-node -n kube-system
+```
+
+添加到 `env:` 下：
+
+```yaml
+        env:
+        - name: FELIX_TYPHAADDR
+          value: "typha.calico.svc.cluster.local:5473"
+```
+
+保存后，`DaemonSet` 会滚动更新，Felix 会连上 Typha。
+
+
+
+##### 补充问题：Felix 是从哪里 watch 网络策略（如 NetworkPolicy）等数据的？我如何指定它从 apiserver 还是 etcd 获取？
+
+Calico 的 Felix 是通过 **`DatastoreType`** 参数来决定是从哪里获取数据的：
+
+| 数据源       | 作用方式                                                     |
+| ------------ | ------------------------------------------------------------ |
+| `kubernetes` | Felix 从 **K8s API Server** 获取 Calico CRD 数据（推荐方式） |
+| `etcd`       | Felix 从 **etcd** 直接获取 Calico 自定义资源（老方式）       |
+
+
+
+**如何配置 `DatastoreType`**
+
+在 `calico-node` Pod 中（DaemonSet 的容器），通过设置环境变量：
+
+```yaml
+- name: DATASTORE_TYPE
+  value: "kubernetes"
+```
+
+或者
+
+```yaml
+- name: DATASTORE_TYPE
+  value: "etcd"
+```
+
+就可以控制 Felix 的数据来源。通常这个配置在 `calico-node` DaemonSet 的 `calico` 容器中。
+
+**示例：配置为使用 Kubernetes API Server**
+
+```yaml
+        env:
+        - name: DATASTORE_TYPE
+          value: "kubernetes"
+        - name: KUBECONFIG
+          value: "/etc/cni/net.d/calico-kubeconfig"
+```
+
+这表示 Felix 会去访问 Kubernetes API Server 中注册的 Calico CRDs，比如：
+
+- `networkpolicies.crd.projectcalico.org`
+- `bgppeers.crd.projectcalico.org`等等
+
+**示例：配置为使用 etcd**
+
+如果你使用 `etcd` 模式部署 Calico（常见于早期的纯 Calico 网络，无 Kubernetes），则配置：
+
+```yaml
+        env:
+        - name: DATASTORE_TYPE
+          value: "etcd"
+        - name: ETCD_ENDPOINTS
+          value: "https://<your-etcd-endpoint>:2379"
+        - name: ETCD_CA_CERT_FILE
+          value: "/calico-secrets/etcd-ca"
+        - name: ETCD_CERT_FILE
+          value: "/calico-secrets/etcd-cert"
+        - name: ETCD_KEY_FILE
+          value: "/calico-secrets/etcd-key"
+```
+
+**注意事项：**
+
+- **Kubernetes 模式**（通过 CRD 存储）是目前 Calico 的 **默认和推荐模式**。
+- 如果你部署的是 Calico 插件用于 K8s 网络，默认就是 `kubernetes` 模式。
+- 只有当你明确部署了外部 etcd，并用了 old-school Calico 网络架构，才会设置为 `etcd` 模式。
+
+```ABAP
+通常50个节点以上使用Typha，而100个节点以上使用BGPRoute Reflector
+```
+
+
+
+
+
+
+
+#### 隧道模型 (Overlay)
+
+- **IPIP（IP - IN - IP）**
+- **VXLAN**
+
+![image-20250327143350887](../markdown_img/image-20250327143350887.png)
+
+
+
+##### ipip隧道
+
+- 适用性好，尤其是跨多子网的网络环境
+- 存在额外开销，mtu一般要设置为1480
+- ipip模式同样需要使用bgp协议，以完成路由分发
+
+- 难以使用该模式的常见场景
+  - 禁止使用ipip协议的环境，例如：azure
+  - 阻止所有bgp报文的网络环境
+
+- 报文的流向：pod --> eth0 --> calixx --> tunl0 --> enp1s0
+
+##### vxlan隧道模式
+
+- 完全不依赖于bgp，开销较之ipip略大(mtu为1450)，但功能更为强大
+- 默认使用udp的4789端口
+- vxlan隧道出入口：vxlan.calico
+- 报文流向：pod --> eth0 --> calixxx --> vxlan.calico --> enp1so
+
+
+
+#### 路由模型 (Underlay)
+
+**基于BGP学习生成路由表**
+
+```ABAP
+如果节点间路由支持BGP协议，则可以跨子网，否则不能跨子网
+```
+
+![image-20250327142246955](../markdown_img/image-20250327142246955.png)
+
+- 每个 Pod 都会被 Calico 创建一个 `veth` 对（容器里是 `eth0`，宿主机上是以 `caliXXXX` 开头的接口）。
+- 这个 `caliXXX` 虚拟接口直接挂载在宿主机的网络命名空间中。
+
+
+
+**节点间通信：靠 主机路由表**
+
+- 每个宿主机会将其本地 Pod 的 IP 段通过 `ip route` 注册到内核路由表。
+
+- alico 会在每个节点上添加静态路由，指向其他节点的 Pod 网段：
+
+  ```bash
+  [root@node1 ~]#route -n
+  内核 IP 路由表
+  目标            网关            子网掩码        标志  跃点   引用  使用 接口
+  0.0.0.0         10.0.0.2        0.0.0.0         UG    0      0        0 eth0
+  10.0.0.0        0.0.0.0         255.255.255.0   U     0      0        0 eth0
+  172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+  192.168.22.0    0.0.0.0         255.255.255.0   U     0      0        0 *
+  192.168.22.14   0.0.0.0         255.255.255.255 UH    0      0        0 calid1eb843872f
+  192.168.22.15   0.0.0.0         255.255.255.255 UH    0      0        0 cali214a0d1d46d
+  192.168.22.16   0.0.0.0         255.255.255.255 UH    0      0        0 cali2266a186640
+  192.168.22.17   0.0.0.0         255.255.255.255 UH    0      0        0 cali2c6d5459769
+  192.168.22.18   0.0.0.0         255.255.255.255 UH    0      0        0 caliecbcd92008b
+  192.168.22.19   0.0.0.0         255.255.255.255 UH    0      0        0 calie58a73424e2
+  192.168.123.0   10.0.0.102      255.255.255.0   UG    0      0        0 eth0
+  192.168.252.0   10.0.0.104      255.255.255.0   UG    0      0        0 eth0
+  192.168.253.0   10.0.0.105      255.255.255.0   UG    0      0        0 eth0
+  ```
+
+**数据包通过 ARP表 定位具体 Pod**
+
+- 当数据包到达目标节点后，目的 IP 是 Pod 的地址
+- Linux 内核会从路由表上看到这个 IP 是 `10.244.2.x`（即本地子网）
+- 它查找这个地址在哪个 `caliXXXX` 接口上（ARP 查询），然后通过那个接口把包送入 Pod 容器的网络命名空间。
+
+```bash
+[root@node1 ~]#arp -n
+地址                     类型    硬件地址            标志  Mask            接口
+192.168.22.17            ether   5a:6c:92:d8:48:dd   C                     cali2c6d5459769
+192.168.22.16            ether   3a:54:a9:7f:07:42   C                     cali2266a186640
+192.168.22.19            ether   42:2f:fe:bf:f9:44   C                     calie58a73424e2
+10.0.0.105               ether   00:50:56:25:92:3d   C                     eth0
+10.0.0.103               ether   00:50:56:31:8d:87   C                     eth0
+10.0.0.104               ether   00:50:56:3d:93:a0   C                     eth0
+10.0.0.102               ether   00:50:56:3b:b3:19   C                     eth0
+10.0.0.2                 ether   00:50:56:eb:68:01   C                     eth0
+192.168.22.18            ether   26:cb:ed:9f:30:94   C                     caliecbcd92008b
+192.168.22.14            ether   22:86:9f:08:b2:90   C                     calid1eb843872f
+10.0.0.106               ether   00:50:56:27:b7:ba   C                     eth0
+```
+
+**补充：Pod内路由表解读**
+
+```bash
+[root@master1 ~]#kubectl exec myapp-547df679bb-67kkp -- route -n
+Kernel IP routing table
+Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
+0.0.0.0         169.254.1.1     0.0.0.0         UG    0      0        0 eth0
+169.254.1.1     0.0.0.0         255.255.255.255 UH    0      0        0 eth0
+```
+
+这张路由表的含义是什么？
+
+🔹 **网关 `169.254.1.1`**
+
+- 这个 IP 是 **宿主机上 veth 对端（caliXXXX）接口的地址**。
+- Pod 中的默认网关指向这个地址，是 CNI 插件（如 Calico）**自动分配并注入的“伪网关”地址**。
+
+它其实 **并不是真正的物理设备 IP**，而是 CNI 网络插件用于出网路由的一种**抽象跳板**，用来让 Pod 的网络流量从容器网络空间出来。
+
+**🔹 默认路由（0.0.0.0/0）**
+
+这行代表：
+
+```ABAP
+任何不在本地子网的 IP，发给 169.254.1.1（由 eth0 接口送出）
+```
+
+意思是：
+
+- 当 Pod 想访问任何非本地地址（比如其他 Pod、Service、外部网络）时，
+- 它就会将数据包发给这个“默认网关”。
+
+Pod 中出现 `169.254.1.1` 这样的网关地址，**通常就是跟 ARP Proxy（代理 ARP）机制有关**，而这个机制通常由像 Calico 这样的 CNI 插件启用的 **“代理网关”** 实现。
+
+**🔹Proxy ARP（代理 ARP）**
+
+**Proxy ARP** 指的是：
+
+一台主机（通常是网关或路由器）**代替其他主机响应 ARP 请求**，使得局域网中的主机可以把流量发送给它，然后由它来转发。
+
+这个行为在 **Calico 的直接路由（Direct Routing）模式或 BGP 模式中很常见**：
+
+- 每个 Pod 的网关设为 `169.254.1.1`
+- 宿主机（即 calico-node）通过开启 `Proxy ARP`，在内核中响应对这个地址的 ARP 请求
+- Pod 发包时，目标 MAC 地址就会被宿主机（Proxy ARP）接收，从而将数据包送出
+
+```bash
+[root@node1 ~]#cat /proc/sys/net/ipv4/conf/cali2c6d5459769/proxy_arp
+1
+```
+
+**示例**
+
+Pod 路由：
+
+```bash
+Destination     Gateway         Genmask         Flags Iface
+0.0.0.0         169.254.1.1     0.0.0.0         UG    eth0
+```
+
+宿主机上通过 Proxy ARP 响应 ARP 请求
+
+```bash
+# Pod 想找 169.254.1.1 的 MAC
+# 宿主机响应：我就是（Proxy ARP）
+```
+
+宿主机收到后，如果发送给同节点的其他Pod，在使用宿主机上的arp表，将数据发送到对应的接口
+
+```bash
+[root@node1 ~]#arp -n
+地址                     类型    硬件地址            标志  Mask            接口
+192.168.22.17            ether   5a:6c:92:d8:48:dd   C                     cali2c6d5459769
+192.168.22.16            ether   3a:54:a9:7f:07:42   C                     cali2266a186640
+192.168.22.19            ether   42:2f:fe:bf:f9:44   C                     calie58a73424e2
+10.0.0.105               ether   00:50:56:25:92:3d   C                     eth0
+10.0.0.103               ether   00:50:56:31:8d:87   C                     eth0
+10.0.0.104               ether   00:50:56:3d:93:a0   C                     eth0
+10.0.0.102               ether   00:50:56:3b:b3:19   C                     eth0
+10.0.0.2                 ether   00:50:56:eb:68:01   C                     eth0
+192.168.22.18            ether   26:cb:ed:9f:30:94   C                     caliecbcd92008b
+192.168.22.14            ether   22:86:9f:08:b2:90   C                     calid1eb843872f
+10.0.0.106               ether   00:50:56:27:b7:ba   C                     eth0
+```
+
+如果不是同节点，则根据路由表发给对应节点
+
+```ABAP
+Calico模式启用IPIP模式，将 Calico 的 ipipMode 设置成ipipMode: Never，此时禁用了 IPIP 隧道封装，新的节点间通信会使用直接路由（host-gw 模式），不再使用 IPIP 了。
+
+但是tunl0 还在
+tunl0 是 Linux 系统下由 calico-node 的 felix 或 bird 自动创建的虚拟网络接口，用来封装/解封装 IPIP 数据包。
+你即使将 IPIP 模式关闭了：
+
+Felix 不会主动删除 tunl0 接口
+因为 Calico 没法判断这个接口是否在被其他系统使用
+所以为了安全起见，它保留了这个接口
+
+可以手动删除tunl
+ip link delete tunl0
+删除后如果 Calico 再次启动时仍然启用了 IPIP，它会重新创建 tunl0
+```
+
+
+
+#### 混合模型
+
+- **BGP With IPIP**
+- **BGP With VXLAN**
+
+
+
+#### 部署calico插件
+
+- 部署方式：
+
+  - operator：由专用的operator和crd管理
+  - manifest：基于配置清单进行部署
+    - 将kubernetes api作为存储，节点数小于等于50
+    - 将kubernetes api作为存储，节点数大于50；重点在于启用typha
+    - 使用专用的etcd数据存储，不推荐 
+
+- 部署前要关注的几项配置
+
+  - 选用的pod cidr及子网掩码长度
+    - 默认为192.168.0.0/16
+    - 可修改
+
+  ```shell
+  env:
+  - name: calico_ipv4pool_cidr
+    value: "192.168.0.0/16"
+  - name: calico_ipv4pool_block_size
+    value: "24"  # 默认26位
+  ```
+
+- 选用的路由模式
+
+  - always, never, cross-subnet
+
+  ```shell
+  env:
+  # 默认ipip:always，且ipip和vxlan只能二选一
+  - name: calico_ipv4pool_ipip
+    value: "Always"
+  - name: calico_ipv4pool_vxlan
+    value: "Never"
+  - name: calico_ipv6pool_vxlan
+    value: "Never"
+  ```
+
+- ipip和vxlan的mtu
+
+  - 默认由configmap/calico-config提供配置
+
+- bgp要是用的ip地址
+
+```shell
+env:
+- name: ip
+  value: "autodetect"
+  # value: "interface=ens33" 
+  # 选择bgp通过哪个接口将子网信息同步给其他节点
+  # autodetect是自动探测
+  # 如果探测错了，需要手动进行更改，手动更改的前提是标准化接口名称等
+```
+
+
+
+#### ippool crd
+
+ippool的作用
+
+- calico可用于为pod配置ip地址的地址池
+- 配置路由模式
+- 支持在同一集群上配置使用多个地址池
+  - 可通过annotation配置默认的ippool
+  - 可通过nodeselector限定其使用到的目标节点
+- 需要预留一小段地址时，可通过ipreservation crd进行定义
+
+```yaml
+apiversion: crd.projectcalico.org/v1
+kind: ippool
+metadata:
+  name: ...
+spec:
+  alloweduses: <[]string> #支持的使用场景，可选项有tunnel和workload
+  blocksize: <integer> # 使用的子网掩码长度，ipv4默认为26，ipv6默认为122
+  cidr: <string>  # 使用的cidr
+  ipipmode: <string>   # ipip的启用模式，默认为never
+  natoutgoing: <boolean>   # 目标地址不在本地cidr范围内时，是否启用snat
+  vxlanmode: <string>   # vxlan的启用模式，默认为never
+  nodeselector: <string>  # 地址池适用到的目标节点，此为节点的标签选择器
+  disablebgpexport: <boolean>  # 是否禁止bgp传播本地址池内的相关路由
+  disabled: <boolean> # 是否禁用本地址池
+```
+
+
+
+#### calico部署
+
+- 重置kubeadm
+
+```shell
+kubeadm reset -f 
+
+# 清除网路插件和残留数据
+rm -rf /etc/cni/net.d
+rm -rf $home/.kube
+
+rm -rf /var/lib/cni
+```
+
+- 主节点执行kubeadm初始化
+
+```shell
+k8s_release_version=1.30.2 && kubeadm init --control-plane-endpoint kubeapi.feng.org --kubernetes-version=v${k8s_release_version} --pod-network-cidr 192.168.0.0/16 --service-cidr 10.96.0.0/12 --image-repository registry.aliyuncs.com/google_containers --token-ttl=0 --upload-certs --cri-socket=unix:///run/cri-dockerd.sock
+
+# worker节点加入主节点
+kubeadm join kubeapi.feng.org:6443 --token se55ec.bu2rwnwjz13os7ss \
+--discovery-token-ca-cert-hash sha256:0b6211893138164398ebcb2b17661178e03010dc662ffeccc52843751a68ef91 --cri-socket=unix:///run/cri-dockerd.sock
+```
+
+- 下载calico的yaml文件
+
+```shell
+curl https://raw.githubusercontent.com/projectcalico/calico/v3.28.1/manifests/calico.yaml -o
+
+# 编辑修改calico.yaml
+# 选用的pod cidr及子网掩码长度  
+- name: calico_ipv4pool_cidr
+  vlaue: "192.168.0.0/16"
+  name: calico_ipv4pool_block_size
+  values: "24"
+
+# 选用的路由模式：always, never, cross-subnet
+env:
+- name: calico_ipv4pool_ipip
+  value: "always"
+- name: calico_ipv4pool_vxlan
+  value: "never"
+- name: calico_ipv6pool_vxlan
+  value: "never"
+```
+
+- 执行calico的yaml
+
+```shell
+kubectl apply -f calico.yaml
+
+# 下载calicoctl
+curl -l https://github.com/projectcalico/calico/releases/download/v3.28.1/calicoctl-linux-amd64 -o calicoctl
+
+# 授权并加入path变量
+chmod +x ./calicoctl
+mv calicoctl /usr/local/bin
+
+# 使用calicoctl查看node状态
+[root@master1 ~]#calicoctl get node -o wide
+name               asn       ipv4            ipv6   
+master1.feng.org   (64512)   10.0.0.121/24          
+worker1.feng.org   (64512)   10.0.0.122/24          
+worker2.feng.org   (64512)   10.0.0.123/24          
+worker3.feng.org   (64512)   10.0.0.124/24 
+```
+
+#### 路由模式分析
+
+- ipip模式
+  - ipip的隧道在隧道出入口处，抓不到封装的包，必须在物理网卡处才能看到封装成节点报文的包
+
+#### calico切换模式
+
+```shell
+kubectl get ippool default-ipv4-ippool -o yaml > ippool.yaml
+
+vim ippool.yaml
+
+apiversion: crd.projectcalico.org/v1
+kind: ippool
+metadata:
+  annotations:
+    projectcalico.org/metadata: '{"creationtimestamp":"2024-08-25t11:47:34z"}'
+  creationtimestamp: "2024-08-25t11:47:34z"
+  generation: 1
+  name: default-ipv4-ippool
+  resourceversion: "1521"
+  uid: 2a607e35-fdcd-4bf9-affc-86ef119e86ad
+spec:
+  alloweduses:
+  - workload
+  - tunnel
+  blocksize: 24
+  cidr: 192.168.0.0/16
+  ipipmode: never    # 将其改为never，当ipip和vxlan都是never时，则成功切换成路由模式
+  natoutgoing: true
+  nodeselector: all()
+  vxlanmode: never
+
+# 在从节点查看路由表
+# 隧道节点已经没了
+内核 IP 路由表
+目标            网关            子网掩码        标志  跃点   引用  使用 接口
+0.0.0.0         10.0.0.2        0.0.0.0         UG    0      0        0 eth0
+10.0.0.0        0.0.0.0         255.255.255.0   U     0      0        0 eth0
+10.244.0.0      10.0.0.121      255.255.255.0   UG    0      0        0 eth0
+10.244.1.0      10.0.0.122      255.255.255.0   UG    0      0        0 eth0
+10.244.2.0      10.0.0.123      255.255.255.0   UG    0      0        0 eth0
+172.17.0.0      0.0.0.0         255.255.0.0     U     0      0        0 docker0
+192.168.163.0   10.0.0.123      255.255.255.0   UG    0      0        0 eth0
+192.168.210.0   0.0.0.0         255.255.255.0   U     0      0        0 *
+192.168.210.2   0.0.0.0         255.255.255.255 UH    0      0        0 cali1b10d3456be
+192.168.222.0   10.0.0.122      255.255.255.0   UG    0      0        0 eth0
+192.168.247.0   10.0.0.121      255.255.255.0   UG    0      0        0 eth0
+
+# 切换混合模式
+vim ippool.yaml
+
+apiversion: crd.projectcalico.org/v1
+kind: ippool
+metadata:
+  annotations:
+    projectcalico.org/metadata: '{"creationtimestamp":"2024-08-25t11:47:34z"}'
+  creationtimestamp: "2024-08-25t11:47:34z"
+  generation: 1
+  name: default-ipv4-ippool
+  resourceversion: "1521"
+  uid: 2a607e35-fdcd-4bf9-affc-86ef119e86ad
+spec:
+  alloweduses:
+  - workload
+  - tunnel
+  blocksize: 24
+  cidr: 192.168.0.0/16
+  ipipmode: CrossSubnet    # 注意Cross和Subnet之间没有横杠
+  natoutgoing: true
+  nodeselector: all()
+  vxlanmode: never
+
+```
+
+
+
+
+
+#### BGP Peering
+
+- Calico在各节点间基于BGP传播路由信息
+  - BGP是路由器交换路由信息的标准路由协议
+    - iBGP：Interior Border Gateway Protocola, 负责在同一AS(自治系统,每个自治系统有自己的自治系统号)内的BGP路由器间传播路由，它通过递归方式进行路径选择
+    - eBGP：Exterior Border Gateway Protocol，用于在不同AS间传播BGP路由，它基于hop-by-hop机制进行路径选择
+  - 每个路由器都存在一到多个BGP Peer（对等端）
+  - Calico Node能够基于BGP协议将物理路由器作为BGP Peer
+
+- BGP的常用拓扑
+  - Full-mesh
+    - 启用BGP时，Calico默认在所有节点间建立一个AS(64512)，并基于iBGP为它们创建full-mesh连接
+    - 该模式较适用于集群规模较小(100个节点以内)的场景
+  - Route Reflectors
+    - 在大规模的iBGP场景中，BGP route reflectors能显著降低每个节点需要维护的BGP Peer的数量
+    - 可选择几个节点作为BGP RR,并在这些RR之间建立full-mesh拓扑
+    - 其他节点只需要同这些RR之间建立Peer连接即可
+  - ToR(Top of Rack)
+    - 节点直接同机柜栈顶的L3交换机建立Peer连接，并禁用默认的full-mesh模式
+    - Calico也能够完全支持eBGP机制，从而允许用户灵活构建出需要的网络拓扑
+
+![image-20250328211351849](../markdown_img/image-20250328211351849.png)
+
+#### 配置Route Reflector模式
+
+- 在100个节点规模以上的Calico集群环境中，为提升iBGP的效率，通常应该建立Router Reflector
+- 在大规模 Kubernetes 集群中，**建议使用多个 Worker 节点作为 Route Reflector（RR）**，以提高 **BGP 路由的扩展性、稳定性和性能**。
+- 配置步骤
+  - 禁用默认的Full-mesh拓扑
+  - 在选定的RR节点上添加专用的节点标签
+  - 配置集群节点同RR节点建立BGP会话
+
+- 创建BGPConfiguration对象，禁用默认的full-mesh拓扑
+
+```yaml
+# 查看calico的crd资源
+[root@master1 ~]#kubectl get crd -n -A|grep -i bgp
+bgpadvertisements.metallb.io                          2025-03-26T13:48:53Z
+bgpconfigurations.crd.projectcalico.org               2025-03-26T13:42:55Z
+bgpfilters.crd.projectcalico.org                      2025-03-26T13:42:55Z
+bgppeers.crd.projectcalico.org                        2025-03-26T13:42:55Z
+bgppeers.metallb.io                                   2025-03-26T13:48:53Z
+
+# 创建bgpconfigurations.crd.projectcalico.org资源
+apiVersion: crd.projectcalico.org/v1
+kind: BGPConfiguration
+metadata:
+  name: default
+spec:
+  logSeverityScreen: Info
+  # 是否启用full-mesh模式，默认为true
+  nodeToNodeMeshEnabled: false
+  nodeMeshMaxRestartTime: 120s
+  # 使用的自治系统号，默认为64512
+  asNumber: 65009
+  # BGP要对外通告的Service CIDR
+  ServiceClusterIPs:
+  - cidr: 10.96.0.0/12
+ 
+```
+
+- 创建BGPPeer对象，配置所有节点同选定的RR节点建立BGP Peer
+
+```yaml
+# 创建bgppeers.crd.projectcalico.org
+apiVersion: crd.projectcalico.org/v1
+kind: BGPPeer
+metadata:
+  name: bgppeer-rr
+spec:
+  # 节点标签选择器，定义当前配置要生效到的目标节点
+  nodeSelector: all()
+  # 该节点要请求与之建立BGP Peer的节点标签选择器，用于过滤和选定远端节点
+  peerSelector: route-reflector == 'true'
+ 
+```
+
+
+
+**详细配置示例**
+
+```http
+https://github.com/iKubernetes/learning-k8s/tree/master/ProjectCalico
+```
+
+
+
+
+
+
+
+
+
+### Cilium 网络插件
+
+Flannel 和 Calico 是利用内核中的 Netfilter 从而实现网络路由实现，而 Cilium 是使用ebpf实现的
+
+| 项目        | 技术机制                                                     | 实现说明                             |
+| ----------- | ------------------------------------------------------------ | ------------------------------------ |
+| **Flannel** | 使用 Linux 路由表 + VXLAN/IPIP + iptables（Netfilter）       | 比较简单，不负责安全策略、服务发现等 |
+| **Calico**  | 使用 Linux 路由表、IPIP/VXLAN/直接路由 + iptables（Netfilter） | 负责网络策略，支持 BGP，功能更强     |
+| **Cilium**  | 使用 **eBPF**（扩展的 BPF）来替代传统 iptables、实现负载均衡、网络策略、安全监控等 | 高性能、低延迟、云原生友好           |
+
+
+
+#### eBPF 简介
+
+eBPF 全称是：**extended Berkeley Packet Filter**
+
+它是一种运行在 Linux 内核中的“沙盒化程序”，可以在内核中运行用户定义的逻辑，而 **不需要内核模块重编译或重启系统**。
+
+**eBPF 可以做什么？**
+
+- 数据包过滤（比 iptables 更高效）
+- 路由转发（如 Cilium 直接用 eBPF 实现 pod 网络转发）
+- 性能监控（如 `bcc`、`bpftrace` 工具）
+- 系统调用拦截（用于安全策略、审计）
+- 负载均衡（Cilium 的 kube-proxy 替代方案）
+
+
+
+#### 隧道模式（Overlay）
+
+- **VXLAN**
+- **GENEVE**
+- **BGP（Cilium要使用BGP，必须部署kube-router）**
+
+
+
+
+
+#### 路由模型（Underlay）
+
+
+
+
+
+### NetWork Policy
+
+#### NetWork Policy **简介**
+
+- 标准的 API 资源类型
+- 由网络插件负责转换为节点上的iptables Filter规则，已定义 Pod 间的通信许可
+- 主要针对 TCP、UDP的 SCTP 协议，实现在 IP地址 或者 Port层面 进行流量控制
+- **NetworkPolicy 就是针对一组 Pod 进行管控，要么是管控自己能够访问谁（Egress），要么是管控谁能访问我（Ingress）**
+  - NetworkPolicy 不是设置在集群全局的，它是 **作用于被选中的一组 Pod**（通过 `podSelector`）。
+  - 就像你给某些 Pod 装了防火墙，它们能不能访问别人、能不能被别人访问，全看你在 Policy 里怎么写。
+
+
+
+#### Network Policy 的功能
+
+- 针对一组Pod，定义其同对端实体通信时，在入向（Ingress）或/和 出向（Egress）流量上的控制规则
+- 描述对端实体的方法有如下几种
+  - 一组 Pod 对象，通常基于标签选择器定义筛选条件
+  - 单个或一组名称空间
+  - IP地址块（但 Pod 同其所在的节点间的通信不受限制）
+- Network Policy 的具体实现依赖于 Network Plugin
+
+
+
+#### Network Policy 的生效机制
+
+- 默认情况下，一组Pod上的出向和入向流量均被允许
+- 同一方向上，适用于一组Pod的多个规则的生效遵循加法机制
+  - 一组Pod上，多个Ingress策略相加所生成的集合（并集）是为最终生效的效果
+  - 一组Pod上，多个Egress策略相同所生成的集合是为最终生效的策略	
+
+- 若同时定义了Ingress和Egress规则，针对一个对端，双向策略都为“许可”，通信才能真实实现
+
+
+
+#### Network Policy 资源规范
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ...
+  namespace: ...          # NetworkPolicy是名称空间级别的资源
+spec:
+  egress:                 # 出向流量控制规则，默认开放
+    to:                   # 出向流量控制规则，默认为开放；流量目标的表示方式与Ingress.from相同 
+    ports:                # 出向流量的目标端口；流量目标端口的表示方式与Ingress.ports相同
+  ingress:                # 入向流量控制规则，默认开放
+    from:                 # 入向流量源，多个列表项之间为"或"逻辑；未给定任何值或未定义该字段，将匹配所有流量源；
+                          # 定义了该字段且至少存在一个item，则表示仅允许指定的流量源
+      ipBlock:            # 源IP地址段，通常是网络地址；不支持同NamespaceSelector或podSeletor同时使用；
+        cidr:             # CIDR格式的网络地址
+        except:           # 要排除的地址列表，可以是CIDR格式的子网地址
+      namespaceSelector:  # namespace标签选择器，用于表示源自匹配到的Namespace内的所有流量
+      podSelector:        # pod标签选择器，用于表示源自匹配到的Pod上的所有流量；可以同namespaceSelector同时使用
+                          # 用于匹配选定的namespace中的pod
+    ports:                # 入向流量的目标端口，即流量源要访问的目标端口，生效机制同from
+      port:               # 端口，同endPort字段同时使用时，表示端口范围的起始端口号
+      endpoint:           # 端口号：同port字段同时使用时，表示端口范围的结束端口号
+      protocol:           # 协议，仅支持TCP、UDP和SCTP，默认为TCP
+  podSelector:            # Pod标签选择器，用于选定流量规则适用的对象，必选字段
+  policyTypes:            # 规则类型，支持Ingress，Egress，默认在两个方向上同时生效
+```
+
+
+
+#### Network Policy 资源示例
+
+```yaml
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-ingress
+spec:
+  podSelector: {}
+  ingress:            
+  - {}     # 此处，配置了Ingress字段，且添加了一个列表元素，表示仅允许匹配到的流量源，而一个为空的元素则表示匹配所有流量源
+  policyTypes:
+  - Ingress
+```
+
+```yaml
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  # ingress:
+  ingress: []  # 此处，不匹配ingress字段，或使用如下两种方式之一，意义相同；它们表示不匹配任何流量源：ingress:|ingress:[]
+  policyTypes:
+  - ingress
+```
+
+```yaml
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-selector-ingresses
+  namespace: default
+spec:
+  podSelector: {}
+  ingress:
+  - from:  # 第一个from中两个列表元素namespaceSelector和ipBlock，它们是并列关系，即匹配两个规则，因此取或
+    - namespaceSelector:
+      matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: in
+        values: ["default", "kuber-system", "monitor"]  # 如果同一名称空间中，没有匹配自己的名称空间，则名称空间内部无                                                           法通信
+    - ipBlock:
+      cidr: 192.168.10.0/24
+    ports: []  # ports为空，表示全匹配
+  - from:  # 第二个from中是第一个列表元素中的字段元素namespaceSelector和podSelector,即一个匹配规则两个条件，因此取与
+    - namespaceSelector:   # 两个from彼此间是或逻辑
+        matchLabels:
+          kubernetes.io/metadata.name: demo
+      podSelector:
+        matchExpressions:
+        - key: app
+          operator: in
+          values: ["demoapp","nginx"]
+    ports:
+    - port: 80
+      protocol: TCP
+  policyTypes:
+  - ingress
+```
+
+
+
+
+
+## Kubernetes 指标流水线
+
+### 资源指标
+
+Kubernetes有一些依赖于指标数据的组件，例如**HPA**和**VPA**等、
+
+- Kubernetes 使用 Metrics API 暴露系统指标给这些组件
+- 该 API 仅提供 CPU 和内存相关的指标数据
+- 负责支撑Metrics API、生成并提供指标数据的组件，称为核心指标流水线（Core Metrics Pipeline）
+
+![image-20250330151801963](../markdown_img/image-20250330151801963.png)
+
+- **cAdvisor**: 用于收集、聚合和公开 Kubelet 中包含的容器指标的守护程序。
+- **kubelet**: 用于管理容器资源的节点代理。 可以使用 /metrics/resource 和 /stats kubelet API 端点访问资源指标。
+- **Summary API**: kubelet 提供的 API，用于发现和检索可通过 /stats 端点获得的每个节点的汇总统计信息。
+- **metrics-server**: 集群插件组件，用于收集和聚合从每个 kubelet 中提取的资源指标。 API 服务器提供 Metrics API 以供 HPA、VPA 和 kubectl top 命令使用。Metrics Server 是 Metrics API 的参考实现。
+- **Metrics API**: Kubernetes API 支持访问用于工作负载自动缩放的 CPU 和内存。 要在你的集群中进行这项工作，你需要一个提供 Metrics API 的 API 扩展服务器。
+
+```ABAP
+cAdvisor 是 kubelet 内置的容器监控模块，负责将节点上每个容器的资源使用数据采集并提供给监控系统使用。
+```
+
+
+
+Kubernetes设计用于暴露其它指标的API，是**Custom  Metrics API** 和 **External Metrics API**
+
+- 此二者通常也要由专用的辅助API Server提供，例如著名的 **Prometheus Adapter** 项目
+- 负责支撑Custom Metrics API，生成并提供指标数据的组件，称为**自定义流水线**
+
+
+
+### 核心指标流水线和自定义指标流水线
+
+
+
+![image-20250330152904957](../markdown_img/image-20250330152904957.png)
+
+
+
+#### Metrics Server
+
+**Metrics Server介绍**
+
+由Kubernetes SIG社区维护
+
+从Kubelet收集CPU和内存的资源指标，默认每15秒收集一次，并经由Metrics API暴露
+
+设计用于支撑HPA和VPA等组件的功能，不适用于作为监控系统组件
+
+
+
+**部署要求**
+
+kube-apiserver 必须启用聚合层
+
+各节点必须启用Webhook认证和鉴权机制
+
+kubelet证书需要由Kubernetes CA签名，或者要使用"**--kubelet-insecure-tls**" 选项禁用证书验证
+
+Container Runtime需要支持container metrics RPC，或者内置**cAdvisor**
+
+控制平面节点需要经由**10250/TCP** 端口访问 Metrics Server
+
+Metrics Server需要访问所有的节点以采集指标，默认为 kubelet 监听的 10250 端口
+
+```bash
+[root@master1 ~]# curl -LO https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+#默认文件需要修改才能工作,因为默认需要内部证书验证和镜像地址k8s.gcr.io所以修改
+# vim components.yaml
+spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=10250
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        - --kubelet-insecure-tls
+        #image: registry.cn-hangzhou.aliyuncs.com/google_containers/metricsserver:v0.7.1 # 可以添加国内源
+        image: registry.k8s.io/metrics-server/metrics-server:v0.7.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+        name: metrics-server
+        ports:
+        - containerPort: 10250
+          name: https
+          protocol: TCP
+          
+[root@master1 yaml]# kubectl apply -f components.yaml 
+serviceaccount/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+service/metrics-server created
+deployment.apps/metrics-server created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+
+
+root@master1 yaml]#kubectl get pod -n kube-system metrics-server-b79d5c976-hqrct 
+NAME                             READY   STATUS    RESTARTS   AGE
+metrics-server-b79d5c976-hqrct   1/1     Running   0          60s
+[root@master1 yaml]#kubectl top node
+NAME      CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
+master1   62m          3%     910Mi           49%       
+node1     30m          1%     669Mi           36%       
+node2     20m          1%     927Mi           50%       
+node3     27m          1%     715Mi           39% 
+```
+
+
+
+#### 核心指标流水线（Core Metrics Pipeline）定义
+
+**核心指标流水线（Core Metrics Pipeline）** 是 Kubernetes 中一条由 kubelet 提供指标，Metrics Server 聚合处理的基础监控数据链路，专门用于支持 HPA（Horizontal Pod Autoscaler）、VPA（部分场景）、`kubectl top` 命令等核心功能。
+
+
+
+**构成组件**
+
+| 组件                  | 角色       | 说明                                                         |
+| --------------------- | ---------- | ------------------------------------------------------------ |
+| **cAdvisor**          | 指标采集器 | kubelet 内嵌，采集容器的 CPU、内存等实时指标                 |
+| **kubelet**           | 指标提供者 | 提供 `/metrics/resource` 和 `/stats/summary` 接口，被 Metrics Server 拉取 |
+| **Metrics Server**    | 指标聚合器 | 负责从每个 Node 的 kubelet 拉取指标，存入内存中，暴露 `/apis/metrics.k8s.io/` 接口 |
+| **HPA / kubectl top** | 消费者     | HPA 查询 Metrics Server 的 API，根据策略进行自动扩缩容；kubectl top 命令展示节点/Pod 实时资源使用 |
+
+
+
+在 **核心指标流水线** 中，**Metrics Server** 就是一个中间桥梁，它的核心作用就是：
+
+✅ **从各个 Node 的 kubelet（底层由 cAdvisor 提供指标）拉取指标**，
+✅ **转化为 Kubernetes 所理解的 Metrics API 格式**，
+✅ 并通过 `/apis/metrics.k8s.io/v1beta1` 暴露出来，供 **HPA、kubectl top、VPA（部分）** 使用。
+
+
+
+**整体流程**
+
+- `cAdvisor` 是 kubelet 内置组件，采集容器级别的 CPU、内存、网络等原始指标；
+- `kubelet` 会提供 `/stats/summary` 接口，把这些原始指标结构化；
+- `Metrics Server` 以 **定时轮询（默认 60s）** 的方式，从所有节点上的 kubelet 拉这些数据；
+- 然后聚合并缓存（保留短时间）这些数据；
+- 最后通过 Kubernetes 的 API Server 统一暴露为 `metrics.k8s.io` API 组。
+
+```ABAP
+核心指标流水线 = kubelet + cAdvisor + Metrics Server + HPA，它是 Kubernetes 内建的最轻量级的实时资源监控和自动扩缩容通道。
+```
+
+
+
+核心指标流水线仅暴露CPU和内存指标，而更多的其他指标并不支持，如果需要使用更多的指标，此需要自定义指标流水线
+
+
+
+#### 自定义指标流水线（Custom Metrics Pipeline）
+
+**自定义指标流水线定义**
+
+**自定义指标流水线**是指 Kubernetes 集群中，用于收集、处理、暴露和消费用户自己定义的业务指标或应用性能指标的整套体系。它通常服务于：
+
+- ⏫ **HPA（HorizontalPodAutoscaler）基于自定义指标的自动扩缩容**
+- 📈 **VPA 或其他策略型控制器的指标输入**
+- ✅ 更复杂的业务场景（比如 QPS、数据库连接数、Redis hit rate）
+
+
+
+##### 自定义指标流水线的组成结构
+
+可以分为 **三个层次**：
+
+**1️⃣ 应用层（业务侧）：产生指标**
+
+- 应用自身暴露 Prometheus 格式的 `/metrics` 接口，例如：
+
+  ```properties
+  http_requests_total{job="myapp", status="200"} 1234
+  redis_connection_pool_size{instance="redis"} 42
+  ```
+
+**2️⃣ 指标收集层：Prometheus + Adapter**
+
+- **Prometheus**：负责抓取业务 Pod 暴露的指标
+- **Custom Metrics Adapter**（如 Prometheus Adapter）：
+  - 负责将 Prometheus 中的指标转换为 Kubernetes 所识别的 API 格式
+  - 并将其注册在 API Server 中的 `/apis/custom.metrics.k8s.io/v1beta1/`
+
+**3️⃣ 消费层：HPA 控制器**
+
+- HPA 控制器通过 Kubernetes API 请求 `/apis/custom.metrics.k8s.io/...`
+- 拿到你设置的指标值
+- 再结合你的 HPA 配置（目标值、容器副本数）进行决策
+
+```ABAP
+App (指标源) --> Prometheus --> Prometheus Adapter --> custom.metrics.k8s.io --> HPA 控制器
+```
+
+
+
+#### kube-state-metrics
+
+Prometheus 本身只支持抓取 **Kubernetes 的运行时资源（Runtime objects）**，通过 `kubernetes_sd_config` 抓取的 `role` 主要包括：
+
+| Role 类型   | 描述                                        |
+| ----------- | ------------------------------------------- |
+| `pod`       | 采集 Pod 的 metrics（需 Pod 提供 /metrics） |
+| `endpoints` | 采集某个 Service 的 endpoints               |
+| `service`   | 采集 Service IP（通常用于静态探测）         |
+| `ingress`   | 获取 Ingress 信息                           |
+| `node`      | 节点级指标（如 node_exporter）              |
+| `apiserver` | 采集 K8s API Server 的状态                  |
+
+这些都是 **运行中的对象**，并不能提供资源定义层面的状态，例如：
+
+- Deployment 期望副本 vs 实际副本数量
+- PVC 是否绑定了 PV？
+- StatefulSet 的滚动升级状态
+- CronJob 上次运行是否成功？
+
+这些信息 **Prometheus 默认是拿不到的**，因为它不是通过 Metrics API 暴露的。
+
+
+
+##### kube-state-metrics 的作用
+
+✅ 专门为了 Prometheus 提供 **Kubernetes 状态对象的指标**。
+
+它以 Kubernetes Controller 的形式运行，监听如下 **控制层（Control Plane）对象**：
+
+| 类型        | 示例指标                               |
+| ----------- | -------------------------------------- |
+| Deployment  | `.spec.replicas` vs `.status.replicas` |
+| StatefulSet | `.status.readyReplicas`                |
+| DaemonSet   | `.status.numberUnavailable`            |
+| PVC / PV    | pvc phase（Bound、Pending）            |
+| CronJob     | 上次是否成功 / 下次调度时间            |
+| HPA         | 当前副本数 / 目标指标值                |
+| Namespace   | 状态（Active/Terminating）             |
+
+举个例子：
+
+```properties
+kube_deployment_status_replicas_ready{deployment="myapp"} = 3
+kube_persistentvolumeclaim_status_phase{namespace="default",persistentvolumeclaim="mypvc",phase="Bound"} 1
+```
+
+这些指标是 **Prometheus 本身无法直接获取的**，只有通过 `kube-state-metrics` 暴露给 Prometheus，才能实现这类业务逻辑或报警
+
+```ABAP
+类似于用于补充抓取Kubernetes默认可获取资源类型指标之外的资源类型指标的exporter
+```
+
+
+
+### Kubernetes **API Aggregation Layer** 工作机制
+
+API Aggregation Layer（简称 **AA Layer**）是 Kubernetes **扩展 API 的机制之一**，允许你将外部的、非核心的 API Server 集成到主 Kubernetes API Server 中，表现得就像是原生的一部分。
+
+![image-20250330182658650](D:\git_repository\cyber_security_learning\markdown_img\image-20250330182658650.png)
+
+
+
+#### 工作流程说明
+
+当客户端发起请求时：
+
+```ABAP
+Client → kube-apiserver → Aggregation Layer → 外部扩展 API Server（如 Metrics Server） → 返回数据
+```
+
+
+
+#### 场景举例（以 Metrics Server 为例）
+
+当你运行如下命令：
+
+```bash
+kubectl top pod
+```
+
+实际过程：
+
+1. `kubectl` 向 `kube-apiserver` 发起请求 `/apis/metrics.k8s.io/v1beta1/...`
+2. kube-apiserver 的 **Aggregation Layer** 判断该 API 由 `metrics-server` 提供；
+3. 请求被**代理转发**给注册在 Aggregation Layer 的扩展 API Server（即 `metrics-server`）；
+4. `metrics-server` 返回指标数据；
+5. kube-apiserver 将结果返回给 `kubectl`。
+
+
+
+**支持 API Aggregation 的组件举例**
+
+| 组件                         | 说明                                                         |
+| ---------------------------- | ------------------------------------------------------------ |
+| `metrics-server`             | 采集资源指标的扩展 API，路径是 `/apis/metrics.k8s.io`        |
+| `custom-metrics-apiserver`   | 提供 HPA 使用的自定义指标                                    |
+| `external-metrics-apiserver` | 提供外部服务指标（如队列长度）                               |
+| 你自定义的 API Server        | 如基于 [KubeBuilder](https://github.com/kubernetes-sigs/kubebuilder) 构建 |
+
+
+
+#### Prometheus Adapter
+
+在 Kubernetes 中，**Prometheus Adapter** 就是一个**扩展 API Server**，它通过 **[API Aggregation Layer（聚合层）]** 与主 API Server 进行集成，从而支持 **自定义指标（Custom Metrics）** 和 **外部指标（External Metrics）** 的查询。
+
+
+
+**使用 Prometheus Adapter 的关键流程如下：**
+
+✅ 1. **Adapter 本身是一个扩展 API Server**
+
+- 它实现了 Kubernetes 自定义指标 API (`custom.metrics.k8s.io`) 和/或外部指标 API (`external.metrics.k8s.io`)。
+- 它会暴露出这些 API 的路径，如 `/apis/custom.metrics.k8s.io/v1beta1/...`。
+
+✅ 2. **通过注册 `APIService` 对象使其可用**
+
+- 要使 Kubernetes 聚合层识别并转发请求给这个扩展 API Server，需要注册一个 `APIService` 资源。
+
+- 这个资源指定：
+
+  - API 的组名（如 `custom.metrics.k8s.io`）
+  - 对应的服务地址（即 Prometheus Adapter 的 `Service`）
+
+  示例：
+
+  ```yaml
+  apiVersion: apiregistration.k8s.io/v1
+  kind: APIService
+  metadata:
+    name: v1beta1.custom.metrics.k8s.io
+  spec:
+    group: custom.metrics.k8s.io
+    version: v1beta1
+    service:
+      name: prometheus-adapter
+      namespace: monitoring
+    groupPriorityMinimum: 100
+    versionPriority: 100
+  ```
+
+✅ 3. **使用场景**
+
+- **Horizontal Pod Autoscaler（HPA）v2** 就可以通过这个 API 使用 Prometheus 提供的自定义指标。
+- 例如，你可以根据某个应用暴露的自定义 `requests_per_second` 指标来自动扩缩容。
+
+
+
+#### APIService资源类型
+
+要使用扩展apiServer必须，必须注册对应的APIService对象
+
+Kubernetes 的聚合层机制允许你通过扩展 API Server 提供额外的 API 组，但前提是：
+
+> ☑️ 你要告诉主 API Server：
+>  “这个 API 组（例如 `custom.metrics.k8s.io`）不是你本身提供的，请转发到我这里（扩展 API Server）。”
+
+这个“告诉”的动作，就是通过创建一个 `APIService` 资源来实现的。
+
+
+
+**工作流程如下：**
+
+1. **Prometheus Adapter**（或其他扩展 API Server）启动并在集群中运行，通常作为一个 `Deployment` 和 `Service`。
+
+2. **你创建 `APIService` 对象**：
+
+   ```yaml
+   apiVersion: apiregistration.k8s.io/v1
+   kind: APIService
+   metadata:
+     name: v1beta1.custom.metrics.k8s.io
+   spec:
+     group: custom.metrics.k8s.io
+     version: v1beta1
+     service:
+       name: prometheus-adapter     # 指向 adapter 的 Service 名
+       namespace: monitoring
+     groupPriorityMinimum: 100
+     versionPriority: 100
+   ```
+
+3. Kubernetes 聚合层会自动将对 `/apis/custom.metrics.k8s.io/v1beta1/...` 的请求，转发给这个 Adapter。
+
+4. HPA 等组件就可以通过这个路径拿到 Prometheus 中的指标了。
+
+
+
+### Prometheus 部署至 Kubernetes
+
+#### Prometheus 为什么能服务发现 Kubernetes 的 apiServer
+
+Prometheus 通过 `kubernetes_sd_configs` 实现对 Kubernetes 集群的自动服务发现，它是靠 **Kubernetes 官方 Go Client（client-go）** 连接 API Server 的。
+
+```bash
+# 解释GO Client
+✅ Prometheus 内置了对 Kubernetes 的服务发现功能，而它内部用的正是 Kubernetes 官方的 Go 客户端库 client-go！
+✅ client-go 是 Kubernetes 官方提供的 用于操作 Kubernetes API 的 Go 语言客户端库。
+✅ 凡是要与 Kubernetes API Server 通信的 Go 应用（比如 Prometheus、Ingress Controller、Operator 等），基本都会用它。
+
+# Prometheus 是如何使用 client-go 的？
+📦Prometheus 的模块结构里有一个叫：discovery/kubernetes
+这个模块就是专门用于与 Kubernetes 集成的，里面封装了对 Kubernetes API 的访问逻辑。
+它的实现直接依赖 client-go，可以自动实现：
+✅ pod/service/endpoint/ingress/node 的服务发现（通过 kubernetes_sd_configs）
+✅ 自动读取集群内部的 service account（含 token、CA、namespace）
+✅ 自动构造客户端与 API Server 通信
+```
+
+
+
+**而 `client-go` 会自动从以下几个地方读取 API Server 的地址和凭据：**
+
+| 优先级 | 来源说明                                                     |
+| ------ | ------------------------------------------------------------ |
+| 1️⃣      | 环境变量 `KUBERNETES_SERVICE_HOST` 和 `KUBERNETES_SERVICE_PORT`（**Pod 运行在集群中自动注入**） |
+| 2️⃣      | 默认的 service DNS 名 `https://kubernetes.default.svc`       |
+| 3️⃣      | `~/.kube/config`（如果你在外部部署 Prometheus）              |
+
+
+
+**场景说明**
+
+**✅ 场景1：Prometheus 运行在 K8s 集群内部（通常是这种）**
+
+1. Kubernetes 会将以下环境变量注入到 Pod 中：
+
+   ```bash
+   KUBERNETES_SERVICE_HOST=10.96.0.1
+   KUBERNETES_SERVICE_PORT=443
+   ```
+
+2. 并挂载 `/var/run/secrets/kubernetes.io/serviceaccount` 目录中的：
+
+   - `ca.crt`
+   - `token`
+   - `namespace`
+
+3. Prometheus 通过这些信息自动连接到 API Server，然后开始基于 `kubernetes_sd_configs` 的服务发现。
+
+**✅ 场景2：Prometheus 在集群外部运行**
+
+- 你需要手动配置 `kubeconfig` 文件：
+
+  ```yaml
+  kubernetes_sd_configs:
+    - role: pod
+      api_server: https://<apiserver-ip>:6443
+      kubeconfig_file: /path/to/kubeconfig
+  ```
+
+
+
+**🧪 验证方法**
+
+你可以 exec 进 Prometheus Pod 中，看下环境变量：
+
+```bash
+kubectl exec -it <prometheus-pod> -n <namespace> -- env | grep KUBERNETES
+```
+
+你也可以看下挂载的 token：
+
+```bash
+kubectl exec -it <prometheus-pod> -n <namespace> -- cat /var/run/secrets/kubernetes.io/serviceaccount/token
+```
+
+```ABAP
+Prometheus 是通过 kubernetes_sd_configs + Kubernetes 的 service account token 自动连接到当前集群的 API Server 的，无需手动指定地址。
+```
+
+
+
+
+
+#### Prometheus 在 Kubernetes 中抓取目标的完整流程
+
+**1️⃣ 使用 `client-go` 自动发现 Kubernetes API Server**
+
+Prometheus 启动后，会自动使用内置的 `client-go`：
+
+- 通过集群中的 **ServiceAccount Token** 和 **Kube API 的 CA** 来访问 API Server。
+- 这些信息默认在容器内 `/var/run/secrets/kubernetes.io/serviceaccount/` 下挂载。
+
+**2️⃣ `kubernetes_sd_configs` 实现资源发现（Service Discovery）**
+
+在 `prometheus.yml` 中配置：
+
+```yaml
+kubernetes_sd_configs:
+  - role: pod        # 这里可以换成 endpoints、service、node、ingress 等
+```
+
+每个 `role` 对应一种资源发现对象，例如：
+
+| role        | 含义                               |
+| ----------- | ---------------------------------- |
+| `pod`       | 获取所有 Pod 列表                  |
+| `service`   | 获取所有 Service                   |
+| `endpoints` | 获取所有 Endpoint（Pod IP + 端口） |
+| `node`      | 获取所有 Node                      |
+| `ingress`   | 获取所有 Ingress                   |
+
+3️⃣ `relabel_configs` + 注解精准控制抓取目标
+
+比如你用 `endpoints` 作为 role，会抓到所有带有 endpoint 的服务，然后你可以通过注解在特定 Pod 或 Service 上控制 Prometheus 是否抓取：
+
+```yaml
+# 仅抓取带有 prometheus.io/scrape=true 的目标
+relabel_configs:
+  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+    action: keep
+    regex: true
+
+# 自定义抓取路径
+  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+    action: replace
+    target_label: __metrics_path__
+    regex: (.+)
+
+# 自定义抓取端口
+  - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+    action: replace
+    target_label: __address__
+    regex: (.+)
+    replacement: $1
+```
+
+**常用注解示例（加在 Pod 或 Service 上）：**
+
+```yaml
+annotations:
+  prometheus.io/scrape: "true"       # 是否抓取该目标的指标。设为 true 时才抓取。
+  prometheus.io/port: "8080"         # 指定抓取指标的端口号。默认为容器暴露的端口。   
+  prometheus.io/path: "/metrics"     # 指定抓取指标的 HTTP 路径，默认为 /metrics。
+```
+
+
+
+#### Prometheus 部署实现
+
+##### manifests方式部署
+
+```bash
+# 创建名称空间
+[root@master1 k8s-prom]#kubectl create namespace prom
+namespace/prom created
+
+# git拉取Prometheus的配置文件
+[root@master1 ~]# git clone https://github.com/iKubernetes/k8s-prom.git
+
+# 启用部署Prometheus
+[root@master1 ~]#cd k8s-prom/prometheus
+[root@master1 prometheus]#ls
+ingress              prometheus-deploy.yaml  prometheus-rules.yaml
+prometheus-cfg.yaml  prometheus-rbac.yaml    prometheus-svc.yaml
+[root@master1 prometheus]#kubectl apply -f . -n prom 
+configmap/prometheus-config created
+deployment.apps/prometheus-server created
+clusterrole.rbac.authorization.k8s.io/prometheus created
+serviceaccount/prometheus created
+clusterrolebinding.rbac.authorization.k8s.io/prometheus created
+configmap/prometheus-rules created
+service/prometheus created
+
+# 使用ingress暴露Prometheus
+[root@master1 prometheus]#cat ingress/ingress-prometheus.yaml 
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus
+  namespace: prom
+  labels:
+    app: prometheus
+spec:
+  ingressClassName: 'nginx'
+  rules:
+  - host: prom.mystical.org
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port:
+              number: 9090
+  - host: prometheus.mystical.org
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: prometheus
+            port: 
+              number: 9090
+
+# 启用kube-state-metrics,将deploy，Statefulset等默认不暴露的资源也纳入监控
+[root@master1 k8s-prom]#cd kube-state-metrics/
+[root@master1 kube-state-metrics]#ls
+kube-state-metrics-deploy.yaml  kube-state-metrics-rbac.yaml  kube-state-metrics-svc.yaml
+
+[root@master1 kube-state-metrics]#kubectl apply -f . -n prom 
+deployment.apps/kube-state-metrics created
+serviceaccount/kube-state-metrics created
+clusterrole.rbac.authorization.k8s.io/kube-state-metrics created
+clusterrolebinding.rbac.authorization.k8s.io/kube-state-metrics created
+service/kube-state-metrics created
+```
+
+
+
+##### Helm方式部署（生产使用）
+
+```bash
+# 从github拉取仓库
+[root@master1 ~]# git clone https://github.com/iKubernetes/k8s-prom.git
+
+[root@master1 ~]#cd k8s-prom/helm
+[root@master1 helm]#ls 
+blackbox-exporter-values.yaml  prom-adapter-values.yaml  prom-values.yaml  README.md
+
+# 添加Prometheus Community的Chart仓库。
+[root@master1 k8s-prom]#helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+"prometheus-community" has been added to your repositories
+
+# 更新仓库
+[root@master1 k8s-prom]#helm repo update
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "harbor" chart repository
+...Successfully got an update from the "prometheus-community" chart repository
+Update Complete. ⎈Happy Helming!⎈
+
+# 运行如下命令，即可加载本地的values文件，部署Prometheus生态组件。
+[root@master1 helm]#helm install prometheus prometheus-community/prometheus --namespace monitoring --values prom-values.yaml --create-namespace
+NAME: prometheus
+LAST DEPLOYED: Mon Mar 31 11:01:31 2025
+NAMESPACE: monitoring
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+The Prometheus server can be accessed via port 9090 on the following DNS name from within your cluster:
+prometheus-server.monitoring.svc.cluster.local
+
+From outside the cluster, the server URL(s) are:
+http://prometheus.magedu.com
+......
+
+# 查看ingress
+[root@master1 helm]#kubectl get ingress -n monitoring 
+NAME                CLASS   HOSTS                   ADDRESS     PORTS   AGE
+prometheus-server   nginx   prometheus.magedu.com   10.0.0.11   80      2m45s
+
+# 查看pod
+[root@master1 helm]#kubectl get pod -n monitoring 
+NAME                                                 READY   STATUS    RESTARTS   AGE
+prometheus-alertmanager-0                            1/1     Running   0          3m19s
+prometheus-kube-state-metrics-55f8b5d87b-b24hh       1/1     Running   0          3m19s
+prometheus-prometheus-node-exporter-b9bck            1/1     Running   0          3m19s
+prometheus-prometheus-node-exporter-dzvv8            1/1     Running   0          3m19s
+prometheus-prometheus-node-exporter-klghj            1/1     Running   0          3m19s
+prometheus-prometheus-node-exporter-xl4qb            1/1     Running   0          3m19s
+prometheus-prometheus-pushgateway-79964b5788-zq6ds   1/1     Running   0          3m19s
+prometheus-server-65996d7b65-tqqhf                   2/2     Running   0          3m19s
+
+# 浏览器访问
+http://prometheus.magedu.com/query
+```
+
+![image-20250331110706503](../markdown_img/image-20250331110706503.png)
+
+```bash
+# helm 部署Prometheus-adapter
+[root@master1 helm]#helm install prometheus-adapter prometheus-community/prometheus-adapter --values prom-adapter-values.yaml --namespace monitoring
+NAME: prometheus-adapter
+LAST DEPLOYED: Mon Mar 31 11:38:59 2025
+NAMESPACE: monitoring
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+NOTES:
+prometheus-adapter has been deployed.
+In a few minutes you should be able to list metrics using the following command(s):
+
+  kubectl get --raw /apis/metrics.k8s.io/v1beta1
+  kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1
+
+  kubectl get --raw /apis/external.metrics.k8s.io/v1beta1
+```
+
+
+
+### Prometheus Adapter
+
+#### 部署Prometheus Adapter
+
+```http
+https://github.com/iKubernetes/k8s-prom/tree/master/prometheus-adpater
+```
+
+```bash
+# 进入Prometheus-adpater目录
+[root@master1 k8s-prom]#cd prometheus-adpater/
+
+# 创建名称空间
+[root@master1 prometheus-adpater]#kubectl create namespace custom-metrics
+
+# 安装 golang-cfssl
+[root@master1 prometheus-adpater]#apt install -y golang-cfssl
+
+# 运行脚本
+[root@master1 prometheus-adpater]#bash gencerts.sh
+
+# 执行脚本后，在Manifest目录下，会创建一个文件cm-adapter-serving-certs.yaml
+[root@master1 prometheus-adpater]#ls manifests/cm-adapter-serving-certs.yaml 
+manifests/cm-adapter-serving-certs.yaml
+
+# 启用清单文件
+[root@master1 prometheus-adpater]#kubectl apply -f manifests/
+secret/cm-adapter-serving-certs created
+clusterrolebinding.rbac.authorization.k8s.io/custom-metrics:system:auth-delegator created
+rolebinding.rbac.authorization.k8s.io/custom-metrics-auth-reader created
+deployment.apps/custom-metrics-apiserver created
+clusterrolebinding.rbac.authorization.k8s.io/custom-metrics-resource-reader created
+serviceaccount/custom-metrics-apiserver created
+service/custom-metrics-apiserver created
+apiservice.apiregistration.k8s.io/v1beta1.custom.metrics.k8s.io created
+apiservice.apiregistration.k8s.io/v1beta2.custom.metrics.k8s.io created
+apiservice.apiregistration.k8s.io/v1beta1.external.metrics.k8s.io created
+clusterrole.rbac.authorization.k8s.io/custom-metrics-server-resources created
+configmap/adapter-config created
+clusterrole.rbac.authorization.k8s.io/custom-metrics-resource-reader created
+clusterrolebinding.rbac.authorization.k8s.io/hpa-controller-custom-metrics created
+
+# 查看扩展api资源
+[root@master1 prometheus-adpater]#kubectl api-versions |grep external.metrics
+external.metrics.k8s.io/v1beta1
+[root@master1 prometheus-adpater]#kubectl api-versions |grep custom
+custom.metrics.k8s.io/v1beta1
+custom.metrics.k8s.io/v1beta2
+
+# 运行下面命令，部署示例应用。该示例应用提供了一个Counter类型的指标http_requests_total。
+[root@master1 prometheus-adpater]#kubectl apply -f example-metrics/metrics-example-app.yaml
+deployment.apps/metrics-app created
+service/metrics-app created
+
+# 查看
+[root@master1 prometheus-adpater]#kubectl get pod
+NAME                           READY   STATUS    RESTARTS      AGE
+metrics-app-56c77b4999-6gmwk   1/1     Running   0             60s
+metrics-app-56c77b4999-p4kmt   1/1     Running   0             60s
+
+# 查看示例pod暴露的指标
+[root@master1 prometheus-adpater]#curl 192.168.253.38/metrics
+# HELP http_requests_total The amount of requests in total
+# TYPE http_requests_total counter
+http_requests_total 8
+# HELP http_requests_per_second The amount of requests per second the latest ten seconds
+# TYPE http_requests_per_second gauge
+http_requests_per_second 0.2
+```
+
+
+
+#### Prometheus Adapter 与自定义指标的使用逻辑
+
+✅ **Prometheus Adapter 的基本作用：**
+
+Prometheus Adapter 是一个 **扩展 API Server**，它的作用是：
+
+将 Prometheus 中的 **PromQL 查询结果** 暴露为 Kubernetes 可识别的 **Custom Metrics API 或 External Metrics API**，供 HPA / VPA 使用。
+
+
+
+**✅ 默认支持的指标**
+
+Prometheus Adapter 默认可以暴露一些「标准格式」的 Prometheus 指标，例如：
+
+- Pod、Deployment 的 CPU、内存（这些其实就是 `metrics.k8s.io` 提供的核心指标）
+- 已知标签结构（比如有 `namespace`, `pod`, `container` 等标签）
+
+这些通常不需要复杂配置就能转发出来。
+
+
+
+✅ **定义/计算型指标 ➜ 需要配置 rules**
+
+对于 **非标准格式** 或 **需要计算得出** 的指标，比如：
+
+- `http_requests_total`（需要聚合成 QPS）
+- `queue_length`
+- `latency_bucket`（直方图类型）
+- 非标准 label，比如 `app`, `instance`, `custom_tag`
+
+就需要在 Prometheus Adapter 的配置中定义 `rules`，手动将 PromQL 查询转换成 API 指标。
+
+**示例配置（适用于 `custom-metrics`）**
+
+```yaml
+rules:
+  custom:
+    - seriesQuery: 'http_requests_total{job="my-app"}'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod: {resource: "pod"}
+      name:
+        matches: "http_requests_total"
+        as: "http_requests_per_second"
+      metricsQuery: 'sum(rate(http_requests_total{job="my-app"}[2m])) by (pod, namespace)'
+```
+
+
+
+#### Prometheus Adapter 的 `rules` 配置详解
+
+配置路径通常在 Prometheus Adapter 的 Helm chart 中：
+
+```yaml
+prometheus-adapter
+└── values.yaml
+    └── rules:
+        └── custom:  # 或 external:
+```
+
+
+
+**一个完整的 `rules.custom` 配置示例：**
+
+```yaml
+rules:
+  custom:
+    - seriesQuery: 'http_requests_total{job="my-app"}'
+      resources:
+        overrides:
+          namespace: {resource: "namespace"}
+          pod: {resource: "pod"}
+      name:
+        matches: "http_requests_total"
+        as: "http_requests_per_second"
+      metricsQuery: 'sum(rate(http_requests_total{job="my-app"}[2m])) by (pod, namespace)'
+```
+
+
+
+**配置字段解释**
+
+1️⃣ **`seriesQuery` — 匹配原始指标名**
+
+- 匹配 Prometheus 中的原始指标（例如 `http_requests_total`）
+
+- 也可以加入标签筛选，比如 `job="my-app"`，减少范围。
+
+  ```yaml
+  seriesQuery: 'http_requests_total{job="my-app"}'
+  ```
+
+**2️⃣ `resources.overrides` — 标签转为资源**
+
+将 Prometheus 指标中的标签映射为 Kubernetes 的资源对象：
+```yaml
+resources:
+  overrides:
+    pod:        # 指定标签为 pod
+      resource: "pod"
+    namespace:  # 指定标签为 namespace
+      resource: "namespace"
+```
+
+👉 表示这条指标对应的是哪个 namespace 和哪个 pod。
+
+**补充详解**
+
+Prometheus 是靠**标签（label）系统**组织指标的，比如：
+
+```properties
+http_requests_total{pod="myapp-67kkp", namespace="default", job="my-app"}
+```
+
+而 Kubernetes 是靠资源对象（Pod、Namespace、Deployment）来组织管理的。
+
+所以 Prometheus Adapter 需要知道：
+ ➡️ **这个指标的哪个 label 表示 Kubernetes 中哪个资源。**
+
+
+
+**举个实际例子**
+
+假设你 Prometheus 中有一条指标：
+
+```cpp
+http_requests_total{pod="myapp-67kkp", namespace="default"}
+```
+
+你想通过 HPA 对这个 Pod 做伸缩，那么 Prometheus Adapter 就要知道：
+
+- `pod="myapp-67kkp"` 这表示 **Kubernetes 的 Pod 名字**
+- `namespace="default"` 表示 **这个 Pod 属于哪个 Namespace**
+
+如果你不告诉它，它就不知道这些标签该怎么“翻译”为 K8s 对象。
+
+所以你在配置里加：
+
+```yaml
+resources:
+  overrides:
+    pod:
+      resource: "pod"
+    namespace:
+      resource: "namespace"
+```
+
+就表示：
+
+- Prometheus 中叫 `pod` 的 label，对应 Kubernetes 中的 `Pod` 资源。
+- Prometheus 中叫 `namespace` 的 label，对应 Kubernetes 中的 `Namespace`。
+
+
+
+**最终 Adapter 就知道：**
+
+- “这条指标是来自哪个 pod 的”
+- “它属于哪个 namespace”
+- “我可以暴露成一个 pod 级别的指标，给 Kubernetes 使用”
+
+
+
+ **HPA 才能这样配置**
+
+```yaml
+metrics:
+- type: Pods
+  pods:
+    metric:
+      name: http_requests_per_second
+    target:
+      type: AverageValue
+      averageValue: "10"
+```
+
+⚠️ 否则，HPA 会报错：**无法找到这个指标对应的资源对象**。
+
+
+
+**3️⃣ `name.matches` / `as` — 重命名指标名（暴露给 K8s）**
+
+- `matches`: 匹配原指标名
+- `as`: 自定义暴露给 K8s 的新名称（用于 HPA）
+
+```yaml
+name:
+  matches: "http_requests_total"
+  as: "http_requests_per_second"
+```
+
+最终你可以在 HPA 中这么使用：
+
+```yaml
+metrics:
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "10"
+```
+
+
+
+**4️⃣ `metricsQuery` — 实际 PromQL 查询语句**
+
+这是关键的转换部分，用于生成最终指标值：
+
+```yaml
+metricsQuery: 'sum(rate(http_requests_total{job="my-app"}[2m])) by (pod, namespace)'
+```
+
+
+
+**实战示例**
+
+![image-20250331095555708](../markdown_img/image-20250331095555708.png)
+
+```bash
+# 添加转换规则
+[root@master1 ~]#kubectl edit cm -n custom-metrics adapter-config
+    - seriesQuery: 'http_requests_total{kubernetes_namespace!="",kubernetes_pod_name!=""}'
+      resources:
+        overrides:
+          kubernetes_namespace: {resource: "namespace"}
+          kubernetes_pod_name: {resource: "pod"}
+      name:
+        matches: "^(.*)_total"
+        as: "${1}_per_second"
+      metricsQuery: rate(<<.Series>>{<<.LabelMatchers>>}[1m])
+      
+# 测试
+[root@master1 ~]# kubectl get --raw /apis/custom.metrics.k8s.io/v1beta1/namespaces/default/pods/*/http_requests_per_second | jq .
+```
+
+
+
+#### Prometheus Adapter 的配置文件中 rules 规则段中Go 模板语法 的占位符详解
+
+Prometheus Adapter 的配置文件中 `rules` 段使用了一些 **Go 模板语法的占位符**，这些占位符用于将 Prometheus 中的指标信息自动 **填充并转化** 为 Kubernetes API 所需的格式。这些占位符是在 `metricsQuery` 生成 PromQL 查询语句时动态替换的。
+
+✅ **Prometheus Adapter 中 `rules` 的结构回顾**
+
+```yaml
+rules:
+  - seriesQuery: <PromQL匹配指标的规则>
+    resources:
+      overrides:     # 或 template
+    name:
+      matches: <正则表达式>
+      as: <转换后的指标名称>
+    metricsQuery: <真正用于 PromQL 查询的表达式>
+```
+
+**✅ 占位符模板变量详解（Go Template）**
+
+这些变量写法如 `<<.Series>>`、`<<.LabelMatchers>>`、`<<.GroupBy>>` 等，都是 [Go template](https://golang.org/pkg/text/template/) 风格。
+
+| 模板变量名           | 含义说明                                                     |
+| -------------------- | ------------------------------------------------------------ |
+| `<<.Series>>`        | 匹配的指标名（如 `container_cpu_usage_seconds_total`）       |
+| `<<.LabelMatchers>>` | 转换自 `seriesQuery` 中的标签条件（如 `{pod!="",namespace!="",container!="POD"}`） |
+| `<<.GroupBy>>`       | 资源相关标签组成的 `by (namespace, pod)` 字段                |
+| `<<.Resource>>`      | 只用于 external metrics，表示当前资源对象类型（如 `deployment`） |
+
+**✅ 各字段使用示例**
+
+**1️⃣ `<<.Series>>`**
+
+表示你在 `seriesQuery` 中匹配到的指标名。
+
+```yaml
+seriesQuery: '{__name__=~"^container_.*"}'
+metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)
+```
+
+如果 `__name__=~"^container_cpu_usage_seconds_total"`，则最终生成：
+
+```properties
+sum(container_cpu_usage_seconds_total{...}) by (...)
+```
+
+**2️⃣ `<<.LabelMatchers>>`**
+
+这个变量根据 `seriesQuery` 中的标签匹配表达式，自动抽取出需要带入的 label 过滤器。
+
+```yaml
+seriesQuery: '{__name__=~"^container_.*", container!="POD", pod!="", namespace!=""}'
+```
+
+最终变成：
+
+```properties
+sum(container_cpu_usage_seconds_total{container!="POD", pod!="", namespace!=""})
+```
+
+**3️⃣ `<<.GroupBy>>`**
+
+自动使用和资源映射相关的标签作为 `group by` 的字段。
+
+```yaml
+resources:
+  overrides:
+    namespace:
+      resource: "namespace"
+    pod:
+      resource: "pod"
+```
+
+会生成：
+
+```properties
+by (namespace, pod)
+```
+
+**4️⃣ `<<.Resource>>`（只用于 external.metrics）**
+
+这个用于 external metrics 规则中，用于将资源名（如 deployment、statefulset）写入 metric 名中。
+
+```yaml
+resources:
+  template: <<.Resource>>
+```
+
+比如 `<<.Resource>>` 是 `deployment`，那么生成的路径将是：
+
+```properties
+apis/external.metrics.k8s.io/v1beta1/namespaces/default/deployments/<name>/http_requests_pe
+```
+
+**✅ 进阶示例（完整）**
+
+```yaml
+rules:
+  - seriesQuery: '{__name__=~"^container_memory_usage_bytes$", container!="POD", pod!="", namespace!=""}'
+    resources:
+      overrides:
+        namespace:
+          resource: namespace
+        pod:
+          resource: pod
+    name:
+      matches: "^container_memory_usage_bytes$"
+      as: "memory_usage"
+    metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>, container!="POD"}) by (<<.GroupBy>>)
+```
+
+会转化为 PromQL：
+
+```properties
+sum(container_memory_usage_bytes{namespace!="", pod!="", container!="POD"}) by (namespace, pod)
+```
+
+然后暴露为：
+
+```http
+/apis/custom.metrics.k8s.io/v1beta1/namespaces/<namespace>/pods/<pod>/memory_usage
+```
+
+**🚀 小结**
+
+| 占位符               | 作用                                                |
+| -------------------- | --------------------------------------------------- |
+| `<<.Series>>`        | 指代 Prometheus 指标名                              |
+| `<<.LabelMatchers>>` | 从 `seriesQuery` 中解析出的 label 条件              |
+| `<<.GroupBy>>`       | 根据 `resources.overrides` 推断出的 `group by` 字段 |
+| `<<.Resource>>`      | external metrics 中用于生成资源类型路径             |
+
+
+
+
+
+
+
+#### 对于 Prometheus adapter 转换后的 Kubernetes API 类型的指标的请求方式
+
+```bash
+kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/<namespace>/<resource>/<resource-name>/<metric-name>"
+```
+
+**参数说明：**
+
+| 字段                     | 含义                                                         |
+| ------------------------ | ------------------------------------------------------------ |
+| `/apis`                  | 说明这是一个扩展 API Server 的路径（聚合层下的 API）         |
+| `custom.metrics.k8s.io`  | Prometheus Adapter 注册的 API Group（也有可能是 `external.metrics.k8s.io`） |
+| `v1beta1`                | 当前版本（注意：可能因版本不同而变化）                       |
+| `namespaces/<namespace>` | 指定命名空间                                                 |
+| `<resource>`             | 资源类型，如 `pods`、`deployments`                           |
+| `<resource-name>`        | 资源对象名称，例如 pod 名或 deployment 名                    |
+| `<metric-name>`          | 指标名称，比如 `http_requests_per_second`                    |
+
+**示例**
+
+```bash
+kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/pods/myapp-547df679bb-67kkp/http_requests_per_second"
+```
+
+这条命令的含义是：
+
+- 查询 default 命名空间下的 pod `myapp-547df679bb-67kkp`
+- 对应指标名是 `http_requests_per_second`
+- 由 Prometheus Adapter 代理，从 Prometheus 拉取并返回指标数据
+
+
+
+**🆚 另外一种：External Metrics 的格式**
+
+如果你配置的是 `external.metrics.k8s.io`，格式会略有不同，**没有 resource-name**：
+
+```bash
+kubectl get --raw "/apis/external.metrics.k8s.io/v1beta1/namespaces/<namespace>/<metric-name>"
+```
+
+比如：
+
+```bash
+kubectl get --raw "/apis/external.metrics.k8s.io/v1beta1/namespaces/default/qps"
+```
+
+**🚨 小结**
+
+| 类型                           | API Group                 | 使用方式          | 示例                                                         |
+| ------------------------------ | ------------------------- | ----------------- | ------------------------------------------------------------ |
+| 自定义指标（Pod/Deployment等） | `custom.metrics.k8s.io`   | 每个资源一个      | `/apis/custom.metrics.k8s.io/v1beta1/namespaces/default/pods/mypod/cpu_usage` |
+| 外部指标（不绑定资源）         | `external.metrics.k8s.io` | 按命名空间+指标名 | `/apis/external.metrics.k8s.io/v1beta1/namespaces/defaul`    |
+
+
+
+
+
+
+
+
+
+### HPA
+
+
+
+### VPA
+
+
+
+
 
 
 
@@ -26955,7 +34696,260 @@ current-context: admin@kubernetes
 
 ## BGP协议
 
+### BGP概述
 
+#### BGP简介
+
+动态路由协议可以按照工作范围分为 **IGP (Internal Gateway Protocol)** 以及 **EGP (External Gateway Protocol)**。IGP 工作在同一个AS内，主要用来发现和计算路由，为AS内提供路由信息的交换；而 EGP工作在 AS 与 AS 之间，在 AS 间提供无环路的路由信息交换，**BGP 则是 EGP 的一种**
+
+
+
+#### 自治系统
+
+![image-20250327153920164](../markdown_img/image-20250327153920164.png)
+
+自治系统（AS）：由同一个技术管理机构管理，使用统一选路策略的一些路由器的集合
+
+自治系统内部的路由协议：IGP（静态路由，OSPF，ISIS，RIP...）
+
+自治系统之间的路由协议：EGP（BGP）
+
+
+
+#### IGP 与 EGP
+
+**IGP**
+
+- 运行于AS内部的路由协议，主要有RIP，OSPF， ISIS等
+- IGP着重于**快速**发现和计算路由
+
+**EGP**
+
+- 运行于AS之间的路由协议，现通常指BGP
+- BGP着重于**控制路由的传播 **和 **选择最优的路由**（BGP的最佳路径并不以带宽为最佳，也不以跳数为最佳，算法复杂）
+
+```ABAP
+GBP发展路径：EGP -> BGP/v1 -> BGP/v4
+```
+
+
+
+#### BGP特征
+
+- BGP是外部路由协议（**用来承载大容量的路由条目**，数以数十万计的路由毫无问题），用来在AS之间传递路由信息
+- 是一种增强的距离矢量路由协议
+  - 可靠的路由更新机制
+  - 丰富的Metric量度方法
+  - 从设计上避免了环路的发生
+- 为路由附带属性信息
+- 支持CIDR（无类别域间选路）
+- 丰富的路由过滤和路由策略
+
+
+
+#### AS号
+
+AS号范围是1~65535，其中
+
+- 1 ~ 64512 是公有AS号（已分配完，无剩余），需要运营商提供
+- 64513 ~65535是私有AS号，大家都能用，类似于192.168...的内网Ip
+
+
+
+### BGP可靠的路由更新
+
+- 传输协议：TCP，端口号179（BGP协议的可靠，体现在使用TCP），BGP是基于TCP的协议
+  - BGP需要先有IGP保证端到端的可达性，在IGP的基础上，才能实现大容量路由的传递
+  - 即只需要保证两个AS之间的边界路由间的可达性即可（通常用静态路由保证），AS内的路由无需保证
+  - BGP想通，IGP先通
+- 无需周期性更新
+- 路由更新：只发送增量路由，即只做增量更新
+- 周期性发送Keepalived报文（很小，不到1K）检测TCP的连通性
+  - 每60s，发送一个Keepalived报文
+
+
+
+#### BGP报文种类
+
+BGP报文有五种类型：
+
+- **Open**：负责和对等体建立邻居关系
+- **Keepalive**：该消息在对等体之间周期性地发送，用以维护连接
+- **Update**：该消息被用来在BGP对等体之间传递路由信息
+- **Notification**：当BGP Speaker检测到错误的时候，就发送该消息给对等体
+- **Route-refresh**：用来通知对等体自己支持路由刷新能力
+
+
+
+##### **BGP报文**
+
+![image-20250327165527701](../markdown_img/image-20250327165527701.png)
+
+
+
+##### **Open报文**
+
+![image-20250327165659260](../markdown_img/image-20250327165659260.png) 
+
+- Version(1B)
+  - 现在基本都是BGP/v4，因此Version这里通常是4
+- My Autonomous System（2B）
+  - 我自己的AS号
+- Hold Time (保存时间)（2B）
+- BGP Identifier（4B）
+- Opt Param Len（1B）
+  - 可选参数
+- Optional Parameters（variable）
+  - 这里会携带一些额外的能力的协商
+
+
+
+##### **Keepalive 报文**
+
+![image-20250327170137460](../markdown_img/image-20250327170137460.png)
+
+keepalive报文非常小，我发送一个Keepalive报文，然后收到一个ack报文确认即可，只要报头就够了
+
+
+
+##### **Update 报文**
+
+![image-20250327170412622](../markdown_img/image-20250327170412622.png)
+
+update报文是最大的，因为每一个报文要装在一个update里面
+
+- Withdrawn Routes Length（2B）
+  - 路由长度
+- Withdrawn Routes（可变长度）
+  - 路由条目
+- Path Attribute Length（2B）
+  - 各种路径属性的长度
+- Path Attribute（可变长度）
+  - 各种路径属性
+- Network Layer Reachability Information（可变长度）
+  - 路由的最终形态（地址）
+
+
+
+##### Notification 报文
+
+![image-20250327170904903](../markdown_img/image-20250327170904903.png)
+
+谁发现的错误，谁去发送Notification报文
+
+
+
+##### Route-refresh报文
+
+![image-20250327171036666](../markdown_img/image-20250327171036666.png)
+
+
+
+#### BGP协议中消息的应用
+
+- 通过TCP建立BGP连接时，发送OPEN消息（TCP连接先建立好，然后发送OPEN报文）
+- 连接建立后，如果有路由需要发送或路由变化时，发送UPDATE消息通告对端
+- 稳定后定时发送KEEPALIVE消息以保持BGP连接的有效性
+- 当本地BGP在运行中发现错误时，要发送Notification消息通告BGP对等体
+- ROUTE-REFRESH消息用来通知对等体自己支持路由刷新
+
+
+
+### BGP路由信息处理
+
+#### BGP状态机
+
+![image-20250327171628874](../markdown_img/image-20250327171628874.png)
+
+- BGP一旦在一个设备上启动，首先进入**Idle状态**，即空闲状态
+- 开始尝试建立，进入**Connect状态**（尝试建立TCP连接）
+- 如果连接状态失败，进入 **Active状态**（等待再次连接）
+- 直到TCP连接状态建立，进入**Open-Sent状态**
+- **上述 Idle 状态，Connect 状态和 Active 状态都是在做 TCP，从 Open-sent 开始才是在做BGP**
+- Open消息报文发出，然后接收到返回的正确的Open报文后，进入**Open-confirm状态**
+- 在进入Open-confirm状态后，又接受到Keepalive报文，说明这个邻居一直没有断，因此进入**ESTABLISH状态**
+- ESTABLISH状态说明BGP建立完成，并不断地周期性发送Keepalive报文
+- 在后期任何一个BGP的状态中，一但收到Notification报文，即错误通告，则直接断掉TCP连接，进入Idle状态
+
+
+
+#### BGP的数据库
+
+在邻居建立完后，BGP要维护自己的数据库，BGP的数据库有
+
+- **IP路由表（IP-RIB）**
+  - 全局路由信息库，包括所有IP路由信息
+- **BGP路由表（Loc-RIB）**
+  - BGP路由信息库，包括本地BGP Speaker选择的路由信息
+  - 这里包含所有路径信息，不止是最佳路径，而最佳路径信息可能会记录到IP路由表中
+  - 非常大
+- **邻居表**
+  - 对等体邻居清单列表
+- **Adj-RIB-In**
+  - 对等体宣告给本地Speaker的未处理的路由信息库
+  - 通常是我从邻居那里收到的未处理的表项，这里的表项是处理给BGP，处理后，会将处理后的表项删掉
+- **Adj-RIB-Out**
+  - 本地Speaker宣告给指定对等体的路由信息库
+  - 即我要把那些路由发送给别人
+
+
+
+#### BGP路由信息处理
+
+![image-20250327173658157](../markdown_img/image-20250327173658157.png)
+
+```ABAP
+BGP的对等体 == BGP的邻居，是一个概念
+BGP Speaker 指的是运行了BGP的网络设备
+```
+
+- 从邻居那里收到的路由信息，首先放到 `Adj-RIB-IN` 中
+- 然后通过输入策略引擎，将需要的路由信息放入`Loc-RIB，即BGP表`中
+- 处理完的信息，在 `Adj-RIB-IN` 中清除
+- `BGP表中` 选出最优路径，然后放入 `IP-RIB，即IP表中` 供我的路由器进行使用
+- 同时将选出的最优路径，通过输出策略引擎发给别人，发给别人的表为`Adj-RIB-Out`，发出的一定是最优的路由
+- BGP 只宣告最优路径
+
+
+
+### BGP的工作原理
+
+#### BGP邻居关系
+
+BGP是基于TCP连接的邻居关系，而TCP又是基于IP可达性实现的，因此
+
+- BGP邻居关系建立在TPC连接的基础之上
+- 可以通过IGP或静态路由来提供TCP连接的IP可达性
+
+
+
+**BGP两种邻居关系 — IBGP 和 EBGP**
+
+![image-20250327175014500](../markdown_img/image-20250327175014500.png)
+
+如果两个邻居，或者两个设备都在同一个AS，那么就叫做**IBGP**
+
+如果两个设别在不同的AS，那么就叫做**EBGP**邻居关系
+
+```ABAP
+问题：为什么在同一个AS内，要建立IBGP邻居关系
+```
+
+- IBGP的第一个作用：传递大容量的路由信息
+- IBGP的第二个作用：当需要跨越多个AS传递路由信息时，IBGP可以将BGP协议的属性传递过去，也可以更高的防止环路，属性的丢失对环路的生成影响很大。
+- IGP为IBGP提供TCP/IP的可达性
+
+
+
+
+
+
+
+
+
+#### BGP通告原则
+
+#### BGP路由通告
 
 
 
