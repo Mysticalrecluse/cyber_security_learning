@@ -6509,3 +6509,208 @@ latest: digest: sha256:c10f729849a3b03cbf222e2220245dd44c39a06d444aa32cc30a35c4c
 
 
 #### 反向再做一遍，实现双向复制
+
+
+
+
+
+# Containerd
+
+
+
+## 安装 Containerd
+
+
+
+### apt/yum 安装
+
+通过 `apt/yum` 源安装Containerd
+
+
+
+#### 验证仓库版本
+
+```bash
+[root@mystical ~]# apt-cache madison containerd
+containerd | 1.7.24-0ubuntu1~22.04.1 | http://cn.archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages
+containerd | 1.6.12-0ubuntu1~22.04.3 | http://cn.archive.ubuntu.com/ubuntu jammy-security/main amd64 Packages
+containerd | 1.5.9-0ubuntu3 | http://cn.archive.ubuntu.com/ubuntu jammy/main amd64 Packages
+```
+
+
+
+#### 安装 containerd
+
+```bash
+[root@mystical ~]# apt install containerd=1.7.24-0ubuntu1~22.04.2
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following additional packages will be installed:
+  runc
+The following NEW packages will be installed:
+  containerd runc       # 会同时安装runc
+0 upgraded, 2 newly installed, 0 to remove and 163 not upgraded.
+......
+```
+
+
+
+#### 查看 Service 文件
+
+```bash
+[root@mystical ~]# cat /lib/systemd/system/containerd.service 
+# Copyright The containerd Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target local-fs.target dbus.service
+
+[Service]
+#uncomment to enable the experimental sbservice (sandboxed) version of containerd/cri integration
+#Environment="ENABLE_CRI_SANDBOXES=sandboxed"
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/bin/containerd
+
+Type=notify
+Delegate=yes
+KillMode=process
+Restart=always
+RestartSec=5
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNPROC=infinity
+LimitCORE=infinity
+LimitNOFILE=infinity
+# Comment TasksMax if your systemd version does not supports it.
+# Only systemd 226 and above support this version.
+TasksMax=infinity
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
+```
+
+
+
+#### 验证 runc 环境
+
+```bash
+[root@mystical ~]# whereis runc
+runc: /usr/bin/runc /usr/sbin/runc /usr/share/man/man8/runc.8.gz
+
+# 查看runc版本
+[root@mystical ~]# runc -v
+runc version 1.1.12-0ubuntu2~22.04.1
+spec: 1.0.2-dev
+go: go1.21.1
+libseccomp: 2.5.3
+```
+
+
+
+#### 查看并修改 containerd 的配置
+
+```bash
+# 查看containerd的默认配置路径
+[root@mystical ~]# containerd --help|grep config
+by using this command. If none of the *config*, *publish*, *oci-hook*, or *help* commands
+A default configuration is used if no TOML configuration is specified or located
+at the default file location. The *containerd config* command can be used to
+generate the default configuration for containerd. The output of that command
+can be used and modified as necessary as a custom configuration.
+   config    Information on the containerd config
+   --config value, -c value     Path to the configuration file (default: "/etc/containerd/config.toml")
+
+# 创建目录
+[root@mystical ~]# mkdir /etc/containerd
+
+# 显示默认所有配置
+[root@mystical ~]# containerd config default
+
+# 将配置文件输出到默认路径
+[root@mystical ~]# containerd config default > /etc/containerd/config.toml
+
+# 修改config.toml配置文件
+[root@mystical ~]# vim /etc/containerd/config.toml 
+......
+    # sandbox_image="registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.9"
+    sandbox_image = "registry.k8s.io/pause:3.8" # 这里如果无法翻墙会导致k8s无法拉取pod，可以修改为国内源路径
+......
+    [plugins."io.containerd.grpc.v1.cri".registry.mirrors]  # 这里负责配置镜像加速
+
+
+# 重启service
+[root@mystical ~]# systemctl restart containerd.service
+```
+
+
+
+#### 通过命令行测试下载镜像
+
+**containerd **的命令行客户端有 `ctr` ，`crictl` ，`nerdctl`等，`containerd` 相比 docker 多了一个名称空间的逻辑概念，自身的命令行客户端 `ctr命令(很不好用)` 默认是在 `default` 名称空间里，`nerdctl` 也是在 `default`，当使用`crictl` 命令的时候，是在 `k8s.io` 这个命名空间，而 k8s 的创建的pod也是在 `k8s.io` 命名空间，因此在使用 `nerdctl` 管理Kubernetes 环境的 Pod 的时候要指定命名空间为 `k8s.io`，否则看不到 Kubernetes 环境中的 Pod。
+
+```ABAP
+ctr 和 crictl 都不是很好用，建议使用 nerdctl
+nerdctl 是 docker 贡献出来的，完全兼容containerd
+```
+
+```bash
+# ctr拉取镜像，必须使用完整名称
+[root@mystical ~]# ctr images pull docker.io/library/alpine:latest
+docker.io/library/alpine:latest:                                                  resolved       |++++++++++++++++++++++++++++++++++++++| 
+index-sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c:    done           |++++++++++++++++++++++++++++++++++++++| 
+manifest-sha256:1c4eef651f65e2f7daee7ee785882ac164b02b78fb74503052a26dc061c90474: done           |++++++++++++++++++++++++++++++++++++++| 
+layer-sha256:f18232174bc91741fdf3da96d85011092101a032a93a388b79e99e69c2d5c870:    done           |++++++++++++++++++++++++++++++++++++++| 
+config-sha256:aded1e1a5b3705116fa0a92ba074a5e0b0031647d9c315983ccba2ee5428ec8b:   done           |++++++++++++++++++++++++++++++++++++++| 
+elapsed: 9.6 s                                                                    total:  3.0 Mi (321.1 KiB/s)                                     
+unpacking linux/amd64 sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c...
+done: 120.150087ms
+```
+
+
+
+#### 验证镜像
+
+```bash
+[root@mystical ~]# ctr image ls
+REF                             TYPE                                    DIGEST                                                                  SIZE    PLATFORMS                                                                                              LABELS 
+docker.io/library/alpine:latest application/vnd.oci.image.index.v1+json sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c 3.5 MiB linux/386,linux/amd64,linux/arm/v6,linux/arm/v7,linux/arm64/v8,linux/ppc64le,linux/riscv64,linux/s390x 
+```
+
+
+
+#### ctr 客户端创建测试容器
+
+运行容器并使用宿主机网络
+
+```bash
+[root@mystical ~]# ctr run -t --net-host docker.io/library/alpine:latest test-container sh
+/ # ls
+bin    etc    lib    mnt    proc   run    srv    tmp    var
+dev    home   media  opt    root   sbin   sys    usr
+
+# 查看容器
+[root@mystical ~]# ctr container ls
+CONTAINER         IMAGE                              RUNTIME                  
+test-container    docker.io/library/alpine:latest    io.containerd.runc.v2
+```
+
+
+
+### 二进制安装 containerd
+
+通过官方二进制安装containerd、runc及CNI，Kubernetes从v.1.24.0开始默认使用containerd作为容器运行时，因此需要提前安装好containerd之后在安装v1.24或更高版本的Kubernetes（如果要继续使用docker，则需要单独安装docker及cri-dockerd）
