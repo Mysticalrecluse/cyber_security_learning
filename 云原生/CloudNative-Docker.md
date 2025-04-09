@@ -6714,3 +6714,321 @@ test-container    docker.io/library/alpine:latest    io.containerd.runc.v2
 ### 二进制安装 containerd
 
 通过官方二进制安装containerd、runc及CNI，Kubernetes从v.1.24.0开始默认使用containerd作为容器运行时，因此需要提前安装好containerd之后在安装v1.24或更高版本的Kubernetes（如果要继续使用docker，则需要单独安装docker及cri-dockerd）
+
+
+
+#### 下载 containerd 二进制并创建 service文件
+
+```bash
+[root@mystical ~]# wget https://github.com/containerd/containerd/releases/download/v2.0.4/containerd-2.0.4-linux-amd64.tar.gz
+
+# 解压
+[root@mystical ~]# tar xf containerd-2.0.4-linux-amd64.tar.gz -C /usr/local
+
+# 查看
+[root@mystical /usr/local/bin]# ls /usr/local/bin
+containerd  containerd-shim-runc-v2  containerd-stress  ctr
+
+# 验证containerd执行结果
+[root@mystical /usr/local/bin]# containerd -v
+containerd github.com/containerd/containerd/v2 v2.0.4 1a43cb6a1035441f9aca8f5666a9b3ef9e70ab20
+
+# 创建service
+[root@mystical /usr/local/bin]# cat /lib/systemd/system/containerd.service
+[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target local-fs.target dbus.service
+
+[Service]
+#uncomment to enable the experimental sbservice (sandboxed) version of containerd/cri integration
+#Environment="ENABLE_CRI_SANDBOXES=sandboxed"
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/local/bin/containerd
+
+Type=notify
+Delegate=yes
+KillMode=process
+Restart=always
+RestartSec=5
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNPROC=infinity
+LimitCORE=infinity
+LimitNOFILE=infinity
+# Comment TasksMax if your systemd version does not supports it.
+# Only systemd 226 and above support this version.
+TasksMax=infinity
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
+
+# 启用
+[root@mystical /usr/local/bin]# systemctl daemon-reload 
+[root@mystical /usr/local/bin]# systemctl start containerd.service
+```
+
+
+
+#### 编辑配置文件
+
+```bash
+[root@mystical /usr/local/bin]# mkdir /etc/containerd
+[root@mystical /usr/local/bin]# containerd config default > /etc/containerd/config.toml
+
+# 修改
+[root@mystical /usr/local/bin]# vim /etc/containerd/config.toml
+......
+    [plugins.'io.containerd.cri.v1.images'.pinned_images]
+    # sandbox = "registry.aliyuncs.com/google_containers/pause:3.10"
+      sandbox = 'registry.k8s.io/pause:3.10'   # 可以更改为国内的pause
+......
+# 在文件末尾添加如下内容（用于镜像加速）
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+  endpoint = ["https://lnrjc2d4.mirror.aliyuncs.com"]  # 阿里云的镜像加速地址
+# 也可以配置多个镜像源备用
+[plugins."io.containerd.grpc.v1.cri".registry.mirrors."docker.io"]
+  endpoint = [
+    "https://registry.aliyuncs.com",
+    "https://docker.mirrors.ustc.edu.cn",
+    "https://hub-mirror.c.163.com"
+  ]
+
+# 修改后，重启containerd
+[root@mystical /usr/local/bin]# systemctl restart containerd.service
+
+# containerd起来后，会有一个socket文件，kubelet默认情况下，会在这个地址找到socket文件
+# 该文件目录可以通过修改配置文件/etc/containerd/config.toml指定
+[root@mystical /usr/local/bin]# ll /run/containerd/containerd.sock
+srw-rw---- 1 root root 0 Apr  3 14:50 /run/containerd/containerd.sock=
+```
+
+
+
+#### 部署 runc
+
+```bash
+# 下载
+[root@mystical ~]# wget https://github.com/opencontainers/runc/releases/download/v1.2.6/runc.amd64
+
+# 添加执行权限，并放入环境变量
+[root@mystical ~]# chmod a+x runc.amd64 
+[root@mystical ~]# mv runc.amd64 /usr/local/bin/runc
+
+# 查看
+[root@mystical ~]# runc -v
+runc version 1.2.6
+commit: v1.2.6-0-ge89a2992
+spec: 1.2.0
+go: go1.23.7
+libseccomp: 2.5.5
+
+# 为containerd配置代理
+[root@mystical /etc/containerd]# vim /lib/systemd/system/containerd.service
+......
+[Service]
+Environment="HTTP_PROXY=http://your-proxy:port"
+Environment="HTTPS_PROXY=http://your-proxy:port"
+......
+
+# 重启
+[root@mystical /etc/containerd]# systemctl daemon-reload
+[root@mystical /etc/containerd]# systemctl restart containerd.service
+
+# 拉取镜像测试
+[root@mystical /etc/containerd]# ctr images pull docker.io/library/alpine:latest
+
+# 查看
+[root@mystical /etc/containerd]# ctr images ls
+[root@mystical /etc/containerd]# ctr -n k8s.io images ls
+```
+
+
+
+### 部署 crictl
+
+**官网**
+
+```http
+https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.32.0/crictl-v1.32.0-linux-amd64.tar.gz
+```
+
+```bash
+[root@mystical ~]# wget https://github.com/kubernetes-sigs/cri-tools/releases/download/v1.32.0/crictl-v1.32.0-linux-amd64.tar.gz
+[root@mystical ~]# tar xf crictl-v1.32.0-linux-amd64.tar.gz -C /usr/local/bin
+
+# 查看
+[root@mystical ~]# crictl -v
+crictl version v1.32.0
+
+# 创建配置文件
+[root@mystical ~]# vim /etc/crictl.yaml
+[root@mystical ~]# cat /etc/crictl.yaml 
+runtime-endpoint: "unix:///run/containerd/containerd.sock"
+image-endpoint: "unix:///run/containerd/containerd.sock"
+timeout: 10
+debug: false    # 如果报错需要调试，可以临时看起debug，解决后再关上
+
+# 查看
+[root@mystical ~]# crictl images
+IMAGE               TAG                 IMAGE ID            SIZE
+
+# 下载
+[root@mystical ~]# crictl pull nginx:latest
+Image is up to date for sha256:53a18edff8091d5faff1e42b4d885bc5f0f897873b0b8f0ace236cd5930819b0
+[root@mystical ~]# crictl images
+IMAGE                     TAG                 IMAGE ID            SIZE
+docker.io/library/nginx   latest              53a18edff8091       72.2MB
+```
+
+
+
+### nerdctl-推荐使用
+
+```http
+https://github.com/containerd/nerdctl
+```
+
+`nerdctl` 是 docker 开发的containerd的客户端，和docker的使用99%相似 
+
+#### 安装 nerdctl
+
+```bash
+[root@mystical ~]# wget https://github.com/containerd/nerdctl/releases/download/v2.0.4/nerdctl-2.0.4-linux-amd64.tar.gz
+
+[root@mystical ~]# tar xf nerdctl-2.0.4-linux-amd64.tar.gz  -C /usr/local/bin
+
+# 查看
+[root@mystical ~]# nerdctl version
+WARN[0000] unable to determine buildctl version          error="exec: \"buildctl\": executable file not found in $PATH"
+Client:
+ Version:	v2.0.4
+ OS/Arch:	linux/amd64
+ Git commit:	39058fbce68e29feecc9cec992ade74b272817d8
+ buildctl:
+  Version:	
+
+Server:
+ containerd:
+  Version:	v2.0.4
+  GitCommit:	1a43cb6a1035441f9aca8f5666a9b3ef9e70ab20
+ runc:
+  Version:	1.2.6
+  GitCommit:	v1.2.6-0-ge89a299
+  
+# 上述警告的原因是nerdctl 在启动时尝试探测 buildctl 的版本（用于构建镜像时的 BuildKit 支持），但系统中没有找到 buildctl 可执行文件。
+# 解决方案：安装 buildctl（用于使用nerdctl build 来构建镜像）
+[root@mystical ~]# wget https://github.com/moby/buildkit/releases/download/v0.20.2/buildkit-v0.20.2.linux-amd64.tar.gz
+
+[root@mystical ~]# tar xf buildkit-v0.20.2.linux-amd64.tar.gz 
+[root@mystical ~/bin]# mv bin/* /usr/local/bin
+
+# 再次测试
+[root@mystical ~]# nerdctl version
+Client:
+ Version:	v2.0.4
+ OS/Arch:	linux/amd64
+ Git commit:	39058fbce68e29feecc9cec992ade74b272817d8
+ buildctl:
+  Version:	v0.20.2
+  GitCommit:	97437fdd7e32f29bb80288d800cd4ffcb34e1c15
+
+Server:
+ containerd:
+  Version:	v2.0.4
+  GitCommit:	1a43cb6a1035441f9aca8f5666a9b3ef9e70ab20
+ runc:
+  Version:	1.2.6
+  GitCommit:	v1.2.6-0-ge89a2992
+```
+
+
+
+#### nerdctl配置文件
+
+```bash
+[root@mystical ~]# mkdir /etc/nerdctl
+[root@mystical ~]# vim /etc/nerdctl/nerdctl.toml
+[root@mystical ~]# cat /etc/nerdctl/nerdctl.toml
+namespace    = "k8s.io"
+debug        = false
+debug_full   = false
+insecure_registry = true
+address = "/run/containerd/containerd.sock"
+```
+
+
+
+#### 安装 CNI
+
+在部署Kubernetes之前必须准备CNI
+
+```http
+https://github.com/containernetworking/plugins/releases
+```
+
+```bash
+# 下载
+[root@mystical ~]# wget https://github.com/containernetworking/plugins/releases/download/v1.6.2/cni-plugins-linux-amd64-v1.6.2.tgz
+
+# 创建目录并解压
+[root@mystical ~]# mkdir /opt/cni/bin -p
+[root@mystical ~]# tar xf cni-plugins-linux-amd64-v1.6.2.tgz -C /opt/cni/bin/
+[root@mystical ~]# ls /opt/cni/bin/
+bandwidth  dummy        host-local  loopback  ptp        static  vlan
+bridge     firewall     ipvlan      macvlan   README.md  tap     vrf
+dhcp       host-device  LICENSE     portmap   sbr        tuning
+
+```
+
+
+
+#### 创建Nginx测试容器并指定端口
+
+```bash
+# 查看镜像
+[root@mystical ~]# nerdctl images
+nginx         latest    124b44bfc9cc    3 hours ago    linux/amd64    206.5MB    72.17MB
+
+# 启动容器
+[root@mystical ~]# nerdctl run -d -p 80:80 --name=web1 --restart=always nginx
+6dabc5a3e0bae073ce32a7917b545c301b680cc6185333b5105b64150d348329
+[root@mystical ~]# nerdctl ps
+CONTAINER ID    IMAGE                             COMMAND                   CREATED          STATUS    PORTS                 NAMES
+6dabc5a3e0ba    docker.io/library/nginx:latest    "/docker-entrypoint.…"    5 seconds ago    Up        0.0.0.0:80->80/tcp    web1
+```
+
+
+
+#### 创建Tomcat容器并指定端口
+
+```bash
+[root@mystical ~]# nerdctl run -d -p 8080:8080 --name=tomcat-web1 --restart=always tomcat
+
+# 查看容器
+[root@mystical ~]# nerdctl ps
+CONTAINER ID    IMAGE                              COMMAND                   CREATED               STATUS    PORTS                     NAMES
+13617e96eeb7    docker.io/library/tomcat:latest    "catalina.sh run"         About a minute ago    Up        0.0.0.0:8080->8080/tcp    tomcat-web1
+6dabc5a3e0ba    docker.io/library/nginx:latest     "/docker-entrypoint.…"    5 minutes ago         Up        0.0.0.0:80->80/tcp        web1
+
+# 查看
+[root@mystical ~]# ss -nlt
+State     Recv-Q    Send-Q       Local Address:Port        Peer Address:Port    Process    
+LISTEN    0         4096         127.0.0.53%lo:53               0.0.0.0:*                  
+LISTEN    0         128              127.0.0.1:6010             0.0.0.0:*                  
+LISTEN    0         128                0.0.0.0:22               0.0.0.0:*                  
+LISTEN    0         4096             127.0.0.1:37377            0.0.0.0:*                  
+LISTEN    0         128                  [::1]:6010                [::]:*                  
+LISTEN    0         128                   [::]:22                  [::]:* 
+
+# 并没有端口listen，原因是虽然你用了 -p 8080:8080 等参数，但宿主机上无法看到 ss 中端口监听的主要原因是你可能使用了 CNI 的 bridge 模式。
+# 这个时候容器的 -p 是通过 iptables NAT 表做端口转发 的，并不会在宿主机看到 LISTEN 的 socket。
+# 查看
+[root@mystical ~]# iptables -t nat -L -n | grep 8080
+CNI-HOSTPORT-SETMARK  tcp  --  10.4.0.0/24          0.0.0.0/0            tcp dpt:8080
+CNI-HOSTPORT-SETMARK  tcp  --  127.0.0.1            0.0.0.0/0            tcp dpt:8080
+DNAT       tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:8080 to:10.4.0.3:808
+CNI-DN-fe0d317f921227af7dacd  tcp  --  0.0.0.0/0            0.0.0.0/0            /* dnat name: "bridge" id: "k8s.io-13617e96eeb7ed49b9c06af1b34d723b7035dae2a69f342425c2277379059846" */ multiport dports 8080
+```
+

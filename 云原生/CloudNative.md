@@ -4272,6 +4272,2798 @@ source ~/.bashrc
 
 
 
+### 基于Kubeadm和Containerd部署Kubernetes
+
+部署环境Ubuntu 22.04.X
+
+```bash
+root@k8s-master1
+root@k8s-node1
+root@k8s-node2
+```
+
+
+
+#### 安装运行时
+
+```bash
+# 所有节点都部署containerd，runc，cni，nerdctl（node节点选做）
+[root@node1 ~]# bash k8s_containerd_runc_cni.sh
+
+# 查看脚本
+#!/bin/bash
+
+PROXY_IP=11.0.1.1
+PROXY_PORT=10809
+DIR=/usr/local/src
+
+ubuntu_install_containerd() {
+	if [ -e k8s_contaierd-2.0.4-runc-1.2.6-buildkit-0.20.2-nerdctl-2.0.4-cni-1.6.2.tar ];then
+		echo -e "\e[1;32m安装包已存在\e[0m"
+
+        else
+	        wget https://www.mysticalrecluse.com/script/tools/k8s_contaierd-2.0.4-runc-1.2.6-buildkit-0.20.2-nerdctl-2.0.4-cni-1.6.2.tar
+	fi
+	tar xf k8s_contaierd-2.0.4-runc-1.2.6-buildkit-0.20.2-nerdctl-2.0.4-cni-1.6.2.tar -C ${DIR}
+	tar xf ${DIR}/containerd-2.0.4-linux-amd64.tar.gz -C /usr/local
+	cat >/lib/systemd/system/containerd.service<<EOF
+[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target local-fs.target dbus.service
+
+[Service]
+#uncomment to enable the experimental sbservice (sandboxed) version of containerd/cri integration
+#Environment="ENABLE_CRI_SANDBOXES=sandboxed"
+Environment="HTTP_PROXY=http://${PROXY_IP}:${PROXY_PORT}"
+Environment="HTTPS_PROXY=http://${PROXY_IP}:${PROXY_PORT}"
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/local/bin/containerd
+
+Type=notify
+Delegate=yes
+KillMode=process
+Restart=always
+RestartSec=5
+# Having non-zero Limit*s causes performance problems due to accounting overhead
+# in the kernel. We recommend using cgroups to do container-local accounting.
+LimitNPROC=infinity
+LimitCORE=infinity
+LimitNOFILE=infinity
+# Comment TasksMax if your systemd version does not supports it.
+# Only systemd 226 and above support this version.
+TasksMax=infinity
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    mkdir /etc/containerd -p
+	containerd config default > /etc/containerd/config.toml
+    systemctl daemon-reload
+	systemctl restart containerd.service
+	systemctl enable containerd.service
+	chmod a+x ${DIR}/runc.amd64
+	mv ${DIR}/runc.amd64 /usr/local/bin/runc
+	tar xf ${DIR}/nerdctl-2.0.4-linux-amd64.tar.gz  -C /usr/local/bin
+	tar xf ${DIR}/buildkit-v0.20.2.linux-amd64.tar.gz -C /usr/local/bin
+	mkdir /etc/nerdctl
+	cat > /etc/nerdctl/nerdctl.toml <<EOF
+namespace    = "k8s.io"
+debug        = false
+debug_full   = false
+insecure_registry = true
+address = "/run/containerd/containerd.sock"
+EOF
+        mkdir /opt/cni/bin -p
+	tar xf ${DIR}/cni-plugins-linux-amd64-v1.6.2.tgz -C /opt/cni/bin/
+	if echo $? &>/dev/null ;then
+	        echo -e "\e[1;32m安装包已存在\e[0m"
+	else
+		echo -e "\e[1;31m部署失败\e[0m"
+	fi
+    
+}
+
+ubuntu_install_containerd
+```
+
+
+
+#### 部署 kubeadm、kubectl、kubelet
+
+```bash
+# Debian/Ubuntu
+apt-get update && apt-get install -y apt-transport-https
+curl -fsSL https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.28/deb/Release.key |
+    gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.32/deb/ /" |
+    tee /etc/apt/sources.list.d/kubernetes.list
+apt-get update
+apt-get install -y kubelet kubeadm kubectl
+
+# CentOS / RHEL / Fedora
+cat <<EOF | tee /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.28/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://mirrors.aliyun.com/kubernetes-new/core/stable/v1.28/rpm/repodata/repomd.xml.key
+EOF
+setenforce 0
+yum install -y kubelet kubeadm kubectl
+systemctl enable kubelet && systemctl start kubelet
+```
+
+
+
+#### 配置代理
+
+```bash
+[root@master1 ~]# vim .bashrc
+export http_proxy=http://11.0.1.1:10809
+export https_proxy=http://11.0.1.1:10809
+export no_proxy="localhost,127.0.0.1,::1,10.0.0.0/8,10.96.0.0/12,10.244.0.0/16,11.0.1.101,11.0.1.102,11.0.1.103,master1.mystical.org,node1.mystical.org,node2.mystical.org,192.168.0.0/16"
+
+[root@master1 ~]# . .bashrc
+```
+
+
+
+
+
+#### 下载 Kubernetes 镜像
+
+提前下载镜像的好处：防止初始化的时候由于镜像下载超时而报错
+
+```bash
+# 查看需要的镜像
+[root@master1 ~]# kubeadm config images list --kubernetes-version v1.32.0
+registry.k8s.io/kube-apiserver:v1.32.0
+registry.k8s.io/kube-controller-manager:v1.32.0
+registry.k8s.io/kube-scheduler:v1.32.0
+registry.k8s.io/kube-proxy:v1.32.0
+registry.k8s.io/pause:3.9
+registry.k8s.io/etcd:3.5.15-0
+registry.k8s.io/coredns/coredns:v1.10.1
+
+# 下载
+[root@master1 ~]# cat images-down.sh 
+#!/bin/bash
+#nerdctl pull registry.k8s.io/kube-apiserver:v1.32.0
+#nerdctl pull registry.k8s.io/kube-controller-manager:v1.32.0
+#nerdctl pull registry.k8s.io/kube-scheduler:v1.32.0
+#nerdctl pull registry.k8s.io/kube-proxy:v1.32.0
+#nerdctl pull registry.k8s.io/pause:3.9
+#nerdctl pull registry.k8s.io/etcd:3.5.15-0
+#nerdctl pull registry.k8s.io/coredns/coredns:v1.10.1
+
+nerdctl pull registry.cn-hangzhou.aliyuncs.com/google_containers/kube-apiserver:v1.32.0
+nerdctl pull registry.cn-hangzhou.aliyuncs.com/google_containers/kube-controller-manager:v1.32.0
+nerdctl pull registry.cn-hangzhou.aliyuncs.com/google_containers/kube-scheduler:v1.32.0
+nerdctl pull registry.cn-hangzhou.aliyuncs.com/google_containers/kube-proxy:v1.32.0
+nerdctl pull registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.9
+nerdctl pull registry.cn-hangzhou.aliyuncs.com/google_containers/etcd:3.5.15-0
+nerdctl pull registry.cn-hangzhou.aliyuncs.com/google_containers/coredns:v1.10.1
+```
+
+
+
+#### 内核参数优化
+
+```bash
+[root@master1 ~]# vim /etc/sysctl.conf
+net.ipv4.ip_forward=1                     # 数据包跨网卡传输，必须打开
+vm.max_map_count=262144
+kernel.pid.max=4194303
+fs.file-max=100000
+net.ipv4.tcp_max_tw_buckets=6000
+net.netfilter.nf_conntrack_max=2097152
+
+net.bridge.bridge-nf-call-ip6tables=1
+net.bridge.bridge-nf-call-iptables=1      # 内核支持对网桥上的报文的检查，必须打开
+vm.swappiness=0
+
+[root@node1 ~]# sysctl --load
+
+# 内核模块开机挂载
+[root@master1 ~]# vim /etc/modules-load.d/modules.conf 
+ip_vs
+ip_vs_ls
+ip_vs_lblc
+ip_vs_lblcr
+ip_vs_rr
+ip_vs_wrr
+ip_vs_sh
+ip_vs_dh
+ip_vs_fo
+ip_vs_nq
+ip_vs_sed
+ip_vs_ftp
+ip_vs_sh
+ip_tables
+ip_set
+ipt_set
+ipt_rpfilter
+ipt_REJECT
+ipip
+xt_set
+br_netfilter
+nf_conntrack
+overlay
+
+# 验证内核模块与内存参数
+[root@master1 ~]# lsmod|grep br_netfilter
+
+# 优化内核能打开的最大文件数（生产中一定要做）
+[root@master1 ~]# vim /etc/security/limits.conf
+root     soft   core  unlimited
+root     hard   core  unlimited
+root     soft   nproc  1000000
+root     hard   nproc  1000000
+root     soft   nofile 1000000
+root     hard   nofile 1000000
+root     soft   memlock 32000
+root     hard   memlock 32000
+root     soft   msgqueue 819200
+root     hard   msgqueue 819200
+
+# 修改后重启
+[root@master1 ~]# reboot
+```
+
+
+
+#### Kubernetes 集群初始化
+
+```bash
+# 这里的版本一定要和上面的kubeadm匹配，否则容易报错
+k8s_release_version=1.32.0 && kubeadm init --control-plane-endpoint master1.mystical.org --kubernetes-version=v${k8s_release_version} --pod-network-cidr 192.168.0.0/16 --service-cidr 10.96.0.0/12 --token-ttl=0 --upload-certs
+
+# 初始化
+  mkdir -p $HOME/.kube
+  sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+  sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+
+
+#### Kubernetes - 基于init文件初始化 - 推荐
+
+```bash
+# kubeadm config print init-defaults # 输出默认初始化配置
+# kubeadm config print init-defaults > kubeadm-init.yaml  # 将默认配置输出至文件
+# cat kubeadm-init.yaml  # 修改后的初始化文件内容
+[root@master1 ~]# cat kubeadm-init.yaml 
+apiVersion: kubeadm.k8s.io/v1beta4
+bootstrapTokens:
+- groups:
+  - system:bootstrappers:kubeadm:default-node-token
+  token: abcdef.0123456789abcdef
+  ttl: 24h0m0s
+  usages:
+  - signing
+  - authentication
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: 11.0.1.101   # 这里改为某个master上的IP地址，一般为当前master的IP地址
+  bindPort: 6443
+nodeRegistration:
+  criSocket: unix:///var/run/containerd/containerd.sock  # 这里默认1.24开始使用containerd,这里是containerd的                                                                 socket文件
+  imagePullPolicy: IfNotPresent
+  imagePullSerial: true
+  name: node
+  taints: null
+timeouts:
+  controlPlaneComponentHealthCheck: 4m0s
+  discovery: 5m0s
+  etcdAPICall: 2m0s
+  kubeletHealthCheck: 4m0s
+  kubernetesAPICall: 1m0s
+  tlsBootstrap: 5m0s
+  upgradeManifests: 5m0s
+---
+apiServer: 
+  timeoutForControlPlane: 4m0s       # 这里添加初始化的超时时间
+apiVersion: kubeadm.k8s.io/v1beta4
+caCertificateValidityPeriod: 87600h0m0s
+certificateValidityPeriod: 8760h0m0s
+certificatesDir: /etc/kubernetes/pki
+clusterName: kubernetes
+controlPlaneEndpoint: IP:6443        # 自行添加这行，这行是一般是负载均衡器的VIP监听的端口地址
+                                     # 如果没有使用负载均衡器，这里可以删掉
+controllerManager: {}
+dns: {}
+encryptionAlgorithm: RSA-2048
+etcd:
+  local:
+    dataDir: /var/lib/etcd
+imageRepository: registry.k8s.io      # 镜像仓库，可以换成国内仓库，比如：
+                                      # registry.cn-hangzhou.aliyuncs.com/google_containers
+kind: ClusterConfiguration
+kubernetesVersion: 1.32.0             # 这里可以换成你想装的k8s版本
+networking:
+  dnsDomain: cluster.local
+  podSubnet: 10.200.0.0/16            # 自行在这里添加pod网络网段，和CNI网络插件的网段地址一致
+  serviceSubnet: 10.96.0.0/12
+proxy: {}
+scheduler: {}
+
+--- # 指定kubelet使用systemd
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+cgroupDriver: systemd            # 这里要和containerd的cgroup驱动一致
+                                 # 尤其是ubuntu22.04之后，cgroup使用v2，这里就必须强行指定为systemd
+
+--- # 指定Kubeproxy使用ipvs
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: ipvs
+
+# 使用初始化文件进行初始化
+[root@master1 ~]# kubeadm init --config kubeadm-init.yaml   # 基于文件执行k8s master初始化
+```
+
+
+
+##### 补充：kubelet 与容器运行时的 cgroup driver 要一致
+
+**背景：资源限制依赖的 cgroup 驱动**
+
+- 容器运行时如 `Docker`、`containerd` 都使用 Linux 的 **cgroup** 实现资源限制（如 CPU、内存）。
+- `cgroup` 本身有两个版本：**cgroup v1** 和 **cgroup v2**。
+- 对于如何**管理这些 cgroup 的分层结构**，存在两种主流驱动方式：
+  - **`cgroupfs`**（早期 Docker 默认）
+  - **`systemd`**（Kubernetes 推荐）
+
+
+
+**kubelet 与容器运行时的 cgroup driver 要一致**
+
+ kubelet 和容器运行时（无论是 docker 还是 containerd）**必须使用同一种 cgroup 驱动**，否则 pod 会因为资源无法限制或识别而调度失败。
+
+
+
+**查看 containerd 的 cgroup 驱动**
+
+**查看 containerd 配置文件**
+
+打开配置文件 `/etc/containerd/config.toml`，找到这一段：
+
+```toml
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+  SystemdCgroup = true
+```
+
+- `SystemdCgroup = true` 表示使用 `systemd` 驱动
+- `SystemdCgroup = true` 或不存在该字段，则表示使用 `cgroupfs`
+
+
+
+如果没有该配置文件，可自行创建修改
+
+```bash
+containerd config default > /etc/containerd/config.toml
+```
+
+然后编辑 `config.toml`，手动加上 `SystemdCgroup = true`：
+
+```toml
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.runc.options]
+  SystemdCgroup = true
+```
+
+⚠️ 修改后请务必重启 containerd：
+
+```bash
+systemctl restart containerd
+```
+
+
+
+**同时别忘了确保 kubelet 的配置一致：**
+
+```yaml
+# /var/lib/kubelet/config.yaml
+cgroupDriver: systemd
+```
+
+也需要重启 kubelet：
+
+```bash
+systemctl restart kubelet
+```
+
+
+
+#### 将node节点加入集群
+
+````bash
+kubeadm join master1.mystical.org:6443 --token 75y4xk.fceeqawwqvujq7la \
+	--discovery-token-ca-cert-hash sha256:441a979658ef2c8605752dbf7f87d15423963a25ec0099d09aea864e7821c88e
+````
+
+
+
+#### 部署网络插件Calico
+
+```bash
+curl https://raw.githubusercontent.com/projectcalico/calico/v3.28.1/manifests/calico.yaml -o
+
+# 编辑修改calico.yaml
+# 选用的pod cidr及子网掩码长度  
+- name: calico_ipv4pool_cidr
+  vlaue: "192.168.0.0/16"
+  name: calico_ipv4pool_block_size
+  values: "24"
+
+# 选用的路由模式：always, never, cross-subnet
+env:
+- name: IP_AUTODETECTION_METHOD   # 指定基于eth0的网卡IP建立BGP连接，默认为服务器第一块
+  value: "interface=eth0"
+- name: calico_ipv4pool_ipip
+  value: "always"
+- name: calico_ipv4pool_vxlan
+  value: "never"
+- name: calico_ipv6pool_vxlan
+  value: "never"
+```
+
+- 执行calico的yaml
+
+```shell
+kubectl apply -f calico.yaml
+
+# calico需要将.kube/config文件拷贝到所有节点，因为calico需要做认证
+scp .kube/config node1:
+scp .kube/config node2:
+
+# 下载calicoctl
+curl -l https://github.com/projectcalico/calico/releases/download/v3.28.1/calicoctl-linux-amd64 -o calicoctl
+
+# 授权并加入path变量
+chmod +x ./calicoctl
+mv calicoctl /usr/local/bin
+
+# 使用calicoctl查看node状态
+[root@master1 ~]#calicoctl get node -o wide
+name               asn       ipv4            ipv6   
+master1.feng.org   (64512)   10.0.0.121/24          
+worker1.feng.org   (64512)   10.0.0.122/24          
+worker2.feng.org   (64512)   10.0.0.123/24          
+worker3.feng.org   (64512)   10.0.0.124/24 
+```
+
+
+
+
+
+### 二进制部署高可用k8s集群部署v.1.30.x
+
+- 多master、实现master高可用和高性能，master最少三个，分布在不同可用区
+- 单独的etcd分布式集群，高可用持久化Kubernetes资源对象数据，并实现高可用
+  - etcd应该使用高性能硬盘，比如SSD
+  - 也可以使用4块10000-15000转的SAS盘做raid10，在组raid的时候，建议同厂商，同规格，至少要保证同规格
+  - etcd最少三个，分布在不同可用区
+- 多node节点运行业务pod，node节点可以是不同硬件规格，如CPU节点、Memory节点，GPU节点，Bigdata节点等
+- 各node节点通过负载均衡器与Master相连，由负载均衡器实现对master的轮询调用及状态监测及路障转移，以在master出现宕机的时候依然可以保持node与master的通信
+  - 同时实现node节点与master节点之间的解耦
+  - 负载均衡器会负责对master即后端服务器进行周期性健康性监测
+- 各节点可弹性伸缩
+
+| 类型        | 服务器IP   | 主机名               | VIP        |
+| ----------- | ---------- | -------------------- | ---------- |
+| K8S Master1 | 10.0.0.201 | master1.mystical.org | 10.0.0.200 |
+| K8S Master2 | 10.0.0.202 | master2.mystical.org | rooroot    |
+| K8S Master3 | 10.0.0.203 | master3.mystical.org |            |
+| Harbor1     | 10.0.0.204 | harbor1.mystical.org |            |
+| Harbor2     | 10.0.0.205 | harbor2.mystical.org |            |
+| etcd节点1   | 10.0.0.206 | etcd1.mystical.org   |            |
+| etcd节点2   | 10.0.0.207 | etcd2.mystical.org   |            |
+| etcd节点3   | 10.0.0.208 | etcd3.mystical.org   |            |
+| Haproxy1    | 10.0.0.209 | ha1.mystical.org     |            |
+| Haproxy2    | 10.0.0.210 | ha2.mystical.org     |            |
+| Node节点1   | 10.0.0.211 | node1.mystical.org   |            |
+| Node节点2   | 10.0.0.212 | node2.mystical.org   |            |
+| Node节点3   | 100.0.213  | node3.mystical.org   |            |
+
+- k8s集群节点的主机名一定不能一样，否则后期kube-proxy会出现异常
+
+- machine-id也不能一样，如果一样需要重新生成不一样的id
+
+  ```bash
+  rm -rf /etc/machine-id && dbus-uuidgen --ensure=/etc/machine-id && cat /etc/macheine-id
+  ```
+
+- 在k8s集群这一层，machine-id一样是没问题的，那是有些服务会出问题，所以建议所以节点的machine-id修改为不一样的
+
+- 向etcd,zookeeper这种服务，并不是机器越多，性能越强，因为会有**写放大**现象，如果集群数量越多，一主多备的情况下，向主数据库写入数据，它会向其他所有备用数据库进行复制，所以备用数据库越多，会导致写IO过多，性能变差
+
+
+
+#### Linux Kernel 升级（选做）
+
+k8s,docker,cilium等很多功能、**特性需要较新的linux内核支持，所以有必要在集群部署前对内核进行升级**；CentOS7 和 Ubuntu16.04可以很方便的完成内核升级。
+
+##### CentOS7
+
+红帽企业版 Linux 仓库网站 [https://www.elrepo.org，主要提供各种硬件驱动（显卡、网卡、声卡等）和内核升级相关资源；兼容](https://www.elrepo.xn--org,();-2o3fa1948e1xbtycqzkwdwf25rn5cinbb925a0zdt91bfjp0v1chhnvsmjj7bb70codjwwk02l531a36exp2iil2ag45h/) CentOS7 内核升级。如下按照网站提示载入elrepo公钥及最新elrepo版本，然后按步骤升级内核（以安装长期支持版本 kernel-lt 为例）
+
+```bash
+# 载入公钥
+rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+# 安装ELRepo
+rpm -Uvh http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm
+# 载入elrepo-kernel元数据
+yum --disablerepo=\* --enablerepo=elrepo-kernel repolist
+# 查看可用的rpm包
+yum --disablerepo=\* --enablerepo=elrepo-kernel list kernel*
+# 安装长期支持版本的kernel
+yum --disablerepo=\* --enablerepo=elrepo-kernel install -y kernel-lt.x86_64
+# 删除旧版本工具包
+yum remove kernel-tools-libs.x86_64 kernel-tools.x86_64 -y
+# 安装新版本工具包
+yum --disablerepo=\* --enablerepo=elrepo-kernel install -y kernel-lt-tools.x86_64
+
+#查看默认启动顺序
+awk -F\' '$1=="menuentry " {print $2}' /etc/grub2.cfg  
+CentOS Linux (4.4.183-1.el7.elrepo.x86_64) 7 (Core)  
+CentOS Linux (3.10.0-327.10.1.el7.x86_64) 7 (Core)  
+CentOS Linux (0-rescue-c52097a1078c403da03b8eddeac5080b) 7 (Core)
+#默认启动的顺序是从0开始，新内核是从头插入（目前位置在0，而4.4.4的是在1），所以需要选择0。
+grub2-set-default 0  
+#重启并检查
+reboot
+```
+
+
+
+##### Ubuntu16.04
+
+```bash
+打开 http://kernel.ubuntu.com/~kernel-ppa/mainline/ 并选择列表中选择你需要的版本（以4.16.3为例）。
+接下来，根据你的系统架构下载 如下.deb 文件：
+Build for amd64 succeeded (see BUILD.LOG.amd64):
+  linux-headers-4.16.3-041603_4.16.3-041603.201804190730_all.deb
+  linux-headers-4.16.3-041603-generic_4.16.3-041603.201804190730_amd64.deb
+  linux-image-4.16.3-041603-generic_4.16.3-041603.201804190730_amd64.deb
+#安装后重启即可
+$ sudo dpkg -i *.deb
+```
+
+
+
+#### 部署 keepalived 和 haproxy
+
+##### 实现 keepalived
+
+```bash
+# haproxy1.mystical.org 和 haproxy2.mystical.org 这两个服务器上部署
+[root@haproxy1 ~]#apt install -y keepalived haproxy
+
+# 使用keepalived配置vip
+[root@haproxy1 ~]#cp  /usr/share/doc/keepalived/samples/keepalived.conf.vrrp /etc/keepalived/keepalived.conf
+
+[root@haproxy1 ~]#vim /etc/keepalived/keepalived.conf
+
+! Configuration File for keepalived
+global_defs {
+  notification_email {
+    acassen
+  }
+  notification_email_from Alexandre.Cassen@firewall.loc
+  smtp_server 192.168.200.1
+  smtp_connect_timeout 30
+  router_id ha1.wang.org  #指定router_id,#在ha2上为ha2.wang.org
+}
+vrrp_script check_haproxy {
+   script "/etc/keepalived/check_haproxy.sh"
+   interval 1
+   weight -30
+   fall 3
+   rise 2
+   timeout 2
+}
+vrrp_instance VI_1 {
+   state MASTER              #在ha2上为BACKUP        
+   interface eth0
+   garp_master_delay 10
+   smtp_alert
+   virtual_router_id 66      #指定虚拟路由器ID,ha1和ha2此值必须相同
+   priority 100              #在ha2上为80          
+   advert_int 1
+   authentication {
+       auth_type PASS
+       auth_pass 123456      #指定验证密码,ha1和ha2此值必须相同  
+   }
+   virtual_ipaddress {
+        10.0.0.88/24 dev eth0 label eth0:0   # 这里是k8s-master的vip
+        10.0.0.89/24 dev eth0 label eth0:1   # 后续服务的vip，用于测试k8s中的vip能否访问
+        10.0.0.90/24 dev eth0 label eth0:2   # 后续服务的vip，用于测试k8s中的vip能否访问
+        10.0.0.91/24 dev eth0 label eth0:3   # 后续服务的vip，用于测试k8s中的vip能否访问
+
+   }
+   track_script {
+       check_haproxy 
+   }
+}
+ [root@ha1 ~]#cat /etc/keepalived/check_haproxy.sh
+ #!/bin/bash
+ /usr/bin/killall -0 haproxy  || systemctl restart haproxy
+ [root@ha1 ~]#chmod +x /etc/keepalived/check_haproxy.sh
+ [root@ha1 ~]#hostname -I
+ 10.0.0.107 
+[root@ha1 ~]#systemctl start keepalived.service 
+#验证keepalived服务是否正常
+
+# 启用开机自启
+[root@haproxy1 ~]# systemctl enable keepalived
+Synchronizing state of keepalived.service with SysV service script with /lib/systemd/systemd-sysv-install.
+Executing: /lib/systemd/systemd-sysv-install enable keepalived
+```
+
+
+
+**实现 Haproxy**
+
+通过 Harproxy 实现 kubernetes Api-server的四层反向代理和负载均衡功能
+
+``````bash
+#在两台主机ha1和ha2都执行下面操作
+# 下面的内核参数必须修改，因为haproxy默认不能监听本机没有的ip，加上开启下面的内核参数，才能允许
+[root@ha1 ~]#cat >> /etc/sysctl.conf <<EOF
+net.ipv4.ip_nonlocal_bind = 1
+EOF
+root@ha1 ~]#sysctl -p 
+
+#安装配置haproxy
+[root@ha1 ~]#apt -y install haproxy
+[root@ha1 ~]#vim /etc/haproxy/haproxy.cfg 
+[root@ha1 ~]#cat /etc/haproxy/haproxy.cfg
+
+global
+	log /dev/log	local0
+	log /dev/log	local1 notice
+	chroot /var/lib/haproxy
+	stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+	stats timeout 30s
+	user haproxy
+	group haproxy
+	daemon
+
+	# Default SSL material locations
+	ca-base /etc/ssl/certs
+	crt-base /etc/ssl/private
+
+	# See: https://ssl-config.mozilla.org/#server=haproxy&server-version=2.0.3&config=intermediate
+        ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
+        ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+        ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
+
+defaults
+	log	global
+	mode	http
+	option	httplog
+	option	dontlognull
+        timeout connect 5000
+        timeout client  50000
+        timeout server  50000
+	errorfile 400 /etc/haproxy/errors/400.http
+	errorfile 403 /etc/haproxy/errors/403.http
+	errorfile 408 /etc/haproxy/errors/408.http
+	errorfile 500 /etc/haproxy/errors/500.http
+	errorfile 502 /etc/haproxy/errors/502.http
+	errorfile 503 /etc/haproxy/errors/503.http
+	errorfile 504 /etc/haproxy/errors/504.http
+
+##########添加以下内容######################
+
+listen stats
+    mode http
+    bind 0.0.0.0:8888
+    stats enable
+    log global
+    stats uri /status
+    stats auth admin:123456
+
+listen  kubernetes-api-6443
+    bind 10.0.0.88:6443
+    mode tcp 
+    server master1 10.0.0.201:6443 check inter 3s fall 3 rise 3 
+    server master2 10.0.0.202:6443 check inter 3s fall 3 rise 3 
+    server master3 10.0.0.203:6443 check inter 3s fall 3 rise 3 
+``````
+
+
+
+浏览器访问： http://ha2.wang.org:8888/status ，可以看到下面界面
+
+
+
+#### 部署harbor
+
+##### 申请证书（生产环境中不建议使用自签证书）
+
+要使用https的harbor，建议使用商业版的证书，而不是自签证书
+
+在阿里云或腾讯云买个域名，有免费证书额度，可以使用免费证书
+
+![image-20250407091828813](../markdown_img/image-20250407091828813.png)
+
+![image-20250407092306507](../markdown_img/image-20250407092306507.png)
+
+![image-20250407092332226](../markdown_img/image-20250407092332226.png)
+
+![image-20250407110939341](../markdown_img/image-20250407110939341.png)
+
+![image-20250407111225625](../markdown_img/image-20250407111225625.png)
+
+
+
+##### **添加一块数据盘，用来放harbor的镜像**
+
+```bash
+# 查看新加磁盘是否识别
+[root@harbor1 ~]#fdisk -l
+Disk /dev/sda：200 GiB，214748364800 字节，419430400 个扇区
+Disk model: VMware Virtual S
+单元：扇区 / 1 * 512 = 512 字节
+扇区大小(逻辑/物理)：512 字节 / 512 字节
+I/O 大小(最小/最佳)：512 字节 / 512 字节
+磁盘标签类型：gpt
+磁盘标识符：CD107A96-8A31-4B05-B62C-EA05609760ED
+
+设备          起点      末尾      扇区  大小 类型
+/dev/sda1     2048      4095      2048    1M BIOS 启动
+/dev/sda2     4096   4198399   4194304    2G Linux 文件系统
+/dev/sda3  4198400 419428351 415229952  198G Linux 文件系统
+
+
+Disk /dev/sdb：500 GiB，536870912000 字节，1048576000 个扇区       # 已识别
+Disk model: VMware Virtual S
+单元：扇区 / 1 * 512 = 512 字节
+扇区大小(逻辑/物理)：512 字节 / 512 字节
+I/O 大小(最小/最佳)：512 字节 / 512 字节
+
+
+Disk /dev/mapper/ubuntu--vg-ubuntu--lv：99 GiB，106296246272 字节，207609856 个扇区
+单元：扇区 / 1 * 512 = 512 字节
+扇区大小(逻辑/物理)：512 字节 / 512 字节
+I/O 大小(最小/最佳)：512 字节 / 512 字节
+
+# 格式化磁盘
+[root@harbor1 ~]#mkfs.xfs /dev/sdb
+meta-data=/dev/sdb               isize=512    agcount=4, agsize=32768000 blks
+         =                       sectsz=512   attr=2, projid32bit=1
+         =                       crc=1        finobt=1, sparse=1, rmapbt=0
+         =                       reflink=1    bigtime=0 inobtcount=0
+data     =                       bsize=4096   blocks=131072000, imaxpct=25
+         =                       sunit=0      swidth=0 blks
+naming   =version 2              bsize=4096   ascii-ci=0, ftype=1
+log      =internal log           bsize=4096   blocks=64000, version=2
+         =                       sectsz=512   sunit=0 blks, lazy-count=1
+realtime =无                    extsz=4096   blocks=0, rtextents=0
+
+# 编辑下/etc/fstab
+[root@harbor1 ~]#vim /etc/fstab 
+/dev/sdb /data  xfs defaults 0 0    # 添加这行
+
+[root@harbor1 ~]#mkdir /data
+[root@harbor1 ~]#mount -a
+
+# 检查是否成功挂载
+[root@harbor1 ~]#df -TH
+文件系统                          类型   大小  已用  可用 已用% 挂载点
+tmpfs                             tmpfs  407M  1.6M  405M    1% /run
+/dev/mapper/ubuntu--vg-ubuntu--lv ext4   105G  9.0G   90G   10% /
+tmpfs                             tmpfs  2.1G     0  2.1G    0% /dev/shm
+tmpfs                             tmpfs  5.3M     0  5.3M    0% /run/lock
+/dev/sda2                         ext4   2.1G  247M  1.7G   13% /boot
+tmpfs                             tmpfs  407M     0  407M    0% /run/user/0
+/dev/sdb                          xfs    537G  3.8G  533G    1% /data             # 挂载成功
+```
+
+
+
+##### 部署harbor
+
+harbor下载网址
+
+```http
+https://github.com/goharbor/harbor/releases   # 注意下载正式版，不要下载rc版本
+```
+
+```bash
+# 下载harbor
+[root@harbor1 ~]#wget https://github.com/goharbor/harbor/releases/download/v2.12.2/harbor-offline-installer-v2.12.2.tgz
+
+# 部署docker
+[root@harbor1 harbor]#wget https://www.mysticalrecluse.com/script/Shell/install_docker_offline.sh
+[root@harbor1 harbor]#bash install_docker_offline.sh
+[root@harbor1 harbor]#source /etc/bash_completion.d/docker_completion
+
+# 部署docker-compose
+[root@harbor1 harbor]# cat ~/docker-compose-repo.sh
+# Add Docker's official GPG key:
+apt-get update
+apt-get install ca-certificates curl
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+
+echo "GPG OVER"
+
+# Add the repository to Apt sources:
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+
+[root@harbor1 harbor]# bash ~/docker-compose-repo.sh
+
+# 官方仓库配置好后，执行下面的指令
+[root@ubuntu2204 ~]#apt install -y docker-compose-plugin
+
+# 创建放置harbor的目录
+[root@ubuntu2204 ~]#mkdir /apps
+[root@ubuntu2204 ~]#tar xvf harbor-offline-installer-v2.12.2.tgz -C /apps/
+harbor/harbor.v2.12.2.tar.gz
+harbor/prepare
+harbor/LICENSE
+harbor/install.sh
+harbor/common.sh
+harbor/harbor.yml.tmpl
+
+[root@ubuntu2204 harbor]# cd /apps/harbor
+
+# 创建证书目录
+[root@harbor1 harbor]#mkdir certs
+
+# 将下载nginx格式的证书传入该目录
+[root@harbor1 certs]# ls
+harbor.mysticalrecluse.com_nginx.zip
+
+# 解压
+[root@harbor1 certs]#unzip harbor.mysticalrecluse.com_nginx.zip 
+Archive:  harbor.mysticalrecluse.com_nginx.zip
+   creating: harbor.mysticalrecluse.com_nginx/
+  inflating: harbor.mysticalrecluse.com_nginx/harbor.mysticalrecluse.com.csr  
+  inflating: harbor.mysticalrecluse.com_nginx/harbor.mysticalrecluse.com_bundle.crt  
+  inflating: harbor.mysticalrecluse.com_nginx/harbor.mysticalrecluse.com_bundle.pem  
+  inflating: harbor.mysticalrecluse.com_nginx/harbor.mysticalrecluse.com.key
+[root@harbor1 certs]# cd harbor.mysticalrecluse.com_nginx/
+[root@harbor1 harbor.mysticalrecluse.com_nginx]# ls
+harbor.mysticalrecluse.com_bundle.crt  harbor.mysticalrecluse.com.csr
+harbor.mysticalrecluse.com_bundle.pem  harbor.mysticalrecluse.com.key
+
+
+[root@ubuntu2204 harbor]#cp harbor.yml.tmpl harbor.yml
+[root@ubuntu2204 harbor]#vim harbor.yml
+# 这里的域名一定和证书的域名一致
+hostname: harbor.mysticalrecluse.com
+
+# http related config
+http:
+  # port for http, default is 80. If https enabled, this port will redirect to https port
+  port: 80
+
+# https related config
+https:
+  # https port for harbor, default is 443
+  port: 443
+  # The path of cert and key files for nginx  
+  certificate: /apps/harbor/certs/harbor.mysticalrecluse.com_nginx/harbor.mysticalrecluse.com_bundle.pem
+  private_key: /apps/harbor/certs/harbor.mysticalrecluse.com_nginx/harbor.mysticalrecluse.com.key
+......
+# 更改harbor的密码
+harbor_admin_password: 646130
+
+......
+# 这里可以更改harbor的数据存放路径，建议这里挂一个数据盘来保存harbor的镜像，将数据和系统分开，系统挂了不影响数据
+data_volume: /data
+
+# 启用镜像漏洞扫描
+trivy:
+  enabled: true
+
+# 启用部署harbor
+[root@harbor1 harbor]#./install.sh 
+......
+[Step 5]: starting Harbor ...
+[+] Running 10/10
+ ✔ Network harbor_harbor        Created                                               0.2s 
+ ✔ Container harbor-log         Started                                               1.4s 
+ ✔ Container redis              Started                                               4.5s 
+ ✔ Container registryctl        Started                                               5.2s 
+ ✔ Container harbor-db          Started                                               5.2s 
+ ✔ Container harbor-portal      Started                                               4.8s 
+ ✔ Container registry           Started                                               4.5s 
+ ✔ Container harbor-core        Started                                               6.3s 
+ ✔ Container harbor-jobservice  Started                                               7.9s 
+ ✔ Container nginx              Started                                               8.6s 
+✔ ----Harbor has been installed and started successfully.----
+
+# 部署成功后，浏览器访问测试
+https://harbor.mysticalrecluse.com/
+```
+
+![image-20250407115822490](../markdown_img/image-20250407115822490.png)
+
+为公司创建一个项目（暂设为公开，如果设为私有，后面需要在k8s中配置secret）
+
+![image-20250407120231183](../markdown_img/image-20250407120231183.png)
+
+![image-20250407120248022](../markdown_img/image-20250407120248022.png)
+
+
+
+##### nerdctl测试登录harbor
+
+在harbor2节点测试登录harbor服务器，以验证是否能够登录harbor及push镜像
+
+```bash
+# 安装部署containerd及客户端nerdctl
+[root@harbor2 ~]#wget https://www.mysticalrecluse.com/script/Shell/k8s_containerd_runc_cni.sh
+[root@harbor2 ~]#bash k8s_containerd_runc_cni.sh
+[root@harbor2 ~]#nerdctl login harbor.mysticalrecluse.com
+Enter Username: admin
+Enter Password: 
+WARN[0004] skipping verifying HTTPS certs for "harbor.mysticalrecluse.com:443" 
+
+WARNING! Your credentials are stored unencrypted in '/root/.docker/config.json'.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/go/credential-store/
+
+Login Succeeded
+
+# 测试上传
+[root@harbor2 ~]#nerdctl pull alpine
+docker.io/library/alpine:latest:                                                  resolved       |++++++++++++++++++++++++++++++++++++++| 
+index-sha256:a8560b36e8b8210634f77d9f7f9efd7ffa463e380b75e2e74aff4511df3ef88c:    done           |++++++++++++++++++++++++++++++++++++++| 
+manifest-sha256:1c4eef651f65e2f7daee7ee785882ac164b02b78fb74503052a26dc061c90474: done           |++++++++++++++++++++++++++++++++++++++| 
+config-sha256:aded1e1a5b3705116fa0a92ba074a5e0b0031647d9c315983ccba2ee5428ec8b:   done           |++++++++++++++++++++++++++++++++++++++| 
+layer-sha256:f18232174bc91741fdf3da96d85011092101a032a93a388b79e99e69c2d5c870:    done           |++++++++++++++++++++++++++++++++++++++| 
+elapsed: 8.5 s                                                                    total:  3.5 Mi (419.7 KiB/s) 
+
+[root@harbor2 ~]#nerdctl tag alpine:latest harbor.mysticalrecluse.com/baseimages/alpine:latest
+[root@harbor2 ~]#nerdctl push harbor.mysticalrecluse.com/baseimages/alpine
+INFO[0000] pushing as a reduced-platform image (application/vnd.oci.image.index.v1+json, sha256:c5048da63aaf2a23ef85098b8a8dfc0cf571ccfa285812d28b71e21e7d60de7f) 
+WARN[0000] skipping verifying HTTPS certs for "harbor.mysticalrecluse.com" 
+index-sha256:c5048da63aaf2a23ef85098b8a8dfc0cf571ccfa285812d28b71e21e7d60de7f:    done           |++++++++++++++++++++++++++++++++++++++| 
+manifest-sha256:1c4eef651f65e2f7daee7ee785882ac164b02b78fb74503052a26dc061c90474: done           |++++++++++++++++++++++++++++++++++++++| 
+layer-sha256:f18232174bc91741fdf3da96d85011092101a032a93a388b79e99e69c2d5c870:    done           |++++++++++++++++++++++++++++++++++++++| 
+config-sha256:aded1e1a5b3705116fa0a92ba074a5e0b0031647d9c315983ccba2ee5428ec8b:   done           |++++++++++++++++++++++++++++++++++++++| 
+elapsed: 0.8 s                                                                    total:  3.5 Mi (4.3 MiB/s)
+
+# 查看harbor
+```
+
+![image-20250407122040531](../markdown_img/image-20250407122040531.png)
+
+```bash
+# 测试下载
+[root@harbor2 ~]#nerdctl images
+REPOSITORY                                      TAG       IMAGE ID        CREATED          PLATFORM       SIZE       BLOB SIZE
+harbor.mysticalrecluse.com/baseimages/alpine    latest    a8560b36e8b8    2 minutes ago    linux/amd64    8.503MB    3.644MB
+<none>                                          <none>    a8560b36e8b8    4 minutes ago    linux/amd64    8.503MB    3.644MB
+alpine                                          latest    a8560b36e8b8    4 minutes ago    linux/amd64    8.503MB    3.644MB
+[root@harbor2 ~]#nerdctl rmi -f a8560b36e8b8
+[root@harbor2 ~]#nerdctl pull harbor.mysticalrecluse.com/baseimages/alpine
+WARN[0000] skipping verifying HTTPS certs for "harbor.mysticalrecluse.com" 
+harbor.mysticalrecluse.com/baseimages/alpine:latest:                              resolved       |++++++++++++++++++++++++++++++++++++++| 
+index-sha256:c5048da63aaf2a23ef85098b8a8dfc0cf571ccfa285812d28b71e21e7d60de7f:    done           |++++++++++++++++++++++++++++++++++++++| 
+manifest-sha256:1c4eef651f65e2f7daee7ee785882ac164b02b78fb74503052a26dc061c90474: done           |++++++++++++++++++++++++++++++++++++++| 
+config-sha256:aded1e1a5b3705116fa0a92ba074a5e0b0031647d9c315983ccba2ee5428ec8b:   done           |++++++++++++++++++++++++++++++++++++++| 
+layer-sha256:f18232174bc91741fdf3da96d85011092101a032a93a388b79e99e69c2d5c870:    done           |++++++++++++++++++++++++++++++++++++++| 
+elapsed: 1.1 s                                                                    total:  3.5 Mi (3.2 MiB/s) 
+```
+
+
+
+#### kubeasz部署高可用Kubernetes
+
+![image-20250407123739224](D:\git_repository\cyber_security_learning\markdown_img\image-20250407123739224.png)
+
+- 上述架构有两类负载均衡器
+  - kube-lb：使用nignx实现，所有的kubelet将请求发给127.0.0.1:6443，然后由nginx，反向代理给各master
+  - external-lb：这里使用haproxy，用于承接kubectl或者dashboard等外部请求，缓解了外部负载均衡器的压力
+
+
+
+使用ansible在部署服务器部署k8s集群
+
+```bash
+#!/bin/bash
+
+# 密钥打通脚本
+IP="
+10.0.0.201
+10.0.0.202
+10.0.0.203
+10.0.0.204
+10.0.0.205
+10.0.0.206
+10.0.0.207
+10.0.0.208
+10.0.0.209
+10.0.0.210
+10.0.0.211
+10.0.0.212
+10.0.0.213
+"
+REMOTE_PORT="22"
+REMOTE_USER="root"
+REMOTE_PASS="646130"
+
+for REMOTE_HOST in ${IP}; do
+  REMOTE_CMD="echo ${REMOTE_HOST} is successfully!"
+  # 添加目标远程主机公钥，相当于输入yes
+  ssh-keyscan -p "${REMOTE_PORT}" "${REMOTE_HOST}" >> ~/.ssh/known_hosts
+  
+  # 通过sshpass配置免秘钥登录，并创建python3软链接
+  apt install -y sshpass
+  sshpass -p "${REMOTE_PASS}" ssh-copy-id "${REMOTE_USER}@${REMOTE_HOST}"
+  ssh ${REMOTE_HOST} ln -sv /usr/bin/python3 /usr/bin/python
+  echo ${REMOTE_HOST} 免秘钥配置完成！
+done
+```
+
+
+
+```bash
+# 部署ansible，这里在haproxy1服务器作为部署服务器
+[root@haproxy1 ~]#wget https://www.mysticalrecluse.com/script/Shell/install_ansible.sh
+[root@haproxy1 ~]#bash install_ansible.sh
+
+# 所有节点打通，配置免密认证
+# 测试
+[root@haproxy1 ansible]#ansible test -m ping
+10.0.0.202 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+10.0.0.207 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+10.0.0.201 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+10.0.0.206 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+10.0.0.203 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+10.0.0.208 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+10.0.0.213 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+10.0.0.212 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+10.0.0.211 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+
+```
+
+
+
+#### 下载kubeasz项目及组件
+
+```bash
+# 现部署k8sv1.30
+[root@haproxy1 ~]#mkdir 1.30
+[root@haproxy1 ~]#cd 1.30/
+[root@haproxy1 1.30]#wget https://github.com/easzlab/kubeasz/releases/download/3.6.4/ezdow
+[root@haproxy1 1.30]#chmod a+x ezdown
+[root@haproxy1 1.30]#./ezdown -D
+```
+
+
+
+#### 生产并自定义hosts文件
+
+```bash
+[root@haproxy1 1.30]#cd /etc/kubeasz/
+[root@haproxy1 kubeasz]#ls
+ansible.cfg  docs  example  ezdown     pics       README.md  tools
+bin          down  ezctl    manifests  playbooks  roles
+
+[root@haproxy1 kubeasz]#./ezctl new k8s-cluster1
+2025-04-07 15:33:44 DEBUG generate custom cluster files in /etc/kubeasz/clusters/k8s-cluster1
+2025-04-07 15:33:44 DEBUG set versions
+2025-04-07 15:33:44 DEBUG cluster k8s-cluster1: files successfully created.
+2025-04-07 15:33:44 INFO next steps 1: to config '/etc/kubeasz/clusters/k8s-cluster1/hosts'
+2025-04-07 15:33:44 INFO next steps 2: to config '/etc/kubeasz/clusters/k8s-cluster1/config.yml'
+
+# config.yaml针对Kubernetes的具体配置
+[root@haproxy1 kubeasz]#vim clusters/k8s-cluster1/config.yml
+......
+############################
+# role:deploy
+############################
+# default: ca will expire in 100 years
+# default: certs issued by the ca will expire in 50 years
+CA_EXPIRY: "876000h"           # 这里配置证书有效期
+CERT_EXPIRY: "438000h"
+
+############################
+# role:etcd
+############################
+# 设置不同的wal目录，可以避免磁盘io竞争，提高性能，etcd这里最好是高性能固态盘，性能好，etcd非常消耗磁盘IO
+ETCD_DATA_DIR: "/var/lib/etcd"
+ETCD_WAL_DIR: ""
+
+
+############################
+# role:runtime [containerd,docker]
+############################
+# [.]启用拉取加速镜像仓库
+ENABLE_MIRROR_REGISTRY: true
+
+# [.]添加信任的私有仓库
+# 必须按照如下示例格式，协议头'http://'和'https://'不能省略
+INSECURE_REG:                                               # 这里可以放本地自签名的harbor地址，进行信任
+  - "http://easzlab.io.local:5000"
+  - "https://reg.yourcompany.com"
+
+# [.]基础容器镜像
+SANDBOX_IMAGE: "easzlab.io.local:5000/easzlab/pause:3.9"     # 这里可以换成私有仓库的地址提供pause容器
+
+# [containerd]容器持久化存储目录
+CONTAINERD_STORAGE_DIR: "/var/lib/containerd"                # 容器数据目录可以单独给一块高性能数据盘，提高容器的运行                                                                速度，如果使用机械盘，速度非常慢
+
+# [docker]容器存储目录
+DOCKER_STORAGE_DIR: "/var/lib/docker"
+
+......
+############################
+# role:kube-master
+############################
+# k8s 集群 master 节点证书配置，可以添加多个ip和域名（比如增加公网ip和域名）
+MASTER_CERT_HOSTS:
+  - "10.0.0.88"                                              # 打算通过哪里访问，这里证书就签发给谁，比如通过负载均衡                                                                器访问，这个地址就是用vip,也因此公有云上的公网ip是不                                                                能随便换的，否则会导致证书和对应的ip不一致，会出问题
+  - "api.mystical.org"
+  #- "www.test.com"
+
+# node 节点上 pod 网段掩码长度（决定每个节点最多能分配的pod ip地址）
+# 如果flannel 使用 --kube-subnet-mgr 参数，那么它将读取该设置为每个节点分配pod网段
+# https://github.com/coreos/flannel/issues/847
+NODE_CIDR_LEN: 24
+
+############################
+# role:kube-node
+############################
+# Kubelet 根目录
+KUBELET_ROOT_DIR: "/var/lib/kubelet"
+
+# node节点最大pod 数
+MAX_PODS: 110                                              # 如果服务器性能特别强，这里可以把pod数上调
+
+############################
+# role:cluster-addon
+############################
+# coredns 自动安装
+dns_install: "no"                                          # 这里改为no，可以后面自己装
+corednsVer: "1.11.1"
+ENABLE_LOCAL_DNS_CACHE: false                              # true启用缓存，提高性能
+dnsNodeCacheVer: "1.22.28"
+# 设置 local dns cache 地址
+LOCAL_DNS_CACHE: "169.254.20.10"
+
+# metric server 自动安装
+metricsserver_install: "no"
+metricsVer: "v0.7.1"
+
+# dashboard 自动安装
+dashboard_install: "no"
+dashboardVer: "v2.7.0"
+dashboardMetricsScraperVer: "v1.0.8"
+
+# prometheus 自动安装
+prom_install: "no"
+prom_namespace: "monitor"
+
+```
+
+
+
+#### 编辑ansible hosts文件
+
+指定etcd节点、master节点、node节点、VIP、运行时、网络组件类型、Service IP与Pod IP范围等配置信息
+
+```bash
+[root@haproxy1 kubeasz]#vim clusters/k8s-cluster1/hosts
+# 'etcd' cluster should have odd member(s) (1,3,5,...)
+[etcd]
+10.0.0.206
+10.0.0.207
+10.0.0.208
+# master node(s), set unique 'k8s_nodename' for each node
+# CAUTION: 'k8s_nodename' must consist of lower case alphanumeric characters, '-' or '.',
+# and must start and end with an alphanumeric character
+[kube_master]
+10.0.0.201 k8s_nodename='master-01'
+10.0.0.202 k8s_nodename='master-02'
+
+# work node(s), set unique 'k8s_nodename' for each node
+# CAUTION: 'k8s_nodename' must consist of lower case alphanumeric characters, '-' or '.',
+# and must start and end with an alphanumeric character
+[kube_node]
+10.0.0.211 k8s_nodename='worker-01'
+10.0.0.212 k8s_nodename='worker-02'
+......
+# K8S Service CIDR, not overlap with node(host) networking      # 不同机房的网段一定不能一样，否则会导致无法通信
+SERVICE_CIDR="10.100.0.0/16"
+
+# Cluster CIDR (Pod CIDR), not overlap with node(host) networking
+CLUSTER_CIDR="10.200.0.0/16"
+......
+
+bin_dir="/user/local/bin"          # 二进制文件放置路径
+
+......
+# Default python interpreter
+ansible_python_interpreter=/usr/bin/python3.10
+```
+
+
+
+#### 启用Kubeasz部署 — 环境初始化
+
+```bash
+[root@haproxy1 kubeasz]#./ezctl setup k8s-cluster1 00
+Usage: ezctl setup <cluster> <step>
+available steps:
+    01  prepare            to prepare CA/certs & kubeconfig & other system settings 
+    02  etcd               to setup the etcd cluster
+    03  container-runtime  to setup the container runtime(docker or containerd)
+    04  kube-master        to setup the master nodes
+    05  kube-node          to setup the worker nodes
+    06  network            to setup the network plugin
+    07  cluster-addon      to setup other useful plugins
+    90  all                to run 01~07 all at once
+    10  ex-lb              to install external loadbalance for accessing k8s from outside
+    11  harbor             to install a new harbor server or to integrate with an existed one
+
+examples: ./ezctl setup test-k8s 01  (or ./ezctl setup test-k8s prepare)
+	  ./ezctl setup test-k8s 02  (or ./ezctl setup test-k8s etcd)
+          ./ezctl setup test-k8s all
+          ./ezctl setup test-k8s 04 -t restart_master
+          
+# 启用01,环境初始化
+[root@haproxy1 kubeasz]#./ezctl setup k8s-cluster1 01
+......
+PLAY RECAP ********************************************************************************
+10.0.0.201                 : ok=28   changed=7    unreachable=0    failed=0    skipped=115  rescued=0    ignored=0   
+10.0.0.202                 : ok=25   changed=4    unreachable=0    failed=0    skipped=111  rescued=0    ignored=0   
+10.0.0.206                 : ok=25   changed=20   unreachable=0    failed=0    skipped=111  rescued=0    ignored=0   
+10.0.0.207                 : ok=25   changed=4    unreachable=0    failed=0    skipped=111  rescued=0    ignored=0   
+10.0.0.208                 : ok=25   changed=4    unreachable=0    failed=0    skipped=111  rescued=0    ignored=0   
+10.0.0.211                 : ok=25   changed=4    unreachable=0    failed=0    skipped=111  rescued=0    ignored=0   
+10.0.0.212                 : ok=25   changed=20   unreachable=0    failed=0    skipped=111  rescued=0    ignored=0   
+localhost                  : ok=31   changed=21   unreachable=0    failed=0    skipped=13   rescued=0    ignored=0 
+```
+
+
+
+#### 部署ETCD集群
+
+```bash
+# 部署etcd集群,02
+[root@haproxy1 kubeasz]#./ezctl setup k8s-cluster1 02
+......
+PLAY RECAP ********************************************************************************
+10.0.0.206                 : ok=10   changed=9    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+10.0.0.207                 : ok=8    changed=7    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+10.0.0.208                 : ok=8    changed=7    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0 
+
+# 各etcd服务器验证etcd服务
+[root@haproxy1 kubeasz]# export NODE_IPS="10.0.0.206 10.0.0.207 10.0.0.208"
+[root@k8s-10-0-0-206 ~]#for ip in ${NODE_IPS}; do ETCDCTL_API=3 etcdctl --endpoints=https://${ip}:2379 --cacert=/etc/kubernetes/ssl/ca.pem --cert=/etc/kubernetes/ssl/etcd.pem --key=/etc/kubernetes/ssl/etcd-key.pem endpoint health; done
+https://10.0.0.206:2379 is healthy: successfully committed proposal: took = 79.772114ms
+https://10.0.0.207:2379 is healthy: successfully committed proposal: took = 96.188498ms
+https://10.0.0.208:2379 is healthy: successfully committed proposal: took = 92.900676ms
+
+# 查看etcd.service文件
+[root@k8s-10-0-0-206 ~]#vim /etc/systemd/system/etcd.service
+```
+
+
+
+#### 部署容器运行时containerd
+
+由证书签发机构签发的证书不需要执行分发步骤，证书可被信任
+
+```bash
+# 验证基础容器镜像
+[root@haproxy1 kubeasz]#grep SANDBOX_IMAGE ./clusters/* -R
+./clusters/k8s-cluster1/config.yml:SANDBOX_IMAGE: "harbor.mysticalrecluse.com/baseimages/pause:3.9“
+
+# 将pause容器拉下来后，上传至私有harbor仓库，后续的pause容器从私有仓拉取
+[root@harbor1 harbor]# docker pull registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.9
+[root@harbor1 harbor]# docker tag registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.9 harbor.mysticalrecluse.com/baseimages/pause:3.9
+[root@harbor1 harbor]#docker push harbor.mysticalrecluse.com/baseimages/pause:3.9
+
+# 配置基础镜像
+[root@haproxy1 kubeasz]#vim clusters/k8s-cluster1/config.yml
+......
+SANDBOX_IMAGE: "harbor.mysticalrecluse.com/baseimages/pause:3.9“
+......
+
+# 配置harbor镜像仓库域名解析-公司有DNS服务器进行域名解析
+[root@haproxy1 kubeasz]#vim roles/containerd/tasks/main.yml
+......
+    - name: 添加 crictl 自动补全
+      lineinfile:
+        dest: ~/.bashrc
+        state: present
+        regexp: 'crictl completion'
+        line: 'source <(crictl completion bash) # generated by kubeasz'
+
+    # 添加如下两行
+    - name: 添加域名解析
+      shell: "echo '10.0.0.204 harbor.mysticalrecluse.com' >> /etc/hosts"
+
+# 可选自定义containers配置文件
+[root@haproxy1 kubeasz]#vim roles/containerd/templates/config.toml.j2 
+
+
+# 配置nerdctl客户端
+[root@haproxy1 ~]#wget https://github.com/containerd/nerdctl/releases/download/v2.0.4/nerdctl-2.0.4-linux-amd64.tar.gz
+[root@haproxy1 ~]#tar xvf nerdctl-2.0.4-linux-amd64.tar.gz -C /etc/kubeasz/bin/containerd-bin/
+nerdctl
+containerd-rootless-setuptool.sh
+containerd-rootless.sh
+
+[root@haproxy1 roles]#vim containerd/tasks/main.yml
+- block:
+    - name: 准备containerd相关目录
+      file: name={{ item }} state=directory
+      with_items:
+      - "{{ bin_dir }}/containerd-bin"
+      - "/etc/containerd"
+      - "/etc/nerdctl/"                          # 添加这行，配置文件目录
+      
+      
+    - name: 下载 containerd 二进制文件
+      copy: src={{ item }} dest={{ bin_dir }}/containerd-bin/ mode=0755
+      with_fileglob:                             # 用来批量读取本地多个文件，并循环处理
+      - "{{ base_dir }}/bin/containerd-bin/*"
+      tags: upgrade
+
+    - name: 创建 containerd 配置文件
+      template: src=config.toml.j2 dest=/etc/containerd/config.toml
+      tags: upgrade
+
+    # 添加下面三行
+    - name: 创建 nerdctl 配置文件
+      template: src=nerdctl.toml.j2 dest=/etc/nerdctl/nerdctl.toml
+      tags: upgrade
+      
+[root@haproxy1 kubeasz]#vim roles/containerd/templates/nerdctl.toml.j2
+namespace    = "k8s.io"
+debug        = false
+debug_full   = false
+insecure_registry = true
+
+# 启用03 创建运行时
+[root@haproxy1 kubeasz]#./ezctl setup k8s-cluster1 03
+......
+PLAY RECAP ********************************************************************************
+10.0.0.201                 : ok=15   changed=14   unreachable=0    failed=0    skipped=13   rescued=0    ignored=0   
+10.0.0.202                 : ok=15   changed=14   unreachable=0    failed=0    skipped=10   rescued=0    ignored=0   
+10.0.0.211                 : ok=15   changed=14   unreachable=0    failed=0    skipped=10   rescued=0    ignored=0   
+10.0.0.212                 : ok=15   changed=14   unreachable=0    failed=0    skipped=10   rescued=0    ignored=0 
+
+# 在master2测试
+[root@master-02 ~]# nerdctl pull nginx
+[root@master-02 ~]# nerdctl tag nginx:lastest harbor.mysticalrecluse.com/myserver/nginx:v1
+[root@master-02 ~]# nerdctl login harbor.mysticalrecluse.com
+[root@master-02 ~]# nerdctl push harbor.mysticalrecluse.com/myserver/nginx:v1
+
+# 在node1测试是否能拉私有仓的镜像
+[root@worker-01 ~]#nerdctl pull harbor.mysticalrecluse.com/myserver/nginx:v1
+```
+
+
+
+#### 部署 Kubernetes master 节点
+
+可选更改启动脚本参数以及路径等自定义功能
+
+```bash
+[root@haproxy1 kubeasz]#./ezctl setup k8s-cluster1 04
+
+# 默认情况下，只在部署节点有kubeconfig文件
+[root@haproxy1 kubeasz]#kubectl get nodes
+NAME        STATUS                     ROLES    AGE    VERSION
+master-01   Ready,SchedulingDisabled   master   8m8s   v1.30.1
+master-02   Ready,SchedulingDisabled   master   8m8s   v1.30.1
+```
+
+
+
+#### 部署 Kubernetes Node 节点
+
+```bash
+[root@haproxy1 kubeasz]#./ezctl setup k8s-cluster1 05
+......
+PLAY RECAP ********************************************************************************
+10.0.0.211                 : ok=38   changed=36   unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+10.0.0.212                 : ok=38   changed=36   unreachable=0    failed=0    skipped=2    rescued=0    ignored=0
+
+# 在部署节点查看
+[root@haproxy1 kubeasz]#kubectl get nodes
+NAME        STATUS                     ROLES    AGE    VERSION
+master-01   Ready,SchedulingDisabled   master   8m8s   v1.30.1
+master-02   Ready,SchedulingDisabled   master   8m8s   v1.30.1
+worker-01   Ready                      node     32s    v1.30.1
+worker-02   Ready                      node     33s    v1.30.1
+
+```
+
+
+
+#### 部署网络服务calico
+
+可选更改calico的镜像地址及各种配置信息
+
+```bash
+[root@haproxy1 kubeasz]# vim clusters/k8s-cluster1/config.yml
+# ------------------------------------------- calico
+# [calico] IPIP隧道模式可选项有: [Always, CrossSubnet, Never],跨子网可以配置为Always与CrossSubnet(公有云建议使用always比较省事，其他的话需要修改各自公有云的网络配置，具体可以参考各个
+公有云说明)
+# 其次CrossSubnet为隧道+BGP路由混合模式可以提升网络性能，同子网配置为Never即可.
+CALICO_IPV4POOL_IPIP: "Always"
+
+# [calico]设置 calico-node使用的host IP，bgp邻居通过该地址建立，可手工指定也可以自动发现
+IP_AUTODETECTION_METHOD: "can-reach={{ groups['kube_master'][0] }}"
+
+# [calico]设置calico 网络 backend: bird, vxlan, none
+CALICO_NETWORKING_BACKEND: "bird"
+
+# [calico]设置calico 是否使用route reflectors
+# 如果集群规模超过50个节点，建议启用该特性
+CALICO_RR_ENABLED: false
+
+# CALICO_RR_NODES 配置route reflectors的节点，如果未设置默认使用集群master节点 
+# CALICO_RR_NODES: ["192.168.1.1", "192.168.1.2"]
+CALICO_RR_NODES: []
+
+# [calico]更新支持calico 版本: ["3.19", "3.23"]
+calico_ver: "v3.26.4"
+
+# [calico]calico 主版本
+calico_ver_main: "{{ calico_ver.split('.')[0] }}.{{ calico_ver.split('.')[1] }}"
+
+
+# 查看部署节点镜像
+[root@haproxy1 kubeasz]#docker images
+REPOSITORY                                           TAG       IMAGE ID       CREATED         SIZE
+easzlab/kubeasz                                      3.6.4     1108a8be8fcc   9 months ago    157MB
+easzlab/kubeasz-ext-bin                              1.10.1    fb29543bf6ab   10 months ago   722MB
+easzlab/kubeasz-k8s-bin                              v1.30.1   41c3580883c5   10 months ago   1.2GB
+easzlab/metrics-server                               v0.7.1    2c06895dd9cd   12 months ago   66.9MB
+easzlab.io.local:5000/easzlab/metrics-server         v0.7.1    2c06895dd9cd   12 months ago   66.9MB
+calico/kube-controllers                              v3.26.4   b32f99198153   16 months ago   74.7MB
+easzlab.io.local:5000/calico/kube-controllers        v3.26.4   b32f99198153   16 months ago   74.7MB
+easzlab.io.local:5000/calico/cni                     v3.26.4   17d35f5bad38   16 months ago   209MB
+calico/cni                                           v3.26.4   17d35f5bad38   16 months ago   209MB
+calico/node                                          v3.26.4   ded66453eb63   16 months ago   252MB
+easzlab.io.local:5000/calico/node                    v3.26.4   ded66453eb63   16 months ago   252MB
+easzlab/k8s-dns-node-cache                           1.22.28   c0120d8e4c91   17 months ago   77.5MB
+easzlab.io.local:5000/easzlab/k8s-dns-node-cache     1.22.28   c0120d8e4c91   17 months ago   77.5MB
+registry                                             2         26b2eb03618e   18 months ago   25.4MB
+coredns/coredns                                      1.11.1    cbb01a7bd410   20 months ago   59.8MB
+easzlab.io.local:5000/coredns/coredns                1.11.1    cbb01a7bd410   20 months ago   59.8MB
+easzlab/pause                                        3.9       78d53e70b442   2 years ago     744kB
+easzlab.io.local:5000/easzlab/pause                  3.9       78d53e70b442   2 years ago     744kB
+kubernetesui/dashboard                               v2.7.0    07655ddf2eeb   2 years ago     246MB
+easzlab.io.local:5000/kubernetesui/dashboard         v2.7.0    07655ddf2eeb   2 years ago     246MB
+kubernetesui/metrics-scraper                         v1.0.8    115053965e86   2 years ago     43.8MB
+easzlab.io.local:5000/kubernetesui/metrics-scraper   v1.0.8    115053965e86   2 years ago     43.8MB
+
+# 查看ansible文件，引用的镜像
+[root@haproxy1 kubeasz]#grep "image:" roles/calico/templates/calico-v3.26.yaml.j2 
+          image: easzlab.io.local:5000/calico/cni:{{ calico_ver }}
+          image: easzlab.io.local:5000/calico/node:{{ calico_ver }} 
+          image: easzlab.io.local:5000/calico/node:{{ calico_ver }}
+          image: easzlab.io.local:5000/calico/kube-controllers:{{ calico_ver }}
+          
+# 查看/kubeasz/clusters/k8s-cluster1/config.yml
+[root@haproxy1 kubeasz]#vim clusters/k8s-cluster1/config.yml
+......
+# [calico]更新支持calico 版本: ["3.19", "3.23"]
+calico_ver: "v3.26.4
+
+# 将calico相关镜像上传到私有仓库
+[root@haproxy1 kubeasz]# docker login harbor.mysticalrecluse.com
+Username: admin
+Password: 
+WARNING! Your password will be stored unencrypted in /root/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+
+[root@haproxy1 ~]# docker tag easzlab.io.local:5000/calico/cni:v3.26.4 harbor.mysticalrecluse.com/baseimages/calico-cni:v3.26.4
+[root@haproxy1 ~]# docker push harbor.mysticalrecluse.com/baseimages/calico-cni:v3.26.4
+[root@haproxy1 ~]#docker tag easzlab.io.local:5000/calico/node:v3.26.4 harbor.mysticalrecluse.com/baseimages/calico-node:v3.26.4
+[root@haproxy1 ~]#docker push harbor.mysticalrecluse.com/baseimages/calico-node:v3.26.4
+[root@haproxy1 ~]#docker tag easzlab.io.local:5000/calico/kube-controllers:v3.26.4 harbor.mysticalrecluse.com/baseimages/calico-kube-controllers:v3.26.4
+[root@haproxy1 ~]#docker push harbor.mysticalrecluse.com/baseimages/calico-kube-controllers:v3.26.4
+
+# 更改配置文件
+[root@haproxy1 kubeasz]#vim roles/calico/templates/calico-v3.26.yaml.j2
+......
+initContainers:
+        # This container installs the CNI binaries
+        # and CNI network config file on each node.
+        - name: install-cni
+          #image: easzlab.io.local:5000/calico/cni:{{ calico_ver }}
+          image: harbor.mysticalrecluse.com/baseimages/calico-cni:v3.26.4
+          imagePullPolicy: IfNotPresent
+          command: ["/opt/cni/bin/install"]
+          envFrom:
+          - configMapRef:
+              # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
+......
+        # in best effort fashion, i.e. no failure for errors, to not disrupt pod creation in iptable mode.
+        - name: "mount-bpffs"
+          # image: easzlab.io.local:5000/calico/node:{{ calico_ver }} 
+          image: harbor.mysticalrecluse.com/baseimages/calico-node:v3.26.4
+          imagePullPolicy: IfNotPresent
+          command: ["calico-node", "-init", "-best-effort"]
+          volumeMounts:
+            - mountPath: /sys/fs
+              name: sys-fs
+......
+      containers:
+        # Runs calico-node container on each Kubernetes node. This
+        # container programs network policy and routes on each
+        # host.
+        - name: calico-node
+          # image: easzlab.io.local:5000/calico/node:{{ calico_ver }}
+          image: harbor.mysticalrecluse.com/baseimages/calico-node:v3.26.4
+          imagePullPolicy: IfNotPresent
+          envFrom:
+          - configMapRef:
+              # Allow KUBERNETES_SERVICE_HOST and KUBERNETES_SERVICE_PORT to be overridden for eBPF mode.
+              name: kubernetes-services-endpoint
+              optional: true
+......
+      containers:
+        - name: calico-kube-controllers
+          # image: easzlab.io.local:5000/calico/kube-controllers:{{ calico_ver }}
+          image: harbor.mysticalrecluse.com/baseimages/calico-kube-controllers:v3.26.4
+          imagePullPolicy: IfNotPresent
+          env:
+            # The location of the etcd cluster.
+            - name: ETCD_ENDPOINTS
+              valueFrom:
+                configMapKeyRef:
+                  name: calico-config
+                  key: etcd_endpoints
+                  
+# 检查测试
+[root@haproxy1 kubeasz]#grep "image:" roles/calico/templates/calico-v3.26.yaml.j2
+          # image: easzlab.io.local:5000/calico/cni:{{ calico_ver }}
+          image: harbor.mysticalrecluse.com/baseimages/calico-cni:v3.26.4
+          # image: easzlab.io.local:5000/calico/node:{{ calico_ver }} 
+          image: harbor.mysticalrecluse.com/baseimages/calico-node:v3.26.4
+          # image: easzlab.io.local:5000/calico/node:{{ calico_ver }}
+          image: harbor.mysticalrecluse.com/baseimages/calico-node:v3.26.4
+          # image: easzlab.io.local:5000/calico/kube-controllers:{{ calico_ver }}
+          image: harbor.mysticalrecluse.com/baseimages/calico-kube-controllers:v3.26.4
+
+# https镜像仓库配置下载认证
+
+# 启用
+[root@haproxy1 kubeasz]#./ezctl setup k8s-cluster1 06
+......
+PLAY RECAP ********************************************************************************
+10.0.0.201                 : ok=13   changed=12   unreachable=0    failed=0    skipped=36   rescued=0    ignored=0   
+10.0.0.202                 : ok=7    changed=6    unreachable=0    failed=0    skipped=13   rescued=0    ignored=0   
+10.0.0.211                 : ok=7    changed=6    unreachable=0    failed=0    skipped=13   rescued=0    ignored=0   
+10.0.0.212                 : ok=7    changed=6    unreachable=0    failed=0    skipped=13   rescued=0    ignored=0 
+
+# 在master节点测试
+[root@master-01 ~]#calicoctl node status
+Calico process is running.
+
+IPv4 BGP status
++--------------+-------------------+-------+----------+-------------+
+| PEER ADDRESS |     PEER TYPE     | STATE |  SINCE   |    INFO     |
++--------------+-------------------+-------+----------+-------------+
+| 10.0.0.212   | node-to-node mesh | up    | 02:43:28 | Established |
+| 10.0.0.211   | node-to-node mesh | up    | 02:43:41 | Established |
+| 10.0.0.202   | node-to-node mesh | up    | 02:43:50 | Established |
++--------------+-------------------+-------+----------+-------------+
+
+IPv6 BGP status
+No IPv6 peers found.
+
+# 将部署节点的config文件复制到master节点
+[root@haproxy1 kubeasz]#scp /root/.kube/config master1:/root/.kube/
+config                                                   100% 6194     2.8MB/s   00:00 
+
+# 在worker的contianerd.service配置代理，注意：这里进作用于containerd，对宿主机无效
+# 同时在宿主机配置的代理，仅作用于宿主机，对containerd无效，而k8s中是kubelet调用containerd进行镜像拉取
+[root@worker-02 ~]#vim /etc/systemd/system/containerd.service
+[Service]
+Environment="HTTP_PROXY=http://your.proxy:port"
+Environment="HTTPS_PROXY=http://your.proxy:port"
+Environment="NO_PROXY=127.0.0.1,localhost,::1,10.0.0.0/8,10.244.0.0/16,10.96.0.0/12"
+```
+
+
+
+#### 验证Pod通信
+
+```bash
+[root@master-01 ~]#kubectl run net-test1 --image=centos:7.9.2009 sleep 10000000
+[root@master-01 ~]#kubectl run net-test2 --image=centos:7.9.2009 sleep 10000000
+[root@master-01 ~]#kubectl get pod
+NAME        READY   STATUS    RESTARTS   AGE
+net-test1   1/1     Running   0          11m
+net-test2   1/1     Running   0          23m
+
+# 测试，访问外网ip
+[root@master-01 ~]#kubectl exec net-test1 -- ping 223.6.6.6
+PING 223.6.6.6 (223.6.6.6) 56(84) bytes of data.
+64 bytes from 223.6.6.6: icmp_seq=1 ttl=127 time=6.32 ms
+64 bytes from 223.6.6.6: icmp_seq=2 ttl=127 time=5.81 ms
+
+# 测试，访问net-test2
+[root@master-01 ~]#kubectl exec net-test1 -- ping 10.200.171.2
+```
+
+
+
+### 集群节点伸缩管理
+
+集群管理主要是添加master、添加node、删除master与删除node等节点管理及监控
+
+```bash
+# 当前集群状态
+[root@master-01 ~]#kubectl get nodes
+NAME        STATUS                     ROLES    AGE    VERSION
+master-01   Ready,SchedulingDisabled   master   128m   v1.30.1
+master-02   Ready,SchedulingDisabled   master   128m   v1.30.1
+worker-01   Ready                      node     120m   v1.30.1
+worker-02   Ready                      node     120m   v1.30.1
+
+[root@haproxy1 kubeasz]#./ezctl --help
+Usage: ezctl COMMAND [args]
+-------------------------------------------------------------------------------------
+Cluster setups:
+    list		             to list all of the managed clusters
+    checkout    <cluster>            to switch default kubeconfig of the cluster
+    new         <cluster>            to start a new k8s deploy with name 'cluster'
+    setup       <cluster>  <step>    to setup a cluster, also supporting a step-by-step way
+    start       <cluster>            to start all of the k8s services stopped by 'ezctl stop'
+    stop        <cluster>            to stop all of the k8s services temporarily
+    upgrade     <cluster>            to upgrade the k8s cluster
+    destroy     <cluster>            to destroy the k8s cluster
+    backup      <cluster>            to backup the cluster state (etcd snapshot)
+    restore     <cluster>            to restore the cluster state from backups
+    start-aio		             to quickly setup an all-in-one cluster with default settings
+
+Cluster ops:
+    add-etcd    <cluster>  <ip>      to add a etcd-node to the etcd cluster
+    add-master  <cluster>  <ip>      to add a master node to the k8s cluster
+    add-node    <cluster>  <ip>      to add a work node to the k8s cluster
+    del-etcd    <cluster>  <ip>      to delete a etcd-node from the etcd cluster
+    del-master  <cluster>  <ip>      to delete a master node from the k8s cluster
+    del-node    <cluster>  <ip>      to delete a work node from the k8s cluster
+
+Extra operation:
+    kca-renew   <cluster>            to force renew CA certs and all the other certs (with caution)
+    kcfg-adm    <cluster>  <args>    to manage client kubeconfig of the k8s cluster
+
+Use "ezctl help <command>" for more information about a given command.
+
+```
+
+
+
+#### 添加Node节点
+
+```bash
+# 1. 打通新加入的Node节点和集群内其他节点的ssh
+
+# 2. 在集群部署服务器，即kubeasz所在服务器，比如新加入node的ip是10.0.0.213
+[root@haproxy1 kubeasz]#./ezctl add-node k8s-cluster1 10.0.0.213
+
+# 查看
+[root@master-01 ~]#kubectl get node
+NAME             STATUS                     ROLES    AGE    VERSION
+k8s-10-0-0-213   Ready                      node     54s    v1.30.1
+master-01        Ready,SchedulingDisabled   master   144m   v1.30.1
+master-02        Ready,SchedulingDisabled   master   144m   v1.30.1
+worker-01        Ready                      node     137m   v1.30.1
+worker-02        Ready                      node     137m   v1.30.1
+```
+
+
+
+#### 添加master节点
+
+```bash
+# 1. 打通新加入的master节点和集群内其他节点的ssh
+
+# 2. 在集群部署服务器，即kubeasz所在服务器，比如新加入master的ip是10.0.0.203
+[root@haproxy1 kubeasz]#./ezctl add-master k8s-cluster1 10.0.0.203
+
+# 查看
+[root@master-01 ~]#kubectl get node
+NAME             STATUS                     ROLES    AGE     VERSION
+k8s-10-0-0-203   Ready,SchedulingDisabled   master   2m36s   v1.30.1
+k8s-10-0-0-213   Ready                      node     19m     v1.30.1
+master-01        Ready,SchedulingDisabled   master   163m    v1.30.1
+master-02        Ready,SchedulingDisabled   master   163m    v1.30.1
+worker-01        Ready                      node     155m    v1.30.1
+worker-02        Ready                      node     155m    v1.30.1
+```
+
+
+
+#### 删除node节点
+
+```bash
+# 本质上是忽略daemonset,强制drain驱逐node上的pod，再踢出node节点
+# --delete-local-data --ignore-daemonsets --force
+# --delete-emptydir-data --ignore-daemonsets --force
+
+# 注意！！！，该操作不建议在业务高峰期执行
+
+# 执行删除指定节点
+[root@haproxy1 kubeasz]#./ezctl del-node k8s-cluster1 10.0.0.213
+
+# 查看
+[root@master-01 ~]#kubectl get node
+NAME             STATUS                     ROLES    AGE    VERSION
+k8s-10-0-0-203   Ready,SchedulingDisabled   master   10m    v1.30.1
+master-01        Ready,SchedulingDisabled   master   170m   v1.30.1
+master-02        Ready,SchedulingDisabled   master   170m   v1.30.1
+worker-01        Ready                      node     163m   v1.30.1
+worker-02        Ready                      node     163m   v1.30.1
+
+# 删除后，重启被删除的node节点，以清理缓存信息
+# 但是！！！，此时可能会出现一个问题，就是删除的节点，无法直接再加入集群，原因是hosts文件内的该主机名没有被删除，删除后重新添加就可以了
+[root@haproxy1 kubeasz]#vim clusters/k8s-cluster1/hosts
+[kube_node]
+10.0.0.211 k8s_nodename='worker-01'
+10.0.0.212 k8s_nodename='worker-02'
+# ？？？ 原10.0.0.213，如果这里没有仍然后痕迹，可能会导致无法加入集群
+
+# 将10.0.0.213再次加入集群
+[root@haproxy1 kubeasz]#./ezctl add-node k8s-cluster1 10.0.0.213
+
+# 查看
+[root@master-01 ~]#kubectl get node
+NAME             STATUS                     ROLES    AGE     VERSION
+k8s-10-0-0-203   Ready,SchedulingDisabled   master   36m     v1.30.1
+k8s-10-0-0-213   Ready                      node     17m     v1.30.1
+master-01        Ready,SchedulingDisabled   master   3h17m   v1.30.1
+master-02        Ready,SchedulingDisabled   master   3h17m   v1.30.1
+worker-01        Ready                      node     3h10m   v1.30.1
+worker-02        Ready                      node     3h10m   v1.30.1
+```
+
+
+
+### 升级集群
+
+对当前 Kubernetes 集群进行版本更新，解决已知 Bug 或新增某些功能
+
+升级的主要行为是替换二进制
+
+如果跨小版本升级，比如1.26.0升级到1.26.4，通常没有问题，如果是跨大版本升级，比如1.26升级到1.27，需要看官方的兼容性，可能会出问题，比如大版本升级后，源版本的参数可能在新版本不支持
+
+```bash
+[root@master-01 src]#kubectl api-resources 
+NAME                                SHORTNAMES   APIVERSION                        NAMESPACED   KIND
+bindings                                         v1                                true         Binding
+componentstatuses                   cs           v1                                false        ComponentStatus
+configmaps                          cm           v1                                true         ConfigMap
+endpoints                           ep           v1                                true         Endpoints
+events                              ev           v1                                true         Event
+limitranges                         limits       v1                                true         LimitRange
+namespaces                          ns           v1                                false        Namespace
+nodes                               no           v1                                false        Node
+persistentvolumeclaims              pvc          v1                                true         PersistentVolumeClaim
+persistentvolumes                   pv           v1                                false        PersistentVolume
+pods                                po           v1                                true         Pod
+podtemplates                                     v1                                true         PodTemplate
+replicationcontrollers              rc           v1                                true         ReplicationController
+resourcequotas                      quota        v1                                true         ResourceQuota
+secrets                                          v1                                true         Secret
+serviceaccounts                     sa           v1                                true         ServiceAccount
+services                            svc          v1                                true         Service
+mutatingwebhookconfigurations                    admissionregistration.k8s.io/v1   false        MutatingWebhookConfiguration
+validatingadmissionpolicies                      admissionregistration.k8s.io/v1   false        ValidatingAdmissionPolicy
+validatingadmissionpolicybindings                admissionregistration.k8s.io/v1   false        ValidatingAdmissionPolicyBinding
+validatingwebhookconfigurations                  admissionregistration.k8s.io/v1   false        ValidatingWebhookConfiguration
+customresourcedefinitions           crd,crds     apiextensions.k8s.io/v1           false        CustomResourceDefinition
+apiservices                                      apiregistration.k8s.io/v1         false        APIService
+controllerrevisions                              apps/v1                           true         ControllerRevision
+daemonsets                          ds           apps/v1                           true         DaemonSet
+deployments                         deploy       apps/v1                           true         Deployment
+replicasets                         rs           apps/v1                           true         ReplicaSet
+statefulsets                        sts          apps/v1                           true         StatefulSet
+......
+
+# 如果升级后，比如Statefulset的apiVersion从apps/v1变为v1，那么升级后，源k8s集群的Statefuls无法使用，所以所有的Statefuls都需要重新创建，因此跨大版本升级，最好在测试环境做好足够的测试再升级
+# 通常情况下，升级1到2个大版本，没有大问题，重点看官方说明
+```
+
+
+
+
+
+#### 批量更新
+
+```bash
+# 当前集群版本
+[root@master-01 ~]#kubectl get node
+NAME             STATUS                     ROLES    AGE     VERSION
+k8s-10-0-0-203   Ready,SchedulingDisabled   master   85m     v1.30.1
+k8s-10-0-0-213   Ready                      node     66m     v1.30.1
+master-01        Ready,SchedulingDisabled   master   4h6m    v1.30.1
+master-02        Ready,SchedulingDisabled   master   4h6m    v1.30.1
+worker-01        Ready                      node     3h58m   v1.30.1
+worker-02        Ready                      node     3h58m   v1.30.1
+
+```
+
+**升级需要下载Kubernetes对应版本的源码包和二进制包**
+**下载网站**
+
+```http
+https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG/CHANGELOG-1.30.md#source-code
+```
+
+![image-20250408135807496](../markdown_img/image-20250408135807496.png)
+
+![image-20250408140107110](../markdown_img/image-20250408140107110.png)
+
+```bash
+[root@haproxy1 src]#pwd
+/usr/local/src
+
+# 下载Source Code
+[root@haproxy1 src]# wget https://dl.k8s.io/v1.30.11/kubernetes.tar.gz
+
+# 下载 Client Binaries
+[root@haproxy1 src]#wget https://dl.k8s.io/v1.30.11/kubernetes-client-linux-amd64.tar.gz
+
+# 下载 Server Binaries
+[root@haproxy1 src]#wget https://dl.k8s.io/v1.30.11/kubernetes-server-linux-amd64.tar.gz
+
+# 下载 Node Binaries
+[root@haproxy1 src]#wget https://dl.k8s.io/v1.30.11/kubernetes-node-linux-amd64.tar.gz
+
+# 查看
+[root@haproxy1 src]#ls
+kubernetes-client-linux-amd64.tar.gz  kubernetes-server-linux-amd64.tar.gz
+kubernetes-node-linux-amd64.tar.gz    kubernetes.tar.gz
+
+
+# 全部解压
+[root@haproxy1 src]#tar xf kubernetes-client-linux-amd64.tar.gz 
+[root@haproxy1 src]#tar xf kubernetes-node-linux-amd64.tar.gz 
+[root@haproxy1 src]#tar xf kubernetes-server-linux-amd64.tar.gz 
+[root@haproxy1 src]#tar xf kubernetes.tar.gz 
+
+# 查看
+[root@haproxy1 src]#ls
+kubernetes                            kubernetes-server-linux-amd64.tar.gz
+kubernetes-client-linux-amd64.tar.gz  kubernetes.tar.gz
+kubernetes-node-linux-amd64.tar.gz
+[root@haproxy1 src]#ls kubernetes
+addons  cluster  hack                   LICENSES  README.md  version
+client  docs     kubernetes-src.tar.gz  node      server
+
+# 进入二进制所在目录
+[root@haproxy1 src]#cd kubernetes/server/bin/
+[root@haproxy1 bin]#ls
+apiextensions-apiserver             kubectl.docker_tag
+kubeadm                             kubectl.tar
+kube-aggregator                     kubelet
+kube-apiserver                      kube-log-runner
+kube-apiserver.docker_tag           kube-proxy
+kube-apiserver.tar                  kube-proxy.docker_tag
+kube-controller-manager             kube-proxy.tar
+kube-controller-manager.docker_tag  kube-scheduler
+kube-controller-manager.tar         kube-scheduler.docker_tag
+kubectl                             kube-scheduler.tar
+kubectl-convert                     mounter
+
+
+# 查看源二进制文件版本
+[root@haproxy1 bin]#/etc/kubeasz/bin/kube-apiserver --version
+Kubernetes v1.30.1
+
+# （可选）如果是跨大版本升级，可能需要改kube-apiserver，kube-scheduler等service文件
+[root@haproxy1 bin]#vim /etc/kubeasz/roles/kube-master/templates/
+aggregator-proxy-csr.json.j2        kubernetes-csr.json.j2
+kube-apiserver.service.j2           kube-scheduler.service.j2
+kube-controller-manager.service.j2 
+
+# 将所有的新版二进制复制到kubeasz项目的bin目录下
+[root@haproxy1 bin]#cp kube-apiserver kube-controller-manager kubectl kubelet kube-proxy kube-scheduler /etc/kubeasz/bin/
+
+# 覆盖后查看版本，确认覆盖成功
+[root@haproxy1 bin]#/etc/kubeasz/bin/kube-apiserver --version
+Kubernetes v1.30.11
+
+# 执行命令，批量升级
+[root@haproxy1 kubeasz]#./ezctl upgrade k8s-cluster1
+......
+PLAY RECAP ***************************************************************************
+10.0.0.201                 : ok=50   changed=38   unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+10.0.0.202                 : ok=50   changed=38   unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+10.0.0.203                 : ok=55   changed=40   unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+10.0.0.211                 : ok=31   changed=22   unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+10.0.0.212                 : ok=31   changed=22   unreachable=0    failed=0    skipped=2    rescued=0    ignored=0   
+10.0.0.213                 : ok=31   changed=22   unreachable=0    failed=0    skipped=2    rescued=0    ignored=0  
+
+# 查看
+[root@master-01 ~]#kubectl get node
+NAME             STATUS                     ROLES    AGE   VERSION
+k8s-10-0-0-203   Ready,SchedulingDisabled   master   18m   v1.30.11
+k8s-10-0-0-213   Ready                      node     16m   v1.30.11
+master-01        Ready,SchedulingDisabled   master   18m   v1.30.11
+master-02        Ready,SchedulingDisabled   master   18m   v1.30.11
+worker-01        Ready                      node     16m   v1.30.11
+worker-02        Ready                      node     16m   v1.30.11
+```
+
+```ABAP
+为避免对业务造成实质性影响，一定要在晚上升级
+```
+
+
+
+#### 手动更新
+
+**方式1**：将二进制文件同步到其它路径，修改service文件加载新版本二进制：**即用新版本替换旧版本**
+
+**方法2**：关闭源服务，替换二进制文件然后启动服务：**即直接替换旧版本**
+
+```bash
+# 升级node节点
+
+# 注意覆盖二进制，尽量在业务低峰期执行，因为会停服务
+[root@master-01 ~]#kubectl get node
+NAME             STATUS                     ROLES    AGE     VERSION
+k8s-10-0-0-203   Ready,SchedulingDisabled   master   146m    v1.30.1
+k8s-10-0-0-213   Ready                      node     127m    v1.30.1
+master-01        Ready,SchedulingDisabled   master   5h7m    v1.30.1
+master-02        Ready,SchedulingDisabled   master   5h7m    v1.30.1
+worker-01        Ready                      node     4h59m   v1.30.1
+worker-02        Ready                      node     4h59m   v1.30.1
+
+# 下线待更新节点，即后续不会往这个节点调度pod
+[root@master-01 ~]#kubectl cordon k8s-10-0-0-213
+node/k8s-10-0-0-213 cordoned
+
+# 查看
+[root@master-01 ~]#kubectl get node
+NAME             STATUS                     ROLES    AGE    VERSION
+k8s-10-0-0-203   Ready,SchedulingDisabled   master   147m   v1.30.1
+k8s-10-0-0-213   Ready,SchedulingDisabled   node     127m   v1.30.1
+master-01        Ready,SchedulingDisabled   master   5h7m   v1.30.1
+master-02        Ready,SchedulingDisabled   master   5h7m   v1.30.1
+worker-01        Ready                      node     5h     v1.30.1
+worker-02        Ready                      node     5h     v1.30.1
+
+# 驱逐下线节点上面的pod，dadmonsets类型的pod要忽略掉，如果有带数据的pod，也要忽略掉
+[root@master-01 ~]#kubectl drain k8s-10-0-0-213 --ignore-daemonsets
+node/k8s-10-0-0-213 already cordoned
+Warning: ignoring DaemonSet-managed Pods: kube-system/calico-node-btpzm
+node/k8s-10-0-0-213 drained
+
+# 此时就可以在10.0.0.213这个节点任意操作，不会影响到原集群
+# 替换升级kubelet
+## 查看原kubelet版本
+[root@k8s-10-0-0-213 ~]#/usr/local/bin/kubelet --version
+Kubernetes v1.30.1
+
+## 停止服务
+[root@k8s-10-0-0-213 ~]#systemctl stop kubelet.service
+
+## 用新版kubelet替换掉旧版kubelet 
+[root@haproxy1 bin]#scp kubelet node3:/usr/local/bin/
+kubelet                                             100%   96MB  42.5MB/s   00:02 
+
+## 查看
+[root@k8s-10-0-0-213 ~]#/usr/local/bin/kubelet --version
+Kubernetes v1.30.11
+
+## 然后启动kubelet
+[root@k8s-10-0-0-213 ~]#systemctl start kubelet.service
+
+## 在master节点查看
+[root@master-01 ~]#kubectl get node
+NAME             STATUS                     ROLES    AGE     VERSION
+k8s-10-0-0-203   Ready,SchedulingDisabled   master   155m    v1.30.1
+k8s-10-0-0-213   Ready,SchedulingDisabled   node     136m    v1.30.11      # 升级成功
+master-01        Ready,SchedulingDisabled   master   5h16m   v1.30.1
+master-02        Ready,SchedulingDisabled   master   5h16m   v1.30.1
+worker-01        Ready                      node     5h8m    v1.30.1
+worker-02        Ready                      node     5h8m    v1.30.1
+
+## 升级成功后，恢复调度
+[root@master-01 ~]#kubectl uncordon k8s-10-0-0-213
+node/k8s-10-0-0-213 uncordoned
+```
+
+
+
+### 部署Kubernetes内部域名解析服务—CoreDNS
+
+目前常用的dns组件有kube-dns和Coredns两个，到k8s版本1.17.X都可以使用，kube-dns和coredns用于解析k8s集群中service name所对应得到IP地址，从Kubernetes v1.18开始不支持使用kube-dns
+
+
+
+#### 部署Coredns
+
+复制coredns.yaml模版
+
+```http
+https://github.com/coredns/deployment/blob/master/kubernetes/coredns.yaml.sed
+```
+
+![image-20250408180337386](D:\git_repository\cyber_security_learning\markdown_img\image-20250408180337386.png)
+
+```bash
+# 拷贝并更改coredns.yaml模版
+[root@master-01 ~]# vim coredns.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: coredns
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: system:coredns
+rules:
+  - apiGroups:
+    - ""
+    resources:
+    - endpoints
+    - services
+    - pods
+    - namespaces
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - discovery.k8s.io
+    resources:
+    - endpointslices
+    verbs:
+    - list
+    - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+  labels:
+    kubernetes.io/bootstrapping: rbac-defaults
+  name: system:coredns
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:coredns
+subjects:
+- kind: ServiceAccount
+  name: coredns
+  namespace: kube-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns
+  namespace: kube-system
+data:
+  Corefile: |
+    .:53 {
+        errors
+        health {
+          lameduck 5s
+        }
+        ready
+        # CLUSTER_DOMAIN REVERSE_CIDRS 改为 cluster.local in-addr.arpa ip6.arpa
+        kubernetes CLUSTER_DOMAIN REVERSE_CIDRS {
+          fallthrough in-addr.arpa ip6.arpa
+        }
+        prometheus :9153
+        # 这里 UPSTREAMNAMESERVER 改为 /etc/resolv.conf
+        forward . UPSTREAMNAMESERVER {
+          max_concurrent 1000
+        }
+        cache 30
+        loop
+        reload
+        loadbalance
+    }STUBDOMAINS              # 删除 STUBDOMAINS
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coredns
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/name: "CoreDNS"
+    app.kubernetes.io/name: coredns
+spec:
+  # replicas: not specified here:
+  # 1. Default is 1.
+  # 2. Will be tuned in real time if DNS horizontal auto-scaling is turned on.
+  # 这里可以改为 replicas: 2，保证高可用
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      k8s-app: kube-dns
+      app.kubernetes.io/name: coredns
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+        app.kubernetes.io/name: coredns
+    spec:
+      priorityClassName: system-cluster-critical
+      serviceAccountName: coredns
+      tolerations:
+        - key: "CriticalAddonsOnly"
+          operator: "Exists"
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+         podAntiAffinity:
+           requiredDuringSchedulingIgnoredDuringExecution:
+           - labelSelector:
+               matchExpressions:
+               - key: k8s-app
+                 operator: In
+                 values: ["kube-dns"]
+             topologyKey: kubernetes.io/hostname
+      containers:
+      - name: coredns
+        image: coredns/coredns:1.9.4            # 这里可以改为私有镜像仓库地址
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: 170Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+        args: [ "-conf", "/etc/coredns/Corefile" ]
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/coredns
+          readOnly: true
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+        - containerPort: 9153
+          name: metrics
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - NET_BIND_SERVICE
+            drop:
+            - all
+          readOnlyRootFilesystem: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8181
+            scheme: HTTP
+      dnsPolicy: Default
+      volumes:
+        - name: config-volume
+          configMap:
+            name: coredns
+            items:
+            - key: Corefile
+              path: Corefile
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-dns
+  namespace: kube-system
+  annotations:
+    prometheus.io/port: "9153"
+    prometheus.io/scrape: "true"
+  labels:
+    k8s-app: kube-dns
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "CoreDNS"
+    app.kubernetes.io/name: coredns
+spec:
+  selector:
+    k8s-app: kube-dns
+    app.kubernetes.io/name: coredns
+  clusterIP: CLUSTER_DNS_IP    # 这里改为10.100.0.2 ,根据POD_IP网段确定，通常是第二个
+  ports:
+  - name: dns
+    port: 53
+    protocol: UDP
+  - name: dns-tcp
+    port: 53
+    protocol: TCP
+  - name: metrics
+    port: 9153
+    protocol: TCP
+```
+
+```bash
+# 启用
+[root@master-01 ~]#kubectl apply -f coredns.yaml
+```
+
+
+
+### Kubectl 常用命令
+
+**kubectl命令行使用简介**
+
+```http
+https://kubernetes.io/zh-cn/docs/reference/kubectl/generated/
+```
+
+| 命令集       | 命令                                                         | 用途         |
+| ------------ | ------------------------------------------------------------ | ------------ |
+| 基础命令     | **create/delete/edit/get/describe/logs/scale**               | 增删改查     |
+| 配置命令     | **Label**：标签管理<br />**apply**：动态配置<br />**cluster-info/top**：集群状态 |              |
+| 集群管理命令 | **cordon**：警戒线，标记node不被调度<br />**uncordon**：取消警戒线标记为cordon的node<br />**drain**：驱逐node上的pod，用于node下线等场景<br />**taint**：给node标记污点，实现反亲和与node反亲和性<br />**api-resources/api-versions/version**：api资源<br />**config**：客户端kube-config配置 | node节点管理 |
+
+
+
+## Kubernetes—etcd
+
+### etcd简介
+
+- etcd是CoreOS团队于2013年6月发起的开源项目，它的目标是构建一个高可用的分布式键值（key-value）数据库。etcd内部采用raft协议作为一致性算法，etcd基于Go语言实现
+- 官方网站：http://etcd.io
+- github地址：https://github.com/etcd-io/etcd
+- 官方硬件推荐：https://etcd.io/docs/v3.5/op-guide/hardware/
+- 官方文档：https://etcd.io/docs/v3.5/op-guide/maintenance
+
+
+
+![image-20250409120720107](../markdown_img/image-20250409120720107.png)
+
+
+
+**etcd具有下面这些属性**
+
+- 完全复制：集群中的每个节点都可以使用完整的存档
+- 高可用性：Etcd可用于避免硬件的单点故障或网络问题
+- 一致性：每次读取都会返回跨多主机的最新写入
+- 简单：包括一个定义良好，面向用户的API（gRPC）
+- 安全：实现了带有可选的客户端证书身份验证的自动化TLS
+- 快速：每秒10000次写入基准速度
+- 可靠：使用Raft算法实现了存储的合理分布Etcd的工作原理
+
+
+
+**etcd的service文件**
+
+```bash
+[root@k8s-10-0-0-206 ~]#cat /etc/systemd/system/etcd.service
+[Unit]
+Description=Etcd Server
+After=network.target
+After=network-online.target
+Wants=network-online.target
+Documentation=https://github.com/coreos
+
+[Service]
+Type=notify
+WorkingDirectory=/var/lib/etcd
+# etcd没有配置文件，直接传递参数
+ExecStart=/usr/local/bin/etcd \
+  --name=etcd-10.0.0.206 \        # etcd基于当前节点名称识别节点，因此etcd集群的每个节点名称不能一样
+  --cert-file=/etc/kubernetes/ssl/etcd.pem \
+  --key-file=/etc/kubernetes/ssl/etcd-key.pem \
+  --peer-cert-file=/etc/kubernetes/ssl/etcd.pem \
+  --peer-key-file=/etc/kubernetes/ssl/etcd-key.pem \
+  --trusted-ca-file=/etc/kubernetes/ssl/ca.pem \
+  --peer-trusted-ca-file=/etc/kubernetes/ssl/ca.pem \
+  --initial-advertise-peer-urls=https://10.0.0.206:2380 \   # 通告自己的集群端口
+  --listen-peer-urls=https://10.0.0.206:2380 \              # 集群之间的通信端口
+  --listen-client-urls=https://10.0.0.206:2379,http://127.0.0.1:2379 \   # 客户端访问地址
+  --advertise-client-urls=https://10.0.0.206:2379 \                      # 通告自己的客户端端口
+  --initial-cluster-token=etcd-cluster-0 \               # 创建集群使用的token，一个集群内的节点保持一致
+  --initial-cluster=etcd-10.0.0.206=https://10.0.0.206:2380,etcd-10.0.0.207=https://10.0.0.207:2380,etcd-10.0.0.208=https://10.0.0.208:2380 \                     # 集群所有的节点信息，节点间会进行健康性检测
+  --initial-cluster-state=new \                # 新建集群的时候的值为new，如果是已经存在的集群为existing
+  --data-dir=/var/lib/etcd \                   # 数据目录路径
+  --wal-dir= \
+  --snapshot-count=50000 \
+  --auto-compaction-retention=1 \
+  --auto-compaction-mode=periodic \
+  --max-request-bytes=10485760 \
+  --quota-backend-bytes=8589934592
+Restart=always
+RestartSec=15
+LimitNOFILE=65536
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
+```
+
+
+
+### etcd选举
+
+- etcd基于Raft算法进行集群角色选举，使用Raft的还有consul，InfluxDB，Kafka等
+- Raft详解 — 知识扩展有详解
+
+
+
+### etcd配置优化
+
+```bash
+# rquests size limit (请求的最大字节数，默认一个key最大1.5Mib，官方最大不要超过10Mib)
+--max-request-bytes=10485760 
+
+# storage size limit (磁盘存储空间大小限制，默认为2G，此值超过8G启动会有警告信息)
+# 因为etcd存储的通常都是集群的元数据，因此占用磁盘大小不大，但是磁盘IO很高
+--quota-backend-bytes=8589934592
+
+# 集群碎片整理，时间长了可以做一下，提升性能
+# 早期
+ETCDCTL_API=3 /usr/local/bin/etcdctl defrag --cluster --endpoints=https://10.0.0.206:2379 --cacert=/etc/kubernetes/ssl/ca.pem --cert=/etc/kubernetes/ssl/etcd.pem --key=/etc/kubernetes/ssl/etcd-key.pem
+
+# 现在基本都是使用v3，以前可能有使用v2的，因此需要声明v3，现在默认都是v3，所以不需要声明
+[root@k8s-10-0-0-206 ~]#/usr/local/bin/etcdctl defrag --cluster --endpoints=https://10.0.0.206:2379 --cacert=/etc/kubernetes/ssl/ca.pem --cert=/etc/kubernetes/ssl/etcd.pem --key=/etc/kubernetes/ssl/etcd-key.pem
+Finished defragmenting etcd member[https://10.0.0.207:2379]
+Finished defragmenting etcd member[https://10.0.0.206:2379]
+Finished defragmenting etcd member[https://10.0.0.208:2379]
+
+```
+
+
+
+### etcd操作
+
+#### etcd成员列表
+
+```bash
+[root@k8s-10-0-0-206 ~]#export NODE_IPS="10.0.0.206 10.0.0.207 10.0.0.208"
+
+[root@k8s-10-0-0-206 ~]#ETCDCTL_API=3 /usr/local/bin/etcdctl --write-out=table member list --endpoints=https://10.0.0.206:2379 --cacert=/etc/kubernetes/ssl/ca.pem --cert=/etc/kubernetes/ssl/etcd.pem --key=/etc/kubernetes/ssl/etcd-key.pem
++------------------+---------+-----------------+-------------------------+-------------------------+------------+
+|        ID        | STATUS  |      NAME       |       PEER ADDRS        |      CLIENT ADDRS       | IS LEARNER |
++------------------+---------+-----------------+-------------------------+-------------------------+------------+
+| 2323451019f6428d | started | etcd-10.0.0.207 | https://10.0.0.207:2380 | https://10.0.0.207:2379 |      false |
+| 23d31ba59ca79fa0 | started | etcd-10.0.0.206 | https://10.0.0.206:2380 | https://10.0.0.206:2379 |      false |
+| 7a42012c95def99e | started | etcd-10.0.0.208 | https://10.0.0.208:2380 | https://10.0.0.208:2379 |      false |
++------------------+---------+-----------------+-------------------------+-------------------------+------------+
+```
+
+
+
+#### etcd验证节点心跳状态
+
+```bash
+[root@k8s-10-0-0-207 ~]#for ip in ${NODE_IPS}; do ETCDCTL_API=3 /usr/local/bin/etcdctl --endpoints=https://${ip}:2379 --cacert=/etc/kubernetes/ssl/ca.pem --cert=/etc/kubernetes/ssl/etcd.pem --key=/etc/kubernetes/ssl/etcd-key.pem endpoint health; done
+https://10.0.0.206:2379 is healthy: successfully committed proposal: took = 68.505353ms
+https://10.0.0.207:2379 is healthy: successfully committed proposal: took = 101.925588ms
+https://10.0.0.208:2379 is healthy: successfully committed proposal: took = 109.962263ms
+```
+
+
+
+#### etcd查看详细信息
+
+```bash
+[root@k8s-10-0-0-207 ~]#for ip in ${NODE_IPS}; do ETCDCTL_API=3 /usr/local/bin/etcdctl --write-out=table endpoint status --endpoints=https://${ip}:2379 --cacert=/etc/kubernetes/ssl/ca.pem --cert=/etc/kubernetes/ssl/etcd.pem --key=/etc/kubernetes/ssl/etcd-key.pem; done
++-------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|        ENDPOINT         |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++-------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| https://10.0.0.206:2379 | 23d31ba59ca79fa0 |  3.5.12 |  2.2 MB |     false |      false |         4 |     144353 |             144353 |        |
++-------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
++-------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|        ENDPOINT         |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++-------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| https://10.0.0.207:2379 | 2323451019f6428d |  3.5.12 |  2.2 MB |      true |      false |         4 |     144354 |             144354 |        |
++-------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
++-------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+|        ENDPOINT         |        ID        | VERSION | DB SIZE | IS LEADER | IS LEARNER | RAFT TERM | RAFT INDEX | RAFT APPLIED INDEX | ERRORS |
++-------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+| https://10.0.0.208:2379 | 7a42012c95def99e |  3.5.12 |  2.2 MB |     false |      false |         4 |     144354 |             144354 |        |
++-------------------------+------------------+---------+---------+-----------+------------+-----------+------------+--------------------+--------+
+
+```
+
+
+
+#### 查看etcd数据
+
+```bash
+# 以路径的方式所有key信息
+ETCD_API=3 etcdctl get / --prefix --keys-only  
+
+# 查看pod信息：
+[root@k8s-10-0-0-207 ~]#ETCD_API=3 etcdctl get / --prefix --keys-only|grep pod
+/calico/ipam/v2/handle/k8s-pod-network.bff6832b73978900eea1e2cb579bbd2efaee3e114030af52c8a68e27b879e7be
+/calico/resources/v3/projectcalico.org/profiles/ksa.kube-system.horizontal-pod-autoscaler
+/calico/resources/v3/projectcalico.org/profiles/ksa.kube-system.pod-garbage-collector
+/registry/clusterrolebindings/system:controller:horizontal-pod-autoscaler
+/registry/clusterrolebindings/system:controller:pod-garbage-collector
+/registry/clusterroles/system:controller:horizontal-pod-autoscaler
+/registry/clusterroles/system:controller:pod-garbage-collector
+/registry/poddisruptionbudgets/kube-system/calico-kube-controllers
+/registry/pods/kube-system/calico-kube-controllers-cdf8978d8-d2xmc
+/registry/pods/kube-system/calico-node-57htk
+/registry/pods/kube-system/calico-node-5hmhr
+/registry/pods/kube-system/calico-node-79jxn
+/registry/pods/kube-system/calico-node-gs4xt
+/registry/pods/kube-system/calico-node-j25th
+/registry/pods/kube-system/calico-node-slntd
+/registry/pods/kube-system/coredns-55c868d7f5-d76zv
+/registry/serviceaccounts/kube-system/horizontal-pod-autoscaler
+/registry/serviceaccounts/kube-system/pod-garbage-collector
+
+# namespace信息
+[root@k8s-10-0-0-207 ~]#ETCD_API=3 etcdctl get / --prefix --keys-only|grep namespaces
+/registry/namespaces/default
+/registry/namespaces/kube-node-lease
+/registry/namespaces/kube-public
+/registry/namespaces/kube-system
+
+# 查看deployment控制器信息
+[root@k8s-10-0-0-207 ~]#ETCD_API=3 etcdctl get / --prefix --keys-only|grep deployment
+/calico/resources/v3/projectcalico.org/profiles/ksa.kube-system.deployment-controller
+/registry/clusterrolebindings/system:controller:deployment-controller
+/registry/clusterroles/system:controller:deployment-controller
+/registry/deployments/kube-system/calico-kube-controllers
+/registry/deployments/kube-system/coredns
+/registry/serviceaccounts/kube-system/deployment-controller
+
+# 查看calico组件信息
+[root@k8s-10-0-0-207 ~]#ETCD_API=3 etcdctl get / --prefix --keys-only|grep calico
+/calico/ipam/v2/assignment/ipv4/block/10.200.129.0-26
+/calico/ipam/v2/assignment/ipv4/block/10.200.171.0-26
+/calico/ipam/v2/assignment/ipv4/block/10.200.184.64-26
+/calico/ipam/v2/assignment/ipv4/block/10.200.222.0-26
+/calico/ipam/v2/assignment/ipv4/block/10.200.37.192-26
+/calico/ipam/v2/assignment/ipv4/block/10.200.49.0-26
+/calico/ipam/v2/config
+......
+
+# 查看key的值，内容可能存在乱码，需要工具（auger）进行解码，将etcd编码的数据重新排列
+# 下载
+[root@k8s-10-0-0-207 ~]# wget https://github.com/etcd-io/auger/releases/download/v1.0.3/auger_1.0.3_linux_amd64.tar.gz
+[root@k8s-10-0-0-206 ~]#tar xf auger_1.0.3_linux_amd64.tar.gz 
+[root@k8s-10-0-0-206 ~]#mv auger augerctl /usr/local/bin
+
+# 相当于kubectl get pod -n kube-system calico-node-57htk -o yaml
+[root@k8s-10-0-0-206 ~]#etcdctl get /registry/pods/kube-system/calico-node-57htk|auger decode
+```
+
+
+
+#### etcd增删改查
+
+```bash
+# 添加数据
+[root@k8s-10-0-0-206 ~]# etcdctl put /name "tom"
+OK
+
+# 查询数据
+[root@k8s-10-0-0-206 ~]#etcdctl get /name
+/name
+tom
+
+# 修改数据，重新put，将值覆盖掉
+[root@k8s-10-0-0-206 ~]#etcdctl put /name curry
+OK
+[root@k8s-10-0-0-206 ~]#etcdctl get /name
+/name
+curry
+
+# 删除数据
+[root@k8s-10-0-0-206 ~]#etcdctl del /name
+1
+```
+
+
+
+#### etcd数据watch机制
+
+基于不断监看数据，发生变化就主动触发通知客户端，Etcd v3 的watch机制支持watch某个固定的key，也支持watch一个范围
+
+```bash
+# 在etcd1 上watch一个key，没有此key也可以执行watch，后期可以再创建
+[root@k8s-10-0-0-206 ~]#etcdctl watch /data
+
+# 在etcd2 修改数据，验证etcd1是否发生数据变化
+[root@k8s-10-0-0-207 ~]#etcdctl put /data "data v1"
+OK
+
+# 观察etcd1
+[root@k8s-10-0-0-206 ~]#etcdctl watch /data
+PUT
+/data
+data v1
+
+[root@k8s-10-0-0-207 ~]#etcdctl put /data "data v2"
+OK
+
+[root@k8s-10-0-0-206 ~]#etcdctl watch /data
+PUT
+/data
+data v1
+PUT
+/data
+data v2
+```
+
+
+
+#### Kubernetes 上 Watch机制示例
+
+```bash
+# kuber-scheduler会watch /registry/pods，/registry/nodes，/registry/bindings
+# 在etcd1 watch /registry/pods
+[root@k8s-10-0-0-206 ~]#etcdctl watch --prefix /registry/pods
+
+# 创建一个pod
+[root@master-01 pod]#kubectl apply -f myapp.yaml 
+pod/alpine3 created
+
+# 观察刚刚watch的路径
+[root@k8s-10-0-0-206 ~]#etcdctl watch --prefix /registry/pods
+PUT
+/registry/pods/default/alpine3
+k8s
+......
+
+# 删除刚刚创建的pod->alpine3
+# 查看etcd的key
+[root@k8s-10-0-0-207 ~]#etcdctl get / --prefix --keys-only |grep events
+/registry/apiregistration.k8s.io/apiservices/v1.events.k8s.io
+/registry/events/default/alpine3.1834a7d6ad5491c5
+/registry/events/default/alpine3.1834a7d6ffc8fbb9
+/registry/events/default/alpine3.1834a7d86aa93aa4
+/registry/events/default/alpine3.1834a7d8788b8e49
+/registry/events/default/alpine3.1834a7d88764f93d
+/registry/events/default/alpine3.1834a7dbe6982b44
+/registry/events/default/alpine3.1834a7eec882ed84
+/registry/events/default/alpine3.1834a7ef13aa3e3e
+/registry/events/default/alpine3.1834a7f05f0ef84e
+/registry/events/default/alpine3.1834a7f0616b646a
+/registry/events/default/alpine3.1834a7f06d7c3b22
+/registry/events/default/alpine3.1834a7f0f67862de
+
+# 为什么 /registry/events/default/alpine3.* 有这么多条目？
+# 你创建 Pod alpine3 后，Kubernetes 控制平面（尤其是 kubelet 和 controller-manager）会对该 Pod 的生命周期过程不断记录事件，例如：Scheduled，Pulling image，Created container，Started container......
+# 每条事件都会单独作为一个对象写入 etcd，路径就是：/registry/events/{namespace}/{pod-name}.{event-uuid}
+# 所以会看到很多条/registry/events/default/alpine3.XXXXXXX
+
+# 那我把 Pod 删除了，为什么这些事件还在？
+# 事件资源（events.k8s.io）是 非绑定生命周期资源（non-owner reference），即使 Pod 被删除，事件并不会马上被清理掉。
+
+# 事件的保留策略如下：
+# 类型: CoreV1 Event   ---->  默认保留时间 ~1 小时左右（1h）
+# 类型: Events.k8s.io/v1   ---->  默认也大约 1 小时，具体取决于 GC 策略
+
+# 这些事件由 event 控制器定期清理，或者由组件（如 kube-controller-manager）后台垃圾回收。
+# 你可以通过以下方式验证其 TTL：kubectl get events --all-namespaces --output=wide
+# 你也可以 watch /registry/events 的变化，过一会它们会自动从 etcd 中清除。
+
+# kube-proxy会 watch /registry/services/specs/
+# 如果想要观察到这个路径下的变化要关掉所有节点上的kube-proxy，否则刚删除数据变化，就会被kube-proxy消费掉
+```
+
+
+
+### etcd v3 API版本数据备份与恢复
+
+**WAL**是write ahead log（预写日志）的缩写，顾名思义，也就是在执行真正的写操作之前先写一个日志，预写日志（详情可以看补充：raft协议详解）
+
+**WAL**：存放预写式日志，最大的作用是记录了整个数据变化的全部历程。在etcd中，所有数据的修改在提交前，都要先写入到WAL中。
+
+
+
+#### V3版本备份数据
+
+```bash
+ETCDCTL_API=3 etcdctl snapshot save snapshot.db
+
+# 示例
+[root@k8s-10-0-0-206 ~]#etcdctl snapshot save /tmp/etcd.db
+{"level":"info","ts":"2025-04-09T21:43:15.766559+0800","caller":"snapshot/v3_snapshot.go:65","msg":"created temporary db file","path":"/tmp/etcd.db.part"}
+{"level":"info","ts":"2025-04-09T21:43:15.776496+0800","logger":"client","caller":"v3@v3.5.12/maintenance.go:212","msg":"opened snapshot stream; downloading"}
+{"level":"info","ts":"2025-04-09T21:43:15.776865+0800","caller":"snapshot/v3_snapshot.go:73","msg":"fetching snapshot","endpoint":"127.0.0.1:2379"}
+{"level":"info","ts":"2025-04-09T21:43:15.998158+0800","logger":"client","caller":"v3@v3.5.12/maintenance.go:220","msg":"completed snapshot read; closing"}
+{"level":"info","ts":"2025-04-09T21:43:16.006574+0800","caller":"snapshot/v3_snapshot.go:88","msg":"fetched snapshot","endpoint":"127.0.0.1:2379","size":"2.3 MB","took":"now"}
+{"level":"info","ts":"2025-04-09T21:43:16.007478+0800","caller":"snapshot/v3_snapshot.go:97","msg":"saved","path":"/tmp/etcd.db"}
+Snapshot saved at /tmp/etcd.db
+
+# 查看
+[root@k8s-10-0-0-206 ~]#ls /tmp/
+etcd.db
+
+# 如果后期etcd集群数据损坏，可以使用这个etcd.db，将数据恢复
+```
+
+
+
+#### V3版本恢复数据
+
+```bash
+# 将数据恢复到一个新的不存在的目录中，单机恢复
+# 恢复数据指定的数据目录必须是新的
+ETCDCTL_API=3 etcdctl snapshot restore snapshot.db --data-dir=/opt/etcd-testdir
+
+# 实际生产中数据恢复
+# 注意：集群恢复必须加下面的参数，否则恢复的是单机状态！！！
+ETCDCTL_API=3 /usr/local/bin/etcdctl snapshot restore snapshot.db \
+--name etcd-{{ inventory_hostname }} \    # 这里必须加etcd的name，下面的参数可以通过etcd.service查看
+--initial-cluster {{ ETCD_NODES }} \
+--initial-cluster-token etcd-cluster-0 \
+--initial-advertise-peer-urls https://{{ inventory_hostname }}:2380
+
+# 恢复数据至etcd数据目录
+cp -rf /etc/_backup/etcd-{{ inventory_hostnamme }}.etcd/member {{ ETCD_DATA_DIR }}/
+
+# 重启etcd数据目录
+systemctl restart etcd.service
+```
+
+
+
+#### 自动备份数据
+
+```bash
+[root@k8s-10-0-0-206 ~]# mkdir /data/etcd-backup-dir/ -p
+[root@k8s-10-0-0-206 ~]# cat etcd-backup.sh
+#!/bin/bash
+source /etc/profile
+DATE=`data +%Y-%m-%d_%H-%M-%S`
+ETCDCTL_API=3 /usr/local/bin/etcdctl snapshot save /data/etcd-backup-dir/etcd-snapshot-${DATE}.db
+```
+
+
+
+#### 使用kubeasz备份恢复集群数据
+
+```bash
+# ./ezctl backup <集群名>
+[root@haproxy1 ~]#./ezctl backup k8s-cluster1
+
+# 查看备份的数据
+[root@haproxy1 kubeasz]#ls clusters/k8s-cluster1/backup/
+snapshot_202504092210.db  snapshot.db
+
+# 恢复指定版本/日期的备份文件
+# 方法1：修改ansible
+[root@haproxy1 kubeasz]# vim ./roles/cluster-restore/defaults/main.yaml
+# 指定需要恢复的 etcd 数据备份，默认使用最近的一次备份
+# 在ansible 控制端查看备份目录：/etc/kubeasz/clusters/_cluster_name_/backup
+db_to_restore: "snapshot.db"    # 改这里
+
+# 方法2：将指定版本/日期备份文件覆盖snapshot.db
+[root@haproxy1 kubeasz]# cd  clusters/k8s-cluster1/backup/ && cp snapshot_XXXX.db snapshot.db
+
+# 恢复数据
+# 恢复数据的时候，会关闭master上的apiserver禁止写入
+[root@haproxy1 kubeasz]# ./ezctl restore k8s-cluster1
+
+# 注意！！！：执行恢复前查看
+[root@haproxy1 kubeasz]#cat roles/cluster-restore/tasks/main.yml 
+- name: 停止ectd 服务
+  service: name=etcd state=stopped
+
+- name: 清除etcd 数据目录
+  file: name={{ ETCD_DATA_DIR }}/member state=absent
+
+- name: 清理上次备份恢复数据
+  file: name=/etcd_backup state=absent
+
+- name: 生成备份目录
+  file: name=/etcd_backup state=directory
+
+- name: 准备指定的备份etcd 数据
+  copy:
+    src: "{{ cluster_dir }}/backup/{{ db_to_restore }}"
+    dest: "/etcd_backup/snapshot.db"
+
+- name: etcd 数据恢复
+  shell: "cd /etcd_backup && \
+	ETCDCTL_API=3 {{ bin_dir }}/etcdctl snapshot restore snapshot.db \   # 下面必须加参数，否则会出现bug
+	--name etcd-{{ inventory_hostname }} \
+	--initial-cluster {{ ETCD_NODES }} \
+	--initial-cluster-token etcd-cluster-0 \
+	--initial-advertise-peer-urls https://{{ inventory_hostname }}:2380"
+
+- name: 恢复数据至etcd 数据目录
+  shell: "cp -rf /etcd_backup/etcd-{{ inventory_hostname }}.etcd/member {{ ETCD_DATA_DIR }}/"
+
+- name: 重启etcd 服务
+  service: name=etcd state=restarted
+
+- name: 以轮询的方式等待服务同步完成
+  shell: "systemctl is-active etcd.service"
+  register: etcd_status
+  until: '"active" in etcd_status.stdout'
+  retries: 8
+  delay: 8
+```
+
+
+
+#### ETCD数据恢复流程
+
+当etcd集群宕机数量超过集群总节点一半以上的时候（如总数为三台宕机两台），就会导致整个集群宕机，后期需要恢复数据
+
+- 恢复服务器系统
+- 重新部署ETCD集群
+- 停止kube-apisever/controller-manager/scheduler/kubelet/kube-proxy
+- 停止ETCD集群
+- 各ETCD节点恢复同一份备份数据
+- 启动各节点并验证ETCD集群
+- 启动kube-apisever/controller-manager/scheduler/kubelet/kube-proxy
+- 验证k8s master状态及pod数据
+
+
+
+### ETCD集群节点添加与删除
+
+- add-etcd
+- del-etcd
+
+
+
 ## Kubernetes资源对象和Pod资源
 
 
@@ -26706,13 +29498,55 @@ kuboard-ingress   nginx   kuboard.mystical.org   10.0.0.10   80      21s
 
 
 
+##### 部署KubeSphere
+
 确保您的机器满足安装的前提条件之后，可以按照以下步骤安装 KubeSphere。
 
 ```bash
-kubectl apply -f https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/kubesphere-installer.yaml
+wget https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/kubesphere-installer.yaml
 
 # 在该文件指定存储，或者配置好默认存储
-kubectl apply -f https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/cluster-configuration.yaml
+wget https://github.com/kubesphere/ks-installer/releases/download/v3.4.1/cluster-configuration.yaml
+```
+
+可以通过修改`cluster-configuration.yaml`，来启用可插拔插件，比如日志，商店，告警等
+
+![image-20250409093047769](../markdown_img/image-20250409093047769.png)
+
+比如启用日志系统
+
+![image-20250409093135861](../markdown_img/image-20250409093135861.png)
+
+比如安装Devops，其实就是部署个jenkins
+
+![image-20250409093347609](../markdown_img/image-20250409093347609.png)
+
+也可以启用后部署
+
+![image-20250409093423471](../markdown_img/image-20250409093423471.png)
+
+![image-20250409104100121](../markdown_img/image-20250409104100121.png)
+
+![image-20250409104403003](../markdown_img/image-20250409104403003.png)
+
+![image-20250409104431982](../markdown_img/image-20250409104431982.png)
+
+
+
+启用部署
+
+```bash
+[root@master-01 kubesphere]# kubectl apply -f kubesphere-installer.yaml 
+customresourcedefinition.apiextensions.k8s.io/clusterconfigurations.installer.kubesphere.io created
+namespace/kubesphere-system created
+serviceaccount/ks-installer created
+clusterrole.rbac.authorization.k8s.io/ks-installer created
+clusterrolebinding.rbac.authorization.k8s.io/ks-installer created
+deployment.apps/ks-installer created
+
+[root@master-01 kubesphere]# kubectl apply  -f cluster-configuration.yaml 
+clusterconfiguration.installer.kubesphere.io/ks-installer created
+
 ```
 
 检查安装日志：
@@ -26766,6 +29600,28 @@ https://kubesphere.io             2025-02-11 13:35:25
 ![image-20250211135114480](../markdown_img/image-20250211135114480.png)
 
 ![image-20250211135302152](../markdown_img/image-20250211135302152.png)
+
+
+
+##### 卸载KubeSphere
+
+```bash
+# 下载官方的卸载脚本
+[root@master-01 ~]# wget https://github.com/kubesphere/ks-installer/blob/release-3.1/scripts/kubesphere-delete.sh
+
+# 卸载k8s资源
+[root@master-01 ~]# kubectl delete statefulsets.apps -n kubesphere-logging-system elasticsearch-logging-data
+[root@master-01 ~]# kubectl delete statefulsets.apps -n kubesphere-logging-system elasticsearch-logging-discovery
+[root@master-01 ~]# kubectl delete statefulsets.apps -n kubesphere-system openldap
+[root@master-01 ~]# kubectl delete daemonsets.apps -n kubesphere-monitoring-system node-exporter
+
+[root@master-01 ~]#  ./kubesphere-delete.sh
+
+[root@master-01 ~]#  kubectl get pv | awk '{print $1}'
+[root@master-01 ~]#  kubectl delete pv PV_NAME
+
+# 最后删掉kubesphere创建的所有的namespace
+```
 
 
 
@@ -40213,12 +43069,10 @@ RequestVote(term, candidateId, lastLogIndex, lastLogTerm)
 
 2. **Follower 还没有投过票（votedFor == nil）**，或者已经投票给这个 Candidate。
 
-3. Candidate 的日志比自己新
-
-   ：
+3. Candidate 的日志比自己新：
 
    - `lastLogTerm` 更大，或者
-   - `lastLogTerm` 相等，但 `lastLogIndex` 更大（保证 Leader 拥有最新的日志）。
+- `lastLogTerm` 相等，但 `lastLogIndex` 更大（保证 Leader 拥有最新的日志）。
 
 如果以上条件成立，Follower **投票给 Candidate**，并更新：
 
@@ -40336,6 +43190,132 @@ Follower 在以下情况下 **拒绝投票**：
 
 
 
+#### 复制状态机（RSM）详解
+
+Raft 协议中的 **复制状态机（Replicated State Machine, RSM）** 是分布式一致性核心思想的体现。它保证即使多个节点协同处理请求，它们仍能保持一致的状态。这一概念是理解 Raft 以及 Paxos 等一致性协议的关键。
+
+
+
+##### 复制状态机的核心定义
+
+将同一个初始状态的状态机复制到多个节点，每个节点接收相同的操作指令序列，最终所有状态机状态保持一致。
+
+简单来说
+
+- 每个节点运行同一个“程序”（状态机）。
+- 所有节点都接收到一样的操作顺序（通过 Raft 协议达成共识）。
+- 因为状态机是**确定性**的，所以最终所有节点的状态是一样的。
+
+
+
+##### 为什么需要复制状态机？
+
+在分布式系统中，尤其是主从结构中，主节点处理请求后必须把状态“复制”到从节点。问题是：
+
+- 网络可能丢包
+- 节点可能崩溃
+- 主节点可能切换
+
+为了让新主节点知道之前发生了什么，就必须**准确地重放之前的操作**，这就需要复制状态机。
+
+
+
+##### Raft 协议中如何实现复制状态机？
+
+我们来看下 Raft 的几个关键角色与步骤：
+
+**日志（Log）**
+
+- 每个节点有一份日志（log），每条 log 是客户端的一条指令，例如 `SET x=1`。
+- Leader 接收客户端命令，将其作为新的日志项写入本地，并**复制**给所有 Follower。
+
+**日志复制过程**
+
+- Leader 将日志广播给所有 Follower。
+- Follower 收到后暂存在本地（未提交状态）。
+- 一旦多数节点确认接受，Leader 提交该日志条目，并告诉所有 Follower“可以提交了”。
+
+**应用到状态机**
+
+- 日志提交后，节点就会**顺序地将日志应用到状态机**中
+- 应用后的状态变更就是系统状态，比如变量 `x=1`。
+
+```ABAP
+只应用“已提交”的日志到状态机，确保一致性。
+```
+
+
+
+##### 示例讲解
+
+假设我们有 3 个节点：`Node A`（Leader）、`Node B`、`Node C`，系统是一个简单的 KV 存储（key-value）。
+
+**客户端操作：**
+
+```bash
+Client -> Leader: SET x = 1
+```
+
+**Raft 内部步骤：**
+
+1. Leader（Node A）接收到操作 `SET x=1`，写入本地日志：
+
+   ```sql
+   log[1]: SET x = 1
+   ```
+
+2. Leader 将该日志广播给 B、C 节点。
+
+   - B、C 也写入了 `log[1]: SET x=1`。
+
+3. B、C 回复 Leader：写入成功。
+
+4. Leader 收到“多数成功”（自己 + B），认为该日志已**提交**。
+
+5. Leader 应用 `SET x=1` 到本地状态机：
+
+   ```bash
+   状态机: x = 1
+   ```
+
+6. Leader 通知 B、C 也“提交”该日志。
+
+7. B、C 应用 `SET x=1` 到自己的状态机。
+
+最终所有节点状态：
+
+```sql
+log[1]: SET x=1
+# 状态机: x = 1
+```
+
+
+
+##### 为什么状态机必须是“确定性的”？
+
+如果状态机是非确定性的（如依赖系统时间、随机数等），即使日志一样，最终状态也会不同 → 一致性就失效了。
+
+所以，**复制状态机必须是：
+
+- 初始状态一致
+- 接收相同顺序的命令
+- 状态转移逻辑是确定性的
+
+
+
+##### 复制状态机 vs 数据复制
+
+| 概念       | 描述                                                     |
+| ---------- | -------------------------------------------------------- |
+| 数据复制   | 把文件/数据块拷贝到多个节点（如 HDFS）                   |
+| 复制状态机 | 把“操作”复制到多个节点，节点独立执行相同操作以保持一致性 |
+
+复制状态机是**强一致性**的基础。
+
+
+
+
+
 ### leader election
 
 #### Role
@@ -40402,7 +43382,7 @@ Follower 在以下情况下 **拒绝投票**：
 
 ### log replication
 
-当系统有了leader后，系统就进入对外工作期了。客户端的一切请求来发送到leader，leader来调度这些并发请求的顺序，并且保证leader与followers状态的一致性。raft中的做法是，将这些请求以及执行顺序告知followers。leader和followers以相同的顺序来执行这些请求，保证状态一致。
+正如前面的内容提到的状态复制机，只要保证节点log的一致性，就可以保证最终的一致性。Raft赋予了leader节点更强的领导力，所有的log都必须交给leader节点处理，并由leader节点复制给其它节点。这个过程，就叫做日志复制（Log replication）
 
 **下图就是请求写入处理的相关流程：**
 
@@ -40415,12 +43395,168 @@ Follower 在以下情况下 **拒绝投票**：
 5. leader与follower通信，协助follower完成变更的提交，当变更提交完毕后，follower会将变更写入到状态机，此时变更才真正的影响到节点，此时的状态可以理解为applied。此过程中，可能会出现各种问题，比如说网络连接超时，命令执行不成功等问题，leader会持续和follower进行通信，保证follower最终完成所有的操作，与leader达成最终一致性。这种最终一致性是对内的，对外部的client的透明的，外部的client只会看到leader上状态的强一致性。这种强一致性和最终一致性的配合使用，不仅降低了一致性实现的各种成本，还保证了系统的健壮性，能保证在各种异常情况下的恢复与状态同步。
    
 
-上述流程中，有点类似于两阶段提交（2PC），这种提交方式的好处就是能简化分布式事务的复杂性，在不直接使用分布式锁的前提下，能最大程度保证分布式事务的实现。但是这里和标准的2PC还是有差别的，差别就是这里**leader只需要多数（majority）的follower答复即可**，那么在这种情况下，raft是怎么保证一致性以及数据的完整性，尤其在集群主节点发生故障的时候呢？此处先留下这个问题，后续在safety模块进行解答
+![image-20250409154633366](../markdown_img/image-20250409154633366.png)
 
-**log的样子**
+日志的结构通常如上图所示，每个日志条目都包含leader收到该条目时的任期和状态机的命令，任期号可以用于检测日志之间的不一致。每个日志条目还有一个唯一的整数索引值（log index），可以用于标识其在日志集合中的位置。此外，每条日志还会存储一个term number（日志条目方块最上方的数字，相同颜色任期号相同），该term表示leader收到这条指令时的当前任期，term相同的log是由同一个leader在其任期内发送的。
+一旦Leader被选举出来，后续的接受客户端请求以及日志复制等操作主要由leader负责。客户端的每个请求都包含了需要由复制状态机执行的命令，leader会将命令作为新条目附加到其日志中，然后向其他服务器并行发出AppendEntries RPC以便它们复制该条目到相应的日志中。
 
-![image-20250312144954765](../markdown_img/image-20250312144954765.png)
+如果follower节点宕机或者运行缓慢，再或者网络数据包丢失，leader会不断地重试AppendEntries RPC，直到follower节点最后存储了所有的日志条目。
+一旦Leader收到超过一半follower的确认，则表明该条目已被成功复制（比如上图中的log index 7）。Leader将该条目应用（apply)到其本地状态机（被视为committed）并将执行结果返回给客户端。此事件还会提交leader日志中之前存在的条目，包括前任leader创建的条目。
+Leader会持续发送心跳包给 followers，心跳包中会携带当前已经安全复制（我们称之为committed）的日志索引，以便其他服务器知晓。一旦follower得知日志条目已提交，它就会将该条目应用到其本地状态机（按日志顺序）。
 
+
+
+Raft的日志机制（安全规则：日志匹配属性）确保了集群中所有服务器之间日志的高度一致性。日志匹配指的是说：
+
+- 如果不同日志中的两个条目拥有相同的term和index，则它们存储着相同的命令。原因就是因为raft要求leader在一个term内针对同一个index只能创建一条日志，并且永远不会修改，保证“持久化”；
+
+- 当发送AppendEntries RPC时，leader在其日志中会额外包含紧邻新条目之前的日志的index和term信息。如果followers在其日志中找不到具有相同索引和任期的日志条目，则它会拒绝新的日志条目。因此，如果不同日志中的两个条目如果拥有相同的index和term，则所有先前条目中的日志也都是相同的；
+
+  **Raft 的 AppendEntries（心跳或日志同步）请求中，关键字段包括：**
+
+  | 字段名         | 说明                                                       |
+  | -------------- | ---------------------------------------------------------- |
+  | `term`         | Leader 的当前任期                                          |
+  | `leaderId`     | Leader 的 ID                                               |
+  | `prevLogIndex` | 本次要追加的日志条目前一条的日志索引（即前置日志的 index） |
+  | `prevLogTerm`  | 与 `prevLogIndex` 对应的日志条目的任期（term）             |
+  | `entries[]`    | 本次要追加的日志条目数组（可能为空，表示仅心跳）           |
+  | `leaderCommit` | Leader 当前的 commitIndex                                  |
+
+- **为什么需要 `prevLogIndex` 和 `prevLogTerm`？**
+
+  这个机制是 Raft 保证日志一致性的关键：
+
+  **作用：**
+
+  - 确保 Follower 的日志与 Leader 之间是“无缝对接”的。
+  - 防止 Follower 接受和 Leader 不一致的日志条目。
+
+  **举例说明：**
+
+  假设 Leader 想要发送 index=5 的日志条目给 Follower， 那么它会在请求里带上：
+
+  ```sql
+  prevLogIndex = 4
+  prevLogTerm = <term of log[4]>
+  ```
+
+  Follower 收到后会检查：
+
+  - 它的日志中是否存在 index=4
+  - 并且该位置的 term 是否等于 `prevLogTerm`
+
+  如果都 **匹配**，说明日志前后一致，Follower 就会接受后续日志条目。
+
+  否则，就会 **拒绝**此次日志追加请求（返回 false）， Leader 会向前回退 index，直到找到匹配点为止。
+
+  
+
+**AppendEntries会执行一致性检查保留上述属性**
+
+每当 AppendEntries 成功返回时，leader就可以知道follower的日志与自己的日志相同。正常运行时，leader和follower的日志保持一致，因此AppendEntries一致性检查不会失败，只会成功。
+
+但是，在leader崩溃的情况下，日志可能会不一致，前任leader可能没有完全复制其日志中的所有条目。这些不一致可能会引起一系列问题引起失败，比如下图所示的内容，followers的条目与leader不完全一致，要么多了，要么缺少。
+
+
+
+为了避免上述情况的发生，**Leader通过强制follower复制自己的日志来处理不一致的问题**
+
+- 既然要保证follower的日志与其自己的一致，leader需要将其日志与follower日志进行比较，找到它们之间最后一次达到一致的条目，就像前面提到的日志匹配属性，因此这个条目如果一致，之前的日志也一定都是一致的。然后接下来删除follower日志中此关键条目之后的所有条目，并向follower发送该点之后自己的所有条目进行同步
+- Leader会针对每个follower都维护一个nextindex，表示下一条需要发送给该follower的日志索引。在leader选举成功上任的时候，会将所有的nextIndex值初始化为其日志中最后一条日志的的日志索引+1；
+- 如果follower和leader的日志不一致，则下次AppendEntries RPC中的AppendEntries一致性检查将失败，Leader将递减nextIndex并重试AppendEntries RPC，直到nextIndex达到Leader和follower日志匹配的点为止；
+- 至此，AppendEntries成功，然后将删除follower日志中任何冲突的条目，并附加领导者日志中的条目（如果有）
+
+
+
+这样的话，leader以及follower的日志就会保持一致直到term任期结束都会保持这种状态。
+
+图解
+
+![image-20250409163205999](../markdown_img/image-20250409163205999.png)
+
+![image-20250409163331571](../markdown_img/image-20250409163331571.png)
+
+注意：Leader永远不会覆盖或删除其日志中的条目，它只会追加新条目。
+
+
+
+### **安全属性（Safety）**
+
+前面的部分主要描述了Raft的核心流程，也提及了个别机制比如说在给定任期内最多只能选举一名领导人。但是在分布式系统中有很多种情况可能发生，还需要更为详细的安全机制来确保每个状态机都可以以相同的顺序执行完全相同的命令。因此，我们需要针对“领导者选举”以及“日志复制”额外加上一些安全属性，来完善整个Raft算法。
+
+#### **选举限制**
+
+综上所述，Leader在整个Raft机制中真的充当着非常重要必不可少的角色，因此Leader的选举重中之重
+
+我们来试想一个场景：当leader提交了多个日志条目时，follower如果此时不可用，还没来得及复制这些日志，就被选举为新任leader了，然后这个新任leader呢，又用新的日志条目覆盖了其他节点上面上任leader committed的日志条目。那么就会导致多个不同的状态机可能执行不同的命令序列
+因此，核心问题还是在于leader选举出现了问题，对于哪些服务器有资格当选leader的限制对于Raft算法的完善十分重要，前面我们已经提过了个别的限制，下面我们再明确细化一下：
+
+- 日志条目仅朝一个方向流动，leader永远不会覆盖其日志中的现有条目，也不会删除其日志中的条目，只能将新条目追加到其日志中（Leader Append-Only）；
+- 在选举过程中，Candidate为了赢得选举，其日志中必须包含所有已提交的条目。为了当选，Candidate必须获得大多数服务器的投票才能当选新任leader，RequestVote RPC中包含有关Candidate日志的信息（term, index），如果其他服务器发现自己的日志比Candidate的日志新，那么将拒绝投票；
+
+如何判定日志新旧？Raft通过比较日志中最后一个条目的index以及term来确定两个日志中哪一个更新。如果日志的最后一个条目有不同的term，那么更大的term对应的日志比较新。如果日志的term都相同，那么index大的日志更新。
+
+
+
+#### Commit限制
+
+Commit限制：通过计算副本数，仅提交leader当前term的日志条目。
+
+![image-20250409164114264](../markdown_img/image-20250409164114264.png)为什么要增加这个限制？我们同样基于这个图进行场景模拟就知道了
+
+- 阶段（a）：S1是leader，收到请求后仅复制index2的日志给了S2，尚未复制给S3 ~ S5；
+- 阶段（b）：S1崩溃，S5凭借 S3、S4 和自身的投票当选为term3的leader，收到请求后保存了与index2不同的条目（term3），此时尚未复制给其他节点；
+- 阶段（c）：S5崩溃,S1重新启动，当选为新任leader（term4），并继续复制，将term2, index2复制给了 S3。这个时候term2,index2已经的日志条目已复制到大多数的服务器上，但是还没提交。
+- 阶段（d）：如果S1如d阶段所示，又崩溃了，S5重新当选了leader（获得S2、S3、S4的选票）然后将 term3, index2的条目赋值给了所有的节点并commit。那这个时候，已经 committed 的 term2, index2被 term3, index2覆盖了
+
+```ABAP
+因此，为了避免上述情况，commit需要增加一个额外的限制：仅commit leader当前term的日志条目。
+```
+
+举个例子，比如在c阶段，即使term4的时候S1已经把term2, index2复制给了大多数节点，但是它也不能直接将其commit，必须等待term4的日志并成功复制后一起commit。
+
+所以除非说阶段c中term2, index2始终没有被 commit，这样S5在阶段d将其覆盖就是安全的，在要么就是像阶段e一样，term2, index2跟term4, index3一起被 commit，这样S5根本就无法当选leader，因为大多数节点的日志都比它新，也就不存在前边的问题了。
+
+
+
+#### Follower 和 Candidate 崩溃
+
+Follower和Candidate崩溃相对来说比Leader节点崩溃更好处理，如果Follower和Candidate出现了问题，那么也就意味着RequestVote和AppendEntries RPC将失败。Raft会无限期的重试，直到服务器重新启动，RPC将成功完成。如果很不凑巧，Follower和Candidate节点是在完成RPC之后但在响应之前崩溃，那么它将在重新启动后再次收到相同的 RPC。
+
+
+
+#### 时间安排和可用性
+
+Raft的安全机制不能依赖于时间（如果与预期时间不符，可能会导致一系列问题），但是可用性（系统及时响应客户端的能力）必然取决于时间，比如领导者选举必须有时间限制，否则系统无法运行下去。
+
+领导者选举是Raft机制中最关键的一个模块。只要系统满足以下时间安排，Raft就能够顺利选举初一个稳定的Leader：
+
+```bash
+broadcastTime < electionTimeout < MTBF
+```
+
+- BroadcastTime：是服务器向集群中的每个服务器并行发送 RPC 并接收其响应所需的平均时间；
+- ElectionTimeout：是前面所描述的选举超时时间；
+- MTBF：是单个服务器的平均故障间隔时间；
+
+在时间长短来看，广播时间是最短的，以便leader在当选后能够更可靠快速地发送心跳消息，以便阻止follower选举冲突；由于选举超时采用的是随即方法，这种方法可以降低分散选票的几率，选举超时时间比MTBF会小几个数量级。当leader节点崩溃时，系统在选举超时时间内不可用。因此，为了维持整个系统的完美可用性，选举超时时间仅占总时间的一小部分，防止影响系统运行。
+
+BroadcastTime以及MTBF的时间具体由底层系统决定，但是ElectionTimeout时间是我们需要自行设定的。 
+
+
+
+#### 快照
+
+正如前面所介绍的内容，Raft核心算法维护了日志的一致性，通过apply日志我们就可以得到一致的状态机，客户端的操作命令会被包装成日志交给 Raft 处理。但是大家有没有想过一个问题，随着客户端请求的增多，这些日志是不是会越来越长，占用越来越高的存储空间？而且，每次系统重启时都需要完整回放一遍所有日志才能得到最新的状态机。如果没有某种机制来清除日志中积累的陈旧信息，最终就会导致可用性问题影响整个系统的运行。
+
+所以，为了避免这一情况的发生，Raft采用了最简单的日志压缩方法--快照（Snapshot）。简单来说，就是将某一时刻系统的状态 dump 下来并落地存储，这样该时刻之前的所有日志条目就都可以丢弃了（也包括先前的快照）。每个服务器独立拍摄快照，仅覆盖committed完成的日志，因为只有committed日志才是确保最终会应用到状态机的。
+
+![image-20250409165057392](../markdown_img/image-20250409165057392.png)
+
+上图展示了服务器用新快照替换了其日志中已提交的条目（index1-index5），新快照仅存储当前状态（变量x、y）。快照中显示的last included index以及的last included term用于定位日志位置以及支持AppendEntries一致性检查
+
+Follower可以保持最新状态的方法就是leader通过网络向其发送最新快照。比如，当follower落后的时候，leader需要向其同步日志，但是这个时候假设leader已经做了快照，旧的日志已经被删除，leader就可以使用InstallSnapshot RPC向落后的follower发送快照，其中将包含该follower未包含的新信息。同样，当集群中有新节点加入，或者某个节点宕机太久落后了太多日志时，leader也可以直接发送快照，节约了大量日志传输和回放时间。
 
 
 
@@ -40443,6 +43579,267 @@ Follower 在以下情况下 **拒绝投票**：
    - 汇总 **Kubernetes 集群 + 物理机数据**。4
    - 进行 **全局查询、统一存储、长期存储**。
    - 实现 **多数据中心联邦**。
+
+
+
+## 「命名空间删除卡住」问题
+
+命名空间在删除前，Kubernetes 会尝试**优雅地清理其中所有资源对象（Pod、CRD、Finalizer 等）**。如果其中有一些资源：
+
+- 存在 **`finalizers`** 没有清除
+- 或某些资源关联的控制器已经失效（如某个 Operator 的 CRD 没响应）
+- 或一些挂载、网络无法回收
+
+就会导致命名空间删除被**“挂起”**。
+
+
+
+### 快速排查思路
+
+你可以用以下命令查看详细的删除信息
+
+```bash
+kubectl get namespace gitlab -o json | jq '.spec.finalizers'
+```
+
+
+
+### 解决方法
+
+#### 强制清理1
+
+**编辑 namespace 清除 finalizers**
+
+```bash
+kubectl get namespace gitlab -o json > gitlab-ns.json
+```
+
+**编辑文件 `gitlab-ns.json`，找到这一段**
+
+```bash
+"spec": {
+  "finalizers": [
+    "kubernetes"
+  ]
+}
+```
+
+把 `"finalizers"` 整段删除（或设为空数组：`[]`）。
+
+**使用 `kubectl proxy` 启动代理（另一个终端执行）**
+
+```bash
+kubectl proxy
+```
+
+**然后在主终端执行强制删除命令**
+
+```bash
+curl -k -H "Content-Type: application/json" -X PUT \
+--data-binary @gitlab-ns.json \
+http://127.0.0.1:8001/api/v1/namespaces/gitlab/finalize
+```
+
+
+
+#### 更强力版本：强制删除 stuck 命名空间 `gitlab`
+
+**第一步：删除 finalizers**
+
+```bash
+# 将 finalizers 清空
+kubectl get namespace gitlab -o json | jq '.spec.finalizers = []' > /tmp/gitlab-finalize.json
+```
+
+**第二步：通过 REST 接口替换**
+
+```bash
+kubectl replace --raw "/api/v1/namespaces/gitlab/finalize" -f /tmp/gitlab-finalize.json
+```
+
+这条命令的作用是直接调用 API 来 finalize 命名空间，而不是等待 controller 来清理。
+
+**第三步：检查是否成功**
+
+```bash
+kubectl get ns gitlab
+```
+
+如果输出是：
+
+```
+Error from server (NotFound): namespaces "gitlab" not found
+```
+
+说明你已经成功强制删除了 stuck 的命名空间 
+
+
+
+### 强制删除原理
+
+从 **finalizers 的作用原理** 到 **REST 接口替换实现强制删除** 的完整流程
+
+#### 什么是 Finalizers
+
+在 Kubernetes 中，`finalizers` 是一种 **资源删除保护机制**，用于在资源被删除前执行一些清理操作
+
+- 每个 Kubernetes 资源对象都有一个 `metadata.finalizers` 字段
+- 当你执行 `kubectl delete` 删除某个资源时
+  - 这个对象不会立刻被从 etcd 中移除
+  - 而是被设置为 `"deletionTimestamp"`
+  - 然后 Kubernetes 会 **等待 finalizers 清理逻辑完成**，再真正删除这个对象
+
+
+
+#### 示例：Namespace 中的 Finalizer
+
+命名空间中常见的 finalizer
+
+```json
+"finalizers": [
+  "kubernetes"
+]
+```
+
+这个 `kubernetes` finalizer 表示 **控制器需要清理该命名空间下的所有资源**（Pod、PVC、Secrets、CRDs等），完成后才允许删除。
+
+但是：
+
+- 如果某些资源 **无法正常清理（比如 stuck 的 cert-manager 资源）**
+- 就会导致 namespace 处于 **"Terminating" 卡死状态**
+
+
+
+#### 为什么用 REST 接口替换可以强制删除
+
+Kubernetes 的 `kubectl replace --raw` 实际上是直接访问 Kubernetes API 的一种方式，它跳过了控制器的行为，从 **资源对象层面直接修改字段**
+
+**工作流程如下：**
+
+1. 我们使用 `kubectl get namespace <ns> -o json` 得到完整的资源对象。
+
+2. 然后用 `jq` 删除 `.spec.finalizers` 字段。
+
+3. 接着使用 `kubectl replace --raw` 调用 API 接口：
+
+   ```bash
+   /api/v1/namespaces/gitlab/finalize
+   ```
+
+   
+
+**这个接口的作用是**：
+
+- **告诉 apiserver 强制 finalize 命名空间对象**
+- 即使 Kubernetes 控制器没能成功清理完资源，也可以从 etcd 中直接清除该资源
+
+
+
+#### 总结图示理解
+
+```css
+kubectl delete ns gitlab
+   │
+   └───> Kubernetes 标记 gitlab 为 "Terminating"
+              │
+              ├── 查找 gitlab 所有子资源（Pod、PVC 等）
+              ├── 执行各控制器的清理任务
+              └── 遇到 stuck resource ⇒ 无法完成 ⇒ 卡住
+
+🛠 强制手动方式：
+kubectl get ns gitlab -o json
+    ↓
+jq 删除 .spec.finalizers
+    ↓
+kubectl replace --raw "/api/v1/namespaces/gitlab/finalize" -f updated.json
+    ↓
+💥 命名空间立即从 etcd 删除（即使资源没清完）
+```
+
+
+
+#### 强制删除 Namespace 的隐患
+
+❗**资源残留在 etcd**
+
+虽然 namespace 看似删除了，但实际上里面的某些资源（Pod、PVC、Secret、CRD 等）可能 **还保留在 etcd 中**，但没有被 controller 彻底清理。
+
+- 比如：
+  - 被 cert-manager 创建的 `challenge` 资源
+  - 被 PVC 创建的 `VolumeAttachment` 对象
+  - 没有绑定成功的 PV 仍然存在
+
+ ❌ **控制器状态不一致**
+
+Kubernetes 控制器（如 controller-manager、cert-manager、csi-controller 等）在监听相关资源时，可能会检测到一些资源“不一致”，并打印大量报错日志。
+
+例如：
+
+- 某个 PVC 仍引用已被删除的 namespace
+- 某个 pod 的 finalizer 永远得不到处理
+
+🚫 **资源被孤立（Orphan）**
+
+如果有资源脱离了 namespace 管理但仍存在，它们可能变成所谓的 “**孤儿资源**”（Orphan），后续可能会导致：
+
+- 占用存储资源
+- 影响调度（调度器以为 Pod 还存在）
+- 控制器不断重试或报错
+
+
+
+#### 应对措施：清理垃圾 & 善后建议
+
+| 操作步骤                                  | 说明                                                         |
+| ----------------------------------------- | ------------------------------------------------------------ |
+| ✅ **1. 手动审查资源残留**                 | 例如：`kubectl get pv` / `kubectl get crd` / `kubectl get secrets --all-namespaces` 等查看是否有遗留资源 |
+| ✅ **2. 清理无主的资源（Orphans）**        | 查看资源的 `metadata.namespace` 是否为空或已不存在的 namespace，如果是就手动删除 |
+| ✅ **3. 查看控制器日志**                   | `kubectl logs -n kube-system <controller-pod>` 监测是否有相关错误，特别是 cert-manager、volume 相关组件 |
+| ✅ **4. 检查 PVC 和 PV**                   | `kubectl get pvc,pv --all-namespaces`，手动删除失效或处于 `Released` 状态的 PV |
+| ✅ **5. 检查存储系统（如 OpenEBS、Ceph）** | 如果你使用的是动态存储，还要去存储后端检查是否有 volume 残留 |
+| ✅ **6. 定期扫描无效资源（推荐脚本工具）** | 使用 `kubectl unused`、`kubecleaner`、`kubectl-resource_cleaner.sh` 脚本做自动化处理 |
+
+
+
+## 真实场景下的k8s资源配置
+
+### 测试及小型的生产环境
+
+3台master  4CPU8G内存60G硬盘 差不多能跑数百个pod
+
+### 中等环境上千Pod
+
+3台master 8CPU16G内存60G硬盘
+
+### 大型环境上万Pod
+
+3台master 16CPU32G内存60G硬盘
+
+### ETCD
+
+一定要使用ssd，非常消耗磁盘IO，磁盘IO一定要快，否则无论删除还是创建资源都会很慢
+
+ETCD基于内存做缓存，因此ETCD是比较消耗内存的
+
+![image-20250409121720741](../markdown_img/image-20250409121720741.png)
+
+上述IOPS上千的都是固态硬盘，通常机械盘的IOPS也就几百
+
+通常一个项目，都有近百-200百左右的pod
+
+国内通常小环境下（几百pod）：4C8G60G固态盘，中等环境（上千pod）：8C32G，大型环境：16/32C32/64G
+
+
+
+### Node
+
+按照主机组进行自定义配置
+
+CPU密集型业务（比如：数据库MySQL，人工智能，视频转码，数据计算，（可能192C96G）
+
+MEMROY类型服务器（比如：Java服务，可能512G128C）
+
+GPU业务（人工智能，模型训练，多模态，智能客服等）
 
 
 
@@ -40791,4 +44188,3 @@ etcd **存储的所有 Kubernetes 资源**，例如：
 
 
 
-aaaaaaaaaa
