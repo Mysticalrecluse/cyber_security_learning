@@ -1347,6 +1347,52 @@ Task
 ### 解答
 
 ```bash
+# 进入master01
+candidate@base:~$ ssh master01
+
+# 因为题目要求支持 Network Policy 实施，而 Flannel 不支持 Network Policy，所以选择支持的 Calico 部署
+# 下载yaml文件
+candidate@base:~$ wget https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/tigera-operator.yaml
+
+# 启用yaml文件
+# 必须使用 kubectl create 而非 apply。直接使用 apply 可能导致 CRD 冲突
+candidate@base:~$ kubectl create -f tigera-operator.yaml
+
+# 检查 K8S 集群中的 Pod CIDR
+candidate@master01:~$ kubectl cluster-info dump | grep -i cluster-cidr
+                            "--cluster-cidr=10.244.0.0/16",
+
+# 部署 Calico 自定义资源 CRD
+# 这个网址题目没有给你，其实就是将上一步网址中的 tigera-operator.yaml 改成 custom-resources.yaml，所以这个单词一定要背过。
+candidate@master01:~$ wget https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/custom-resources.yaml
+
+# 编辑配置文件
+candidate@master01:~$ vim custom-resources.yaml
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+ name: default
+spec:
+ # Configures Calico networking.
+ calicoNetwork:
+ # Note: The ipPools section cannot be modified post-install.
+   ipPools:
+   - blockSize: 26
+     cidr: 10.244.0.0/16       # 这里改为10.244.0.0/16
+     encapsulation: VXLANCrossSubnet
+     natOutgoing: Enabled
+     nodeSelector: all()
+
+# 创建
+candidate@master01:~$ kubectl create -f custom-resources.yaml
+
+# 检查 Calico 组件运行状态
+# 考试时，大约需要等 2 分钟，Pod 才会 Running
+candidate@master01:~$ kubectl -n calico-system get pod
+
+# 做完后退出
+candidate@master01:~$ exit
+logout
 ```
 
 
@@ -1392,7 +1438,380 @@ relative-fawn namespace 中的 WordPress 应用程序包含：
 
 
 
-解答
+### 解答
+
+```bash
+candidate@base:~$ ssh master01
+
+# 将 WordPress Deployment 缩放为 0 个副本
+# 题目里提示了，要先将 Deployment 缩放为 0。
+# 真正考试时，如果你不将其缩小为 0，而是直接修改 cpu 和 memory 值，会导致新 Pod 起不来，因为考试环境提前做了一些限制。
+candidate@master01:~$ kubectl -n relative-fawn scale deployment wordpress --replicas=0
+deployment.apps/wordpress scaled
+
+# 再次检查副本数，发现已为 0
+candidate@master01:~$ kubectl -n relative-fawn get deployments.apps wordpress 
+NAME        READY   UP-TO-DATE   AVAILABLE   AGE
+wordpress   0/0     0            0           38d
+
+# 检查 nodes 资源请求情况
+candidate@master01:~$ kubectl describe nodes base
+......
+  Resource           Requests   Limits
+  --------           --------   ------
+  cpu                100m (5%)  0 (0%)
+  memory             90Mi (4%)  0 (0%)
+  ephemeral-storage  0 (0%)     0 (0%)
+......
+
+# requests 的硬性要求是，集群中全部 Pod 的申请不能超过 100%。
+# 从上图所得，CPU 100m 占用了 5%，可计算出，大约每 1%是 20m
+# 因为当前已经申请用了 5%，所以还剩下 95%可供申请，也就是一共还剩 1900m 可以申请。
+# 然后，这个 deployment 是里面有 2 个 containers 容器，而且最终是要 3 副本，所以一共有 6 个 containers 平分 1900m，每个 containers 约可以分300m左右。
+# 所以每个 containers 的 cpu requests 上限不能超过 300m，所以理论上 cpu request ：1m-300m 都可以设置。
+# 我们这里就设置 100m 吧，因为太低了，可能也会导致 Pod 获取不到资源。
+
+# 同样的方法，memory request 90Mi 占 4%，所以大于每 1%为22.5。
+# 剩余 96%可供申请，也就是剩余 1910Mi。让 6 个 containers 平分，所以每个最高是 308Mi。
+# 我们这里就设置为 200Mi 吧。
+
+# 如果你不会计算，你只需要记住，真正考试时，这道题 requests cpu 也是设置为 100m，requests memory 也是设置为 200Mi，就可以保证 Pod 正常 Running。
+# 因为考试时，它做了一些隐形限制，如果你的 request 过低或者过高，都会让 Pod 无法启动。
+
+# 更新 WordPress Deployment 的资源请求
+# 将配置文件里，2 个 containers 的 requests cpu 设置为 100m，内存设置为 200Mi
+# limits 不需要改，因为题目里写了“您无需更改任何资源限制”，指的就是不要改 limits。
+candidate@master01:~$ kubectl -n relative-fawn edit deployment wordpress
+......
+        name: wordpress-container
+        resources:
+          limits:
+            cpu: 25000m
+            memory: 2600Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+......
+        name: init-container
+        resources:
+          limits:
+            cpu: 25000m
+            memory: 2600Mi
+          requests:
+            cpu: 100m
+            memory: 200Mi
+......
+
+#  将 WordPress Deployment 副本恢复为 3 个
+candidate@master01:~$ kubectl -n relative-fawn scale deployment wordpress --replicas=3
+deployment.apps/wordpress scaled
+
+# 检查 wordpress pod 是否都是 running
+# 这里大约需要等 2 分钟，Pod 才会 Running。（考试时也这样）
+candidate@master01:~$ kubectl get pod -n relative-fawn 
+NAME                         READY   STATUS    RESTARTS   AGE
+wordpress-7c6bcdc6f4-4zc9h   1/1     Running   0          9m4s
+wordpress-7c6bcdc6f4-htlt4   1/1     Running   0          9m4s
+wordpress-7c6bcdc6f4-w4lwt   1/1     Running   0          9m4s
+
+# 检查 deployment wordpress 是否为 3 个副本
+candidate@master01:~$ kubectl get deployments.apps -n relative-fawn 
+NAME        READY   UP-TO-DATE   AVAILABLE   AGE
+wordpress   3/3     3            3           38d
+
+# 做完退出
+candidate@master01:~$ exit 
+logout
+
+```
 
 
+
+
+
+## etcd修复
+
+
+
+### 考题
+
+```ABAP
+您必须连接到正确的主机。不这样做可能导致零分。
+[candidate@base] $ ssh cka000059
+
+Context
+kubeadm 配置的集群已迁移到新机器。它需要更改配置才能成功运行。
+
+Task
+修复在机器迁移过程中损坏的单节点集群。
+
+首先，确定损坏的集群组件，并调查导致其损坏的原因。
+注意：已停用的集群使用外部 etcd 服务器。
+
+接下来，修复所有损坏的集群组件的配置。
+注意：确保重新启动所有必要的服务和组件，以使更改生效。否则可能导致分数降低。
+
+最后，确保集群运行正常。确保：
+每个节点 和 所有 Pod 都处于 Ready 状态。
+
+模拟环境需要执行这道题的初始化脚本，模拟 etcd 异常。
+sh etcd-set.sh
+```
+
+
+
+### 参考链接
+
+略
+
+
+
+### 解答
+
+```bash
+# 切换集群
+candidate@base:~$ ssh master01
+# 切换root
+candidate@master01:~$ sudo -i
+
+# 执行脚本，创建模拟环境
+root@master01:~# ./etcd-set.sh 
+
+# 查看node
+root@master01:~# kubectl get node
+E0410 10:15:33.560553    3123 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://11.0.1.111:6443/api?timeout=32s\": dial tcp 11.0.1.111:6443: connect: connection refused"
+E0410 10:15:33.562054    3123 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://11.0.1.111:6443/api?timeout=32s\": dial tcp 11.0.1.111:6443: connect: connection refused"
+E0410 10:15:33.563744    3123 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://11.0.1.111:6443/api?timeout=32s\": dial tcp 11.0.1.111:6443: connect: connection refused"
+E0410 10:15:33.565386    3123 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://11.0.1.111:6443/api?timeout=32s\": dial tcp 11.0.1.111:6443: connect: connection refused"
+E0410 10:15:33.566702    3123 memcache.go:265] "Unhandled Error" err="couldn't get current server API group list: Get \"https://11.0.1.111:6443/api?timeout=32s\": dial tcp 11.0.1.111:6443: connect: connection refused"
+The connection to the server 11.0.1.111:6443 was refused - did you specify the right host or port?
+
+# 排查思路
+# 连接不上11.0.1.111:6443,说明apiserver有问题，查看api-Server的容器日志
+root@master01:~# crictl ps -a|grep kube-apiserver
+c294719078aa2       95c0bda56fc4d       About a minute ago   Exited              kube-apiserver              12                  7979b735148b6       kube-apiserver-master01            kube-system
+
+root@master01:~# crictl logs c294719078aa2 
+W0410 02:31:16.194075       1 registry.go:256] calling componentGlobalsRegistry.AddFlags more than once, the registry will be set by the latest flags
+I0410 02:31:16.194630       1 options.go:238] external host was not specified, using 11.0.1.111
+I0410 02:31:16.196755       1 server.go:143] Version: v1.32.1
+I0410 02:31:16.196790       1 server.go:145] "Golang settings" GOGC="" GOMAXPROCS="" GOTRACEBACK=""
+I0410 02:31:16.513398       1 shared_informer.go:313] Waiting for caches to sync for node_authorizer
+I0410 02:31:16.522785       1 shared_informer.go:313] Waiting for caches to sync for *generic.policySource[*k8s.io/api/admissionregistration/v1.ValidatingAdmissionPolicy,*k8s.io/api/admissionregistration/v1.ValidatingAdmissionPolicyBinding,k8s.io/apiserver/pkg/admission/plugin/policy/validating.Validator]
+I0410 02:31:16.528858       1 plugins.go:157] Loaded 13 mutating admission controller(s) successfully in the following order: NamespaceLifecycle,LimitRanger,ServiceAccount,NodeRestriction,TaintNodesByCondition,Priority,DefaultTolerationSeconds,DefaultStorageClass,StorageObjectInUseProtection,RuntimeClass,DefaultIngressClass,MutatingAdmissionPolicy,MutatingAdmissionWebhook.
+I0410 02:31:16.528966       1 plugins.go:160] Loaded 13 validating admission controller(s) successfully in the following order: LimitRanger,ServiceAccount,PodSecurity,Priority,PersistentVolumeClaimResize,RuntimeClass,CertificateApproval,CertificateSigning,ClusterTrustBundleAttest,CertificateSubjectRestriction,ValidatingAdmissionPolicy,ValidatingAdmissionWebhook,ResourceQuota.
+I0410 02:31:16.529193       1 instance.go:233] Using reconciler: lease
+W0410 02:31:36.512988       1 logging.go:55] [core] [Channel #1 SubChannel #2]grpc: addrConn.createTransport failed to connect to {Addr: "192.168.18.111:2379", ServerName: "192.168.18.111:2379", }. Err: connection error: desc = "transport: Error while dialing: dial tcp 192.168.18.111:2379: i/o timeout"
+W0410 02:31:36.513077       1 logging.go:55] [core] [Channel #3 SubChannel #4]grpc: addrConn.createTransport failed to connect to {Addr: "192.168.18.111:2379", ServerName: "192.168.18.111:2379", }. Err: connection error: desc = "transport: Error while dialing: dial tcp 192.168.18.111:2379: operation was canceled"
+W0410 02:31:36.531026       1 logging.go:55] [core] [Channel #5 SubChannel #6]grpc: addrConn.createTransport failed to connect to {Addr: "192.168.18.111:2379", ServerName: "192.168.18.111:2379", }. Err: connection error: desc = "transport: Error while dialing: dial tcp 192.168.18.111:2379: i/o timeout"
+F0410 02:31:36.531136       1 instance.go:226] Error creating leases: error creating storage factory: context deadline exceeded
+
+# 上述日志说明：连接的etcd地址有问题，192.168.18.111:2379无法访问，应切换为etcd的地址
+root@master01:~# ss -nlt
+State                    Recv-Q                   Send-Q                                     Local Address:Port                                      Peer Address:Port                   Process                   
+LISTEN                   0                        16384                                          127.0.0.1:10248                                          0.0.0.0:*                                                
+LISTEN                   0                        16384                                          127.0.0.1:10249                                          0.0.0.0:*                                                
+LISTEN                   0                        16384                                          127.0.0.1:9099                                           0.0.0.0:*                                                
+LISTEN                   0                        16384                                          127.0.0.1:2379                                           0.0.0.0:*                                                
+LISTEN                   0                        16384                                         11.0.1.111:2379                                           0.0.0.0:*                                            
+# 可以看出2379的端口监听在127.0.0.1和11.0.1.111上监听
+# 更改api-server的启动yaml
+root@master01:~# vim /etc/kubernetes/manifests/kube-apiserver.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint: 11.0.1.111:6443
+  creationTimestamp: null
+  labels:
+    component: kube-apiserver
+    tier: control-plane
+  name: kube-apiserver
+  namespace: kube-system
+spec:
+  containers:
+  - command:
+    - kube-apiserver
+    - --advertise-address=11.0.1.111
+    - --allow-privileged=true
+    - --authorization-mode=Node,RBAC
+    - --client-ca-file=/etc/kubernetes/pki/ca.crt
+    - --enable-admission-plugins=NodeRestriction
+    - --enable-bootstrap-token-auth=true
+    - --etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt
+    - --etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt
+    - --etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key
+    - --etcd-servers=https://192.168.18.111:2379    # 果然这里有问题，应该为127.0.0.1:2379
+......
+
+# 更改后，重启kubelet，让kubelet重新创建pod
+root@master01:~# systemctl daemon-reload 
+root@master01:~# systemctl restart kubelet.service 
+
+# 成功访问etcd
+root@master01:~# kubectl get node
+NAME       STATUS   ROLES           AGE   VERSION
+base       Ready    <none>          38d   v1.32.1
+master01   Ready    control-plane   38d   v1.32.1
+node02     Ready    <none>          38d   v1.32.1
+
+# 再次查看pod状态
+root@master01:~# kubectl get pod -n kube-system 
+NAME                               READY   STATUS                   RESTARTS         AGE
+coredns-6766b7b6bb-26cfm           0/1     CrashLoopBackOff         12 (4m10s ago)   38d
+coredns-6766b7b6bb-m9nrp           0/1     CrashLoopBackOff         12 (4m ago)      38d
+etcd-master01                      1/1     Running                  4 (27m ago)      38d
+kube-apiserver-master01            1/1     Running                  0                38d
+kube-controller-manager-master01   1/1     Running                  4 (27m ago)      38d
+kube-proxy-2cgdg                   1/1     Running                  4 (91m ago)      38d
+kube-proxy-62gnq                   1/1     Running                  4 (27m ago)      38d
+kube-proxy-sfzz8                   1/1     Running                  4 (89m ago)      38d
+kube-scheduler-master01            0/1     ContainerStatusUnknown   0                38d
+
+# 发现kube-scheduler-master01无法启动，查看kubelet日志，为什么这个kube-scheduler这个容器无法被拉起
+root@master01:~# cat kubelet.log |grep fail
+Apr 10 10:39:02 master01 kubelet[9529]: I0410 10:39:02.913704    9529 predicate.go:185] "Failed to admit pod, unexpected error while attempting to recover from admission failure" pod="kube-system/kube-scheduler-master01" err="preemption: error finding a set of pods to preempt: no set of running pods found to reclaim resources: [(res: cpu, q: 2550), ]"
+Apr 10 10:39:02 master01 kubelet[9529]: I0410 10:39:02.913712    9529 kubelet.go:2357] "Pod admission denied" podUID="bc449538bd25dc8e916a59305e6d6fdc" pod="kube-system/kube-scheduler-master01" reason="UnexpectedAdmissionError" message="Unexpected error while attempting to recover from admission failure: preemption: error finding a set of pods to preempt: no set of running pods found to reclaim resources: [(res: cpu, q: 2550), ]"
+
+# 可以发现CPU无法申请2.5个，无法申请，且无法争抢pod
+# 查看宿主机CPU数量
+root@master01:~# lscpu
+Architecture:                       x86_64
+CPU op-mode(s):                     32-bit, 64-bit
+Byte Order:                         Little Endian
+Address sizes:                      45 bits physical, 48 bits virtual
+CPU(s):                             2
+......
+
+# 发现有2个CPU，说明资源不足
+# 解决方法：减少资源申请
+root@master01:~# vim /etc/kubernetes/manifests/kube-scheduler.yaml 
+......
+    resources:
+      requests:
+        # set CPU requests to 10% of CPUs available in the SYSTEM
+        cpu: 4      # 这里改为100m
+......
+
+# 更改Manifest目录下的yaml后，会重新创建pod
+root@master01:~# kubectl get pod -n kube-system 
+NAME                               READY   STATUS    RESTARTS       AGE
+coredns-6766b7b6bb-26cfm           1/1     Running   13 (15m ago)   38d
+coredns-6766b7b6bb-m9nrp           1/1     Running   13 (15m ago)   38d
+etcd-master01                      1/1     Running   4 (39m ago)    38d
+kube-apiserver-master01            1/1     Running   0              38d
+kube-controller-manager-master01   1/1     Running   4 (39m ago)    38d
+kube-proxy-2cgdg                   1/1     Running   4 (102m ago)   38d
+kube-proxy-62gnq                   1/1     Running   4 (39m ago)    38d
+kube-proxy-sfzz8                   1/1     Running   4 (101m ago)   38d
+kube-scheduler-master01            1/1     Running   0              43s   # 创建成功
+
+# 修复后，退出
+root@master01:~# exit
+logout
+candidate@master01:~$ exit
+logout
+```
+
+
+
+
+
+## cri-dockerd
+
+
+
+### 考题
+
+```ABAP
+您必须连接到正确的主机。不这样做可能导致零分。
+[candidate@base] $ ssh cka000051
+
+Context
+您的任务是为 Kubernetes 准备一个 Linux 系统。 Docker 已被安装，但您需要为 kubeadm 配置它。
+
+Task
+完成以下任务，为 Kubernetes 准备系统：
+
+设置 cri-dockerd ：
+⚫ 安装 Debian 软件包 ~/cri-dockerd_0.3.6.3-0.ubuntu-jammy_amd64.deb
+Debian 软件包使用 dpkg 安装。
+⚫ 启用并启动 cri-docker 服务
+
+配置以下系统参数:
+net.bridge.bridge-nf-call-iptables 设置为 1
+net.ipv6.conf.all.forwarding 设置为 1
+net.ipv4.ip_forward 设置为 1
+net.netfilter.nf_conntrack_max 设置为 131072
+
+确保这些系统参数在系统重启后仍然存在，并应用于正在运行的系统
+```
+
+
+
+### 参考链接
+
+略
+
+
+
+### 解答
+
+```bash
+candidate@master01:~$ ssh master01
+
+# 使用 dpkg 安装软件包
+candidate@master01:~$ sudo apt install -y ./cri-dockerd_0.3.6.3-0.ubuntu-jammy_amd64.deb
+
+# 启用并开机自启
+candidate@master01:~$ sudo systemctl enable --now cri-docker
+
+# 查看
+candidate@master01:~$ sudo systemctl status cri-docker.s
+Unit cri-docker.s.service could not be found.
+candidate@master01:~$ sudo systemctl status cri-docker
+● cri-docker.service - CRI Interface for Docker Application Container Engine
+     Loaded: loaded (/lib/systemd/system/cri-docker.service; enabled; vendor preset: enabl>
+     Active: active (running) since Thu 2025-04-10 11:01:24 CST; 1min 31s ago
+TriggeredBy: ● cri-docker.socket
+       Docs: https://docs.mirantis.com
+   Main PID: 13164 (cri-dockerd)
+      Tasks: 8
+     Memory: 49.5M
+     CGroup: /system.slice/cri-docker.service
+             └─13164 /usr/bin/cri-dockerd --container-runtime-endpoint fd://
+
+Apr 10 11:01:24 master01 cri-dockerd[13164]: time="2025-04-10T11:01:24+08:00" level=info m>
+Apr 10 11:01:24 master01 cri-dockerd[13164]: time="2025-04-10T11:01:24+08:00" level=info m>
+Apr 10 11:01:24 master01 cri-dockerd[13164]: time="2025-04-10T11:01:24+08:00" level=info m>
+Apr 10 11:01:24 master01 cri-dockerd[13164]: time="2025-04-10T11:01:24+08:00" level=info m>
+Apr 10 11:01:24 master01 cri-dockerd[13164]: time="2025-04-10T11:01:24+08:00" level=info m>
+Apr 10 11:01:24 master01 cri-dockerd[13164]: time="2025-04-10T11:01:24+08:00" level=info m>
+Apr 10 11:01:24 master01 cri-dockerd[13164]: time="2025-04-10T11:01:24+08:00" level=info m>
+Apr 10 11:01:24 master01 cri-dockerd[13164]: time="2025-04-10T11:01:24+08:00" level=info m>
+Apr 10 11:01:24 master01 cri-dockerd[13164]: time="2025-04-10T11:01:24+08:00" level=info m>
+Apr 10 11:01:24 master01 systemd[1]: Started CRI Interface for Docker Application Containe>
+
+# 配置系统参数
+candidate@master01:~$ sudo vim /etc/sysctl.conf 
+......
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv6.conf.all.forwarding = 1
+net.ipv4.ip_forward = 1
+net.netfilter.nf_conntrack_max = 131072
+
+candidate@master01:~$ sudo sysctl -p
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv6.conf.all.forwarding = 1
+net.ipv4.ip_forward = 1
+net.netfilter.nf_conntrack_max = 131072
+
+# 检查
+candidate@master01:~$ sysctl net.bridge.bridge-nf-call-iptables
+net.bridge.bridge-nf-call-iptables = 1
+
+# 退出
+candidate@master01:~$ exit
+logout
+```
 
