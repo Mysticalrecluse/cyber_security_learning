@@ -7032,3 +7032,112 @@ DNAT       tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:8080 to:10
 CNI-DN-fe0d317f921227af7dacd  tcp  --  0.0.0.0/0            0.0.0.0/0            /* dnat name: "bridge" id: "k8s.io-13617e96eeb7ed49b9c06af1b34d723b7035dae2a69f342425c2277379059846" */ multiport dports 8080
 ```
 
+
+
+
+
+## 基于nerdctl + buildkitd + containerd 构建容器镜像
+
+
+
+容器技术除了docker之外，还有CoreOS的rkt，google的gvisor，以及docker开源的containerd，redhat的podman，阿里的pouch等，为了保证容器生态的标准性和健康可持续发展，包括Linux基金会，Docker，微软，红帽，Google和IBM等公司在2015年6月共同成立了一个Open Container（OCI）的组织，其目的就是定制开放的标准的容器规范，目前OCI一共发布了另两个规范，分别是runtime spec和image format spec，有了这两个规范，不同的容器公司开发的容器只要兼容这两个规范，就可以保证容器的可移植性和相互可操作性。
+
+
+
+buildkit：从Docker公司的开源出来的一个镜像构建工具包，支持OCI标准的镜像构建
+
+```http
+https://github.com/moby/buildkit
+```
+
+
+
+### buildkitd
+
+**buildkitd（服务端）**，目前支持runc和containerd作为构建环境，默认是runc，可以更换为containerd
+
+**buildctl（客户端）**，负责解析Dockerfile文件，并向服务端buildkitd发出构建请求
+
+
+
+#### 部署 buildkitd
+
+```bash
+[root@worker-01 src]# pwd
+/usr/local/src
+
+[root@worker-01 src]# wget https://github.com/moby/buildkit/releases/download/v0.21.0/buildkit-v0.21.0.linux-amd64.tar.gz
+
+[root@worker-01 src]# tar xf buildkit-v0.21.0.linux-amd64.tar.gz
+[root@worker-01 src]# mv bin/* /usr/local/bin
+[root@worker-01 src]#buildctl --help
+NAME:
+   buildctl - build utility
+
+USAGE:
+   buildctl [global options] command [command options] [arguments...]
+
+VERSION:
+   v0.21.0
+
+......
+
+[root@worker-01 src]#vim /lib/systemd/system/buildkitd.socket
+[Unit]
+Description=BuildKit
+Documentation=https://github.com/moby/buildkit
+
+[Socket]
+ListenStream=%t/buildkit/buildkitd.sock
+
+[Install]
+WantedBy=sockets.target
+
+[root@worker-01 src]#vim /lib/systemd/system/buildkitd.service
+[Unit]
+Description=BuildKit
+Requires=buildkitd.socket
+After=buildkitd.socket
+Documentation=https://github.com/moby/buildkit
+
+[Service]
+ExecStart=/usr/local/bin/buildkitd --oci-worker=false --containerd-worker=true
+
+[Install]
+WantedBy=multi-user.target
+
+[root@worker-01 src]#systemctl daemon-reload
+[root@worker-01 src]#systemctl enable --now buildkitd.socket
+[root@worker-01 src]#systemctl enable --now buildkitd.service
+```
+
+
+
+### 测试镜像构建
+
+#### nerdctl常用命令
+
+```bash
+# 配置命令补全
+[root@worker-01 ~]# vim .bashrc
+......
+source <(nerdctl completion bash)
+
+[root@worker-01 ~]# . .bashrc
+
+# 确保镜像能上传成功
+[root@worker-01 ~]#nerdctl pull ubuntu
+[root@worker-01 ~]#nerdctl tag ubuntu:latest harbor.mysticalrecluse.com/baseimages/ubuntu:latest
+[root@worker-01 ~]#nerdctl push harbor.mysticalrecluse.com/baseimages/ubuntu:latest
+
+```
+
+
+
+### 镜像构建
+
+```bash
+[root@worker-01 ~]# /usr/local/bin/nerdctl build -t harbor.mysticalrecluse.com/libaray/nginx-base:1.22.0 .
+[root@worker-01 ~]# /usr/local/bin/nerdctl push harbor.mysticalrecluse.com/libaray/nginx-base:1.22.0
+```
+

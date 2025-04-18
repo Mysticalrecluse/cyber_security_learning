@@ -4258,15 +4258,7 @@ node3     Ready    <none>          92m   v1.30.8
 
 #### 启用自动补全脚本
 
-``````bash
-# 临时补全命令
-source <(kubectl completion bash)
 
-
-# 用户永久补全，每次登录都生效
-echo 'source <(kubectl completion bash)' >> ~/.bashrc
-source ~/.bashrc
-``````
 
 
 
@@ -9383,7 +9375,145 @@ kubectl run nginx --image=nginx --replicas=1
 
 
 
+#### Pod的状态详解
 
+- **Pending**
+
+  ```bash
+  # Pod 还没有完全准备好运行。包括还没被调度，或调度了但容器镜像还在拉取等
+  # 总结起来就是镜像拉取成功前的状态
+  
+  # 显示位置
+  kubectl get pod 的 status列
+  
+  # 常见触发原因
+  资源不足、PVC 未绑定、调度器还没选中节点等
+  ```
+
+  - **Unschedulable**
+
+    ```bash
+    # 是 Pending 的一种细化原因，说明 调度器尝试过调度但失败
+    # 属于 Pending 的子状态
+    
+    # 显示位置
+    显示在 kubectl describe pod 的 Events 中
+    
+    # 常见触发原因
+    节点没满足条件（资源不足、亲和性不满足、Taints/Tolerations 不匹配）等
+    ```
+
+  - **PodScheduled**
+
+    ```bash
+    # PodScheduled 是 Pending 状态下的一个子条件（Condition）
+    # 举个例子：kubectl get pod -o yaml 里的状态
+    status:
+      phase: Pending
+      conditions:
+      - type: PodScheduled
+        status: "True"
+        lastProbeTime: null
+        lastTransitionTime: "2025-04-16T03:11:12Z"
+      - type: Initialized
+        status: "True"
+      - type: ContainersReady
+        status: "False"
+      - type: Ready
+        status: "False"
+    
+    # PodScheduled 的含义：表示调度器是否已成功将 Pod 分配给某个节点
+    # Pod 处于 Pending 状态时，如果 PodScheduled=True，说明调度已经完成；
+    # 如果 PodScheduled=False 且 Reason=Unschedulable，那就是调度器还没找到合适节点，卡在调度这一步。
+    ```
+
+    
+
+- **Unknown/NotReady**
+
+  ```bash
+  # 如果 kubelet 异常或无法汇报,当 kubelet 无法与 API Server 通信（例如 kubelet 崩溃、节点宕机、网络断开等）
+  1. 节点的状态 NodeStatus 将在一段时间（默认 40 秒）后被标记为: NotReady
+  
+  2. 节点上所有的 Pod 状态 将显示为: Unknow
+  
+  # 详解：
+  ## Kubelet 会周期性地向 API Server 报告：
+  当前节点的状态（NodeStatus）
+  每个 Pod 的状态（PodStatus）
+  
+  ## node-controller（运行在 controller-manager 中）负责检测 kubelet 是否失联
+  如果 心跳（node status）在 --node-monitor-grace-period（默认 40s）内没更新，会认为 kubelet 异常，并设置
+  Node 为 NotReady
+  Pod 状态为 Unknown
+  
+  ## 关键参数（可以在 controller-manager 里配置）：
+  
+  参数名	                         说明	                                   默认值
+  --node-monitor-grace-period	   多久没收到 kubelet 心跳就认为它“掉线”	      40s
+  --pod-eviction-timeout	       失联节点上的 Pod 被驱逐前的等待时间	         5m
+  ```
+
+
+
+- **Failed**
+
+  ```bash
+  # Failed 是 Pod 的一种终态（Terminal Phase）
+  # Failed 表示已经运行过了，但 失败退出了，是一个终点状态。
+  
+  # 举个例子帮助理解
+  kubectl get pod mypod -o wide
+  如果状态是 Failed，说明：
+  - Pod 曾经成功调度到了节点。
+  - 至少有一个容器运行过。
+  - 后来因为 非 0 退出码 或 CrashLoopBackOff 最后失败 被标记为失败。
+  ```
+
+  
+
+- **CrashLoopBackOff**
+
+  ```bash
+  # 它是一种 容器级别的状态，出现在 Pod 的容器因为崩溃而不断重启时
+  # 它不是 status.phase 的一种，而是 containerStatuses.state.waiting.reason
+  # 示例
+  state:
+    waiting:
+      reason: CrashLoopBackOff
+  
+  # 重启次数和失败状态之间的关系详解
+  1. 默认情况下，Kubernetes 会根据 Pod 的 restartPolicy 来决定是否重启容器。
+  - Always（默认）：不管失败多少次，都会尝试重启。
+  - OnFailure：仅在非 0 退出时重启
+  	- 示例：如果容器主进程是 sleep 10；10 秒后自然退出，退出码 0，OnFailure 不会重启。
+  - Never：不管退出码如何，都不会重启。
+  
+  2. CrashLoopBackOff 是带有指数退避的重启机制
+  - 首次失败后会马上重启
+  - 失败多次后，每次重启的间隔时间越来越长（最大约为 5 分钟）。
+  
+  3. 它不会自行转换成 Pod 的 Failed 状态，除非 restartPolicy: Never/OnFailure 且失败了。
+  
+  # 可以控制人为控制重启次数，否则会不断重启
+  1. 对于 Job
+  spec:
+    backoffLimit: 3   # Job 的 Pod 重启失败 3 次后就 Failed
+  
+  2. 对于容器测试
+  可以使用 liveness probe 让它失败几次后被标记为不健康，但这不影响 CrashLoopBackOff 本身
+  ```
+
+
+
+- **ImagePullBackOff**
+  - Pod所在node节点下载镜像失败
+
+- **Terminating**
+
+  - Pod正在被销毁
+
+  
 
 #### Pod的生命周期
 
@@ -9400,16 +9530,85 @@ kubectl run nginx --image=nginx --replicas=1
   - Pod可以拥有任意数量的init容器，init顺序执行，最后一个执行完成后，才启动主容器
   - init容器不支持探针检测功能
     - 它主要是为了主容器准备运行环境的功能，比如：给主容器准备配置文件，向主容器的存储写入数据，然后将存储卷挂载到主容器上，下载相关资源，监测主容器依赖服务等
+  
+  ```yaml
+  # init container示例
+  ......
+  spec:
+    containers:
+      - name: myserver-myapp-container
+        image: nginx:1.20.0
+        # imagePullPolicy: Always
+        volumeMounts:
+        - mountPath: "/usr/share/nginx/html/myserver"
+          name: myserver-data
+        - name: tz-config
+          mountPath: "/etc/localtime"
+    initContainers:
+      - name: init-web-data
+        image: centos:7.9.2009
+        command: ['/bin/bash','-c',"for i in `seq 1 10`;do echo '<h1>'$1 web page at $(date +%Y%m%d%H%M%S) '</h1>' >> /data/nginx/html/myserver/index.html; sleep 1; done"]
+        volumeMounts:
+        - mountPath: "/data/nginx/html/myserver"
+          name: server-data
+        - name: tz-config
+          mountPath: "/etc/localtime"
+      - name: change-data-owner
+        image: busybox:1.28
+        command: ['/bin/sh','-c',"/bin/chmod 644 /data/nginx/html/myserver/* -R"]
+        volumeMounts:
+        - mountPath: "/data/nginx/html/myserver"
+          name: myserver-data
+        - name: tz-config
+          mountPath: "/etc/localtime"
+    volumes:
+    - name: myserver-data
+      hostPath:
+        path: /tmp/data/html
+    - name: tz-config
+      hostPath:
+        path: /etc/localtime
+  ```
 - **启动后钩子PostStart（Post Start Hook）**: 与主容器同时启动
 - 状态监测
 - **Startup probe：启动探针**：启动探针用来探测这个服务是否起来的，如果探针检查失败，会认为该容器不健康，因此会重新启动容器，如果健康，就会进入下一步
   - 启动探针只检测容器是否启动，容器启动后，后续不再检查
+  
+  ```ABAP
+  Startup Probe 是为了解决容器“启动特别慢”时被误杀的问题。
+  ```
+  
+  - **实际应用场景**
+  
+    - 场景 1：大型 Java 应用容器（SpringBoot）
+  
+      ```yaml
+      startupProbe:
+        httpGet:
+          path: /healthz
+          port: 8080
+        failureThreshold: 30
+        periodSeconds: 10
+      ```
+  
+      - 某些 SpringBoot 服务可能需要 3~5 分钟才能启动；
+      - 若使用 `livenessProbe` 默认参数（失败3次，间隔10s），30秒内不响应就会被重启；
+      - 而 `startupProbe` 设置为最多失败 30 次，每次间隔 10 秒，总共 **最多等 5 分钟**
+      - 一旦 `/healthz` 返回 200，就进入就绪阶段，才启用 livenessProbe。
+  
+  - **什么时候应该使用 `startupProbe`**
+  
+    | 适用场景                                    | 是否建议   |
+    | ------------------------------------------- | ---------- |
+    | 服务启动时间很长（大于 liveness 超时）      | ✅ 强烈建议 |
+    | 使用 Java / .NET Core / 大模型服务          | ✅ 建议     |
+    | 启动流程依赖其他系统、DB等外部依赖          | ✅ 建议     |
+    | 容器启动瞬间会报错（如 healthz 一开始报错） | ✅ 建议     |
+    | 容器启动极快（<5 秒）                       | ❌ 可省略   |
 - **Liveiness probe（存活探针）**：判断当前Pod是否处于存活状态，是Readiness存活的前提，对应READY状态的m/n的n值
 - **Readiness Probe（就绪探针**）：判断当前Pod的主应用容器是否可以正常对外提供服务，只有Liveiness为存活，Readiness
   - Liveness probe和Readiness Probe持续容器终身，只要容器在启动，会不断地探测，如果容器出故障，可以进行一些操作
   - 三个探针就是用来检测容器健康性的
-
-
 
 - Service关联Pod
 - 接收用户请求
@@ -9842,7 +10041,7 @@ spec:
 | 重启策略  | 描述                                                         |
 | --------- | ------------------------------------------------------------ |
 | Always    | 无论退出码exit code是否为0，都要重启，即只要退出就重启，并且重启次数并没有限制，此为默认值 |
-| OnFailure | 容器终止运行退出码exit code不为0时才重启,重启次数并没有限制  |
+| OnFailure | 容器终止运行退出码exit code不为0时才重启,重启次数并没有限制，比如：如果容器主进程是 sleep 10；10 秒后自然退出，退出码 0，OnFailure 不会重启 |
 | Never     | 无论何种退出码exit code,Pod都不重启。主要针对Job和CronJob    |
 
 
@@ -18987,7 +19186,7 @@ spec:
         configMapKeyRef:
           name: cm-nginx-config
           key: port
-          optional: true
+          optional: true  # 即使找不到对应的 ConfigMap 或 Key，也不会让 Pod 启动失败，而是忽略这个变量，Pod 照常启动。
     - name: NGINX_USER
       valueFrom:
         configMapKeyRef:
@@ -19903,7 +20102,33 @@ fastcgi_params	modules     scgi_params
 
 
 
+### ConfigMap的问题与生产中的扩展
 
+#### ConfigMap/Secret 的大小限制
+
+Kubernetes 中对单个对象（包括 `ConfigMap` 和 `Secret`）的大小有限制：
+
+- **单个 ConfigMap/Secret 的大小上限为 1MiB**
+- 且 **建议远低于此值**，否则会影响 apiserver 性能、ETCD 存储效率等
+
+原因：所有资源都存在 etcd 中，大对象会导致 etcd 性能下降。
+
+
+
+#### 配置文件超过1MiB的场景
+
+常见场景如下：
+
+- 前端 SPA 项目打包产物（如 index.html）
+- 各种证书（如大型 CA 链）
+- 自定义语言模型文件（如 tokenizer、embedding）
+- 大型 YAML/JSON 配置（如复杂的业务规则）
+
+
+
+#### 解决方案：使用Nacos解决k8s上的配置管理
+
+**在公司中将 Nacos 部署在 Kubernetes 中用于配置管理，是一种非常常见且成熟的方式**，尤其是在使用微服务架构（如 Spring Clo
 
 ### Secret
 
@@ -21210,7 +21435,7 @@ systemctl restart kubelet
 
 
 
-
+#### External Secrets Operator (ESO) — Vault
 
 
 
@@ -28178,7 +28403,7 @@ node3     Ready    <none>          4d5h   v1.30.8
 
 - 基于资源对象保存ServiceAccount的数据
 - 认证信息保存于ServiceAccount对象专用的Secret中
-- 隶属名称空间级别，专供集群上的Pod中的进程访问API Server时使用
+- 隶属名称空间级别，专供集群上的Pod中的进程**访问API Server**时使用
 - 需要用到特殊权限时，可为Pod指定要使用的自定义ServiceAccount资源对象
 
 
@@ -35343,7 +35568,8 @@ rm -rf /var/lib/cni
 - 主节点执行kubeadm初始化
 
 ```shell
-k8s_release_version=1.30.2 && kubeadm init --control-plane-endpoint kubeapi.feng.org --kubernetes-version=v${k8s_release_version} --pod-network-cidr 192.168.0.0/16 --service-cidr 10.96.0.0/12 --image-repository registry.aliyuncs.com/google_containers --token-ttl=0 --upload-certs --cri-socket=unix:///run/cri-dockerd.sock
+k8s_release_version=1.30.2 && kubeadm init --control-plane-endpoint kubeapi.feng.org --kubernetes-version=v${k8s_release_version} --pod-network-cidr ls
+0/16 --service-cidr 10.96.0.0/12 --image-repository registry.aliyuncs.com/google_containers --token-ttl=0 --upload-certs --cri-socket=unix:///run/cri-dockerd.sock
 
 # worker节点加入主节点
 kubeadm join kubeapi.feng.org:6443 --token se55ec.bu2rwnwjz13os7ss \
