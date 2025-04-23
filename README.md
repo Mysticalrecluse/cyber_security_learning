@@ -24,9 +24,22 @@
   <li><a href="云原生/CloudNative-Kubernetes.md#kubernetes组件" style="font-size:20px; font-weight:600; color:#2b6cb0;"> Kubernetes组件</a></li><br>
   <li><a href="云原生/CloudNative-Kubernetes.md#kubernetes-版本" style="font-size:20px; font-weight:600; color:#2b6cb0;"> Kubernetes 版本</a></li><br>
   <li><a href="云原生/CloudNative-Kubernetes.md#kubernetes扩展接口" style="font-size:20px; font-weight:600; color:#2b6cb0;"> Kubernetes扩展接口</a></li><br>
-  <details>
-        <summary><a href="云原生/CloudNative-Kubernetes.md#kubernetes集群部署" style="font-size:20px; font-weight:600; color:#2b6cb0;"> Kubernetes集群部署</a></summary>
-  </details>
+  <li><a href="云原生/CloudNative-Kubernetes.md#kubernetes集群部署" style="font-size:20px; font-weight:600; color:#2b6cb0;"> Kubernetes集群部署</a>
+      <ul><br>
+          <li><a href="云原生/CloudNative-Kubernetes.md#基于Kubeadm和 Docker 部署 kubernetes 高可用集群" style="font-size:18px; font-weight:500; color:#2b6cb0;">基于Kubeadm和 Docker 部署 kubernetes 高可用集群</a></li><br>
+          <li><a href="云原生/CloudNative-Kubernetes.md#基于Kubeadm和Containerd部署Kubernetes" style="font-size:18px; font-weight:500; color:#2b6cb0;">基于Kubeadm和Containerd部署Kubernetes</a></li><br>
+          <li><a href="云原生/CloudNative-Kubernetes.md#二进制部署高可用k8s集群部署v.1.30.x" style="font-size:18px; font-weight:500; color:#2b6cb0;">二进制部署高可用k8s集群部署v.1.30.x</a></li>
+      </ul>
+  </li><br>
+  <li><a href="云原生/CloudNative-Kubernetes.md##集群节点伸缩管理" style="font-size:20px; font-weight:600; color:#2b6cb0;">集群节点伸缩管理</a>
+      <ul><br>
+          <li><a href="云原生/CloudNative-Kubernetes.md###添加Node节点" style="font-size:18px; font-weight:500; color:#2b6cb0;">添加Node节点</a></li><br>
+          <li><a href="云原生/CloudNative-Kubernetes.md###添加master节点" style="font-size:18px; font-weight:500; color:#2b6cb0;">添加Master节点</a></li><br>
+          <li><a href="云原生/CloudNative-Kubernetes.md###删除node节点" style="font-size:18px; font-weight:500; color:#2b6cb0;">删除node节点</a></li><br>
+          <li><a href="云原生/CloudNative-Kubernetes.md##升级集群" style="font-size:18px; font-weight:500; color:#2b6cb0;">升级集群</a></li>
+      </ul>
+   </li><br>
+  <li><a href="云原生/CloudNative-Kubernetes.md##Kubectl 常用命令" style="font-size:20px; font-weight:600; color:#2b6cb0;">Kubectl 常用命令</a></li><br>
 </details>
 
 
