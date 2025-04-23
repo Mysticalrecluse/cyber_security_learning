@@ -167,7 +167,7 @@ kube-system   kube-dns     10.244.2.38:53,10.244.2.40:53,10.244.2.38:53 + 3 more
 
 
 
-#### Service 工作模型
+#### Service工作模型
 
 一个Service对象最终体现为工作节点上的一些**iptables或ipvs规则**，这些规则是由kube-proxy进行实时生成和维护\
 
@@ -329,7 +329,7 @@ kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: deployment-test-74b
 
 
 
-#### 创建 Service 方式说明
+#### 创建Service方式说明
 
 对于Service的创建有两种方法：
 
@@ -408,7 +408,7 @@ spec:
 
 
 
-#### 补充：Deployment.Name 和 Service.Name 相同时会自动匹配的原理
+#### 补充：Deployment.Name和Service.Name相同时会自动匹配的原理
 
 ```bash
 [root@master1 manifests]#kubectl create deployment pod-test1 --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas=3
