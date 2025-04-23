@@ -1,20 +1,149 @@
 # CKA
 
-- **HPA 自动扩缩容**
-- **Ingress**
-- **Sidecar**
+
+
+## 考前注意事项
+
+1. 注意新考试平台，不让使用自己的浏览器书签了！考试期间允许访问 K8S 官网 https://kubernetes.io/docs/ ，也
+   可通过每道题的参考链接，跳到相应的参考页面。
+2. 考试是从老师给你发题后，开始计时的。前面的身份验证，环境检查，都不占用实际考试时间。一旦发题后，你在做题过程掉线、更换电脑等，这些都是计时的。
+3. 考试时，考题里的这些蓝色字体，用鼠标左键点一下，就会自动复制了。
+
+![image-20250419163313054](../markdown_img/image-20250419163313054.png)
+
+4. 其他官方说明，详见下文。
+   https://docs.linuxfoundation.org/tc-docs/certification/tips-cka-and-ckad
+   官方说明地址
+   https://docs.linuxfoundation.org/tc-docs/certification/faq-cka-ckad-cks#what-are-the-id-requirements-to-take-the-exam
+
+
+
+<span style="color:red">考前 1 小时，Windows 操作系统要禁用 Vmware 服务，以免影响考试软件。考完试，再将 Vmware 服务启动。其他操作系统没事的。</span>
+
+![image-20250419163611243](../markdown_img/image-20250419163611243.png)
 
 
 
 
 
+## 报名注意事项
+
+![image-20250419163901397](../markdown_img/image-20250419163901397.png)
+
+1. 在中文官网购买 CKA 后，在“个人中心”→“我的考试”里，点击上图的“查看考试券”，可以获得一个“考试码”。
+2. 复制“考试码”，打开上图“考试说明”，按照官方说明，跳转到“考试中心”注册考试的
+3. 默认第一次登陆“考试中心”，需要创建一个帐号的，建议跟上面的“Linux 开源软件学园”使用同一个邮箱帐号和密码。
+
+```ABAP
+PS：请注意，在中文官网购买后，考试码有效期是 1 个月，务必在 1 个月内到“考试中心”注册考试。注册考试后，实际考试有效期就变成了 1 年
+```
+
+![image-20250419164308509](../markdown_img/image-20250419164308509.png)
+
+<span style="color:purple">两种报名方式：（错误的组合，会导致考试时验证身份不通过的！）</span>
+<span style="color:purple">**第一种：姓名中文汉字报名**，考试需要有身份证或驾照或护照。证书显示姓名中文汉字。</span>
+
+<span style="color:purple">**第二种：姓名拼音报名**，必须要有护照，才能选择这种方式。证书显示姓名拼音。</span>
+
+<mark><span style="color:red">PS：只有身份证或驾照的同学，只可以使用这种报名方式。（推荐）</span></mark>
+
+![image-20250419164717008](../markdown_img/image-20250419164717008.png)
+
+![image-20250419165133647](../markdown_img/image-20250419165133647.png)
+
+<span style="color:purple">然后使用此账号再次登录上面的网站，按照如下方式使用“考试码”，注册考试</span>
+
+
+
+![image-20250419165240221](../markdown_img/image-20250419165240221.png)
+
+![image-20250419165327809](../markdown_img/image-20250419165327809.png)
+
+![image-20250419165732258](../markdown_img/image-20250419165732258.png)
+
+![image-20250419165805582](../markdown_img/image-20250419165805582.png)
+
+
+
+## 约考注意事项
+
+
+
+### 注意事项1
+
+<span style="color:red">**注意！注意！**</span>
+<span style="color:purple">下面的 Verify Name，一定要写对，比如你的姓名是张小明，则应该写【张 小明】，张和小明之间有一个空格。</span>
+
+<span style="color:purple">如果你的名字是李四，则应该写【李 四】，李和四之间有一个空格。</span>
+
+![image-20250419170033784](../markdown_img/image-20250419170033784.png)
 
 
 
 
 
+### 注意事项2
 
-## HPA 自动扩缩容
+**关于考试浏览器的问题**
+
+<span style="color:purple">等到考前 30 分钟，点击上图的“启动考试”，然后，需要先安装考试浏览器 “PSI 安全浏览器”，安装完成后才能进入考试。</span>
+
+<span style="color:red">其实这个“PSI 安全浏览器”可以提前安装，但是考虑到它可能会更新，如果你之前安装的是旧版本，反而会出问题，所以建议考前卸载，并在提前 30 分钟点击“启动考试”按钮后，在考试现场安装最新版本！</span>
+
+<span style="color:red">安装时，退出 360 等杀毒软件，可能被拦截。</span>
+
+如果要想体验一下 PSI 安全浏览器，可以从以下网址下载，但建议体验完就删除！
+手动打开浏览器是报错的，只能通过也考的那个“启动考试”按钮，自动带出 PSI 安全浏览器，才能正常启动。
+
+![image-20250419170619745](../markdown_img/image-20250419170619745.png)
+
+
+
+## 注意：必读
+
+<mark><span style="color:red">真正考试时，也并不是在 root 下，也是在 candidate 普通账号下，在 base 机器上 ssh 不同的机器后做题的。 所以模拟环境也是用 candidate 账号，在 base 机器上做题的。</span></mark>
+
+<mark><span style="color:red">主机名 node1.magedu.org</span></mark>
+
+<mark><span style="color:red">IP 地址 11.0.1.102 </span></mark>
+
+<mark><span style="color:red">帐号为 candidate </span></mark>
+
+<mark><span style="color:red">密码为 123456</span></mark>
+
+
+
+<span style="color:brown">注意，官方的考试环境有多套，考试时，不一定抽到哪套。不同考试环境部分题目的内容有略微变化，但题干都是一样的</span>
+
+<span style="color:blue">注意：几乎所有同学都反馈新考试平台非常卡，70%反馈不用 V-P-N 没法做题，20%反馈用了 V-P-N 还是卡，甚至有 少部分同学没有做完题。尽量熟练到 70%的题不参考 K8S 官网，另外在模拟环境里，熟练到一个半小时内可以做完全部题目，再去约考，成功的把握大</span>
+
+
+
+<span style="color:purple">新考试平台(PSI)，不允许外接第二个屏幕，不允许访问自己的浏览器书签。</span>
+
+ <span style="color:purple">新考试平台(PSI)，更像是一个远程的 Ubuntu 桌面，在这个 Ubuntu 桌面里，你可以用终端做题，可以用 Ubuntu 自带的火狐浏览器到 K8S 官网查资料。 另外每道考试题目里，也都会给你一个参考链接，但是这些不是太好，没有参考价值，不建议使用。还是推荐用考试软件 PSI 里的火狐浏览器到官网自己查。 注意考试时搜出来的结果，跟平常在官网搜出来结果排序不一样。还有就是官网网页的最右边，是可以点击选择中文/英文的。但是如果屏幕太小，可能显示不全， 导致看不到网页右边的语言按钮。所以建议平常练习，就使用英文网页。</span>
+
+每次练习时，还原初始化快照后，<span style="color:red">**开机后等 5 分钟**</span>，再 ssh 登录 node1（11.0.1.102）检查一下所有的 pod，确保都 Running 了，再开始练习。（CKA 题目里 5 个不 是 Running 的，忽略）。另外，考试环境和模拟环境的 kubectl 命令，都有自动补全的。
+
+![image-20250419095957045](../markdown_img/image-20250419095957045.png)
+
+
+
+kubectl 备忘单（kubectl Cheat Sheet）
+
+ https://kubernetes.io/zh-cn/docs/reference/kubectl/quick-reference/
+
+比较好的命令参考网址
+
+ https://kubernetes.io/docs/reference/generated/kubectl/kubectl-commands
+
+
+
+<span style="color:red">这套《题库》跟《真题》的题干是一样的，区别在于里面的一些 pod、deployment、namespace、ServiceAccount 等参数可能不同而已。 因为在真实考试中，也会时常变换里面的这些变量参数的。注意理解这些变量的含义，而不要死记硬背答案。</span>
+
+
+
+## 1. HPA 自动扩缩容
 
 ### 考题
 
@@ -90,7 +219,7 @@ exit
 
 
 
-## Ingress
+## 2. Ingress
 
 ### 考题
 
@@ -242,7 +371,7 @@ candidate@master01:~$ exit
 
 
 
-## Sidecar
+## 3. Sidecar
 
 
 
@@ -386,7 +515,7 @@ candidate@master01:~# exit
 
 
 
-## StorageClass
+## 4. StorageClass
 
 
 
@@ -459,7 +588,7 @@ candidate@master01:~# exit
 
 
 
-## Service
+## 5. Service
 
 
 
@@ -521,7 +650,7 @@ front-end-svc   NodePort   10.102.116.98   <none>        80:31549/TCP   34s
 
 candidate@master01:~# curl 10.102.116.98
 Hello World ^_^
-candidate@master01:~# curl 11.0.1.112:31549
+candidate@master01:~# curl 11.0.1.102:31549
 Hello World ^_^
 
 # 别忘记，做完后，退回到base节点，这样下一道题才能继续切节点。 
@@ -530,7 +659,7 @@ candidate@master01:~# exit·
 
 
 
-## Pod优先级 PriorityClass
+## 6. Pod优先级 PriorityClass
 
 
 
@@ -640,7 +769,7 @@ candidate@base:~# exit
 
 
 
-## Argo CD
+## 7. Argo CD
 
 
 
@@ -745,7 +874,7 @@ candidate@master01:~# exit
 
 
 
-## PVC
+## 8. PVC
 
 
 
@@ -834,7 +963,7 @@ candidate@master01:~# exit
 
 
 
-## Gateway
+## 9. Gateway
 
 
 
@@ -950,8 +1079,8 @@ spec:
   # -----------------  这段可省略，不写默认和下方一致，pathType: PathPrefix，value: /是默认行为
   - matches:
     - path:
-      type: PathPrefix
-      value: /
+        type: PathPrefix
+        value: /
  # -------------------
     backendRefs:
     - name: web
@@ -973,7 +1102,7 @@ candidate@master01:~# exit
 
 
 
-## NetworkPolicy
+## 10. NetworkPolicy
 
 
 
@@ -1133,7 +1262,7 @@ candidate@master01:~$ exit
 
 
 
-## 定制资源定义 CRD
+## 11. 定制资源定义 CRD
 
 
 
@@ -1226,7 +1355,7 @@ candidate@master01:~$ exit
 
 
 
-## ConfigMap
+## 12. ConfigMap
 
 
 
@@ -1303,7 +1432,7 @@ candidate@master01:~# exit
 
 
 
-## Calico
+## 13. Calico
 
 
 
@@ -1399,7 +1528,7 @@ logout
 
 
 
-## resources  cpu 和memory 
+## 14. resources  cpu 和memory 
 
 
 
@@ -1529,7 +1658,7 @@ logout
 
 
 
-## etcd修复
+## 15. etcd修复
 
 
 
@@ -1717,7 +1846,7 @@ logout
 
 
 
-## cri-dockerd
+## 16. cri-dockerd
 
 
 
