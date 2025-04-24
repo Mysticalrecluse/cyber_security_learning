@@ -74,7 +74,7 @@ ingress 其具备了动态更新并加载新配置的特性。而且ingress本�
 
 
 
-###  Ingress controller 常见的解决方案
+###  Ingress-controller常见的解决方案
 
 对于Ingress controller的软件实现，其实没有特殊的要求，只要能够实现七层的负载均衡功能效果即可
 

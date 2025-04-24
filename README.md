@@ -198,7 +198,7 @@
          <li><a href="云原生/CloudNative-Kubernetes数据存储.md#CAS和OpenEBS" style="font-size:18px; font-weight:500; color:#2b6cb0;">CAS 和 OpenEBS</a>
              <ul><br>
                   <li><a href="云原生/CloudNative-Kubernetes数据存储.md#Kubernetes存储架构" style="font-size:18px; font-weight:500; color:#2b6cb0;">Kubernetes存储架构</a></li><br>
-                  <li><a href="云原生/CloudNative-Kubernetes数据存储.md#CAS(Container-Attached-Storage)" style="font-size:18px; font-weight:500; color:#2b6cb0;">CAS(Container Attached Storage)</a></li><br>
+                  <li><a href="云原生/CloudNative-Kubernetes数据存储.md#CAS-Container-Attached-Storage" style="font-size:18px; font-weight:500; color:#2b6cb0;">CAS(Container Attached Storage)</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernetes数据存储.md#存储制备器" style="font-size:18px; font-weight:500; color:#2b6cb0;">存储制备器</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernetes数据存储.md#OpenEBS" style="font-size:18px; font-weight:500; color:#2b6cb0;">OpenEBS</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernetes数据存储.md#OpenEBS-Jiva-复制卷部署" style="font-size:18px; font-weight:500; color:#2b6cb0;">OpenEBS Jiva 复制卷部署</a></li>
@@ -236,7 +236,7 @@
   <li><a href="云原生/CloudNative-Kubernetes流量调度-Ingress.md#Kubernetes流量调度-Ingress" style="font-size:20px; font-weight:600; color:#2b6cb0;">Kubernetes流量调度-Ingress</a>
       <ul><br>
           <li><a href="云原生/CloudNative-Kubernetes流量调度-Ingress.md#Ingress原理" style="font-size:18px; font-weight:500; color:#2b6cb0;">Ingress原理</a></li><br>
-          <li><a href="云原生/CloudNative-Kubernetes流量调度-Ingress.md#Ingress controller 常见的解决方案" style="font-size:18px; font-weight:500; color:#2b6cb0;">Ingress controller 常见的解决方案</a></li><br>
+          <li><a href="云原生/CloudNative-Kubernetes流量调度-Ingress.md#Ingress-controller常见的解决方案" style="font-size:18px; font-weight:500; color:#2b6cb0;">Ingress controller 常见的解决方案</a></li><br>
           <li><a href="云原生/CloudNative-Kubernetes流量调度-Ingress.md#Ingress-nginx-Controller安装和配置" style="font-size:18px; font-weight:500; color:#2b6cb0;">Ingress-nginx Controller 安装和配置</a></li><br>
           <li><a href="云原生/CloudNative-Kubernetes流量调度-Ingress.md#Ingress命令式实现" style="font-size:18px; font-weight:500; color:#2b6cb0;">Ingress命令式实现</a></li><br>
           <li><a href="云原生/CloudNative-Kubernetes流量调度-Ingress.md#Ingress声明式实现" style="font-size:18px; font-weight:500; color:#2b6cb0;">Ingress声明式实现</a></li><br>
@@ -261,7 +261,7 @@
           <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTPRoute-声明式实现" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTPRoute 声明式实现</a>
               <ul><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTPRoute-官方示例" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTPRoute 官方示例</a></li><br>
-                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTP-redirects-and-rewrites(重定向与重写)" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTP redirects and rewrites ( 重定向与重写 )</a></li><br>
+                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTP-redirects-and-rewrites重定向与重写" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTP redirects and rewrites ( 重定向与重写 )</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTP-traffic-splitting分流" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTP traffic splitting 分流</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#Cross-Namespace-routing不同名称空间之间的路由 " style="font-size:18px; font-weight:500; color:#2b6cb0;">Cross-Namespace routing 不同名称空间之间的路由</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTP请求头部字段修改" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTP 请求头部字段修改</a></li><br>
@@ -272,7 +272,7 @@
           <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#TLSRoute" style="font-size:18px; font-weight:500; color:#2b6cb0;">TLSRoute</a>
               <ul><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#TLSRoute在Downstream端解密和Upstream端加密详解" style="font-size:18px; font-weight:500; color:#2b6cb0;">TLSRoute 在 Downstream 端解密 和 Upstream 端加密详解</a></li><br>
-                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#Wildcard(通配符证书)TLS-Listeners" style="font-size:18px; font-weight:500; color:#2b6cb0;">Wildcard(通配符证书) TLS Listeners</a></li><br>
+                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#Wildcard通配符证书TLS-Listeners" style="font-size:18px; font-weight:500; color:#2b6cb0;">Wildcard(通配符证书) TLS Listeners</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#跨命名空间引用证书" style="font-size:18px; font-weight:500; color:#2b6cb0;">跨命名空间引用证书</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#TargetRefs-and-TLS" style="font-size:18px; font-weight:500; color:#2b6cb0;">TargetRefs and TLS</a></li>
               </ul>
@@ -280,7 +280,7 @@
           <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#实战案例" style="font-size:18px; font-weight:500; color:#2b6cb0;">实战案例</a>
               <ul><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#把HTTP请求重定向为HTTPS" style="font-size:18px; font-weight:500; color:#2b6cb0;">把 HTTP 请求重定向为 HTTPS</a></li><br>
-                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#Gateway双向TLS认证(Mutual-TLS,mTLS)" style="font-size:18px; font-weight:500; color:#2b6cb0;">Gateway 双向 TLS 认证 (Mutual TLS, mTLS) </a></li>
+                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#Gateway双向TLS认证-Mutual-TLS" style="font-size:18px; font-weight:500; color:#2b6cb0;">Gateway 双向 TLS 认证 (Mutual TLS, mTLS) </a></li>
               </ul>
           </li>
       </ul>
