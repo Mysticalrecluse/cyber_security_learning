@@ -2,10 +2,248 @@
 
 
 
-## 🧬 云原生
+## 💻 Computer Science
+
+
+
+## 🧱 Data Structure
+
+
+
+## 🧮 algorithm
+
+
+
+## 🐧 Linux
+
+
+
+## 🌍 Web Server
+
+
 
 <details>
-<summary><a href="云原生/CloudNative-Docker.md#Docker" style="font-size:24px; font-weight:700; text-decoration:none; color:#2b6cb0;">☁️ Docker与Containerd</a></summary><br>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🪶 Apache</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🌐 Nginx</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🐱 Tomcat</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+
+
+## ⚖️ Load Balancer
+
+
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🔥 Iptables</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🧭 LVS</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🛡️ Keepalived</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🌀 HAProxy</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+
+
+## 🛢️ Database
+
+
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🐬 MySQL</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">⚡ Redis</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🐘 PostgreSQL</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🌿 MongoDB</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+
+
+## 💾 存储解决方案
+
+
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">📁 NFS</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">📤 Minio</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">📦 OpenEBS</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">📡 Ceph</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+
+
+## 🚨 运维保障
+
+
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">📈 Zabbix</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">📈 Prometheus</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🌌 Skywalking</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">📜 ELK</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+</ul>
+-->
+</details>
+
+
+
+## 🧬 Cloud Native
+
+
+
+<details>
+<summary><a href="云原生/CloudNative-Docker.md#Docker" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🐳 Docker And Containerd</a></summary><br>
 <ul>
   <li><a href="云原生/CloudNative-Docker.md#Docker" style="font-size:20px; font-weight:600; color:#2b6cb0;">Docker</a>
       <ul><br>
@@ -24,17 +262,17 @@
                   <li><a href="云原生/CloudNative-Docker.md#Docker安装" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker安装</a></li><br>
                   <li><a href="云原生/CloudNative-Docker.md#Docker配置优化" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker配置优化</a>
                       <ul><br>
-                          <li><a href="云原生/CloudNative-Docker.md#优化方法1：用空间足够的高速磁盘用来存放docker的相关数据" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法1：用空间足够的高速磁盘用来存放docker的相关数据</a></li><br>
-                          <li><a href="云原生/CloudNative-Docker.md#优化方法2：从自建仓库下载镜像" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法2：从自建仓库下载镜像</a></li><br>
-                          <li><a href="云原生/CloudNative-Docker.md#优化方法3：调整允许最多同时下载docker镜像的数量-使其性能更好" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法3：调整允许最多同时下载docker镜像的数量-使其性能更好</a></li><br>
-                          <li><a href="云原生/CloudNative-Docker.md#优化方法4：对容器中生成的日志进行约束" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法4：对容器中生成的日志进行约束</a></li><br>
-                          <li><a href="云原生/CloudNative-Docker.md#优化方法5：镜像加速-加快镜像下载速度" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法5：镜像加速-加快镜像下载速度</a></li><br>
-                          <li><a href="云原生/CloudNative-Docker.md#扩展：docker远程连接" style="font-size:18px; font-weight:500; color:#2b6cb0;">扩展：docker远程连接</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#优化方法1-用空间足够的高速磁盘用来存放docker的相关数据" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法1：用空间足够的高速磁盘用来存放docker的相关数据</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#优化方法2-从自建仓库下载镜像" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法2：从自建仓库下载镜像</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#优化方法3-调整允许最多同时下载docker镜像的数量-使其性能更好" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法3：调整允许最多同时下载docker镜像的数量-使其性能更好</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#优化方法4-对容器中生成的日志进行约束" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法4：对容器中生成的日志进行约束</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#优化方法5-镜像加速-加快镜像下载速度" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法5：镜像加速-加快镜像下载速度</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#扩展-docker远程连接" style="font-size:18px; font-weight:500; color:#2b6cb0;">扩展：docker远程连接</a></li><br>
                           <li><a href="云原生/CloudNative-Docker.md#远程连接的实现方法1" style="font-size:18px; font-weight:500; color:#2b6cb0;">远程连接的实现方法1</a></li><br>
                           <li><a href="云原生/CloudNative-Docker.md#远程连接的实现方法2-更安全" style="font-size:18px; font-weight:500; color:#2b6cb0;">远程连接的实现方法2-更安全</a></li><br>
-                          <li><a href="云原生/CloudNative-Docker.md#优化方法6：重启docker不影响容器运行" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法6：重启docker不影响容器运行</a></li><br>
-                          <li><a href="云原生/CloudNative-Docker.md#优化方法7：修改默认docker0网络的网段" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法7：修改默认docker0网络的网段</a></li><br>
-                          <li><a href="云原生/CloudNative-Docker.md#优化方法8：添加代理" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法8：添加代理</a></li>
+                          <li><a href="云原生/CloudNative-Docker.md#优化方法6-重启docker不影响容器运行" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法6：重启docker不影响容器运行</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#优化方法7-修改默认docker0网络的网段" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法7：修改默认docker0网络的网段</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#优化方法8-添加代理" style="font-size:18px; font-weight:500; color:#2b6cb0;">优化方法8：添加代理</a></li>
                       </ul>
                   </li>
               </ul>
@@ -82,13 +320,62 @@
               <ul><br>
                   <li><a href="云原生/CloudNative-Docker.md#Docker镜像说明" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker镜像说明</a></li><br>
                   <li><a href="云原生/CloudNative-Docker.md#将现有容器通过docker-commit手动构建镜像" style="font-size:18px; font-weight:500; color:#2b6cb0;">将现有容器通过docker-commit手动构建镜像</a></li><br>
-                  <li><a href="CloudNative-Docker.md#利用DockerFile文件执行dockerbuild自动构建镜像" style="font-size:18px; font-weight:500; color:#2b6cb0;">利用DockerFile文件执行dockerbuild自动构建镜像</a></li>
+                  <li><a href="云原生/CloudNative-Docker.md#利用DockerFile文件执行dockerbuild自动构建镜像" style="font-size:18px; font-weight:500; color:#2b6cb0;">利用DockerFile文件执行dockerbuild自动构建镜像</a></li>
               </ul>
           </li><br>
-          <li><a href="云原生/CloudNative-Docker.md#容器数据管理" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker容器数据管理</a></li><br>
-          <li><a href="云原生/CloudNative-Docker.md#容器网络管理" style="font-size:18px; font-weight:500; color:#2b6cb0;">容器网络管理</a></li><br>
-          <li><a href="云原生/CloudNative-Docker.md#Docker-Compose单机编排" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker-Compose单机编排</a></li><br>
-          <li><a href="云原生/CloudNative-Docker.md#仓库管理" style="font-size:18px; font-weight:500; color:#2b6cb0;">仓库管理</a></li>
+          <li><a href="云原生/CloudNative-Docker.md#容器数据管理" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker容器数据管理</a>
+              <ul><br>
+                  <li><a href="云原生/CloudNative-Docker.md#Docker容器的分层" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker容器的分层</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#容器数据持久保存方式" style="font-size:18px; font-weight:500; color:#2b6cb0;">容器数据持久保存方式</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#tmpfs挂载" style="font-size:18px; font-weight:500; color:#2b6cb0;">tmpfs挂载</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#数据卷data-volume" style="font-size:18px; font-weight:500; color:#2b6cb0;">数据卷data-volume</a></li>
+              </ul>
+          </li><br>
+          <li><a href="云原生/CloudNative-Docker.md#容器网络管理" style="font-size:18px; font-weight:500; color:#2b6cb0;">容器网络管理</a>
+              <ul><br>
+                  <li><a href="云原生/CloudNative-Docker.md#浅谈容器网络" style="font-size:18px; font-weight:500; color:#2b6cb0;">浅谈容器网络</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#容器网络通信" style="font-size:18px; font-weight:500; color:#2b6cb0;">容器网络通信</a>
+                      <ul><br>
+                          <li><a href="云原生/CloudNative-Docker.md#容器间通信" style="font-size:18px; font-weight:500; color:#2b6cb0;">容器间通信</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#修改默认docker0网桥的网络配置" style="font-size:18px; font-weight:500; color:#2b6cb0;">修改默认docker0网桥的网络配置</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#修改默认网络设置使用自定义网桥" style="font-size:18px; font-weight:500; color:#2b6cb0;">修改默认网络设置使用自定义网桥</a></li>
+                      </ul>
+                  </li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#容器名称互联" style="font-size:18px; font-weight:500; color:#2b6cb0;">容器名称互联</a>
+                      <ul><br>
+                          <li><a href="云原生/CloudNative-Docker.md#通过容器名称互联" style="font-size:18px; font-weight:500; color:#2b6cb0;">通过容器名称互联</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#通过自定义容器别名互联" style="font-size:18px; font-weight:500; color:#2b6cb0;">通过自定义容器别名互联</a></li>
+                      </ul>
+                  </li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#Docker网络连接模式" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker 网络连接模式</a>
+                      <ul><br>
+                          <li><a href="云原生/CloudNative-Docker.md#网络模式介绍" style="font-size:18px; font-weight:500; color:#2b6cb0;">网络模式介绍</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#网络模式指定" style="font-size:18px; font-weight:500; color:#2b6cb0;">网络模式指定</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#Bridge网络模式" style="font-size:18px; font-weight:500; color:#2b6cb0;">Bridge网络模式</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#Host模式" style="font-size:18px; font-weight:500; color:#2b6cb0;">Host模式</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#None模式" style="font-size:18px; font-weight:500; color:#2b6cb0;">None模式</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#Container模式" style="font-size:18px; font-weight:500; color:#2b6cb0;">Container模式</a></li><br>
+                          <li><a href="云原生/CloudNative-Docker.md#自定义网络模式" style="font-size:18px; font-weight:500; color:#2b6cb0;">自定义网络模式</a></li>
+                      </ul>
+                  </li>
+              </ul>
+          </li><br>
+          <li><a href="云原生/CloudNative-Docker.md#Docker-Compose单机编排" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker-Compose单机编排</a>
+              <ul><br>
+                  <li><a href="云原生/CloudNative-Docker.md#Docker-Compose介绍" style="font-size:18px; font-weight:500; color:#2b6cb0;">Docker-Compose介绍</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#安装和准备" style="font-size:18px; font-weight:500; color:#2b6cb0;">安装和准备</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#Compose文件" style="font-size:18px; font-weight:500; color:#2b6cb0;">Compose文件</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#docker-compose命令行" style="font-size:18px; font-weight:500; color:#2b6cb0;">docker-compose命令行</a></li>
+              </ul>
+          </li><br>
+          <li><a href="云原生/CloudNative-Docker.md#仓库管理" style="font-size:18px; font-weight:500; color:#2b6cb0;">仓库管理</a>
+              <ul><br>
+                  <li><a href="云原生/CloudNative-Docker.md#分布式仓库Harbor" style="font-size:18px; font-weight:500; color:#2b6cb0;">分布式仓库Harbor</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#使用单主机Harbor" style="font-size:18px; font-weight:500; color:#2b6cb0;">使用单主机Harbor</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#Compose文件" style="font-size:18px; font-weight:500; color:#2b6cb0;">Compose文件</a></li><br>
+                  <li><a href="云原生/CloudNative-Docker.md#实现Harbor高可用" style="font-size:18px; font-weight:500; color:#2b6cb0;">实现Harbor高可用</a></li>
+              </ul>
+          </li>
       </ul>
   </li><br>
   <li><a href="云原生/CloudNative-Docker.md#Containerd" style="font-size:20px; font-weight:600; color:#2b6cb0;">Containerd</a>
@@ -100,7 +387,23 @@
 </details>
 
 <details>
-<summary><a href="云原生/CloudNative-简介.md#cloudnative" style="font-size:24px; font-weight:700; text-decoration:none; color:#2b6cb0;">☁️ CloudNative</a></summary><br>
+<summary><a href="云原生/CloudNative-CICD.md#cloudnative" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🔄 CICD</a></summary><br>
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+    </ul>
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-Microservices.md#微服务" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🧩 Microservices</a></summary><br>
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+    </ul>
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-简介.md#cloudnative" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">☁️ CloudNative</a></summary><br>
 <ul>
   <li><a href="云原生/CloudNative-简介#什么是云原生-cloud-native" style="font-size:20px; font-weight:600; color:#2b6cb0;"> 什么是云原生(Cloud Native)?</a></li><br>
   <li><a href="云原生/CloudNative-简介.md#云原生的核心思想" style="font-size:20px; font-weight:600; color:#2b6cb0;"> 云原生的核心思想</a></li><br>
@@ -113,7 +416,7 @@
 </details>
 
 <details>
-<summary><a href="云原生/CloudNative-Kubernetes概述.md#kubernetes" style="font-size:24px; font-weight:700; text-decoration:none; color:#2b6cb0;">⛵ Kubernetes</a></summary><br>
+<summary><a href="云原生/CloudNative-Kubernetes概述.md#kubernetes" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">☸️ Kubernetes</a></summary><br>
 <ul>
   <li><a href="云原生/CloudNative-Kubernetes概述.md#kubernets逻辑架构" style="font-size:20px; font-weight:600; color:#2b6cb0;"> Kubernets逻辑架构</a></li><br>
   <li><a href="云原生/CloudNative-Kubernetes概述.md#kubernetes组件" style="font-size:20px; font-weight:600; color:#2b6cb0;"> Kubernetes组件</a></li><br>
@@ -608,13 +911,13 @@
   </li><br>
   <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#实际生产案例—业务迁移" style="font-size:20px; font-weight:600; color:#2b6cb0;">实际生产案例—业务迁移</a>
       <ul><br>
-          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之一：业务规划及镜像分层构建" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之一：业务规划及镜像分层构建</a></li><br>
-          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之二：Nginx+Tomcat+NFS实现动静分离" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之二：Nginx+Tomcat+NFS实现动静分离</a></li><br>
-          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之三：PV与PVC及zookeeper" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之三：PV与PVC及zookeeper</a></li><br>
-          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之四：Redis-Cluster—StatefulSet" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之四：Redis-Cluster—StatefulSet</a></li><br>
-          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之五：MySQL一主多从" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之五：MySQL一主多从</a></li><br>
-          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之六：Java应用-Jenkins" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之六：Java应用-Jenkins</a></li><br>
-          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之七：dubbo微服务" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之七：dubbo微服务</a></li>
+          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之一业务规划及镜像分层构建" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之一：业务规划及镜像分层构建</a></li><br>
+          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之二Nginx+Tomcat+NFS实现动静分离" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之二：Nginx+Tomcat+NFS实现动静分离</a></li><br>
+          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之三PV与PVC及zookeeper" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之三：PV与PVC及zookeeper</a></li><br>
+          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之四Redis-Cluster—StatefulSet" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之四：Redis-Cluster—StatefulSet</a></li><br>
+          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之五MySQL一主多从" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之五：MySQL一主多从</a></li><br>
+          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之六Java应用-Jenkins" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之六：Java应用-Jenkins</a></li><br>
+          <li><a href="云原生/CloudNative-实际生产案例-业务迁移.md#业务容器化案例之七dubbo微服务" style="font-size:18px; font-weight:500; color:#2b6cb0;">业务容器化案例之七：dubbo微服务</a></li>
       </ul>
   </li><br>
   <li><a href="云原生/CloudNative-velero架构及备份流程.md#velero架构及备份流程" style="font-size:20px; font-weight:600; color:#2b6cb0;">velero架构及备份流程</a>
@@ -641,5 +944,51 @@
 
 
 
+## 🛡️ CyberSecurity
 
+
+
+## 💻 Programming
+
+
+
+<details>
+<summary><a href="云原生/CloudNative-CICD.md#cloudnative" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🧪	Shell</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;"></a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;"></a></li><br>
+    </ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-CICD.md#cloudnative" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🔧	C</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;"></a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;"></a></li><br>
+    </ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-CICD.md#cloudnative" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🐍 Python</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;"></a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;"></a></li><br>
+    </ul>
+-->
+</details>
+
+<details>
+<summary><a href="云原生/CloudNative-CICD.md#cloudnative" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🐹	Golang</a></summary><br>
+<!--
+<ul>
+  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;"></a></li><br>
+  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;"></a></li><br>
+    </ul>
+-->
+</details>
 

@@ -2,7 +2,7 @@
 
 
 
-## 私有软件仓库 GitLab
+## 私有软件仓库GitLab
 
 ![image-20250206113905921](../markdown_img/image-20250206113905921.png)
 
@@ -1492,7 +1492,7 @@ irb(main):005:0> quit
 
 
 
-## DevOps 之 CICD 服务器 Jenkins
+## DevOps之CICD服务器Jenkins
 
 
 

@@ -1,6 +1,6 @@
 ## 实际生产案例—业务迁移
 
-### 业务容器化案例之一：业务规划及镜像分层构建
+### 业务容器化案例之一业务规划及镜像分层构建
 
 ![image-20250419122548232](../markdown_img/image-20250419122548232.png)
 
@@ -83,7 +83,7 @@ nerdctl push harbor.mysticalrecluse.com/baseimages/mystical-centos-base:7.9.2009
 
 
 
-### 业务容器化案例之二：Nginx+Tomcat+NFS实现动静分离
+### 业务容器化案例之二Nginx+Tomcat+NFS实现动静分离
 
 ![image-20250419160043736](../markdown_img/image-20250419160043736.png)
 
@@ -688,7 +688,7 @@ nginx web1 n56 v1
 
 
 
-### 业务容器化案例之三：PV与PVC及zookeeper
+### 业务容器化案例之三PV与PVC及zookeeper
 
 zookeeper集群的每个实例的存储是独立的，因此建议使用openebs的host-path
 
@@ -1118,7 +1118,7 @@ Mode: follower
 
 
 
-### 业务容器化案例之四：Redis-Cluster—StatefulSet
+### 业务容器化案例之四Redis-Cluster—StatefulSet
 
 ```bash
 # 构建redis镜像
@@ -1369,7 +1369,7 @@ OK
 
 
 
-### 业务容器化案例之五：MySQL一主多从
+### 业务容器化案例之五MySQL一主多从
 
 ![image-20250421171035342](../markdown_img/image-20250421171035342.png)
 
@@ -1661,7 +1661,7 @@ Bye
 
 
 
-### 业务容器化案例之六：Java应用-Jenkins
+### 业务容器化案例之六Java应用-Jenkins
 
 
 
@@ -1938,7 +1938,7 @@ magedu-jenkins-deployment-666d865657-f5ctn   1/1     Running   0          14m
 
 
 
-### 业务容器化案例之七：dubbo微服务
+### 业务容器化案例之七dubbo微服务
 
 ![image-20250422103507993](../markdown_img/image-20250422103507993.png)
 
