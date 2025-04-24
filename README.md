@@ -7,7 +7,7 @@
 <details>
 <summary><a href="云原生/CloudNative-简介.md#cloudnative" style="font-size:24px; font-weight:700; text-decoration:none; color:#2b6cb0;">☁️ CloudNative</a></summary><br>
 <ul>
-  <li><a href="云原生/CloudNative-简介#什么是云原生-cloud-native" style="font-size:20px; font-weight:600; color:#2b6cb0;"> 什么是云原生（Cloud Native）?</a></li><br>
+  <li><a href="云原生/CloudNative-简介#什么是云原生-cloud-native" style="font-size:20px; font-weight:600; color:#2b6cb0;"> 什么是云原生(Cloud Native)?</a></li><br>
   <li><a href="云原生/CloudNative-简介.md#云原生的核心思想" style="font-size:20px; font-weight:600; color:#2b6cb0;"> 云原生的核心思想</a></li><br>
   <li><a href="云原生/CloudNative-简介.md#云原生的四大技术基石" style="font-size:20px; font-weight:600; color:#2b6cb0;"> 云原生的四大技术基石</a></li><br>
   <li><a href="云原生/CloudNative-简介.md#云原生的关键技术栈" style="font-size:20px; font-weight:600; color:#2b6cb0;"> 云原生的关键技术栈</a></li><br>
@@ -198,7 +198,7 @@
          <li><a href="云原生/CloudNative-Kubernetes数据存储.md#CAS和OpenEBS" style="font-size:18px; font-weight:500; color:#2b6cb0;">CAS 和 OpenEBS</a>
              <ul><br>
                   <li><a href="云原生/CloudNative-Kubernetes数据存储.md#Kubernetes存储架构" style="font-size:18px; font-weight:500; color:#2b6cb0;">Kubernetes存储架构</a></li><br>
-                  <li><a href="云原生/CloudNative-Kubernetes数据存储.md#CAS(Container Attached Storage)" style="font-size:18px; font-weight:500; color:#2b6cb0;">CAS(Container Attached Storage)</a></li><br>
+                  <li><a href="云原生/CloudNative-Kubernetes数据存储.md#CAS(Container-Attached-Storage)" style="font-size:18px; font-weight:500; color:#2b6cb0;">CAS(Container Attached Storage)</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernetes数据存储.md#存储制备器" style="font-size:18px; font-weight:500; color:#2b6cb0;">存储制备器</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernetes数据存储.md#OpenEBS" style="font-size:18px; font-weight:500; color:#2b6cb0;">OpenEBS</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernetes数据存储.md#OpenEBS-Jiva-复制卷部署" style="font-size:18px; font-weight:500; color:#2b6cb0;">OpenEBS Jiva 复制卷部署</a></li>
@@ -261,7 +261,7 @@
           <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTPRoute-声明式实现" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTPRoute 声明式实现</a>
               <ul><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTPRoute-官方示例" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTPRoute 官方示例</a></li><br>
-                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTP-redirects-and-rewrites( 重定向与重写 )" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTP redirects and rewrites ( 重定向与重写 )</a></li><br>
+                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTP-redirects-and-rewrites(重定向与重写)" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTP redirects and rewrites ( 重定向与重写 )</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTP-traffic-splitting分流" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTP traffic splitting 分流</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#Cross-Namespace-routing不同名称空间之间的路由 " style="font-size:18px; font-weight:500; color:#2b6cb0;">Cross-Namespace routing 不同名称空间之间的路由</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#HTTP请求头部字段修改" style="font-size:18px; font-weight:500; color:#2b6cb0;">HTTP 请求头部字段修改</a></li><br>
@@ -272,7 +272,7 @@
           <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#TLSRoute" style="font-size:18px; font-weight:500; color:#2b6cb0;">TLSRoute</a>
               <ul><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#TLSRoute在Downstream端解密和Upstream端加密详解" style="font-size:18px; font-weight:500; color:#2b6cb0;">TLSRoute 在 Downstream 端解密 和 Upstream 端加密详解</a></li><br>
-                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#Wildcard（通配符证书）TLS-Listeners" style="font-size:18px; font-weight:500; color:#2b6cb0;">Wildcard（通配符证书） TLS Listeners</a></li><br>
+                  <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#Wildcard(通配符证书)TLS-Listeners" style="font-size:18px; font-weight:500; color:#2b6cb0;">Wildcard(通配符证书) TLS Listeners</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#跨命名空间引用证书" style="font-size:18px; font-weight:500; color:#2b6cb0;">跨命名空间引用证书</a></li><br>
                   <li><a href="云原生/CloudNative-Kubernete-GatewayAPI.md#TargetRefs-and-TLS" style="font-size:18px; font-weight:500; color:#2b6cb0;">TargetRefs and TLS</a></li>
               </ul>

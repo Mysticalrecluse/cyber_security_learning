@@ -2332,7 +2332,7 @@ CSI 插件由 控制平面的 Controller（如 Provisioner 和 Attacher） 和 �
 
 
 
-#### CAS(Container Attached Storage)
+#### CAS(Container-Attached-Storage)
 
 ##### CAS 简介
 

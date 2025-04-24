@@ -241,7 +241,7 @@ spec:
 
 
 
-#### HTTP-redirects-and-rewrites ( 重定向与重写 )
+#### HTTP-redirects-and-rewrites(重定向与重写)
 
 ##### HTTP redirects Http -> Https
 
@@ -1425,7 +1425,7 @@ Gateway支持双向认证
 
 
 
-#### Wildcard（通配符证书）TLS-Listeners
+#### Wildcard(通配符证书)TLS-Listeners
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
