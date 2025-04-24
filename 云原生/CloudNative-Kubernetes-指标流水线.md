@@ -37,7 +37,7 @@ Kubernetes设计用于暴露其它指标的API，是**Custom  Metrics API** 和 
 
 
 
-#### Metrics Server
+#### Metrics-Server
 
 **Metrics Server介绍**
 
@@ -118,7 +118,7 @@ node3     27m          1%     715Mi           39%
 
 
 
-#### 核心指标流水线（Core Metrics Pipeline）定义
+#### 核心指标流水线Core-Metrics-Pipeline定义
 
 **核心指标流水线（Core Metrics Pipeline）** 是 Kubernetes 中一条由 kubelet 提供指标，Metrics Server 聚合处理的基础监控数据链路，专门用于支持 HPA（Horizontal Pod Autoscaler）、VPA（部分场景）、`kubectl top` 命令等核心功能。
 
@@ -161,7 +161,7 @@ node3     27m          1%     715Mi           39%
 
 
 
-#### 自定义指标流水线（Custom Metrics Pipeline）
+#### 自定义指标流水线Custom-Metrics-Pipeline
 
 **自定义指标流水线定义**
 
@@ -260,7 +260,7 @@ kube_persistentvolumeclaim_status_phase{namespace="default",persistentvolumeclai
 
 
 
-### Kubernetes **API Aggregation Layer** 工作机制
+### Kubernetes-API-Aggregation-Layer工作机制
 
 API Aggregation Layer（简称 **AA Layer**）是 Kubernetes **扩展 API 的机制之一**，允许你将外部的、非核心的 API Server 集成到主 Kubernetes API Server 中，表现得就像是原生的一部分。
 
@@ -278,7 +278,7 @@ Client → kube-apiserver → Aggregation Layer → 外部扩展 API Server（�
 
 
 
-#### 场景举例（以 Metrics Server 为例）
+#### 场景举例-以Metrics-Server为例
 
 当你运行如下命令：
 
@@ -307,7 +307,7 @@ kubectl top pod
 
 
 
-#### Prometheus Adapter
+#### Prometheus-Adapter
 
 在 Kubernetes 中，**Prometheus Adapter** 就是一个**扩展 API Server**，它通过 **[API Aggregation Layer（聚合层）]** 与主 API Server 进行集成，从而支持 **自定义指标（Custom Metrics）** 和 **外部指标（External Metrics）** 的查询。
 
@@ -393,9 +393,9 @@ Kubernetes 的聚合层机制允许你通过扩展 API Server 提供额外的 AP
 
 
 
-### Prometheus 部署至 Kubernetes
+### Prometheus部署至Kubernetes
 
-#### Prometheus 为什么能服务发现 Kubernetes 的 apiServer
+#### Prometheus为什么能服务发现Kubernetes的apiServer
 
 Prometheus 通过 `kubernetes_sd_configs` 实现对 Kubernetes 集群的自动服务发现，它是靠 **Kubernetes 官方 Go Client（client-go）** 连接 API Server 的。
 
@@ -480,7 +480,7 @@ Prometheus 是通过 kubernetes_sd_configs + Kubernetes 的 service account toke
 
 
 
-#### Prometheus 在 Kubernetes 中抓取目标的完整流程
+#### Prometheus在Kubernetes中抓取目标的完整流程
 
 **1️⃣ 使用 `client-go` 自动发现 Kubernetes API Server**
 
@@ -758,9 +758,9 @@ Error scraping target: non-compliant scrape target sending blank Content-Type an
 
 
 
-### Prometheus Adapter
+### Prometheus-Adapter
 
-#### manifest方式部署Prometheus Adapter
+#### manifest方式部署Prometheus-Adapter
 
 ```http
 https://github.com/iKubernetes/k8s-prom/tree/master/prometheus-adpater
@@ -834,7 +834,7 @@ http_requests_per_second 0.2
 
 
 
-#### Helm方式部署Prometheus Adapter
+#### Helm方式部署Prometheus-Adapter
 
 ```bash
 # helm 部署Prometheus-adapter
@@ -895,7 +895,7 @@ In a few minutes you should be able to list metrics using the following command(
 
 
 
-#### Prometheus Adapter 与自定义指标的使用逻辑
+#### Prometheus-Adapter与自定义指标的使用逻辑
 
 ✅ **Prometheus Adapter 的基本作用：**
 
@@ -945,7 +945,7 @@ rules:
 
 
 
-#### Prometheus Adapter 的 `rules` 配置详解
+#### Prometheus-Adapter的rules配置详解
 
 配置路径通常在 Prometheus Adapter 的 Helm chart 中：
 
@@ -1134,7 +1134,7 @@ metricsQuery: 'sum(rate(http_requests_total{job="my-app"}[2m])) by (pod, namespa
 
 
 
-#### Prometheus Adapter 的配置文件中 rules 规则段中Go 模板语法 的占位符详解
+#### Prometheus-Adapter的配置文件中rules规则段中Go模板语法占位符详解
 
 Prometheus Adapter 的配置文件中 `rules` 段使用了一些 **Go 模板语法的占位符**，这些占位符用于将 Prometheus 中的指标信息自动 **填充并转化** 为 Kubernetes API 所需的格式。这些占位符是在 `metricsQuery` 生成 PromQL 查询语句时动态替换的。
 
@@ -1271,7 +1271,7 @@ sum(container_memory_usage_bytes{namespace!="", pod!="", container!="POD"}) by (
 
 
 
-#### 对于 Prometheus adapter 转换后的 Kubernetes API 类型的指标的请求方式
+#### 对于Prometheus-adapter转换后的Kubernetes-API类型的指标的请求方式
 
 ```bash
 kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/<namespace>/<resource>/<resource-name>/<metric-name>"
@@ -1420,7 +1420,7 @@ HPA 默认依赖 metrics.k8s.io API 来获取 Pod 的资源使用情况（如 CP
 
 
 
-#### kube-controller-manager 的启动参数调优示例
+#### kube-controller-manager的启动参数调优示例
 
 
 
@@ -1451,7 +1451,7 @@ kubectl autoscale deployment myapp --cpu-percent=70 --min=2 --max=6
 
 
 
-#### 查看 HPA
+#### 查看HPA
 
 ✅ 查看所有命名空间下的 HPA
 
@@ -1483,7 +1483,7 @@ kubectl describe hpa myapp
 
 
 
-#### HPA 的清单结构和字段说明
+#### HPA的清单结构和字段说明
 
 以下是一个**生产级别** HPA 完整示例（基于 CPU 利用率）：
 
@@ -1620,17 +1620,6 @@ behavior:
 
 
 
-#### 正确设置HPA，防止抖动的最佳实践
-
-| 场景               | 最佳实践                                             |
-| ------------------ | ---------------------------------------------------- |
-| 想稳定运行，少缩容 | **提高 `minReplicas`**（最直接、最有效的防抖动方式） |
-| 不能浪费资源       | 精细设置 `scaleDown` 行为策略                        |
-| 应对突发高峰       | 设定合理 `scaleUp` 策略                              |
-| 指标波动剧烈       | 使用 PromQL 平滑函数 `avg_over_time()`               |
-
-
-
 ### VPA
 
 **VPA（垂直自动扩缩容器）** 是 Kubernetes 中一个 **自动为 Pod 分配适当 CPU 和内存资源（requests/limits）** 的组件。
@@ -1763,7 +1752,7 @@ spec:
 
 
 
-#### Java 应用自动调参 + VPA 配置建议表
+#### Java应用自动调参与VPA配置建议表
 
 **基础知识理解**
 

@@ -1,4 +1,4 @@
-## 实际生产案例1 — 业务迁移
+## 实际生产案例—业务迁移
 
 ### 业务容器化案例之一：业务规划及镜像分层构建
 
@@ -688,7 +688,7 @@ nginx web1 n56 v1
 
 
 
-### 业务容器化案例之三：PV/PVC及zookeeper
+### 业务容器化案例之三：PV与PVC及zookeeper
 
 zookeeper集群的每个实例的存储是独立的，因此建议使用openebs的host-path
 
@@ -1118,7 +1118,7 @@ Mode: follower
 
 
 
-### 业务容器化案例之四：Redis Cluster — StatefulSet
+### 业务容器化案例之四：Redis-Cluster—StatefulSet
 
 ```bash
 # 构建redis镜像

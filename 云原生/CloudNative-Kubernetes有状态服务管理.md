@@ -10,7 +10,7 @@
 
 ### StatefulSet
 
-#### StatefulSet 机制
+#### StatefulSet机制
 
 ```http
 https://kubernetes.io/zh-cn/docs/tutorials/stateful-application/
@@ -525,7 +525,7 @@ web-2                       1/1     Running              0               115s
 
 
 
-#### 案例：StatefulSet 简单案例
+#### 案例-StatefulSet简单案例
 
 ##### 准备NFS服务和动态置备
 
@@ -751,7 +751,7 @@ myapp-0
 
 
 
-#### 案例：MySQL 主从复制集群
+#### 案例-MySQL主从复制集群
 
 注意: MySQL5.7.39失败,其它版本MySQL5.7.36，44 都成功
 
@@ -1081,9 +1081,9 @@ mysql> show processlist;
 
 
 
-### CRD 定制资源
+### CRD定制资源
 
-#### CRD 说明
+#### CRD说明
 
 为了在k8s上能够正常的运行所需的服务，需要遵循以下方式来创建相关资源：
 
@@ -1149,7 +1149,7 @@ CRD 功能是在 Kubernetes 1.7 版本被引入的，用户可以根据自己的
 
 
 
-#### CRD 配置解析
+#### CRD配置解析
 
 ```yaml
 apiVersion: apiextensions.k8s.io/v1          # API群组和版本
@@ -1184,7 +1184,7 @@ spec:
 
 
 
-#### CRD 案例
+#### CRD案例
 
 范例: 定义CRD资源
 

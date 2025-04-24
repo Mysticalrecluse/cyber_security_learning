@@ -14,7 +14,7 @@
 
 
 
-### Helm 说明和部署
+### Helm说明和部署
 
 #### Helm 说明
 
@@ -265,7 +265,7 @@ https://artifacthub.io/
 
 
 
-### Helm 客户端安装
+### Helm客户端安装
 
 #### 官方说明
 
@@ -307,7 +307,7 @@ version.BuildInfo{Version:"v3.17.2", GitCommit:"cc0bbbd6d6276b83880042c1ecb34087
 
 
 
-### Helm 命令用法
+### Helm命令用法
 
 ```http
 https://v3.helm.sh/zh/docs/helm/
@@ -536,9 +536,9 @@ mysql
 
 
 
-### Helm 案例
+### Helm案例
 
-#### 案例：部署 MySQL
+#### 案例-部署MySQL
 
 ```http
 https://artifacthub.io/packages/helm/bitnami/mysql
@@ -846,7 +846,7 @@ mysql-secondary-1   1/1     Running   0          3m30s
 
 
 
-#### 案例：部署 WordPress
+#### 案例-部署WordPress
 
 ```http
 https://artifacthub.io/packages/helm/bitnami/wordpress
@@ -889,7 +889,7 @@ https://artifacthub.io/packages/helm/bitnami/wordpress
 
 
 
-#### 案例：部署 Harbor
+#### 案例-部署Harbor
 
 ```http
 https://artifacthub.io/packages/helm/harbor/harbor
@@ -1036,7 +1036,7 @@ myharbor-trivy-0                       1/1     Running   0             15m
 
 ### 自定义 Chart
 
-#### Chart 目录结构
+#### Chart目录结构
 
 ```http
 https://docs.helm.sh/docs/chart_template_guide/getting_started/
@@ -1806,7 +1806,7 @@ data:
 
 
 
-#### 案例：自定义 Chart 实现部署升级回滚版本管理
+#### 案例-自定义Chart实现部署升级回滚版本管理
 
 ##### 固定配置的 Chart
 

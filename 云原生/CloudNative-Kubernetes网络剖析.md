@@ -429,7 +429,7 @@ UDP 8472
 
 ![image-20250328133758938](../markdown_img/image-20250328133758938.png)
 
-#### Flannel VXLAN 通信过程总结
+#### Flannel-VXLAN通信过程总结
 
 - Container-1（10.244.1.2）发送数据给 Container-2（10.244.2.2）
 
@@ -531,7 +531,7 @@ UDP 8472
 
 
 
-### Kubernetes 网络模型 与 CNI 网络插件
+### Kubernetes网络模型与CNI网络插件
 
 在上述的讲解中，这些例子有一个共性，那就是用户的容器都连接在 docker0 网桥上。而网络插件则在宿主机上创建了一个特殊的设备（UDP 模式创建的是 TUN 设备，VXLAN 模式创建的则是 VTEP 设备），docker0 与这个设备之间，通过 IP 转发（路由表）进行协作
 
@@ -592,7 +592,7 @@ Kubernetes 之所以要设置这样一个与 docker0 网桥功能几乎一样的
 
 
 
-##### CNI 插件的部署方式
+##### CNI插件的部署方式
 
 那么，这个网络栈的配置工作又是如何完成的呢？
 
@@ -697,7 +697,7 @@ $ cat /etc/cni/net.d/10-flannel.conflist
 
 
 
-##### CNI 插件的工作原理
+##### CNI插件的工作原理
 
 当 kubelet 组件需要创建 Pod 的时候，它第一个创建的一定是 Infra 容器。所以在这一步，cri-dockerd 就会先调用 Docker API 创建并启动 Infra 容器，紧接着执行一个叫作 SetUpPod 的方法。这个方法的作用就是：为 CNI 插件准备参数，然后调用 CNI 插件为 Infra 容器配置网络。
 
@@ -921,9 +921,9 @@ $ ip addr add 10.244.0.1/24 dev cni0
 
 
 
-### 解读 Kubernetes 三层网络方案
+### 解读Kubernetes三层网络方案
 
-#### Flannel 的 host-gw 模式
+#### Flannel的host-gw模式
 
 ![image-20250327140420571](../markdown_img/image-20250327140420571.png)
 
@@ -1226,7 +1226,7 @@ Tip:正常情况下，节点的网络配置在节点的网络接口上，Service
 
 
 
-#### Flannel 支持的“后端”
+#### Flannel支持的后端
 
 **Flanneld**
 
@@ -1313,7 +1313,7 @@ Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
 
 
 
-### Calico 网络插件
+### Calico网络插件
 
 #### calico简介
 
@@ -1330,7 +1330,7 @@ Destination     Gateway         Genmask         Flags Metric Ref    Use Iface
 
 
 
-#### Calico 系统组件
+#### Calico系统组件
 
 ![image-20250328155236970](../markdown_img/image-20250328155236970.png)
 
@@ -1626,7 +1626,7 @@ Calico 的 Felix 是通过 **`DatastoreType`** 参数来决定是从哪里获取
 
 
 
-#### 隧道模型 (Overlay)
+#### 隧道模型Overlay
 
 - **IPIP（IP - IN - IP）**
 - **VXLAN**
@@ -1656,7 +1656,7 @@ Calico 的 Felix 是通过 **`DatastoreType`** 参数来决定是从哪里获取
 
 
 
-#### 路由模型 (Underlay)
+#### 路由模型Underlay
 
 **基于BGP学习生成路由表**
 
@@ -1887,7 +1887,7 @@ env:
 
 
 
-#### ippool crd
+#### ippool-crd
 
 ippool的作用
 
@@ -2064,7 +2064,7 @@ spec:
 
 
 
-#### BGP Peering
+#### BGP-Peering
 
 - Calico在各节点间基于BGP传播路由信息
   - BGP是路由器交换路由信息的标准路由协议
@@ -2087,7 +2087,7 @@ spec:
 
 ![image-20250328211351849](../markdown_img/image-20250328211351849.png)
 
-#### 配置Route Reflector模式
+#### 配置Route-Reflector模式
 
 - 在100个节点规模以上的Calico集群环境中，为提升iBGP的效率，通常应该建立Router Reflector
 - 在大规模 Kubernetes 集群中，**建议使用多个 Worker 节点作为 Route Reflector（RR）**，以提高 **BGP 路由的扩展性、稳定性和性能**。
@@ -2157,7 +2157,7 @@ https://github.com/iKubernetes/learning-k8s/tree/master/ProjectCalico
 
 
 
-### Cilium 网络插件
+### Cilium网络插件
 
 Flannel 和 Calico 是利用内核中的 Netfilter 从而实现网络路由实现，而 Cilium 是使用ebpf实现的
 
@@ -2201,9 +2201,9 @@ eBPF 全称是：**extended Berkeley Packet Filter**
 
 
 
-### NetWork Policy
+### NetWork-Policy
 
-#### NetWork Policy **简介**
+#### NetWork-Policy简介
 
 - 标准的 API 资源类型
 - 由网络插件负责转换为节点上的iptables Filter规则，已定义 Pod 间的通信许可
@@ -2214,7 +2214,7 @@ eBPF 全称是：**extended Berkeley Packet Filter**
 
 
 
-#### Network Policy 的功能
+#### Network-Policy的功能
 
 - 针对一组Pod，定义其同对端实体通信时，在入向（Ingress）或/和 出向（Egress）流量上的控制规则
 - 描述对端实体的方法有如下几种
@@ -2225,7 +2225,7 @@ eBPF 全称是：**extended Berkeley Packet Filter**
 
 
 
-#### Network Policy 的生效机制
+#### Network-Policy的生效机制
 
 - 默认情况下，一组Pod上的出向和入向流量均被允许
 - 同一方向上，适用于一组Pod的多个规则的生效遵循加法机制
@@ -2236,7 +2236,7 @@ eBPF 全称是：**extended Berkeley Packet Filter**
 
 
 
-#### Network Policy 资源规范
+#### Network-Policy资源规范
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -2267,7 +2267,7 @@ spec:
 
 
 
-#### Network Policy 资源示例
+#### Network-Policy资源示例
 
 ```yaml
 ---

@@ -13,7 +13,7 @@
 
 
 
-### Velero 与 etcd 快照备份的区别
+### Velero与etcd快照备份的区别
 
 - etcd快照是全局完成备份（类似于MySQL全量备份），即使需要恢复一个资源对象（类似于只恢复MySQL的一个库），但是也需要做全局恢复到备份的状态（类似于MySQL的全库恢复），即会影响其它namespace中pod运行服务（类似于会影响MySQL其他数据库的数据）
 - Velero可以有针对性的备份，比如按照namespace单独备份，只备份单独的资源对象等，在恢复的时候可以根据备份只恢复单独的namespace或资源对象，而不影响其它namespace中pod运行服务
@@ -73,7 +73,7 @@ d335ed0e9a7e   minio/minio   "/usr/bin/docker-ent…"   8 seconds ago   Up 6 sec
 
 
 
-#### 部署 Velero
+#### 部署Velero
 
 在部署前，要先查看velero与Kubernetes的对应版本
 
@@ -230,7 +230,7 @@ default   aws        kubernetes-velero-backup   Available   2025-04-22 22:42:52 
 
 
 
-#### 对 default ns 进行备份
+#### 对default-ns进行备份
 
 ```bash
 [root@master-01 velero]#pwd
@@ -387,7 +387,7 @@ done
 
 
 
-### 使用 Velero 实现 **Kubernetes 集群迁移** 的完整实战流程
+### 使用Velero实现Kubernetes集群迁移的完整实战流程
 
 目标：从一个集群（源集群）迁移全部或部分资源到另一个集群（目标集群）
 

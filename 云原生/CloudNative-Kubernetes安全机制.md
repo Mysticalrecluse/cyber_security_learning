@@ -1429,7 +1429,7 @@ node3     Ready    <none>          4d4h   v1.30.8
 
 
 
-#### User Account 综合案例
+#### User-Account综合案例
 
 
 
@@ -1728,7 +1728,7 @@ node3     Ready    <none>          4d5h   v1.30.8
 
 
 
-#### Service Account 管理
+#### Service-Account管理
 
 #####  Service Account 基础
 
@@ -2141,7 +2141,7 @@ spec:
 
 
 
-####  RBAC 机制
+####  RBAC机制
 
 
 
@@ -2412,7 +2412,7 @@ kubectl delete pod kube-apiserver-<node-name> -n kube-system
 
 
 
-#### Role 和 RoleBinding 组合实现
+#### Role和RoleBinding组合实现
 
 
 

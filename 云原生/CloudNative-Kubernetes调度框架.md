@@ -92,7 +92,7 @@ spec.containers[].resources.requests.memory
 
 
 
-#### Kubernetes 的 QoS 模型
+#### Kubernetes的QoS模型
 
 在 Kubernetes 中，不同的 requests 和 limits 的设置方式，其实会将这个 Pod 划分到不同的 QoS 级别当中。
 
@@ -254,7 +254,7 @@ spec:
 
 ### Kubernetes默认调度器
 
-#### Kubernetes 的默认调度器（default scheduler）
+#### Kubernetes的默认调度器default-scheduler
 
 在 Kubernetes 项目中，**默认调度器**的主要职责，就是**为一个新创建出来的 Pod，寻找一个最合适的节点（Node）**。
 
@@ -524,7 +524,7 @@ spec:
 
 
 
-#### **Priorities 阶段**
+#### **Priorities阶段**
 
 在 Predicates 阶段完成了节点的“过滤”之后，Priorities 阶段的工作就是为这些节点打分。这里打分的范围是 0-10 分，得分最高的节点就是最后被 Pod 绑定的最佳节点。
 
@@ -643,7 +643,7 @@ spec:
 
 
 
-#### Kubernetes 调度器里的抢占机制
+#### Kubernetes调度器里的抢占机制
 
 抢占发生的原因，一定是一个高优先级的 Pod 调度失败。这一次，我们还是称这个 Pod 为“抢占者”，称被抢占的 Pod 为“牺牲者”（victims）。
 
@@ -695,7 +695,7 @@ spec:
 
 
 
-### Kubernetes GPU管理与Device Plugin机制
+### Kubernetes-GPU管理与Device-Plugin机制
 
 对于云的用户来说，在 GPU 的支持上，他们最基本的诉求其实非常简单：我只要在 Pod 的 YAML 里面，声明某容器需要的 GPU 个数，那么 Kubernetes 为我创建的容器里就应该出现对应的 GPU 设备，以及它对应的驱动目录。
 
@@ -913,9 +913,9 @@ kubectl describe node nodeName
 
 
 
-### Kubernetes 中的 Affinity Secheduling
+### Kubernetes中的Affinity-Secheduling
 
-#### Node Affinity
+#### Node-Affinity
 
 基于 Pod 和 Node 关系的调度策略，称为 Node 亲和度
 
@@ -1034,7 +1034,7 @@ spec:
 
 
 
-#### Pod Affinity 和 Anti Affinity
+#### Pod-Affinity和Anti-Affinity
 
 基于Pod和Pod间关系的调度策略，称为**Pod亲和调度（Affinity）**，以及**Pod反亲和调度（AntiAffinity）**
 
@@ -1191,7 +1191,7 @@ affinity:
 
 
 
-#### Pod Topology Spread Constraint
+#### Pod-Topology-Spread-Constraint
 
 **什么是 Pod Topology Spread Constraints？**
 
@@ -1269,7 +1269,7 @@ spec:
 
 
 
-#### Taints 与 Tolerations
+#### Taints与Tolerations
 
 **什么是 Taints 与 Tolerations？**
 
