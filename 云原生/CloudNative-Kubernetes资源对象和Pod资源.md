@@ -82,7 +82,7 @@ Kubernetes 系统将一切事物都称为资源对象, 相当于面向对象的�
 
 
 
-#### 资源及其在 API 中的组织形式
+#### 资源及其在API中的组织形式
 
 Kubernetes 利用标准的 **RESTful 术语**来描述其 API 概念
 
@@ -248,7 +248,7 @@ Object资源型对象对应的 API 群组可以归为以下两类：
 
   
 
-#### 访问 Kubernetes REST API
+#### 访问Kubernetes-REST-API
 
 ```bash
 # 这个TOKEN在后面学习创建SA的时候会学习如何得到
@@ -511,7 +511,7 @@ apiVersion和kind 描述类型的元数据
 
 
 
-#### metadata 嵌套字段
+#### metadata嵌套字段
 
 metadata 字段用于描述对象的元数据,即属性信息，其内嵌多个用于定义资源的元数据，如 **name** 和  **labels** 等。这些字段可以分为必选字段和可选字段
 
@@ -536,7 +536,7 @@ metadata 字段用于描述对象的元数据,即属性信息，其内嵌多个�
 
 
 
-####  spec 和 status 字段
+####  spec和status字段
 
 定义资源配置清单时，spec 是必须的字段。用于描述对象的目标状态，也就是用户期望对象所表现出来的特征。
 
@@ -1033,7 +1033,7 @@ No resources found in ns-mystical namespace.
 
 
 
-#### 什么是 Pod
+#### 什么是Pod
 
 ```ABAP
 关于Pod最重要的一个事实是：它只是一个逻辑概念
@@ -1624,7 +1624,7 @@ PID   USER     TIME  COMMAND
 
 
 
-#### 删除 Pod
+#### 删除Pod
 
 删除资源对象推荐使用指令式管理命令 `kubectl delete`
 
@@ -3044,7 +3044,7 @@ spec:
 
 
 
-#### Pod 的健康状态监测
+#### Pod的健康状态监测
 
 
 

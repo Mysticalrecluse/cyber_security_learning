@@ -6,7 +6,7 @@
 
 
 
-### Gateway API 介绍
+### Gateway-API介绍
 
 **官方网站**
 
@@ -26,7 +26,7 @@ https://gateway-api.sigs.k8s.io/
 
 
 
-### Gateway API 流量分发流程
+### Gateway-API-流量分发流程
 
 #### A Simple Gateway
 
@@ -140,7 +140,7 @@ spec:
 
 
 
-### Gateway 声明式实现
+### Gateway-声明式实现
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -160,7 +160,7 @@ spec:
 
 
 
-### HTTPRoute 声明式实现
+### HTTPRoute-声明式实现
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -178,7 +178,7 @@ spec:
 
 
 
-#### HTTPRoute 官方示例
+#### HTTPRoute-官方示例
 
 ![image-20250320144558874](D:\git_repository\cyber_security_learning\markdown_img\image-20250320144558874.png)
 
@@ -241,7 +241,7 @@ spec:
 
 
 
-#### HTTP redirects and rewrites ( 重定向与重写 )
+#### HTTP-redirects-and-rewrites ( 重定向与重写 )
 
 ##### HTTP redirects Http -> Https
 
@@ -698,7 +698,7 @@ spec:
 
 
 
-#### HTTP traffic splitting 分流
+#### HTTP-traffic-splitting分流
 
 HTTPRoute 资源允许您指定权重以在不同的后端之间转移流量。这对于在推出、金丝雀变更或紧急情况下分割流量非常有用。
 
@@ -775,7 +775,7 @@ spec:
 
 
 
-#### Cross-Namespace routing 不同名称空间之间的路由 
+#### Cross-Namespace-routing不同名称空间之间的路由 
 
 **Gateway -> Route**：对名称空间没有限制（除非 **`allowedRoutes` 限制**）。
 
@@ -1022,7 +1022,7 @@ spec:
 
 
 
-#### HTTP 请求头部字段修改
+#### HTTP请求头部字段修改
 
 HTTP 标头修改是在传入请求中添加、删除或修改 HTTP 头部字段的过程。
 
@@ -1076,7 +1076,7 @@ Headers can also be removed, by using the `remove` keyword and a list of header 
 
 
 
-#### HTTP 响应头部字段修改
+#### HTTP响应头部字段修改
 
 就像编辑请求标头很有用一样，响应标头也很有用。例如，它允许团队仅为某个后端添加/删除 cookie，这有助于识别之前重定向到该后端的某些用户。
 
@@ -1103,7 +1103,7 @@ Headers can also be removed, by using the `remove` keyword and a list of header 
 
 
 
-### TCP routing
+### TCP-Routing
 
 Gateway API 旨在与多种协议配合使用，而 TCPRoute 就是这样一种路由，它允许管理 TCP 流量。
 
@@ -1265,7 +1265,7 @@ spec:
 
 ### TLSRoute
 
-#### TLSRoute 在 Downstream 端解密 和 Upstream 端加密详解
+#### TLSRoute在Downstream端解密和Upstream端加密详解
 
 ###### Downstream 端解密 (TLS Termination)
 
@@ -1425,7 +1425,7 @@ Gateway支持双向认证
 
 
 
-#### Wildcard（通配符证书） TLS Listeners
+#### Wildcard（通配符证书）TLS-Listeners
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -1584,7 +1584,7 @@ kubectl api-resources
 
 
 
-#### TargetRefs and TLS
+#### TargetRefs-and-TLS
 
 `BackendTLSPolicy` 是 **Kubernetes Gateway API** 中的一种扩展资源，用于“**验证后端 TLS 服务是否可信**”的！
 
@@ -1707,7 +1707,7 @@ validation:
 
 ### 实战案例
 
-#### 把 HTTP 请求重定向为 HTTPS
+#### 把HTTP请求重定向为HTTPS
 
 1️⃣ **用RequestRedirect 这个Filter实现重定向，Gateway 要有 HTTP 和 HTTPS 两个前端Listener**
 
@@ -1777,7 +1777,7 @@ spec:
 
 
 
-#### Gateway 双向 TLS 认证 (Mutual TLS, mTLS) 
+#### Gateway双向TLS认证(Mutual-TLS,mTLS)
 
 **场景**
 

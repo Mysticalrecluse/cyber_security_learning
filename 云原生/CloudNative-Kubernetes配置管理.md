@@ -1859,7 +1859,7 @@ Secret资源在Pod中引用的方式有三种
 
 
 
-#### Generic 案例
+#### Generic案例
 
 generic 主要用于实现用户名和密码的加密保存
 
@@ -2907,7 +2907,7 @@ systemctl restart kubelet
 
 
 
-#### External Secrets Operator (ESO) — Vault
+#### External-Secrets-Operator(ESO)—Vault
 
 
 
@@ -3266,7 +3266,7 @@ total 8
 
 
 
-### 综合案例：使用持久卷部署WordPress和MySQL
+### 综合案例-使用持久卷部署WordPress和MySQL
 
 在kubernetes部署 wordpress，要满足以下要求：
 

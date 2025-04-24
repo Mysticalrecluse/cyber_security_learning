@@ -91,7 +91,7 @@ Kubernetes支持同时部署二个或以上的数量的Ingress Controller
 
 
 
-### Ingress-nginx Controller 安装和配置
+### Ingress-nginx-Controller安装和配置
 
 ![image-20250104103640034](../markdown_img/image-20250104103640034.png)
 
@@ -1639,7 +1639,7 @@ kubernetes pod-test v0.1!! ClientIP: 10.244.3.178, ServerName: deployment-test-5
 
 
 
-### Ingress Nginx 实现蓝绿BlueGreen 和灰度Canary 发布
+### Ingress-Nginx实现蓝绿BlueGreen和灰度Canary发布
 
 
 
@@ -1715,7 +1715,7 @@ Ingress Nginx 的 Annotations支持的Canary规则， Annotations 和 Label 相�
 
 #### 实战案例
 
-##### 范例：初始环境准备新旧两个版本应用
+##### 初始环境准备新旧两个版本应用
 
 ```yaml
 # 准备新旧版本对应的各自独立的两套deployment和service
@@ -1829,7 +1829,7 @@ kubernetes pod-test v0.2!! ClientIP: 10.244.0.0, ServerName: pod-test-v2-54df7d7
 
 
 
-##### 范例：蓝绿发布
+##### 蓝绿发布
 
 ```yaml
 # 创建Ingress，使其对应旧版本应用
@@ -1894,7 +1894,7 @@ kubernetes pod-test v0.2!! ClientIP: 10.244.3.178, ServerName: pod-test-v2-54df7
 
 
 
-##### 范例：基于权重的金丝雀发布
+##### 基于权重的金丝雀发布
 
 ```yaml
 # 清单文件
@@ -1973,7 +1973,7 @@ ingress.networking.k8s.io "pod-test-canary-by-weight" deleted
 
 
 
-##### 范例：基于Cookie实现金丝雀发布
+##### 基于Cookie实现金丝雀发布
 
 ```yaml
 # 清单文件
@@ -2021,7 +2021,7 @@ kubernetes pod-test v0.2!! ClientIP: 10.244.3.178, ServerName: pod-test-v2-54df7
 
 
 
-##### 范例：基于请求Header固定值的金丝雀发布
+##### 基于请求Header固定值的金丝雀发布
 
 ```yaml
 # 清单文件
@@ -2066,9 +2066,7 @@ kubernetes pod-test v0.2!! ClientIP: 10.244.3.178, ServerName: pod-test-v2-54df7
 
 ```
 
-
-
-##### 范例: 基于请求 Header 精确匹配指定值的金丝雀发布
+##### 基于请求Header精确匹配指定值的金丝雀发布
 
 ```yaml
 # 清单
@@ -2113,7 +2111,7 @@ ingress.networking.k8s.io "pod-test-canary-by-header-value" deleted
 
 
 
-##### 范例：基于请求 Header 正则表达式模式匹配的指定值的金丝雀发布
+##### 基于请求Header正则表达式模式匹配的指定值的金丝雀发布
 
 ```yaml
 # 清单文件

@@ -408,7 +408,7 @@ spec:
 
 
 
-#### 补充：Deployment.Name和Service.Name相同时会自动匹配的原理
+#### 补充:Deployment.Name和Service.Name相同时会自动匹配的原理
 
 ```bash
 [root@master1 manifests]#kubectl create deployment pod-test1 --image=registry.cn-beijing.aliyuncs.com/wangxiaochun/pod-test:v0.1 --replicas=3
@@ -437,7 +437,7 @@ pod-test1   192.168.123.238:80,192.168.22.134:80,192.168.253.172:80   26s
 
 
 
-#### ClusterIP Service实现
+#### ClusterIP-Service实现
 
 #####  单端口应用
 
@@ -516,7 +516,7 @@ spec:
 
 
 
-#### NodePort Service实现
+#### NodePort-Service实现
 
 NodePort会在所有节点主机上，向外暴露一个指定或者随机的端口，供集群外部的应用能够访问
 
@@ -625,7 +625,7 @@ myweb-565cb68445-fc6xg   1/1     Running   1 (17m ago)   13h   10.244.3.101   no
 
 
 
-#### LoadBalancer Service实现
+#### LoadBalancer-Service实现
 
 ![image-20241224093229587](../markdown_img/image-20241224093229587.png)
 
@@ -948,7 +948,7 @@ kubernetes pod-test v0.1!! ClientIP: 10.244.0.0, ServerName: myapp-547df679bb-57
 
 
 
-#### ExternalName Service实现
+#### ExternalName-Service实现
 
 Service 不仅可以实现Kubernetes集群内Pod应用之间的相互访问以及从集群外部访问集群中的Pod
 

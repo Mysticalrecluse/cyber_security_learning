@@ -533,7 +533,7 @@ selector:
 
 
 
-### Replica Set
+### Replica-Set
 
 ####  Replica Set 工作机制
 

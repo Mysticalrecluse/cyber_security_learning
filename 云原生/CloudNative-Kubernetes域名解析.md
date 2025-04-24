@@ -259,7 +259,7 @@ options ndots:5
 
 
 
-#### Service 资源对应的DNS资源记录
+#### Service资源对应的DNS资源记录
 
 基于DNS的服务发现，对于每个Service对象，都会具有以下3个类型的DNS资源记录**A/AAAA**，**PTR**和 **SRV**
 
@@ -437,7 +437,7 @@ deployment.apps/coredns restarted
 
 
 
-### Headless Service
+### Headless-Service
 
 #### 无头服务机制
 

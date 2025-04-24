@@ -736,7 +736,7 @@ spec:
 
 ![image-20241228171426884](../markdown_img/image-20241228171426884.png)
 
-#### PV Persistent Volume 定义
+#### PV-Persistent-Volume定义
 
 工作中的存储资源一般都是独立于Pod的，将之称为资源对象Persistent Volume(PV)，是由管理员设置的存储，它是kubernetes集群的一部分，PV 是 Volume 之类的卷插件，**但具有独立于使用 PV 的 Pod  的生命周期**
 
@@ -767,7 +767,7 @@ PV持久卷是用插件的形式来实现的。Kubernetes目前支持一下插�
 
 
 
-#### PVC Persistent Volume Claim定义
+#### PVC-Persistent-Volume-Claim定义
 
 Persistent Volume Claim(PVC) 是一个网络存储服务的**请求**。
 
@@ -1495,7 +1495,7 @@ PVC和PV可以属于某个SC，也可以不属于任何SC,PVC只能够在同一�
 
 
 
-#### storageClass API
+#### storageClass-API
 
 每个 StorageClass 都包含 **provisioner** 、 **parameters** 和 **reclaimPolicy** 字段， 这些字段会在 StorageClass 需要动态制备 PersistentVolume 时会使用到。
 
@@ -1625,7 +1625,7 @@ spec:
 
 
 
-#### Local Volume
+#### Local-Volume
 
 
 
@@ -1835,7 +1835,7 @@ pod/pod-sc-local-demo created
 
 
 
-#### NFS StorageClass
+#### NFS-StorageClass
 
 ##### NFS的存储制备器方案
 
@@ -2223,7 +2223,7 @@ web1
 
 
 
-### CAS 和 OpenEBS
+### CAS和OpenEBS
 
 #### Kubernetes存储架构
 
@@ -2332,7 +2332,7 @@ CSI 插件由 控制平面的 Controller（如 Provisioner 和 Attacher） 和 �
 
 
 
-#### CAS  (Container Attached Storage)
+#### CAS(Container Attached Storage)
 
 ##### CAS 简介
 
@@ -2595,7 +2595,7 @@ spec:
 
 
 
-#### OpenEBS Jiva 复制卷部署
+#### OpenEBS-Jiva-复制卷部署
 
 OpenEBS 管理每个 Kubernetes 节点上可用的存储，并使用该存储为有状态工作负载提供本地或分布式（也称为复制）持久卷。
 

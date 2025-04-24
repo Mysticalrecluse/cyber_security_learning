@@ -30,7 +30,7 @@
 
 
 
-### 基于Kubeadm和 Docker 部署 kubernetes 高可用集群
+### 基于Kubeadm和Docker部署kubernetes高可用集群
 
 
 ![alt text](images/image23.png)
