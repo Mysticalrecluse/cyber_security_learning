@@ -7141,3 +7141,697 @@ source <(nerdctl completion bash)
 [root@worker-01 ~]# /usr/local/bin/nerdctl push harbor.mysticalrecluse.com/libaray/nginx-base:1.22.0
 ```
 
+
+
+
+
+
+
+# 一次构建出X86_64及ARM等多CPU指令容器镜像
+
+
+
+## CPU指令集与不同指令集的使用场景
+
+- 当前CPU的两大架构是CISC（复杂指令集）和RISC（精简指令集），X86是CISC的代表架构，占领了95%以上的桌面计算机和服务器市场。
+- ARM和MIPS都是RISC即精简指令集，尤其ARM在智能手机，可穿戴设备（智能手表，手环，智能眼镜）等移动处理器市场占领主要地位
+- RISC-V和MIPS两大精简指令集架构将会得到广泛使用
+
+
+
+**X86架构**
+
+- 1968年Intel成立，1978年发明X86架构，并且在后来授权给AMD使用
+- 1969年AMD成立，2003年AMD推出64位处理器，并授权给Intel使用
+- X86主要用于企业服务器及个人办公PC市场
+
+
+
+**ARM**
+
+- 成立于1990年，全世界超过95%的智能手机和平板电脑都采用ARM架构
+  - 手机：华为 小米 三星 苹果
+  - Pad：华为 小米 三星 苹果
+  - 机顶盒：各电视机顶盒
+  - 华为泰山服务器—鲲鹏系列ARM系列CPU、阿里倚天710（arm64 v9）
+
+
+
+**RISC-V**
+
+- 1980年加州大学伯克利分校开始研发RISC课题，2010年开始发出RISC-V并开源
+
+
+
+**MIPS**
+
+- MIPS是一种RISC处理器，它最早是在80年代初期由斯坦福（Stanford）大学john L. Hennessy（约翰-亨利斯）教授领导研究小组研制出来的，MIPS是出现最早的商业RISC架构芯片之一，MIPS计算机系统公司创建于1984年，最初的目的是将斯坦福大学MIPS CPU小组的研究成功商业化，商用MIPS CPU增强了内存管理硬件，并于1985年末作为R2000面世，其后又相继推出了R3000、R4000、R10000等多款处理器
+
+
+
+## 安装Docker环境
+
+```bash
+[root@minio ~]#wget https://www.mysticalrecluse.com/script/Shell/install_docker_offline.sh
+```
+
+
+
+## 安装CPU指令集模拟平台
+
+- qemu-user-static：是一个可以在当前操作系统来运行其他架构的一个仿真器，可以通过X86的机器编译出其他不同架构的docker镜像
+- binfmt-support：解析不同系统的二进制文件给内核执行，再将执行结果返回给用户空间的进程
+
+```bash
+[root@minio ~]#apt install -y qemu-user-static binfmt-support
+```
+
+![image-20250429233017738](../markdown_img/image-20250429233017738.png)
+
+
+
+## 配置多平台CPU指令集模拟器
+
+```bash
+# 注册 QEMU 的 binfmt 支持（如未注册）
+[root@minio ~]# docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+# 这些二进制就是用来模拟不同平台的环境的
+[root@minio ~]#ls /usr/bin/qemu*
+/usr/bin/qemu-aarch64_be-static    /usr/bin/qemu-mips-static
+/usr/bin/qemu-aarch64-static       /usr/bin/qemu-nios2-static
+/usr/bin/qemu-alpha-static         /usr/bin/qemu-or1k-static
+/usr/bin/qemu-armeb-static         /usr/bin/qemu-ppc64le-static
+/usr/bin/qemu-arm-static           /usr/bin/qemu-ppc64-static
+/usr/bin/qemu-cris-static          /usr/bin/qemu-ppc-static
+/usr/bin/qemu-hexagon-static       /usr/bin/qemu-riscv32-static
+/usr/bin/qemu-hppa-static          /usr/bin/qemu-riscv64-static
+/usr/bin/qemu-i386-static          /usr/bin/qemu-s390x-static
+/usr/bin/qemu-m68k-static          /usr/bin/qemu-sh4eb-static
+/usr/bin/qemu-microblazeel-static  /usr/bin/qemu-sh4-static
+/usr/bin/qemu-microblaze-static    /usr/bin/qemu-sparc32plus-static
+/usr/bin/qemu-mips64el-static      /usr/bin/qemu-sparc64-static
+/usr/bin/qemu-mips64-static        /usr/bin/qemu-sparc-static
+/usr/bin/qemu-mipsel-static        /usr/bin/qemu-x86_64-static
+/usr/bin/qemu-mipsn32el-static     /usr/bin/qemu-xtensaeb-static
+/usr/bin/qemu-mipsn32-static       /usr/bin/qemu-xtensa-static
+
+# 测试arm架构镜像能否运行
+[root@minio ~]#docker run --rm -it --platform linux/arm64 arm64v8/ubuntu:20.04 uname -a
+Unable to find image 'arm64v8/ubuntu:20.04' locally
+20.04: Pulling from arm64v8/ubuntu
+ecd83b6c3544: Pull complete 
+Digest: sha256:0908a765aeb02fe4e564b543eaed1d77839b7a08de94041e24328b2cb62ac553
+Status: Downloaded newer image for arm64v8/ubuntu:20.04
+Linux 7398f6c0e249 5.15.0-138-generic #148-Ubuntu SMP Fri Mar 14 19:05:48 UTC 2025 aarch64 aarch64 aarch64 GNU/Linux
+
+# 可以通过以下方式验证注册是否成功：
+[root@minio ~]#ls /proc/sys/fs/binfmt_misc/ | grep qemu
+qemu-aarch64
+qemu-aarch64_be
+qemu-alpha
+qemu-arm
+qemu-armeb
+qemu-hexagon
+qemu-hppa
+qemu-m68k
+qemu-microblaze
+qemu-microblazeel
+qemu-mips
+qemu-mips64
+qemu-mips64el
+qemu-mipsel
+qemu-mipsn32
+qemu-mipsn32el
+qemu-or1k
+qemu-ppc
+qemu-ppc64
+qemu-ppc64le
+qemu-riscv32
+qemu-riscv64
+qemu-s390x
+qemu-sh4
+qemu-sh4eb
+qemu-sparc
+qemu-sparc32plus
+qemu-sparc64
+qemu-xtensa
+qemu-xtensaeb
+
+# 测试risc架构镜像能否运行
+[root@minio ~]#docker run --rm -it --platform linux/riscv64 riscv64/ubuntu:22.04 uname -a
+Unable to find image 'riscv64/ubuntu:22.04' locally
+22.04: Pulling from riscv64/ubuntu
+4e243dbf3d7e: Pull complete 
+Digest: sha256:c58b44cd74210e1ea2bd3c218f97ddd032064276a248364e30d1477947fde6af
+Status: Downloaded newer image for riscv64/ubuntu:22.04
+Linux edea6e69eb4b 5.15.0-138-generic #148-Ubuntu SMP Fri Mar 14 19:05:48 UTC 2025 riscv64 riscv64 riscv64 GNU/Linux
+```
+
+
+
+## 初始化buildx
+
+```bash
+# 使用BuildKit的功能（BuildKit是由Docker公司开发的下一代docker build工具，2018年7月正式内置于Docker-ce 18.06.0）
+# 确认 buildx 是否可用
+[root@minio ~]# docker buildx version
+
+# 如果不可用，即没有输出版本号，则手动安装buildx插件
+[root@minio ~]# mkdir -p ~/.docker/cli-plugins
+[root@minio ~]# curl -SL https://github.com/docker/buildx/releases/download/v0.13.1/buildx-v0.13.1.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
+[root@minio ~]# chmod +x ~/.docker/cli-plugins/docker-buildx
+
+[root@minio ~]#docker buildx version
+github.com/docker/buildx v0.13.1 788433953af10f2a698f5c07611dddce2e08c7a0
+
+# 第一步：创建一个描述文件
+[root@minio ~]#docker buildx create --name mybuilder
+mybuilder
+
+# 切换到mybuilder
+[root@minio ~]#docker buildx use mybuilder
+
+# 初始化buildx
+# 重点是宿主机要能连接外网，export https_proxy=http://IP:端口
+[root@minio ~]#docker buildx inspect --bootstrap
+Name:          mybuilder
+Driver:        docker-container
+Last Activity: 2025-04-29 16:25:15 +0000 UTC
+
+Nodes:
+Name:                  mybuilder0
+Endpoint:              unix:///var/run/docker.sock
+Status:                running
+BuildKit daemon flags: --allow-insecure-entitlement=network.host
+BuildKit version:      v0.20.2
+Platforms:             linux/amd64, linux/amd64/v2, linux/amd64/v3, linux/arm64, linux/riscv64, linux/ppc64, linux/ppc64le, linux/s390x, linux/386, linux/arm/v7, linux/arm/v6
+Labels:
+ org.mobyproject.buildkit.worker.executor:         oci
+ org.mobyproject.buildkit.worker.hostname:         14b599931d09
+ org.mobyproject.buildkit.worker.network:          host
+ org.mobyproject.buildkit.worker.oci.process-mode: sandbox
+ org.mobyproject.buildkit.worker.selinux.enabled:  false
+ org.mobyproject.buildkit.worker.snapshotter:      overlayfs
+GC Policy rule#0:
+ All:           false
+ Filters:       type==source.local,type==exec.cachemount,type==source.git.checkout
+ Keep Duration: 48h0m0s
+GC Policy rule#1:
+ All:           false
+ Keep Duration: 1440h0m0s
+ Keep Bytes:    9.313GiB
+GC Policy rule#2:
+ All:        false
+ Keep Bytes: 9.313GiB
+GC Policy rule#3:
+ All:        true
+ Keep Bytes: 9.313GiB
+ 
+# 查看容器
+[root@ubuntu2204 ~]#docker ps
+CONTAINER ID   IMAGE                           COMMAND                   CREATED         STATUS              PORTS     NAMES
+37d4fcb7cbf5   moby/buildkit:buildx-stable-1   "buildkitd --allow-i…"   2 minutes ago   Up About a minute             buildx_buildkit_mybuilder0
+
+# 在容器内将hosts记录注入进去
+[root@ubuntu2204 ~]#docker exec -it buildx_buildkit_mybuilder0 sh
+/ # cat /etc/hosts
+127.0.0.1	localhost
+::1	localhost ip6-localhost ip6-loopback
+fe00::0	ip6-localnet
+ff00::0	ip6-mcastprefix
+ff02::1	ip6-allnodes
+ff02::2	ip6-allrouters
+172.17.0.2	37d4fcb7cbf5
+
+10.0.0.204 harbor.mysticalrecluse.com
+```
+
+
+
+## 执行构建
+
+### 构建介绍
+
+构建镜像并上传到镜像仓库，可以同时构建x86_64及arm等多本镜像
+
+```bash
+# 单独构建arm64架构镜像,nerdctl只能一次构建一个镜像，不能像docker那样，一次构建多种不同架构的镜像
+nerdctl build --platform=arm64 -t registry.cn-qingdao.aliyuncs.com/zhangshijie/nginx:v1 .
+
+# 可以一次性构建多个架构的镜像，并通过--push直接上传
+docker buildx build -t ${TAG} --platform linux/amd64,linux/arm64 . --push
+```
+
+
+
+构建arm64镜像保存到本地，导入到本地只能构建单独一个平台的镜像，比如单独的arm64或单独的x86_64，不能同时指定
+
+```bash
+docker buildx build -t ${TAG} --platform linux/arm64 . --load
+```
+
+
+
+执行构建
+
+```bash
+# 查看父镜像的可支持架构
+[root@ubuntu2204 ~]#export https_proxy=http://10.0.0.1:10809
+[root@ubuntu2204 ~]#docker manifest inspect ubuntu:22.04
+{
+   "schemaVersion": 2,
+   "mediaType": "application/vnd.oci.image.index.v1+json",
+   "manifests": [
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 424,
+         "digest": "sha256:a76d0e9d99f0e91640e35824a6259c93156f0f07b7778ba05808c750e7fa6e68",
+         "platform": {
+            "architecture": "amd64",
+            "os": "linux"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 562,
+         "digest": "sha256:a6cd687c898b5613acc56d40cfe3a9059c392e0e716a717f375aa6631624812d",
+         "platform": {
+            "architecture": "unknown",
+            "os": "unknown"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 424,
+         "digest": "sha256:4f6f9af1518bf360df5bd6214cd573d6dc0143334234757ed745715f6a95d0cd",
+         "platform": {
+            "architecture": "arm",
+            "os": "linux",
+            "variant": "v7"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 562,
+         "digest": "sha256:0988fe336db53044d67e3cff5e4a8cfc5eb15196f0e83a083a6e6049a3943484",
+         "platform": {
+            "architecture": "unknown",
+            "os": "unknown"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 424,
+         "digest": "sha256:04c0fd7fceedf5c0fe69ec1685c37cf270f03ae424322a58548b095528f4a3c3",
+         "platform": {
+            "architecture": "arm64",
+            "os": "linux",
+            "variant": "v8"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 562,
+         "digest": "sha256:72c820571a3450ee426288ff415793bb8072fbd8888d1e4eba9b406b3ee0e1db",
+         "platform": {
+            "architecture": "unknown",
+            "os": "unknown"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 424,
+         "digest": "sha256:7457621cb268f8a7fc02e0d0e3437fc781660471cbef89d6fa86f487c607bfa0",
+         "platform": {
+            "architecture": "ppc64le",
+            "os": "linux"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 562,
+         "digest": "sha256:4cc6371f8609fe959a2b77b80895b1013aafbef071b7c40416ee413d512015df",
+         "platform": {
+            "architecture": "unknown",
+            "os": "unknown"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 424,
+         "digest": "sha256:b471c68040bbe418a64e33b1353c0404b8a27cdf21d5b5a84a0a48659e055b52",
+         "platform": {
+            "architecture": "riscv64",
+            "os": "linux"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 562,
+         "digest": "sha256:89dccecefbc6727eb7ee845e97d151c9d6bb53098b45c836d0dbc707613bf7fd",
+         "platform": {
+            "architecture": "unknown",
+            "os": "unknown"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 424,
+         "digest": "sha256:4db7867d48bd95ff981c26e4990afc10006ffdafab3279e2f25591ba400e283d",
+         "platform": {
+            "architecture": "s390x",
+            "os": "linux"
+         }
+      },
+      {
+         "mediaType": "application/vnd.oci.image.manifest.v1+json",
+         "size": 562,
+         "digest": "sha256:08fd136151e0ae83b29a73332622d73aa99976e579538b4041c14ad71bff88c1",
+         "platform": {
+            "architecture": "unknown",
+            "os": "unknown"
+         }
+      }
+   ]
+}
+
+# 基于上述观察，arm64和amd64都支持
+# 所以上传到私仓
+
+# 上传父镜像到私仓
+[root@ubuntu2204 ~]# docker pull ubuntu:22.04
+[root@ubuntu2204 ~]# docker tag ubuntu:22.04 harbor.mysticalrecluse.com/myserver/ubuntu:22.04
+[root@ubuntu2204 ~]# docker push harbor.mysticalrecluse.com/myserver/ubuntu:22.04
+
+# 父镜像和构建镜像的构架必须一致，也就是说如果构建的是arm64的镜像，父镜像也要是arm64
+[root@minio docker]#ls
+build-command.sh  Dockerfile  nginx-1.22.0.tar.gz  sources.list
+
+[root@ubuntu2204 docker]#cat Dockerfile 
+FROM harbor.mysticalrecluse.com/myserver/ubuntu:22.04
+LABEL maintainer="mysticalrecluse@gmail.com"
+
+ADD sources.list /etc/apt/sources.list
+
+RUN apt update && \
+    apt install -y \
+    build-essential \
+    libpcre3 \
+    libpcre3-dev \
+    zlib1g-dev \
+    openssl \
+    libssl-dev \
+    iproute2 \
+    ntpdate \
+    tcpdump \
+    telnet \
+    traceroute \
+    nfs-kernel-server \
+    nfs-common \
+    lrzsz \
+    tree \
+    unzip \
+    zip \
+    make \
+    ca-certificates \
+    && apt clean && rm -rf /var/lib/apt/lists/*
+
+ADD nginx-1.22.0.tar.gz /usr/local/src
+
+WORKDIR /usr/local/src/nginx-1.22.0
+RUN ./configure --prefix=/apps/nginx \
+    --with-http_ssl_module \
+    --with-http_gzip_static_module \
+    --with-http_stub_status_module && \
+    make && make install && \
+    ln -sv /apps/nginx/sbin/nginx /usr/bin
+
+RUN groupadd -g 2088 nginx && \
+    useradd -g nginx -s /usr/sbin/nologin -u 2088 nginx && \
+    chown -R nginx.nginx /apps/nginx
+
+EXPOSE 80 443
+CMD ["nginx", "-g", "daemon off;"]
+
+
+# 查看build-command.sh
+#!/bin/bash
+docker buildx build -t harbor.mysticalrecluse.com/myserver/nginx:v1 --platform linux/arm64,linux/amd64 . --push
+
+# 执行构建
+[root@minio docker]#bash build-command.sh
+```
+
+
+
+
+
+# 重点：如何让容器的应用程序配置文件可以读取环境变量的值（实现K8S动态配置）
+
+
+
+## 方式 1：应用直接支持读取环境变量（最推荐）
+
+比如：
+
+- Nginx 可使用 `$VAR_NAME`（但不推荐）
+- Spring Boot 支持通过环境变量配置端口、数据库等
+- Python、Node.js、Go 都可以通过 `os.environ`、`process.env`、`os.Getenv()` 读取变量
+
+### 📦 示例（以 Flask 应用为例）：
+
+```python
+import os
+db_url = os.getenv("DATABASE_URL", "sqlite:///default.db")
+```
+
+然后你在 Pod 中设置：
+
+```yaml
+env:
+- name: DATABASE_URL
+  value: "mysql://user:pass@db:3306/mydb"
+```
+
+
+
+## 方式 2：配置文件模板化（容器启动时渲染）
+
+如果你的应用只读取配置文件，不支持环境变量，可以这样做：
+
+1. 把配置文件写成模板，比如用 `${PORT}` 占位符；
+2. 用 `envsubst` 或 shell 脚本启动前渲染；
+
+
+
+### 示例 1：Flask 应用使用模板渲染配置文件
+
+**📁 配置文件模板（`config.template.py`）**
+
+```python
+DEBUG = ${DEBUG}
+PORT = ${APP_PORT}
+DB_URI = "${DATABASE_URI}"
+```
+
+**🐳 Dockerfile**
+
+```dockerfile
+FROM python:3.10
+
+WORKDIR /app
+COPY . /app
+RUN pip install flask
+
+# 安装 envsubst 工具
+RUN apt update && apt install -y gettext-base
+
+# 添加启动脚本
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+```
+
+**🚀 启动脚本（`entrypoint.sh`）**
+
+```bash
+#!/bin/bash
+set -e
+
+# 渲染配置文件
+envsubst < /app/config.template.py > /app/config.py
+
+# 启动 Flask 应用
+python main.py
+```
+
+**📜 Kubernetes Pod 配置（env）**
+
+```yaml
+env:
+  - name: DEBUG
+    value: "True"
+  - name: APP_PORT
+    value: "5000"
+  - name: DATABASE_URI
+    value: "mysql://user:pass@mysql:3306/db"
+```
+
+
+
+### 示例 2：Nginx 配置模板渲染
+
+**📄 nginx.conf.template**
+
+```nginx
+server {
+    listen       ${NGINX_PORT};
+    server_name  ${SERVER_NAME};
+
+    location / {
+        proxy_pass http://${UPSTREAM_HOST}:${UPSTREAM_PORT};
+    }
+}
+```
+
+**🐳 Dockerfile**
+
+```dockerfile
+FROM nginx:alpine
+
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+**🚀 entrypoint.sh**
+
+```bash
+#!/bin/sh
+
+envsubst < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf
+exec "$@"
+```
+
+**📜 Kubernetes Deployment 环境变量注入示例**
+
+```yaml
+env:
+  - name: NGINX_PORT
+    value: "80"
+  - name: SERVER_NAME
+    value: "my.example.com"
+  - name: UPSTREAM_HOST
+    value: "backend-service"
+  - name: UPSTREAM_PORT
+    value: "8080"
+```
+
+
+
+## 补充envsubst用法
+
+`envsubst` 是一个非常实用的 Linux 工具，它可以将文本中的 **环境变量占位符**（如 `${PORT}`）替换为当前 shell 中对应的值，常用于在容器启动时将配置模板转为实际配置文件。
+
+
+
+### 安装envsubst
+
+```bash
+[root@haproxy-dns-etc]# apt update && apt install -y gettext-base
+```
+
+
+
+### 基本用法
+
+#### 替换所有环境变量
+
+```bash
+export PORT=8080
+export HOST=localhost
+
+echo 'Server is running on $HOST:$PORT' | envsubst
+```
+
+**输出：**
+
+```pgsql
+Server is running on localhost:8080
+```
+
+
+
+#### 只替换指定变量
+
+如果你只想替换特定变量（比如 `$PORT`），而不替换其他的：
+
+```bash
+export PORT=8080
+export HOST=localhost
+
+echo 'Connect to $HOST:$PORT' | envsubst '$PORT'
+```
+
+输出：
+
+```nginx
+Connect to $HOST:8080
+```
+
+注意：`$HOST` 没有被替换。
+
+
+
+#### 替换配置文件中的变量
+
+```bash
+# 假设 config.template 文件内容如下：
+# api:
+#   port: ${PORT}
+#   host: ${HOST}
+
+export PORT=8080
+export HOST=localhost
+
+envsubst < config.template > config.yaml
+```
+
+渲染后的 `config.yaml`：
+
+```yaml
+api:
+  port: 8080
+  host: localhost
+```
+
+
+
+#### 多变量替换（控制范围）
+
+```bash
+envsubst '${PORT} ${HOST}' < config.template > config.yaml
+```
+
+
+
+### 常见用法场景
+
+| 场景                         | 示例                                                     |
+| ---------------------------- | -------------------------------------------------------- |
+| 容器启动前渲染配置           | `envsubst < nginx.conf.template > /etc/nginx/nginx.conf` |
+| CI/CD 中构建配置文件         | `envsubst < values.template.yaml > values.yaml`          |
+| 渲染 HTML 模板（带环境变量） | `envsubst < index.html.template > index.html`            |
+
+
+
+### ⚠️ 注意事项
+
+1. **变量必须已 export** 才能被 `envsubst` 识别；
+2. 占位符应写成 `${VAR}` 而不是 `$VAR`，更安全；
+3. `envsubst` 不支持复杂的 shell 表达式，如 `${VAR:-default}`。

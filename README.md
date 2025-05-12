@@ -87,16 +87,39 @@
 </ul>
 -->
 </details>
-
 <details>
-<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🌀 HAProxy</a></summary><br>
-<!--
+<summary><a href="linux_study/HAProxy.md#web架构介绍" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">🌀 HAProxy</a></summary><br>
 <ul>
-  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
-  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+  <li><a href="linux_study/HAProxy.md#web架构介绍" style="font-size:20px; font-weight:600; color:#2b6cb0;">web架构介绍</a>
+      <ul><br>
+          <li><a href="linux_study/HAProxy.md#单机房架构" style="font-size:20px; font-weight:600; color:#2b6cb0;">单机房架构</a></li><br>
+          <li><a href="linux_study/HAProxy.md#多机房架构" style="font-size:20px; font-weight:600; color:#2b6cb0;">多机房架构</a></li><br>
+          <li><a href="linux_study/HAProxy.md#单机房架构" style="font-size:20px; font-weight:600; color:#2b6cb0;">公有云架构</a></li><br>
+          <li><a href="linux_study/HAProxy.md#单机房架构" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有云架构</a></li>
+      </ul>
+  </li><br>
+  <li><a href="linux_study/HAProxy.md#负载均衡简介" style="font-size:20px; font-weight:600; color:#2b6cb0;">负载均衡简介</a>
+      <ul><br>
+          <li><a href="linux_study/HAProxy.md#负载均衡类型" style="font-size:20px; font-weight:600; color:#2b6cb0;">负载均衡类型</a></li><br>
+          <li><a href="linux_study/HAProxy.md#HAProxy介绍" style="font-size:20px; font-weight:600; color:#2b6cb0;">HAProxy介绍</a></li>
+      </ul>
+  </li><br>
+  <li><a href="linux_study/HAProxy.md#HAProxy安装及基础配置" style="font-size:20px; font-weight:600; color:#2b6cb0;">HAProxy安装及基础配置</a>
+      <ul><br>
+          <li><a href="linux_study/HAProxy.md#Ubuntu安装" style="font-size:20px; font-weight:600; color:#2b6cb0;">Ubuntu安装</a></li><br>
+          <li><a href="linux_study/HAProxy.md#CentOS安装" style="font-size:20px; font-weight:600; color:#2b6cb0;">CentOS安装</a></li><br>
+          <li><a href="linux_study/HAProxy.md#编译安装HAProxy" style="font-size:20px; font-weight:600; color:#2b6cb0;">编译安装HAProxy</a></li><br>
+          <li><a href="linux_study/HAProxy.md#基础配置详解" style="font-size:20px; font-weight:600; color:#2b6cb0;">基础配置详解</a></li>
+      </ul>
+  </li><br>
+  <li><a href="linux_study/HAProxy.md#HAProxy调度算法" style="font-size:20px; font-weight:600; color:#2b6cb0;">HAProxy调度算法</a>
+      <ul><br>
+          <li><a href="linux_study/HAProxy.md#静态算法" style="font-size:20px; font-weight:600; color:#2b6cb0;">静态算法</a></li><br>
+          <li><a href="linux_study/HAProxy.md#动态算法" style="font-size:20px; font-weight:600; color:#2b6cb0;">动态算法</a></li>
+  </li><br>
 </ul>
--->
 </details>
+
 
 
 
@@ -225,16 +248,18 @@
 </ul>
 -->
 </details>
-
 <details>
-<summary><a href="云原生/CloudNative-Prometheus.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">📜 ELK</a></summary><br>
-<!--
+<summary><a href="云原生/ELK_Stack.md#Prometheus" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">📜 ELK</a></summary><br>
 <ul>
-  <li><a href="云原生/CloudNative-CICD#私有软件仓库GitLab" style="font-size:20px; font-weight:600; color:#2b6cb0;">私有软件仓库GitLab</a></li><br>
-  <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
+  <li><a href="云原生/ELK_Stack.md#ELK概述" style="font-size:20px; font-weight:600; color:#2b6cb0;">ELK概述</a></li><br>
+  <li><a href="云原生/ELK_Stack.md#Elasticsearch部署和管理" style="font-size:20px; font-weight:600; color:#2b6cb0;">Elasticsearch 部署和管理</a></li><br>
+  <li><a href="云原生/ELK_Stack.md#Beats收集数据" style="font-size:20px; font-weight:600; color:#2b6cb0;">Beats收集数据</a></li><br>
+  <li><a href="云原生/ELK_Stack.md#Logstash过滤" style="font-size:20px; font-weight:600; color:#2b6cb0;">Logstash 过滤</a></li><br>
+  <li><a href="云原生/ELK_Stack.md#Kibana图形显示" style="font-size:20px; font-weight:600; color:#2b6cb0;">Kibana图形显示</a></li><br>
+  <li><a href="云原生/ELK_Stack.md#ELK综合实战案例" style="font-size:20px; font-weight:600; color:#2b6cb0;">ELK 综合实战案例</a></li><br>
 </ul>
--->
 </details>
+
 
 
 
@@ -401,7 +426,6 @@
   <li><a href="云原生/CloudNative-CICD.md#DevOps之CICD服务器Jenkins" style="font-size:20px; font-weight:600; color:#2b6cb0;">DevOps之CICD服务器Jenkins</a></li><br>
     </ul>
 </details>
-
 <details>
 <summary><a href="云原生/CloudNative-简介.md#cloudnative" style="font-size:22px; font-weight:700; text-decoration:none; color:#2b6cb0;">☁️ CloudNative</a></summary><br>
 <ul>
@@ -940,7 +964,18 @@
           <li><a href="云原生/CloudNative-velero架构及备份流程.md#使用Velero实现Kubernetes集群迁移的完整实战流程" style="font-size:18px; font-weight:500; color:#2b6cb0;">使用Velero实现Kubernetes集群迁移的完整实战流程</a></li>
       </ul>
   </li><br>
+  <li><a href="云原生/CloudNative-公有云自建高可用Kubernetes集群.md#公有云自建高可用Kubernetes集群" style="font-size:20px; font-weight:600; color:#2b6cb0;"> 公有云自建高可用Kubernetes集群（阿里云）</a></li><br>
+  <li><a href="云原生/CloudNative-Kubernetes-资源限制.md#Kubernetes-资源限制" style="font-size:20px; font-weight:600; color:#2b6cb0;"> Kubernetes-资源限制</a>
+      <ul><br>
+          <li><a href="云原生/CloudNative-Kubernetes-资源限制.md#Kubernetes中资源限制概括" style="font-size:18px; font-weight:500; color:#2b6cb0;">Kubernetes中资源限制概括</a></li><br>
+          <li><a href="云原生/CloudNative-Kubernetes-资源限制.md#kubernetes对单个容器的CPU及memory实现资源限制" style="font-size:18px; font-weight:500; color:#2b6cb0;">kubernetes对单个容器的CPU及memory实现资源限制</a></li><br>
+          <li><a href="云原生/CloudNative-Kubernetes-资源限制.md#kubernetes对单个pod的CPU及memory实现资源限制" style="font-size:18px; font-weight:500; color:#2b6cb0;">kubernetes对单个pod的CPU及memory实现资源限制</a></li><br>
+          <li><a href="云原生/CloudNative-Kubernetes-资源限制.md#kubernetes对整个namespace的CPU及memory实现资源限制" style="font-size:18px; font-weight:500; color:#2b6cb0;">kubernetes对整个namespace的CPU及memory实现资源限制</a></li>
+      </ul>
+  </li><br>
 </details>
+
+
 
 
 
@@ -991,4 +1026,3 @@
     </ul>
 -->
 </details>
-

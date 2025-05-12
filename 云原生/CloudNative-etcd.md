@@ -77,7 +77,7 @@ WantedBy=multi-user.target
 ### etcd选举
 
 - etcd基于Raft算法进行集群角色选举，使用Raft的还有consul，InfluxDB，Kafka等
-- [Raft协议详解](CloudNative-Kubernetes.md##Raft协议)
+- 点击这里：[Raft协议详解](CloudNative-Kubernetes知识扩展#Raft协议)
 
 
 

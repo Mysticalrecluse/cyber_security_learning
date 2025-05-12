@@ -340,3 +340,525 @@ etcd **存储的所有 Kubernetes 资源**，例如：
   ```
 
   **重新初始化 etcd**（例如 `kubeadm init phase etcd`），那么 **etcd 的数据通常会被清空**，集群中的所有资源（Pods、Deployments、Services、ConfigMaps 等）都会丢失。**这类似于全新部署 etcd。**
+
+
+
+
+
+## 排错案例2
+
+### 问题背景
+
+**部署metrics-server出现报错**
+
+```bash
+[root@master1]$ kubectl get pod -A
+NAMESPACE     NAME                                       READY   STATUS    RESTARTS   AGE
+kube-system   calico-kube-controllers-864cf7ff46-khgtl   1/1     Running   0          10h
+kube-system   calico-node-6nvz5                          1/1     Running   0          10h
+kube-system   calico-node-jbvpb                          1/1     Running   0          10h
+kube-system   calico-node-jvz7j                          1/1     Running   0          10h
+kube-system   calico-node-w9xvw                          1/1     Running   0          10h
+kube-system   coredns-76fccbbb6b-95jsl                   1/1     Running   0          11h
+kube-system   coredns-76fccbbb6b-p8cbc                   1/1     Running   0          11h
+kube-system   etcd-master1                               1/1     Running   1          11h
+kube-system   kube-apiserver-master1                     1/1     Running   1          11h
+kube-system   kube-controller-manager-master1            1/1     Running   1          11h
+kube-system   kube-proxy-cpn54                           1/1     Running   0          11h
+kube-system   kube-proxy-gvhmb                           1/1     Running   0          11h
+kube-system   kube-proxy-hwnjv                           1/1     Running   0          11h
+kube-system   kube-proxy-tknzn                           1/1     Running   0          11h
+kube-system   kube-scheduler-master1                     1/1     Running   1          11h
+kube-system   metrics-server-5488b6568-f9pbx             0/1     Running   0          31m  # 这里始终显示0/1
+```
+
+
+
+### 故障排查与修复
+
+```bash
+# 查看pod的日志和状态
+[root@master1]$ kubectl describe pod -n kube-system metrics-server-5488b6568-f9pbx 
+Events:
+  Type     Reason     Age                  From               Message
+  ----     ------     ----                 ----               -------
+  Normal   Scheduled  3m55s                default-scheduler  Successfully assigned kube-system/metrics-server-5488b6568-f9pbx to work1.mystical.org
+  Normal   Pulling    3m54s                kubelet            Pulling image "harbor.magedu.mysticalrecluse.com/k8simage/metrics-server:v0.7.2"
+  Normal   Pulled     3m53s                kubelet            Successfully pulled image "harbor.magedu.mysticalrecluse.com/k8simage/metrics-server:v0.7.2" in 1.366s (1.366s including waiting). Image size: 19493207 bytes.
+  Normal   Created    3m53s                kubelet            Created container: metrics-server
+  Normal   Started    3m53s                kubelet            Started container metrics-server
+  Warning  Unhealthy  3s (x23 over 3m30s)  kubelet            Readiness probe failed: HTTP probe failed with statuscode: 500
+  
+# 查看日志
+[root@master1]$ kubectl logs -n kube-system metrics-server-5488b6568-f9pbx 
+......
+\"https://10.2.1.151:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.151 because it doesn't contain any IP SANs" node="master1"
+E0502 06:13:50.939933       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.198:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.198 because it doesn't contain any IP SANs" node="work3.mystical.org"
+E0502 06:13:50.951533       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.238:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.238 because it doesn't contain any IP SANs" node="work2.mystical.org"
+E0502 06:13:50.954955       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.106:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.106 because it doesn't contain any IP SANs" node="work1.mystical.org"
+I0502 06:13:51.035049       1 shared_informer.go:318] Caches are synced for client-ca::kube-system::extension-apiserver-authentication::requestheader-client-ca-file
+I0502 06:13:51.035167       1 shared_informer.go:318] Caches are synced for RequestHeaderAuthRequestController
+I0502 06:13:51.035240       1 shared_informer.go:318] Caches are synced for client-ca::kube-system::extension-apiserver-authentication::client-ca-file
+E0502 06:14:05.938933       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.238:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.238 because it doesn't contain any IP SANs" node="work2.mystical.org"
+E0502 06:14:05.943590       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.106:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.106 because it doesn't contain any IP SANs" node="work1.mystical.org"
+```
+
+说明你的 Kubernetes 集群中 **kubelet 的 TLS 证书**没有包含对应节点的 IP 或主机名（SAN 字段缺失），所以 `metrics-server` 或 `scraper` 无法通过 HTTPS 成功拉取节点指标。
+
+
+
+#### 错误解释（核心问题）
+
+Kubernetes 的 `kubelet` 启动了一个 HTTPS 服务在 `10250` 端口（暴露 `/metrics/resource` 等）：
+
+- 该服务使用的是 `/var/lib/kubelet/pki/kubelet.crt` 证书；
+- 这个证书由 `kubelet` 启动时自动请求签发（Bootstrapping）；
+- **但你的集群没有配置正确的 SAN 签发策略**，导致：
+
+> 所有节点的 kubelet 证书只包含了 `CN=kubelet`，**没有 IP 或主机名 SAN**
+
+
+
+### 解决方案
+
+#### 方案一：无需重装，使用 `kubelet-serving` CSR 动态重签证书（推荐）
+
+Kubelet 会自动创建一个 `kubelet-serving` 的 CSR 请求（CertificateSigningRequest），你可以手动批准：
+
+**查看CSR请求**
+
+```bash
+[root@master1]$ kubectl get csr
+No resources found
+```
+
+❌ `No resources found`，说明 kubelet 没有发出新的证书签名请求（CSR）
+
+**这通常有两个原因**
+
+- 原因 1：Kubelet 没有配置自动向 API 申请证书（client 和 serving）
+  - 默认 kubeadm 初始化的 kubelet 会自动申请两种证书：
+    - **client 证书**：用于 kubelet 自己连 API server
+    - **serving 证书**：用于其他组件访问 kubelet 的 10250 端口
+  - 但你当前可能没有启用 serving 证书自动申请功能。
+
+
+
+**检查 kubelet 配置**
+
+查看 `/var/lib/kubelet/config.yaml` 中有没有：
+
+```bash
+serverTLSBootstrap: true
+```
+
+如果 **缺失或为 false**，则 kubelet 不会自动申请 serving 证书。
+
+
+
+#### 解决步骤（启用 serverTLSBootstrap）
+
+**第一步：编辑 kubelet 配置文件**
+
+```bash
+# 编辑kubelet配置文件
+[root@master1]$ vim /var/lib/kubelet/config.yaml
+......
+serverTLSBootstrap: true    # 添加或修改这行
+```
+
+保存后退出。
+
+
+
+**第二步：重启 kubelet**
+
+```bash
+[root@master1]$ systemctl restart kubelet.service
+```
+
+
+
+**第三步：查看并批准 CSR**
+
+```bash
+[root@master1]$ kubectl get csr
+NAME        AGE   SIGNERNAME                      REQUESTOR             REQUESTEDDURATION   CONDITION
+csr-jbphr   8s    kubernetes.io/kubelet-serving   system:node:master1   <none>              Pending
+
+# 当前是pending状态，手动批准证书请求
+[root@master1]$ kubectl certificate approve csr-jbphr
+certificatesigningrequest.certificates.k8s.io/csr-jbphr approved
+
+# 再次查看
+[root@master1]$ kubectl get csr
+NAME        AGE    SIGNERNAME                      REQUESTOR             REQUESTEDDURATION   CONDITION
+csr-jbphr   111s   kubernetes.io/kubelet-serving   system:node:master1   <none>              Approved,Issued
+```
+
+**Kubelet 会自动替换自己的证书，稍等几分钟 `metrics-server` 会恢复正常抓取**。
+
+
+
+**查看最终的效果**
+
+```bash
+[root@master1]$ kubectl get pod -A
+NAMESPACE     NAME                                       READY   STATUS    RESTARTS   AGE
+kube-system   calico-kube-controllers-864cf7ff46-khgtl   1/1     Running   0          10h
+kube-system   calico-node-6nvz5                          1/1     Running   0          10h
+kube-system   calico-node-jbvpb                          1/1     Running   0          10h
+kube-system   calico-node-jvz7j                          1/1     Running   0          10h
+kube-system   calico-node-w9xvw                          1/1     Running   0          10h
+kube-system   coredns-76fccbbb6b-95jsl                   1/1     Running   0          11h
+kube-system   coredns-76fccbbb6b-p8cbc                   1/1     Running   0          11h
+kube-system   etcd-master1                               1/1     Running   1          11h
+kube-system   kube-apiserver-master1                     1/1     Running   1          11h
+kube-system   kube-controller-manager-master1            1/1     Running   1          11h
+kube-system   kube-proxy-cpn54                           1/1     Running   0          11h
+kube-system   kube-proxy-gvhmb                           1/1     Running   0          11h
+kube-system   kube-proxy-hwnjv                           1/1     Running   0          11h
+kube-system   kube-proxy-tknzn                           1/1     Running   0          11h
+kube-system   kube-scheduler-master1                     1/1     Running   1          11h
+kube-system   metrics-server-5488b6568-f9pbx             1/1     Running   0          32m
+
+# 测试
+[root@master1]$ kubectl top pod -A
+NAMESPACE     NAME                              CPU(cores)   MEMORY(bytes)   
+kube-system   calico-node-6nvz5                 25m          120Mi           
+kube-system   etcd-master1                      21m          46Mi            
+kube-system   kube-apiserver-master1            51m          255Mi           
+kube-system   kube-controller-manager-master1   18m          49Mi            
+kube-system   kube-proxy-hwnjv                  10m          17Mi            
+kube-system   kube-scheduler-master1            12m          22Mi 
+```
+
+
+
+## 排错案例3
+
+### 问题背景
+
+worker节点加入kubernetes集群，使用负载均衡器的IP，而不是直接使用master节点IP，但是导致join加入集群的时候阻塞在初始化阶段
+
+| 行为                              | 结果                                                         |
+| --------------------------------- | ------------------------------------------------------------ |
+| `curl -k https://10.2.1.139:6443` | ✅ 返回 403，说明 **TLS 成功握手 + 请求被 kube-apiserver 接收 + 匿名用户被拒绝** |
+| `kubeadm join 10.2.1.139:6443`    | ❌ 阻塞在 preflight，说明 **连接建立但请求未成功返回（或验证失败）** |
+
+#### 问题起因
+
+ kube-apiserver 返回证书中未包含该 SNI，导致 kubeadm TLS 验证失败卡死。
+
+
+
+#### 知识点补充：SNI 是怎么参与 `kubeadm join` 的？
+
+- `kubeadm join` 使用 HTTPS+TLS 和 apiserver 通信；
+- 它会发起带有 SNI 的 TLS Client Hello；
+- **如果 kube-apiserver 返回的证书中不包含这个 SNI（如 VIP 或 HAProxy IP），就会被 TLS 客户端验证失败！**
+
+
+
+**所以：如果你 kubeadm init 时没有指定 SNI / SAN（如 HAProxy 的 IP），那么返回的证书只包含：**
+
+- `CN = kube-apiserver`
+- `SubjectAltName: DNS: kube-apiserver, IP: 10.2.1.151`（master IP）
+
+> 当你使用 `curl -k` 可以绕过 TLS 校验（`-k` 跳过 SNI 验证），但 `kubeadm join` 不会这么做，它是严格验证的。
+
+
+
+#### 对SNI内容缺失的验证
+
+你可以手动查看 kube-apiserver 证书内容：
+
+```bash
+openssl x509 -in /etc/kubernetes/pki/apiserver.crt -text -noout | grep -A1 "Subject Alternative Name"
+```
+
+如果输出中没有包含 `10.2.1.139` 或 `10.2.0.100`（你用于 join 的地址）：
+
+```bash
+X509v3 Subject Alternative Name:
+    DNS:kubernetes, IP Address:10.2.1.151
+```
+
+那就说明了——**join 时使用的 IP 不在 SAN 中 → TLS 验证失败卡住**
+
+
+
+### 故障排查与修复
+
+初始化的时候在 `kubeadm init` 配置中添加 SNI/SAN
+
+创建一个 `kubeadm-config.yaml`：
+
+```yaml
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: 10.2.1.151
+  bindPort: 6443
+
+---
+apiVersion: kubeadm.k8s.io/v1beta3
+kind: ClusterConfiguration
+apiServer:
+  certSANs:
+    - "10.2.1.151"
+    - "10.2.1.139"     # HAProxy真实IP
+    - "10.2.0.100"     # VIP
+    - "127.0.0.1"
+    - "kubernetes"
+    - "kubernetes.default"
+```
+
+然后使用：
+
+```bash
+kubeadm init --config kubeadm-config.yaml
+```
+
+这将生成包含多个 IP 的 SAN 证书，支持后续任意地址 join。
+
+
+
+**⚠️ 如果集群已部署，可以重新生成 apiserver 证书，不必全部重装（使用 `kubeadm alpha certs` 工具）**。
+
+
+
+## 排错案例4
+
+### 问题背景
+
+由于apiserver证书过期，导致apiserver反复崩溃
+
+
+
+### 故障排查与修复
+
+```bash
+[root@master01 ~]# nerdctl logs <CONTAINER ID> --namespace k8s.io
+# 发现是证书过去导致错误
+```
+
+
+
+#### 修复方法1：使用 `kubeadm` 自动重新生成证书（推荐）
+
+如果你是通过 `kubeadm` 部署的集群，可以使用以下命令自动续期：
+
+```bash
+[root@master01 ~]# kubeadm certs renew all
+```
+
+然后重启 `kubelet`，apiserver 会重新加载新证书：
+
+```bash
+[root@master01 ~]# systemctl restart kubelet
+```
+
+注意：此命令默认使用 `/etc/kubernetes/pki/ca.crt` 和 `ca.key` 来签发新证书，默认有效期为 1 年。
+
+
+
+#### 修复方法2：自定义生成有效期更长的新证书
+
+如果你希望有效期不是 1 年，可以手动生成： 
+
+**生成私钥（如果没有）**
+
+```bash
+[root@master01 ~]# openssl genrsa -out apiserver.key 2048
+```
+
+**创建证书请求（CSR）**
+
+创建 `apiserver-csr.conf` 文件：
+
+```ini
+[req]
+req_extensions = v3_req
+distinguished_name = req_distinguished_name
+prompt = no
+
+[req_distinguished_name]
+CN = kube-apiserver
+
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment, digitalSignature
+extendedKeyUsage = serverAuth, clientAuth
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = kubernetes
+DNS.2 = kubernetes.default
+DNS.3 = kubernetes.default.svc
+DNS.4 = kubernetes.default.svc.cluster.local
+IP.1 = 10.96.0.1
+IP.2 = 127.0.0.1
+IP.3 = <你的API Server IP或VIP>
+```
+
+**生成 CSR 文件**
+
+```bash
+[root@master01 ~]# openssl req -new -key apiserver.key -out apiserver.csr -config apiserver-csr.conf
+```
+
+**使用集群的 CA 签发证书，有效期自定义（如 10 年）**
+
+```bash
+openssl x509 -req -in apiserver.csr -CA /etc/kubernetes/pki/ca.crt \
+  -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial \
+  -out apiserver.crt -days 3650 -extensions v3_req -extfile apiserver-csr.conf
+```
+
+**替换证书后重启 kubelet**
+
+```bash
+cp apiserver.crt /etc/kubernetes/pki/
+cp apiserver.key /etc/kubernetes/pki/
+systemctl restart kubelet
+```
+
+
+
+## 排错案例5
+
+### 问题背景
+
+在部署了metrics-server之后，执行`kubectl top node`，返回如下
+
+```bash
+[root@master1]# kubectl top node
+NAME                 CPU(cores)   CPU(%)      MEMORY(bytes)   MEMORY(%)   
+master1              232m         5%          1611Mi          13%         
+work1.mystical.org   <unknown>    <unknown>   <unknown>       <unknown>   
+work2.mystical.org   <unknown>    <unknown>   <unknown>       <unknown>   
+work3.mystical.org   <unknown>    <unknown>   <unknown>       <unknown>   
+```
+
+可以看出所有的worker节点的信息无法采集
+
+
+
+查看metrics-server日志结果如下
+
+```bash
+[root@master1]# kubectl -n kube-system edit deployments.apps metrics-server
+......
+E0504 07:28:05.953674       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.198:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.198 because it doesn't contain any IP SANs" node="work3.mystical.org"
+E0504 07:28:20.938137       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.106:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.106 because it doesn't contain any IP SANs" node="work1.mystical.org"
+E0504 07:28:20.939317       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.238:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.238 because it doesn't contain any IP SANs" node="work2.mystical.org"
+E0504 07:28:20.950004       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.198:10250/metrics/resource\": tls: failed to verify certificate: x509: cannot validate certificate for 10.2.1.198 because it doesn't contain any IP SANs" node="work3.mystical.org"
+E0504 07:28:35.936570       1 scraper.go:149] "Failed to scrape node" err="Get \"https://10.2.1.198:10250/metrics/reso
+```
+
+
+
+### 故障排查与修复
+
+#### **推荐方法（最常用）**
+
+编辑 metrics-server 的 Deployment，**加上 `--kubelet-insecure-tls` 参数**：
+
+```yaml
+[root@master1] # kubectl -n kube-system edit deployment metrics-server
+containers:
+- name: metrics-server
+  args:
+    - --kubelet-insecure-tls      # 添加这行
+    - --kubelet-preferred-address-types=InternalIP,Hostname
+
+# 修改后，重启kubelet
+[root@master1] # systemctl restart kubelet
+```
+
+
+
+#### **进阶方法（安全性高，但复杂）**：
+
+1. 为每个 node 生成 kubelet 的证书，**且必须在 SAN 里包含每个节点的 IP**；
+2. kubelet 启动时指定该证书；
+3. metrics-server 信任这些证书；
+4. 重新部署集群或手动更新 kubelet 的 cert。
+
+一般生产环境中为了省事都走第一个方案，**只加 `--kubelet-insecure-tls`**。
+
+
+
+##### **全流程步骤（适用于每个 Worker 节点）**
+
+⚠️ 操作前 **备份证书**，确保掌握节点重启和 kubelet 日志排查能力。
+
+**第一步：编辑 kubelet 配置文件**
+
+编辑或创建 `/var/lib/kubelet/config.yaml` 中，加入：
+
+```yaml
+tlsCertFile: /var/lib/kubelet/pki/kubelet.crt
+tlsPrivateKeyFile: /var/lib/kubelet/pki/kubelet.key
+```
+
+**第二步：生成自定义 kubelet 证书（以 `10.2.1.198` 为例）**
+
+创建 OpenSSL 配置（`kubelet-openssl.cnf`）：
+
+```ini
+[ req ]
+distinguished_name = req_distinguished_name
+x509_extensions = v3_req
+prompt = no
+
+[ req_distinguished_name ]
+CN = system:node:work3.mystical.org
+O = system:nodes
+
+[ v3_req ]
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth,clientAuth
+subjectAltName = @alt_names
+
+[ alt_names ]
+IP.1 = 10.2.1.198
+DNS.1 = work3.mystical.org
+```
+
+你需要为每个节点更换 `CN` 和 `IP/DNS`
+
+生成私钥和证书签署请求：
+
+```bash
+openssl genrsa -out kubelet.key 2048
+
+openssl req -new -key kubelet.key -out kubelet.csr \
+  -config kubelet-openssl.cnf
+```
+
+使用集群 CA 签名生成证书：
+
+```bash
+openssl x509 -req -in kubelet.csr -CA /etc/kubernetes/pki/ca.crt \
+  -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial \
+  -out kubelet.crt -days 365 -extensions v3_req \
+  -extfile kubelet-openssl.cnf
+```
+
+**第三步：放置证书并重启 kubelet**
+
+```bash
+mkdir -p /var/lib/kubelet/pki/
+cp kubelet.crt kubelet.key /var/lib/kubelet/pki/
+
+systemctl restart kubelet
+```
+
+**第四步：确认 Node 正常 & metrics-server 不再报 SAN 错误**
+
+- `kubectl get node`
+- `kubectl top node`
+- `kubectl logs -n kube-system deploy/metrics-server`
+

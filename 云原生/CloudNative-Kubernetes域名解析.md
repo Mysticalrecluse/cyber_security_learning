@@ -322,7 +322,7 @@ spec:
   - name: demo
     image: wangxiaochun/pod-test:v0.1
     imagePullPolicy: IfNotPresent
-  dnsPolicy: None
+  dnsPolicy: None     # ⚠️ 必须设置为 None 才能使用 dnsConfig
   dnsConfig:
     nameservers:
     - 10.96.0.10
@@ -336,6 +336,117 @@ spec:
     - name: ndots
       value: "5"  #意味着如果域名中只有5个或更少的点，则系统会尝试在其末尾添加搜索域。
 ```
+
+
+
+#### Pod 的 DNS 工作原理
+
+当你没有显式配置 `dnsPolicy` 时，Pod 使用的是：
+
+```yaml
+dnsPolicy: ClusterFirst
+```
+
+这意味着：
+
+1. Pod 的 `/etc/resolv.conf` 中的 nameserver 是 CoreDNS 的 ClusterIP（如 `10.96.0.10`）；
+2. 所有 DNS 请求都会先发给 CoreDNS；
+3. 如果 CoreDNS 解析不到（如 `yang.test.org`），CoreDNS **返回 NXDOMAIN 或 SERVFAIL**；
+4. ❌ 不会“自动尝试”节点的 DNS，也不会 fallback 到 `/etc/resolv.conf` 中的其它 DNS；
+5. 除非 CoreDNS 自己配置了 fallback 或 `forward .` 到外部 DNS。
+
+
+
+**Pod 不会继承 Node 的 DNS 服务器设置**
+
+如果你想让所有未匹配的域名都交给私有 DNS：
+
+```bash
+.:53 {
+    ...
+    forward . 192.168.100.2  # 或多个 IP
+    ...
+}
+```
+
+
+
+**查看是否 CoreDNS 真的接收请求？**
+
+```bash
+kubectl logs -n kube-system -l k8s-app=kube-dns
+```
+
+
+
+##### ClusterFirst 和 None的区别
+
+| 模式                   | DNS 从哪儿解析                                               |
+| ---------------------- | ------------------------------------------------------------ |
+| `ClusterFirst`（默认） | 使用集群内的 DNS 服务（CoreDNS）解析，优先解析 Kubernetes 服务域名 |
+| `None`                 | 不使用 CoreDNS，完全由你自己指定 DNS 服务器和搜索域（`dnsConfig`） |
+
+
+
+##### Default 和 None的区别
+
+| 属性                             | `dnsPolicy: Default`                      | `dnsPolicy: None`                                |
+| -------------------------------- | ----------------------------------------- | ------------------------------------------------ |
+| DNS 来自哪里？                   | ✅ **直接继承 Node 的 `/etc/resolv.conf`** | ❌ **完全自定义，需搭配 `dnsConfig` 手动指定**    |
+| 是否使用 CoreDNS？               | ❌ 否，除非节点 DNS 配置中写了 CoreDNS     | ❌ 否                                             |
+| 是否可以解析 Kubernetes 服务名？ | ❌ 不能（除非 Node 自己能解析）            | ❌ 不能（除非你在 `dnsConfig` 指定）              |
+| 是否可以控制 DNS 设置？          | ❌ 不行，只继承 Node 配置                  | ✅ 可以通过 `dnsConfig` 指定 DNS、search、options |
+| 使用场景                         | 你想让 Pod 的 DNS 和 Node 完全一致        | 你要手动控制 DNS 配置（特别精细）                |
+
+
+
+##### ClusterFirstWithHostNet的场景示例
+
+`dnsPolicy: ClusterFirstWithHostNet` 是 Kubernetes 中一个**特殊的 DNS 策略**，它结合了：
+
+- **`hostNetwork: true`（Pod 直接使用宿主机网络）**
+- **集群内 DNS 解析能力（CoreDNS）**
+
+
+
+**默认情况下的问题：**
+
+如果你使用 `hostNetwork: true`，**默认的 `dnsPolicy` 会是 `Default`**，这会导致：
+
+- Pod 使用的是 Node 的 `/etc/resolv.conf`
+- 🚫 无法解析 Kubernetes 服务名称（例如 `svc.cluster.local`）
+
+这可能导致：
+
+- 应用连接服务失败
+- 解析 `kubernetes.default` 报错
+
+
+
+**解决方法：设置为 `ClusterFirstWithHostNet`**
+
+```yaml
+spec:
+  hostNetwork: true
+  dnsPolicy: ClusterFirstWithHostNet
+```
+
+这样即使你用了 Node 网络，Pod 依然会使用 **CoreDNS 的 ClusterIP 作为 nameserver**，解析服务名就不会失效 ✅
+
+
+
+**应用场景**
+
+**网络插件、守护进程、监控代理**
+
+这些组件必须运行在 **hostNetwork**，但仍然需要解析服务名，如：
+
+- `kube-proxy`
+- `calico-node` / `cilium-agent`
+- `fluentd` / `vector`（日志收集器，可能要连接内部服务）
+- `node-exporter`（需要访问 Prometheus service）
+
+> 如果没有设置 `ClusterFirstWithHostNet`，这些组件解析不了服务，会日志报错！
 
 
 

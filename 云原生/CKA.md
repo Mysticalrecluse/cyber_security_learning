@@ -598,7 +598,7 @@ candidate@master01:~# exit
 Task 
 重新配置 spline-reticulator namespace 中现有的 front-end Deployment，以公开现有容器 nginx 的端口 80/tcp  
 创建一个名为 front-end-svc 的新 Service ，以公开容器端口 80/tcp  
-配置新的 Service ，以通过 NodePort 公开各个 Pod  
+配置新的 Service ，以通过 NodePort 公开各个 --  
 ```
 
 

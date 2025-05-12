@@ -76,6 +76,239 @@ LISTEN 0      4096               *:10250            *:*    users:(("kubelet",pid
 
 
 
+#### Kubernetes API鉴权流程
+
+![image-20250425091845076](../markdown_img/image-20250425091845076.png)
+
+
+
+#### Kubernetes API 鉴权类型
+
+鉴权类型
+
+```http
+https://kubernetes.io/zh-cn/docs/reference/access-authn-authz/authorization/
+```
+
+
+
+##### 配置api Server支持的鉴权类型
+
+```bash
+[root@master-01 ~]#cat /etc/systemd/system/kube-apiserver.service
+[Unit]
+Description=Kubernetes API Server
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/kube-apiserver \
+  --allow-privileged=true \
+  --anonymous-auth=false \
+  --api-audiences=api,istio-ca \
+  --authorization-mode=Node,RBAC \      # 默认的鉴权类型是Node，RBAC,API Server 开启 Node 鉴权（Node Authorizer） 是为了 控制 kubelet（或其他节点组件）访问 Kubernetes API 的权限
+  --bind-address=10.0.0.201 \
+  --client-ca-file=/etc/kubernetes/ssl/ca.pem \
+  --endpoint-reconciler-type=lease \
+  --etcd-cafile=/etc/kubernetes/ssl/ca.pem \
+  --etcd-certfile=/etc/kubernetes/ssl/kubernetes.pem \
+  --etcd-keyfile=/etc/kubernetes/ssl/kubernetes-key.pem \
+  --etcd-servers=https://10.0.0.206:2379,https://10.0.0.207:2379,https://10.0.0.208:2379 \
+  --kubelet-certificate-authority=/etc/kubernetes/ssl/ca.pem \
+  --kubelet-client-certificate=/etc/kubernetes/ssl/kubernetes.pem \
+  --kubelet-client-key=/etc/kubernetes/ssl/kubernetes-key.pem \
+  --secure-port=6443 \
+  --service-account-issuer=https://kubernetes.default.svc \
+  --service-account-signing-key-file=/etc/kubernetes/ssl/ca-key.pem \
+  --service-account-key-file=/etc/kubernetes/ssl/ca.pem \
+  --service-cluster-ip-range=10.100.0.0/16 \
+  --service-node-port-range=30000-32767 \
+  --tls-cert-file=/etc/kubernetes/ssl/kubernetes.pem \
+  --tls-private-key-file=/etc/kubernetes/ssl/kubernetes-key.pem \
+  --requestheader-client-ca-file=/etc/kubernetes/ssl/ca.pem \
+  --requestheader-allowed-names= \
+  --requestheader-extra-headers-prefix=X-Remote-Extra- \
+  --requestheader-group-headers=X-Remote-Group \
+  --requestheader-username-headers=X-Remote-User \
+  --proxy-client-cert-file=/etc/kubernetes/ssl/aggregator-proxy.pem \
+  --proxy-client-key-file=/etc/kubernetes/ssl/aggregator-proxy-key.pem \
+  --enable-aggregator-routing=true \
+  --v=2
+Restart=always
+RestartSec=5
+Type=notify
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+```
+
+
+
+
+
+##### Node（节点鉴权）
+
+针对kubelet发出的API进行鉴权
+
+授予 node 节点的 kubelet 读取 services、endpoints、secrets、configmaps等事件状态，并向API Server 更新 Pod 与 Node 状态。
+
+
+
+###### 为什么 API Server 要开启 Node 鉴权？
+
+**原因：Kubelet 需要访问 API Server**
+
+Kubelet 是每个节点上运行的核心组件，它需要频繁地和 API Server 通信来完成一系列任务，比如：
+
+- 获取 Pod 资源信息（自己该运行哪些 Pod）
+- 获取 ConfigMap、Secret、Volume 等配置资源
+- 上报 Pod 状态、Node 状态
+- 创建/删除 Volume Attachment 等资源
+
+由于 kubelet 是通过 API Server 来做这些事情的，**就必须具备访问 API Server 的权限**。
+
+
+
+**不能让 kubelet 拥有太多权限！**
+
+<span style="color:red">如果不给 kubelet 限权，它就有可能访问不属于它自己的资源（比如别的节点上的 Pod 或 Secret）——这会产生**严重的安全隐患**</span>
+
+
+
+###### 解决方案：Node Authorizer + Node身份（Node身份认证）
+
+为了安全，Kubernetes 引入了两个机制：
+
+1. **Node身份认证机制（Node Authentication）**
+
+- 每个 kubelet 使用一个身份登录到 API Server，常见的是通过 **bootstrap token 申请证书**，身份是 `system:node:<nodeName>`，属于组 `system:nodes`
+
+2. **Node Authorizer（节点授权器）**
+
+- API Server 启用了 `--authorization-mode=Node` 之后，就会使用 Node Authorizer 判断：
+
+> 这个 kubelet 请求的资源是不是“它该能访问的”？
+
+Node Authorizer 的规则是这样的：
+
+- kubelet 只能访问**和它自己节点相关的资源**，比如：
+  - 这个节点上的 Pod
+  - 和这个节点相关的 VolumeAttachment
+  - 这个节点自己的 Node 对象
+  - 与其管理的 Pod 相关的 Secret、ConfigMap（只读）
+
+```ABAP
+当你在 Kubernetes 的 API Server 中设置：
+--authorization-mode=Node
+
+就会自动启用 Node Authorizer，并且它有一套内置的、不可修改的规则，用于判断 kubelet 是否有权限访问某些资源。你不需要、也不能直接配置 Node Authorizer 的规则 —— 它是 硬编码（built-in）在 Kubernetes 里的安全策略。
+```
+
+
+
+**🔒 举个例子：**
+
+假设你有三个节点：`node1`, `node2`, `node3`
+
+- kubelet 运行在 `node1`
+- 它的身份是 `system:node:node1`
+
+如果 kubelet `node1` 想获取 `node2` 上的 Pod 信息，Node Authorizer 会拒绝请求 ✅
+
+
+
+###### 进阶：RBAC 和 Node Authorizer 是怎么配合的？
+
+你可以同时启用多个授权模式：
+
+```bash
+--authorization-mode=Node,RBAC
+```
+
+<span style="color:red;font-weight:700">顺序很重要</span>：API Server 会**按顺序尝试每种授权器**，只要有一个授权器允许了操作，请求就会被允许。
+
+- Node Authorizer 负责节点权限
+- RBAC 可以管控用户、控制器、Webhook 等
+
+
+
+##### Webhook
+
+Webhook 鉴权是 Kubernetes 支持的一种**自定义认证机制**，它的核心思想是：
+
+当 Kubernetes 需要判断一个用户是否有权限执行某个操作时，它会**发送一个 HTTP 请求（POST）给你自己实现的一个 REST 服务（也就是 Webhook 服务）**，由你来告诉它：这个请求是否被允许。
+
+
+
+###### 实际案例
+
+你写了一个 Webhook 服务，每次有人操作 Kubernetes，比如创建 Pod，Kubernetes 就会发送一个 JSON 请求到你的服务，像这样：
+
+```json
+{
+  "apiVersion": "authorization.k8s.io/v1",
+  "kind": "SubjectAccessReview",
+  "spec": {
+    "user": "alice",
+    "resourceAttributes": {
+      "namespace": "dev",
+      "verb": "create",
+      "resource": "pods"
+    }
+  }
+}
+```
+
+你的 Webhook 服务看到了这个请求后，查一下自己的数据库，发现 “alice” 有权限创建 dev 命名空间下的 Pod，于是它返回：
+
+```json
+{
+  "apiVersion": "authorization.k8s.io/v1",
+  "kind": "SubjectAccessReview",
+  "status": {
+    "allowed": true
+  }
+}
+```
+
+这样 Kubernetes 就会放行这个操作
+
+
+
+###### 配置 Webhook 鉴权
+
+你需要在 Kubernetes 的 API Server 配置中加入如下内容（简化版本）：
+
+```bash
+--authorization-mode=Webhook
+--authorization-webhook-config-file=/etc/k8s/webhook-config.yaml
+```
+
+配置文件 `webhook-config.yaml` 内容如下（示例）：
+
+```yaml
+apiVersion: v1
+kind: Config
+clusters:
+- name: my-authz-webhook
+  cluster:
+    certificate-authority: /path/to/ca.pem
+    server: https://my-authz-service.example.com/authz
+users:
+- name: webhook-user
+contexts:
+- context:
+    cluster: my-authz-webhook
+    user: webhook-user
+  name: webhook-context
+current-context: webhook-context
+```
+
+
+
+
+
 ### 认证机制
 
 主要涉及到**用户帐号UA**和**服务帐号SA**的认证内容
@@ -3513,3 +3746,435 @@ https://kubesphere.io             2025-02-11 13:35:25
 
 # 最后删掉kubesphere创建的所有的namespace
 ```
+
+
+
+
+
+## 生产案例：RBAC多账户实现
+
+
+
+### 基于Token访问
+
+```bash
+# 在指定namespace创建账户：（在test名称空间，创建mystical账户）
+[root@master-01 ~]#kubectl create sa mystical -n test
+serviceaccount/mystical created
+
+
+# 创建role规则
+[root@master-01 ~]#cat mystical-role.yaml 
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  namespace: test
+  name: mystical-role
+rules:
+- apiGroups: ["*"]
+  resources: ["pods","pods/exec"] # pods/exec:能够在pod中执行命令
+  verbs: ["*"]
+  ##RO-ROLE
+  #verbs: ["get","watch","list"]
+- apiGroups: ["extensions","apps/v1"]
+  resources: ["deployments"]
+  verbs: ["get","list","watch","create","update","patch","delete"]
+  ##RO-ROLE
+  #verbs: ["get","watch","list"]
+  
+[root@master-01 ~]#kubectl apply -f mystical-role.yaml 
+role.rbac.authorization.k8s.io/mystical-role created
+
+
+# 将规则与账户进行绑定
+[root@master-01 ~]#cat mystical-role-bind.yaml 
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: role-bind-mystical
+  namespace: test
+subjects:
+- kind: ServiceAccount
+  name: mystical
+  namespace: test
+roleRef:
+  kind: Role
+  name: mystical-role
+  apiGroup: rbac.authorization.k8s.io
+
+[root@master-01 ~]#kubectl apply -f mystical-role-bind.yaml 
+rolebinding.rbac.authorization.k8s.io/role-bind-mystical created
+
+
+# 获取token名称
+# 1.26以上版本的k8s，要自己创建token
+[root@master-01 ~]#cat mystical-token.yaml 
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/service-account-token
+metadata:
+  name: mystical-user-token
+  namespace: test
+  annotations:
+    kubernetes.io/service-account.name: "mystical" # 标注在哪个账号上创建token
+
+[root@master-01 ~]#kubectl apply -f mystical-token.yaml 
+secret/mystical-user-token created
+
+# 查看
+[root@master-01 ~]#kubectl get secrets -n test|grep mystical
+mystical-user-token   kubernetes.io/service-account-token   3      45s
+
+[root@master-01 ~]#kubectl describe secrets -n test mystical-user-token 
+Name:         mystical-user-token
+Namespace:    test
+Labels:       <none>
+Annotations:  kubernetes.io/service-account.name: mystical
+              kubernetes.io/service-account.uid: d051c7a2-ff34-4244-b916-47afe459f0dc
+
+Type:  kubernetes.io/service-account-token
+
+Data
+====
+namespace:  4 bytes
+token:      eyJhbGciOiJSUzI1NiIsImtpZCI6InZDaFZyZWxCVlliYVRtZ0JVU2c0ektSbXhHN2QxMzZkZ2wwZUxGNEdpWTgifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJ0ZXN0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6Im15c3RpY2FsLXVzZXItdG9rZW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoibXlzdGljYWwiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJkMDUxYzdhMi1mZjM0LTQyNDQtYjkxNi00N2FmZTQ1OWYwZGMiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6dGVzdDpteXN0aWNhbCJ9.ftDzPbKsS5NXoFAgC1LR3S4MOA0ig7UBTB9yzpWb5BIBVSF2BUsFINwxc_mqphe7gn05eG_qpMNAMyj-KO1yDPKXLB1QHDjCIwbHKGme6nDek1sqD38-jkqb1CQG-z6lP5vffoZKcm09XUaU0FTme2xnr7hhHu1ap-_mPG-G9mBj6tWOAYeWaBrJYHrs3mZMcpSfp0in1fe__NJKF4eNajYiyOXQ_LswCNq0HXBwycmVnrm0l3gDmvNDiz7S3vvhoBhFBFPW2Els38S-KFY9TPv4HlCMD_tGOOINAM05zD-e7EoLDp2k7q7qu4tOesy8NldsvMjST_2A8WWyoCcOtg
+ca.crt:     1310 bytes
+
+# 上述token是这个账户登录的认证，后续使用token进行登录
+```
+
+
+
+**注意**
+
+```ABAP
+给 pods/exec 授权时，必须使用 create 动作,因为 kubectl exec 的底层机制是向 Kubernetes API 发起一个“创建”子资源请求。
+```
+
+**🔍 背后机制解析**
+
+在 Kubernetes 中，`pods/exec` 是一个 **“子资源（subresource）”**，它不是对 Pod 本身的普通读取、修改或删除操作，而是对 Pod 附加功能的一种“启动行为”。
+
+执行命令：
+
+```bash
+kubectl exec -it my-pod -- /bin/sh
+```
+
+实际上会触发下面这个 HTTP 请求：
+
+```bash
+POST /api/v1/namespaces/{namespace}/pods/{pod}/exec
+```
+
+也就是说：
+
+- 它是一个 **HTTP POST（创建）请求**；
+- 操作的是子资源 `pods/exec`；
+- 所以需要 `create` 权限来允许“发起一次 exec session”。
+
+
+
+**✅ 示例：对应 RBAC 权限配置**
+
+要执行 `kubectl exec`，需要授予以下权限：
+
+```yaml
+apiGroups: [""]
+resources: ["pods/exec"]
+verbs: ["create"]
+```
+
+可以通过 Role 或 ClusterRole 来配置，比如：
+
+```yaml
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: pod-exec-role
+  namespace: my-namespace
+rules:
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create"]
+```
+
+然后通过 RoleBinding 绑定给你的用户或 ServiceAccount。
+
+
+
+**创建dashboard进行测试**
+
+```bash
+[root@master-01 dashborad]# https://github.com/kubernetes/dashboard/releases/download/kubernetes-dashboard-7.12.0/kubernetes-dashboard-7.12.0.tgz
+[root@master-01 dashborad]# tar xf kubernetes-dashboard-7.12.0.tgz
+[root@master-01 dashborad]# vim kubernetes-dashboard/values.yaml
+......
+  ingress:
+    enabled: true    # 这里改为true
+    hosts:
+      # Keep 'localhost' host only if you want to access Dashboard using 'kubectl port-forward ...' on:
+      # https://localhost:8443
+      #- localhost
+      - kubernetes.dashboard.com # 这里指定域名
+    ingressClassName: nginx      # 这里使用提前配置好的ingress-nginx
+......
+
+# 部署helm
+[root@master-01 dashborad]# helm install dashboard ./kubernetes-dashboard --namespace dashboard --create-namespace
+
+# 在浏览器访问
+https://kubernetes.dashboard.com
+```
+
+![image-20250425135614276](../markdown_img/image-20250425135614276.png)
+
+输入之前创建的mystical账户的token
+
+```bash
+[root@master-01 ~]#kubectl get secrets -n test|grep mystical
+mystical-user-token   kubernetes.io/service-account-token   3      45s
+
+[root@master-01 ~]#kubectl describe secrets -n test mystical-user-token 
+Name:         mystical-user-token
+Namespace:    test
+Labels:       <none>
+Annotations:  kubernetes.io/service-account.name: mystical
+              kubernetes.io/service-account.uid: d051c7a2-ff34-4244-b916-47afe459f0dc
+
+Type:  kubernetes.io/service-account-token
+
+Data
+====
+namespace:  4 bytes
+token:      eyJhbGciOiJSUzI1NiIsImtpZCI6InZDaFZyZWxCVlliYVRtZ0JVU2c0ektSbXhHN2QxMzZkZ2wwZUxGNEdpWTgifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJ0ZXN0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6Im15c3RpY2FsLXVzZXItdG9rZW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoibXlzdGljYWwiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJkMDUxYzdhMi1mZjM0LTQyNDQtYjkxNi00N2FmZTQ1OWYwZGMiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6dGVzdDpteXN0aWNhbCJ9.ftDzPbKsS5NXoFAgC1LR3S4MOA0ig7UBTB9yzpWb5BIBVSF2BUsFINwxc_mqphe7gn05eG_qpMNAMyj-KO1yDPKXLB1QHDjCIwbHKGme6nDek1sqD38-jkqb1CQG-z6lP5vffoZKcm09XUaU0FTme2xnr7hhHu1ap-_mPG-G9mBj6tWOAYeWaBrJYHrs3mZMcpSfp0in1fe__NJKF4eNajYiyOXQ_LswCNq0HXBwycmVnrm0l3gDmvNDiz7S3vvhoBhFBFPW2Els38S-KFY9TPv4HlCMD_tGOOINAM05zD-e7EoLDp2k7q7qu4tOesy8NldsvMjST_2A8WWyoCcOtg
+ca.crt:     1310 bytes
+```
+
+![image-20250425135949688](../markdown_img/image-20250425135949688.png)
+
+尝试在pod内容器中运行（exec）
+
+![image-20250425140235654](../markdown_img/image-20250425140235654.png)
+
+访问其他名称空间和资源会报错
+
+![image-20250425140024941](../markdown_img/image-20250425140024941.png)
+
+
+
+### 基于kube-config文件登录
+
+注意：准备cfssl签发环境，点击这里：<a href="CloudNative-velero架构及备份流程.md#配置Velero认证环境" style="font-size:18px; font-weight:500; color:#2b6cb0;">配置Velero认证环境（这里有cfssl签发环境）</a>
+
+```bash
+# 创建csr文件
+[root@master-01 rbac-kubeconfig]#cat mystical-csr.json 
+{
+  "CN": "China",
+  "hosts": [],
+  "key": {
+    "algo": "rsa",
+    "size": 2048
+  },
+  "names": [
+     {
+      "C": "CN",
+      "ST": "Beijing",
+      "L": "Beijing",
+      "O": "k8s",
+      "OU": "System"
+    }
+  ]
+}
+
+# 签发证书
+# 将ca-config.json从部署节点传到master节点
+[root@haproxy1 kubeasz]#scp /etc/kubeasz/clusters/k8s-cluster1/ssl/ca-config.json master1:
+ca-config.json                                    100%  459    98.3KB/s   00:00 
+
+# 查看ca-config.json
+[root@master-01 rbac-kubeconfig]#cat ../ca-config.json 
+{
+  "signing": {
+    "default": {
+      "expiry": "438000h"
+    },
+    "profiles": {
+      "kubernetes": {
+        "usages": [
+            "signing",
+            "key encipherment",
+            "server auth",
+            "client auth"
+        ],
+        "expiry": "438000h"
+      },
+      "kcfg": {
+        "usages": [
+            "signing",
+            "key encipherment",
+            "client auth"
+        ],
+        "expiry": "438000h"
+      }
+    }
+  }
+}
+
+
+# 在master节点执行，注意执行前，要下载/部署cfssl的各个组件
+[root@master-01 rbac-kubeconfig]#cfssl gencert -ca=/etc/kubernetes/ssl/ca.pem -ca-key=/etc/kubernetes/ssl/ca-key.pem -config=/root/ca-config.json -profile=kubernetes mystical-csr.json | cfssljson -bare mystical
+2025/04/25 14:54:41 [INFO] generate received request
+2025/04/25 14:54:41 [INFO] received CSR
+2025/04/25 14:54:41 [INFO] generating key: rsa-2048
+2025/04/25 14:54:42 [INFO] encoded CSR
+2025/04/25 14:54:42 [INFO] signed certificate with serial number 307199575539620096396385894917461393316695423217
+2025/04/25 14:54:42 [WARNING] This certificate lacks a "hosts" field. This makes it unsuitable for
+websites. For more information see the Baseline Requirements for the Issuance and Management
+of Publicly-Trusted Certificates, v.1.1.6, from the CA/Browser Forum (https://cabforum.org);
+specifically, section 10.2.3 ("Information Requirements").
+
+# 查看，这里重要的是生成的私钥：mystical-key.pem，以及证书：mystical.pem
+[root@master-01 rbac-kubeconfig]#ls
+mystical.csr  mystical-csr.json  mystical-key.pem  mystical.pem
+```
+
+
+
+#### 补充：这里也可以通过Openssl来生成自己签发的私钥和证书
+
+```bash
+# 生成私钥
+[root@master-01 openssl]#openssl genrsa -out mystical.key 2048
+[root@master-01 openssl]#ls
+mystical.key
+
+# 创建 CSR 配置文件（mystical.csr.cnf）
+[root@master-01 openssl]#cat mystical.csr.cnf 
+[ req ]
+prompt = no                    # 禁止命令行交互，使用下面 [dn] 区块提供的字段自动填充
+distinguished_name = dn        # 指定使用哪个 section 来填充“主题”（Subject）字段，这里使用 [dn]
+req_extensions = v3_req        # 指定使用哪个 section 中的扩展字段（即附加的证书用途信息），这里是 [v3_req]
+
+[ dn ]
+CN = mystical-user             # 用户名，在 Kubernetes 中表示“这个证书是谁”（如 mystical-user）
+O = k8s                        # 所属组，在 Kubernetes 中映射为 Group，可用于 RBAC 授权
+OU = System                    # 部门单位，可作为标识用途，但 Kubernetes 不使用它
+C = CN                         # 国家代码，这里 CN 代表中国
+ST = Beijing                   # 省份，比如 Beijing
+L = Beijing                    # 城市，也写 Beijing，仅供显示用
+
+[ v3_req ]                     # CSR 的扩展用途（X.509 v3 扩展）,这是告诉 OpenSSL，这个证书的“用途”。
+# 指定基础密钥用途，如数字签名、加密密钥。critical 表示此项必须理解、不能忽略
+# digitalSignature: 允许使用该证书进行数字签名
+# keyEncipherment: 允许使用该证书进行密钥交换（加密）
+# extendedKeyUsage: 指定扩展用途，这里为 clientAuth，表示该证书用于客户端身份验证
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = clientAuth
+```
+
+注意：Kubernetes 实际使用的是 `CN` 和 `O`，其他字段仅供识别和审计，不参与权限判断。
+
+**用于 Kubernetes 的效果**
+
+生成这个证书后，Kubernetes 会识别出：
+
+- 用户名：`mystical-user`
+- 用户组：`k8s`
+
+可以通过 RBAC 给这个用户或组授权，比如：
+
+```yaml
+subjects:
+- kind: User
+  name: mystical-user
+```
+
+```yaml
+subjects:
+- kind: Group
+  name: k8s
+```
+
+
+
+**生成 CSR 文件**
+
+```bash
+[root@master-01 openssl]# openssl req -new -key mystical.key -out mystical.csr -config mystical.csr.cnf
+```
+
+
+
+**签发证书（用 kubeadm 提供的 CA）**
+
+```bash
+[root@master-01 openssl]# openssl x509 -req -in mystical.csr -CA /etc/kubernetes/ssl/ca.pem -CAkey /etc/kubernetes/ssl/ca-key.pem -CAcreateserial -out mystical.crt -days 3650 -extensions v3_req -extfile mystical.csr.cnf 
+Certificate request self-signature ok
+subject=CN = mystical, O = k8s, OU = System, C = CN, ST = Beijing, L = Beijing
+
+# 查看
+[root@master-01 openssl]#ls
+mystical.crt  mystical.csr  mystical.csr.cnf  mystical.key
+```
+
+
+
+#### 生成证书后，即可生成普通用户kubeconfig文件
+
+```bash
+[root@master-01 openssl]# kubectl config set-cluster cluster1 --certificate-authority=/etc/kubernetes/ssl/ca.pem --embed-certs=true --server=https://10.0.0.88:6443 --kubeconfig=mystical.kubeconfig
+Cluster "cluster1" set.
+
+[root@master-01 openssl]#ls
+mystical.crt  mystical.csr  mystical.csr.cnf  mystical.key  mystical.kubeconfig
+
+# 设置客户端认证参数
+[root@master-01 openssl]#kubectl config set-credentials mystical --client-certificate=/etc/kubernetes/ssl/mystical.crt --client-key=/etc/kubernetes/ssl/mystical.key --embed-certs=true --kubeconfig=mystical.kubeconfig 
+User "mystical" set.
+
+# 设置上下文参数（多集群使用上下文区分）
+[root@master-01 openssl]#kubectl config set-context cluster1 --cluster=cluster1 --user=mystical --namespace=test --kubeconfig=mystical.kubeconfig 
+Context "cluster1" created.
+
+# 设置默认上下文
+[root@master-01 openssl]#kubectl config use-context cluster1 --kubeconfig=mystical.kubeconfig 
+Switched to context "cluster1".
+
+# 注意这里的mystical是user而不是sa，所以它的kind类型是User，要新创建一个RoleBinding，给User账户的mystical授权
+[root@master-01 openssl]#cat mystical-user-access.yaml 
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mystical-user-access
+  namespace: test
+subjects:
+- kind: User      # 注意这里的User
+  name: mystical
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: mystical-role
+  apiGroup: rbac.authorization.k8s.io
+
+# 启用
+[root@master-01 openssl]#kubectl apply -f mystical-user-access.yaml 
+rolebinding.rbac.authorization.k8s.io/mystical-user-access created
+
+# 执行
+[root@master-01 openssl]#kubectl --kubeconfig=./mystical.kubeconfig get pod -n test
+NAME                                   READY   STATUS    RESTARTS   AGE
+deployment-pod-test-7999bcfc77-7jz5f   1/1     Running   0          97m
+deployment-pod-test-7999bcfc77-gmqc4   1/1     Running   0          97m
+deployment-pod-test-7999bcfc77-kwp6w   1/1     Running   0          7h8m
+
+# 仅能支持mystical-role这个Role的权限
+[root@master-01 openssl]#kubectl --kubeconfig=./mystical.kubeconfig get deploy
+Error from server (Forbidden): deployments.apps is forbidden: User "mystical" cannot list resource "deployments" in API group "apps" in the namespace "test
+```
+
+```ABAP
+这里的重点是要区分，SA和USER是两个不同的账户体系，即使名称一样，也不相同，要各自授权
+```
+

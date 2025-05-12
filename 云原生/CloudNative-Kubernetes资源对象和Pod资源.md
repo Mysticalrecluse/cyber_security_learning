@@ -3670,6 +3670,194 @@ node3     27m          1%     715Mi           39%
 
 
 
+##### metrics-server解读
+
+✅ **metrics-server采集指标的全过程，即这个过程中的重点资源**
+
+metrics-server 的 API 是通过创建 `APIService` 对象，注册到 kube-apiserver 的聚合层（kube-aggregator）中。
+
+```bash
+# apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io
+# 查看metrics-server的apiserver对象
+[root@master1 ~]# kubectl get apiservices.apiregistration.k8s.io -n kube-system v1beta1.metrics.k8s.io 
+NAME                     SERVICE                      AVAILABLE   AGE
+v1beta1.metrics.k8s.io   kube-system/metrics-server   True        6d1h
+
+# 查看资源清单
+[root@master1 ~]# kubectl get apiservices.apiregistration.k8s.io -n kube-system v1beta1.metrics.k8s.io -o yaml
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apiregistration.k8s.io/v1","kind":"APIService","metadata":{"annotations":{},"labels":{"k8s-app":"metrics-server"},"name":"v1beta1.metrics.k8s.io"},"spec":{"group":"metrics.k8s.io","groupPriorityMinimum":100,"insecureSkipTLSVerify":true,"service":{"name":"metrics-server","namespace":"kube-system"},"version":"v1beta1","versionPriority":100}}
+  creationTimestamp: "2025-05-02T06:13:47Z"
+  labels:
+    k8s-app: metrics-server
+  name: v1beta1.metrics.k8s.io
+  resourceVersion: "348056"
+  uid: d7c94e84-00a7-47e1-a16a-dbc3c41017b4
+spec:
+  group: metrics.k8s.io
+  groupPriorityMinimum: 100
+  insecureSkipTLSVerify: true     # 跳过了front-proxy-ca的验证，测试环境使用，生产环境不安全
+  # insecureSkipTLSVerify: false
+  # caBundle: <base64-encoded front-proxy-ca.crt>
+  service:
+    name: metrics-server
+    namespace: kube-system
+    port: 443
+  version: v1beta1
+  versionPriority: 100
+```
+
+
+
+metrics-server 会向每个节点的 kubelet 发出请求，访问 `/stats/summary` 接口，这是采集 **Pod 和 Node 的 CPU/内存等资源使用情况** 的关键数据源。
+
+```bash
+# metrics-server的pod，与kubelet通信，需要Kubernetes-ca证书验证kubelet的客户端证书
+# 查看metrics-server的pod
+[root@master1 ~]# kubectl get pod -n kube-system metrics-server-6b66984b5c-76n6k 
+NAME                              READY   STATUS    RESTARTS   AGE
+metrics-server-6b66984b5c-76n6k   1/1     Running   0          4d
+
+# 查看资源清单
+[root@master1 ~]# kubectl get pod -n kube-system metrics-server-6b66984b5c-76n6k -o yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    cni.projectcalico.org/containerID: 6b5f240b002dce5021d1b18c5e1ccfee524869a947a3ef8
+117a7d99f302f969f
+    cni.projectcalico.org/podIP: 10.200.200.1/32
+    cni.projectcalico.org/podIPs: 10.200.200.1/32
+  creationTimestamp: "2025-05-04T07:31:19Z"
+  generateName: metrics-server-6b66984b5c-
+  labels:
+    k8s-app: metrics-server
+    pod-template-hash: 6b66984b5c
+  name: metrics-server-6b66984b5c-76n6k
+  namespace: kube-system
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: metrics-server-6b66984b5c
+    uid: b9dc4666-3d11-47ef-8253-8941829d4767
+  resourceVersion: "348040"
+  uid: 2ae17462-194f-47d0-b21c-f541ab005445
+spec:
+  containers:
+  - args:
+    - --cert-dir=/tmp
+    - --secure-port=10250
+    - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+    - --kubelet-use-node-status-port
+    - --metric-resolution=15s
+    - --kubelet-insecure-tls    # 这里不安全，生产环境不建议
+    # - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt
+    image: harbor.magedu.mysticalrecluse.com/k8simage/metrics-server:v0.7.2
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: /livez
+        port: https
+        scheme: HTTPS
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+    name: metrics-server
+    ports:
+    - containerPort: 10250
+      name: https
+      protocol: TCP
+    readinessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: /readyz
+        port: https
+        scheme: HTTPS
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 200Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /tmp
+      name: tmp-dir
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-zvfff
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  nodeName: work2.mystical.org
+  nodeSelector:
+    kubernetes.io/os: linux
+  preemptionPolicy: PreemptLowerPriority
+  priority: 2000000000
+  priorityClassName: system-cluster-critical
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: metrics-server
+  serviceAccountName: metrics-server
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - emptyDir: {}
+    name: tmp-dir
+  - name: kube-api-access-zvfff
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+```
+
+
+
+
+
+
+
 ##### 资源限制实现
 
 范例：limits和requests值大小

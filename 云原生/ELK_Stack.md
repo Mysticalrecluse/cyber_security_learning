@@ -407,7 +407,7 @@ Loki 受到 Prometheus启发,也使用标签来作为索引，而不是对全文
 
 
 
-# Elasticsearch 部署和管理
+# Elasticsearch部署和管理
 
 Elasticsearch 是一个分布式的免费开源搜索和分析引擎，适用于包括文本、数字、地理空间、结构化和 非结构化数据等在内的所有类型的数据
 
@@ -2180,6 +2180,822 @@ fs.file-max = 1000000
 
 
 
+## ElasticSearch应用
+
+
+
+### 创建、查询、删除索引
+
+这里我们可以使用Kibana的开发工具对Elasticsearch进行操作，选择“DevTools”开发工具：
+
+![image-20250506110317866](../markdown_img/image-20250506110317866.png)
+
+![image-20250506110358258](../markdown_img/image-20250506110358258.png)
+
+
+
+#### 创建索引
+
+![image-20250506111325697](../markdown_img/image-20250506111325697.png)
+
+```http
+PUT /kubernetes
+{
+  "settings": {
+    "index": {
+      "number_of_shards": "2",
+      "number_of_replicas": "0"
+    }
+  }
+}
+```
+
+![image-20250506111411157](../markdown_img/image-20250506111411157.png)
+
+查看Cerebro,可以都看到刚才创建的索引
+
+![image-20250506111529328](../markdown_img/image-20250506111529328.png)
+
+**创建带副本的索引**
+
+```http
+PUT /nat
+{
+  "settings": {
+    "index": {
+      "number_of_shards": "4",
+      "number_of_replicas": "1"
+    }
+  }
+}
+```
+
+![image-20250506111856591](../markdown_img/image-20250506111856591.png)
+
+#### 查询索引
+
+```http
+GET /_cat/indices
+```
+
+![image-20250506112445291](../markdown_img/image-20250506112445291.png)
+
+#### 删除索引
+
+```http
+DELETE /nat
+```
+
+![image-20250506112756466](D:\git_repository\cyber_security_learning\markdown_img\image-20250506112756466.png)
+
+
+
+### 插入数据
+
+```http
+URL规则：POST /{索引}/{类型}/{id}
+```
+
+插入数据（指定id）
+
+```http
+POST /kubernetes/user/1
+{
+  "id": 1,
+  "name": "mystical",
+  "age": 20,
+  "sex": "male"
+}
+```
+
+![image-20250506133639103](../markdown_img/image-20250506133639103.png)
+
+插入数据（不指定id）
+
+```http
+POST /kubernetes/user
+{
+  "id": 2,
+  "name": "kobe",
+  "age": 32,
+  "sex": "male"
+}
+```
+
+![image-20250506134431505](../markdown_img/image-20250506134431505.png)
+
+
+
+### 查询数据
+
+#### **查询全部数据**
+
+```http
+GET /kubernetes/user/_search
+```
+
+![image-20250506134753923](../markdown_img/image-20250506134753923.png)
+
+
+
+#### 根据id指定查询
+
+```http
+GET /kubernetes/user/1
+```
+
+![image-20250506135013924](../markdown_img/image-20250506135013924.png)
+
+
+
+#### 根据关键字查询数据
+
+```http
+GET /kubernetes/user/_search?q=name:kobe
+```
+
+![image-20250506135312947](../markdown_img/image-20250506135312947.png)
+
+
+
+### 更新数据
+
+在Elasticsearch中，文档数据是不可修改的，但是可以通过覆盖的方式进行更新
+
+更新一条数据的所有信息
+
+```http
+PUT /kubernetes/user/1
+{
+  "id":1,
+  "name":"susan",
+  "age":24,,
+  "sex":"female"
+}
+```
+
+![image-20250506135825945](../markdown_img/image-20250506135825945.png)
+
+可以看到数据已经被覆盖了。问题来了，可以局部更新吗？可以的，前面不是说，文档数据不能更新吗？其实是这样的：在内部，依然会查询到这个文档数据，然后进行覆盖操作，步骤如下：
+
+- 从旧文档中检索JSON
+- 修改它
+- 删除就旧文档
+- 索引新文档
+
+
+
+#### 局部更新
+
+```http
+POST /kubernetes/user/1/_update
+{
+  "doc":{
+    "age":33
+  }
+}
+```
+
+![image-20250506140507255](../markdown_img/image-20250506140507255.png)
+
+
+
+### 删除数据
+
+在Elasticsearch中，删除文档数据，只需要发起DELETE请求即可，不用额外的参数
+
+**删除一条存在的数据**
+
+```http
+DELETE /kubernetes/user/1
+```
+
+![image-20250506141031657](../markdown_img/image-20250506141031657.png)
+
+
+
+### DSL搜索
+
+Elasticsearch提供丰富且灵活的查询语句叫DSL查询（Query DSL），它允许你构建更加复杂，强大的查询。DSL以JSON请求的形式出现
+
+
+
+#### **示例1：查询名字是kobe的用户**
+
+```http
+POST /kubernetes/user/_search
+{
+  "query":{
+    "match":{   # match精确匹配，只是查询的一种
+      "name":"kobe"
+    }
+  }
+}
+```
+
+![image-20250506142417995](../markdown_img/image-20250506142417995.png)
+
+
+
+#### **示例2：查询年龄大于30岁的男性用户**
+
+```http
+生成数据,当索引不存在的时候，创建数据的时候会自动创建索引
+POST /test/user/1
+{
+  "id":1,
+  "name":"curry",
+  "age":37,
+  "sex":"male"
+}
+
+POST /test/user/2
+{
+  "id":2,
+  "name":"susan",
+  "age":26,
+  "sex":"female"
+}
+
+POST /test/user/3
+{
+  "id":3,
+  "name":"kobe",
+  "age":22,
+  "sex":"male"
+}
+```
+
+![image-20250506143221752](../markdown_img/image-20250506143221752.png)
+
+**查询**
+
+```http
+POST /test/user/_search
+{
+  "query":{
+    "bool":{
+      "filter":{
+        "range":{
+          "age":{
+            "gt":30
+          }
+        }
+      },
+      "must":{
+        "match":{
+          "sex":"male"
+        }
+      }
+    }
+  }
+}
+```
+
+![image-20250506143922574](../markdown_img/image-20250506143922574.png)
+
+##### 补充：`filter` 和 `must` 都是`bool`查询（`bool query`）的一部分，用于组合多个查询条件，但它们的行为和用途有明显区别
+
+**`must`**
+
+- **语义**：必须匹配（相当于逻辑 AND）。
+- **作用**：文档必须匹配 `must` 中的所有子查询，才能被返回。
+- **评分**：`must` 参与文档的**相关性评分（_score）**，即文档匹配得好坏会影响其得分排序。
+
+**`filter`**
+
+- **语义**：过滤匹配。
+- **作用**：文档必须满足 `filter` 条件才能被返回。
+- **评分**：`filter` **不参与评分**，只是一个纯过滤器，适合用在不需要打分的场景（比如范围过滤、精确值过滤）。
+- **性能**：因为不打分，**性能更好**，会被 Elasticsearch 缓存优化。
+
+
+
+**何时用 `filter`？何时用 `must`？**
+
+| 场景                       | 用 `must` | 用 `filter` |
+| -------------------------- | --------- | ----------- |
+| 需要全文搜索、相关性排序   | ✅ 是      | ❌ 否        |
+| 精确值匹配（状态、标签等） | ❌ 否      | ✅ 是        |
+| 范围查询（时间、年龄等）   | ❌ 否      | ✅ 是        |
+| 影响结果排序               | ✅ 是      | ❌ 否        |
+| 想要缓存以加快性能         | ❌ 否      | ✅ 是        |
+
+
+
+**打分的含义**
+
+在 Elasticsearch 中，“打分”是指对每个**匹配的文档**根据其**与查询条件的相关性**进行评分，称为 `_score`。这个评分决定了**搜索结果的排序顺序**，更相关的文档会排在更前面。
+
+
+
+**为什么要打分？**
+
+打分的目的是为了：
+
+- **排序搜索结果**：让更“相关”的内容排在前面。
+- **体现匹配程度**：不是简单的“是否匹配”，而是“匹配得有多好”。
+
+**举例说明**
+
+假设你搜索
+
+```json
+{
+  "query": {
+    "match": {
+      "message": "error"
+    }
+  }
+}
+```
+
+如果有两个文档：
+
+- 文档 A：`"message": "critical error occurred while processing"`
+- 文档 B：`"message": "everything is fine, no issue"`
+
+虽然两个都包含了关键词 "error"，但**文档 A 更相关**，它的 `_score` 会更高，因此它排在前面。
+
+**`_score` 在哪里体现？**
+
+在查询结果中，每个文档会带一个 `_score` 字段，例如：
+
+```json
+{
+  "_index": "log",
+  "_id": "1",
+  "_score": 2.354,
+  "_source": {
+    "message": "critical error occurred"
+  }
+}
+```
+
+**什么时候不需要打分？**
+
+不需要打分的场景一般是：
+
+- 过滤（`filter`）：
+  - 比如 `status = "active"`、`age > 18` 这类查询只是决定**是否符合条件**，不需要参与排序。
+  - 使用 `filter` 会提升性能，因为 Elasticsearch 可以**跳过打分计算**并启用缓存。
+
+
+
+#### 示例3：过滤name为kobe和curry的数据
+
+```http
+POST /test/user/_search
+{
+  "query":{
+    "match":{
+      "name": "kobe curry"
+    }
+  }
+}
+```
+
+![image-20250506145354026](../markdown_img/image-20250506145354026.png)
+
+
+
+## Elasticsearch核心概念
+
+### 文档
+
+在Elasticsearch中，文档以JSON格式存储，可以是复杂的结构，如
+
+```http
+# 查看文档
+GET /test/_doc/1
+{
+  "_index":"test",
+  "_type":"_doc",
+  "_id":"1",
+  "_version":1,
+  "_seq_no":0,
+  "primary_term":1,
+  "found":true
+  "_source":{
+    "id":1,
+    "name":"curry",
+    "age":37,
+    "sex":"male"
+  }
+}
+```
+
+一个文档不只有数据。它还包含了元数据（metadata）。三个必须得元数据节点是
+
+- `_index`: 文档存储的地方
+- `_type`：文档代表的对象的类
+- `_id`：文档的唯一标识
+
+
+
+### 查询响应
+
+在响应的数据中，如果我们不需要全部的字段，可以指定某些需要的字段进行返回。通过添加`_source`实现。
+
+```http
+GET /test/user/1?_source=id,name
+```
+
+![image-20250506151541090](../markdown_img/image-20250506151541090.png)
+
+如不需要返回元数据，仅仅返回原始数据，可以这样：
+
+```http
+GET /test/user/1/_source
+```
+
+![image-20250506151759982](../markdown_img/image-20250506151759982.png)
+
+如果不需要返回元数据，还想获取指定字段的数据时，可以这样：
+
+```http
+GET /test/user/1/_source?_source=id,name
+```
+
+![image-20250506152041242](../markdown_img/image-20250506152041242.png)
+
+
+
+### 判断文档是否存在
+
+如果我们需要判断文档是否存在，而不是查询文档内容，那么可以执行如下操作
+
+```http
+HEAD /test/user/1
+```
+
+![image-20250506152314474](../markdown_img/image-20250506152314474.png)
+
+当文档不存在时判断：
+
+![image-20250506152458350](../markdown_img/image-20250506152458350.png)
+
+
+
+### 批量操作
+
+在某些情况下可以通过批量操作减少网络请求。如：批量查询，批量插入数据
+
+**批量查询**
+
+```http
+POST /test/user/_mget
+{
+  "ids": ["1","2"]
+}
+```
+
+![image-20250506152754895](../markdown_img/image-20250506152754895.png)
+
+如果某一条数据不存在，不影响整体响应，需要通过found的值进行判断是否查询到数据。如果found值为false则表示该数据不存在
+
+```http
+POST /test/user/_mget
+{
+  "ids":["10","2"]
+}
+```
+
+![image-20250506154149265](../markdown_img/image-20250506154149265.png)
+
+
+
+**`_bulk`操作**
+
+在Elasticsearch中，支持批量插入，修改，删除操作，都是通过`_bulk`的**api**完成的
+
+请求格式如下
+
+```http
+{ action: { metadata }}
+{ request body }
+{ action: { metadata }}
+{ request body }
+......
+```
+
+**批量插入数据**
+
+```http
+POST /test/user/_bulk
+{"create":{"_index":"test","_type":"user","_id":2001}}
+{"id":2001,"name","name1","age":20,"sex":"male"}
+{"create":{"_index":"test","_type":"user","_id":2002}}
+{"id":2002,"name","name2","age":21,"sex":"male"}
+{"create":{"_index":"test","_type":"user","_id":2003}}
+{"id":2003,"name","name3","age":22,"sex":"male"}
+{"create":{"_index":"test","_type":"user","_id":2004}}
+{"id":2004,"name","name4","age":23,"sex":"male"}
+```
+
+![image-20250506155034674](../markdown_img/image-20250506155034674.png)
+
+**批量删除**
+
+```http
+POST /test/user/_bulk?pretty
+{"delete":{"_index":"test","_type":"user","_id":2001}}
+{"delete":{"_index":"test","_type":"user","_id":2002}}
+{"delete":{"_index":"test","_type":"user","_id":2003}}
+{"delete":{"_index":"test","_type":"user","_id":2004}}
+```
+
+![image-20250506160353212](../markdown_img/image-20250506160353212.png)
+
+
+
+### 分页查询
+
+要执行Elasticsearch的分页查询，你需要使用from和size参数来指定结果集的起始位置和数量
+
+- **size: **分页的结果数，默认10
+- **from: **跳过开始的结果数，默认0
+
+例如：如果你想每页显示5个结果，那请求如下
+
+```http
+GET /_search?size=5
+```
+
+**应用案例**
+
+示例1：跳过第1个数据拿第2个数据，一页最多显示5个结果
+
+```http
+GET /test/user/_search?size=5&from=1
+```
+
+![image-20250506161118808](../markdown_img/image-20250506161118808.png)
+
+示例2：数据分页。每页5条数据，查看第2页数据
+
+```http
+GET /test/user/_search
+{
+  "from":5,
+  "size":5,
+  "query":{
+    "match_all": {}
+  }
+}
+```
+
+在上述示例中，我们指定了从结果集中的第5个文档开始获取5个文档。match_all查询是一个简单的查询类型，它会返回索引中的全部文档
+
+
+
+### 映射
+
+前面创建的索引以及插入数据，都是由Elasticsearch进行自动判断类型，有些时候我们是需要进行明确字段类型的，否则，自动判断的类型和实际需要时不相符的
+
+**自动判断的规则如下**
+
+| JSON type                       | Field type  |
+| ------------------------------- | ----------- |
+| Boolean: `true` or `false`      | "`boolean`" |
+| Whole number: 123               | "long"      |
+| Floating point: 123.45          | "double"    |
+| String valid data: "2014-09-15" | "date"      |
+| String: "foo bar"               | "string"    |
+
+上述表格的意思是，如果你输入的是true或者false，就会被定义为"boolean"类型；如果输入的是123，会被定义为"long"类型。......
+
+
+
+Elasticsearch中支持的类型如下：字符串类型，数字类型，浮点类型，布尔类型，date类型
+
+| 类型           | 表示的数据类型                  |
+| -------------- | ------------------------------- |
+| String         | `string`, `text`, `keyword`     |
+| Whole number   | `byte`,`short`,`integer`,`long` |
+| Floating point | `float`,`double`                |
+| Boolean        | `boolean`                       |
+| Date           | `date`                          |
+
+- String类型在Elasticsearch旧版本中使用较多，从Elasticsearch5.0开始不再支持String，由`text`和`keyword类型`代替
+- **text类型**：text类型用于索引长文本或字符串数据。当你使用text类型时，Elasticsearch会对文本进行分词，并根据分词后的结果建立倒排索引。这使得我们**可以对文本进行全文搜索，找到包含特定词汇的文档**。text类型适合于需要进行全文搜索的字段。在聚合时，text类型会将字段的每个独立词汇作为聚合的独立项
+- **keyword类型: **适用于索引结构化的字段，比如email地址，主机名，状态码，标签。如果字段需要进行过滤（比如查找已发布博客中status属性为published的文章）、排序、聚合。keyword类型的字段**只能通过精确值搜索到**
+
+
+
+**创建明确类型的索引**
+
+```http
+PUT /itcast?include_type_name=true     #itcast是索引名
+{
+  "settings":{
+    "index":{
+      "number_of_shards: "2",
+      "number_of_replicas: "0"
+    }
+  }
+  "mappings":{
+    "person":{
+      "properties":{
+        "name":{
+          "type":"text"
+        },
+        "age":{
+          "type":"integer"
+        },
+        "mail":{
+          "type":"keyword"
+        },
+        "hobby":{
+          "type":"text"
+        }
+      }
+    }
+  }
+}
+```
+
+![image-20250506170243621](../markdown_img/image-20250506170243621.png)
+
+**查询映射**
+
+```http
+GET /itcast/_mapping
+```
+
+![image-20250506170423476](../markdown_img/image-20250506170423476.png)
+
+
+
+### 结构化查询
+
+在Elasticsearch中，可以使用结构化查询来检索和过滤数据。结构化查询的语法是基于Elasticsearch的查询DSL（领域特定语言）的
+
+#### term查询
+
+**term**主要用于精确匹配哪些值，比如数字，日期，布尔值或字符串
+
+```http
+{"term":{"age":26}}
+{"term":{"date":"2014-09-01"}}
+{"term":{"public":true}}
+{"term":{"tag":"full_text"}}
+```
+
+示例1：精确匹配`age=20`的数据
+
+```http
+POST /itcast/person/_search
+{
+  "query":{
+    "term":{
+      "age":20
+    }
+  }
+}
+```
+
+#### terms查询
+
+terms和term有点类似，但terms允许指定多个匹配条件。如果某个字段指定了多个值，那么文档需要一起去做匹配
+
+```http
+{
+  "terms":{
+    "tag":[
+      "search",
+      "full_text",
+      "nosql"
+    ]
+  }
+}
+```
+
+示例
+
+```http
+POST /itcast/person/_search
+{
+  "query": {
+    "terms": {
+      "age": [
+        20,
+        21,
+        22
+      ]
+    }
+  }
+}
+```
+
+#### 范围查询
+
+根据范围条件查询指定字段的值。range过滤允许我们按照指定范围查找一批数据
+
+```http
+{
+  "range":{
+    "age":{
+      "gte":20,
+      "lt":30
+    }
+  }
+}
+```
+
+范围操作符包含：
+
+- **gt**：大于
+- **gte**：大于等于
+- **lt**：小于
+- **lte**：小于等于
+
+示例：查询年龄在20~30之间的数据
+
+```http
+POST /itcast/person/_search
+{
+  "query":{
+    "range":{
+      "age":{
+        "gte":20,
+        "lte":30
+      }
+    }
+  }
+}
+```
+
+#### 存在查询
+
+检查指令字段是否存在。`exists`查询可以用于查找文档中是否包含指定字段
+
+示例：查找拥有age字段的数据
+
+```http
+POST /itcast/person/_search
+{
+  "query":{
+    "exists":{
+      "field":"age"
+    }
+  }
+}
+```
+
+#### 匹配查询
+
+根据特定字段匹配查询文档。match查询是一个标准查询，不管你需要全文本查询还是精确查询基本上都用到它
+
+注意：match可以做精确匹配和模糊匹配使用（keyword不支持模糊查询）
+
+示例：匹配查询name中有"张"的数据
+
+```http
+POST /itcast/person/_search
+{
+  "query":{
+    "match":{
+      "name":"张"
+    }
+  }
+}
+```
+
+#### 布尔查询
+
+组合多个查询条件进行复合查询。bool查询可以用来合并多个条件查询结果的布尔逻辑，它包含一些操作符
+
+```bash
+must           # 多个查询条件的完全匹配，相当于and
+must_not       # 多个查询条件的相反匹配，相当于not
+should         # 至少有一个查询条件匹配，相当于or
+```
+
+示例1：查找喜欢足球的，不喜欢音乐的
+
+```http
+POST /itcast/person/_search
+{
+  "query":{
+    "bool":{
+      "must":{
+        "match":{
+          "hobby":"足球"
+        }
+      }，
+      "must_not":{
+        "match":{
+          "hobby":"音乐"
+        }
+      }
+    }
+  }
+}
+```
+
+
+
 
 
 # Beats收集数据
@@ -3709,7 +4525,7 @@ output.logstash:
 
 
 
-# Logstash 过滤
+# Logstash过滤
 
 ## Logstash 介绍
 
@@ -6212,7 +7028,7 @@ LISTEN      0           511                     0.0.0.0:5601                  0.
 
 
 
-# ELK 综合实战案例
+# ELK综合实战案例
 
 ## Filebeat 收集Nginx日志并写入 Kafka 缓存发送至 Elasticsearch
 

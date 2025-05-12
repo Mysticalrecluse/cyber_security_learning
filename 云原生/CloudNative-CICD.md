@@ -10750,7 +10750,7 @@ LISTEN 0      244        127.0.0.1:5432      0.0.0.0:*    users:(("postgres",pid
 
 #修改监听地址支持远程连接（如果sonarqube和PostgreSQL在同一台主机，可不做修改）
 [root@mystical ~]#  vim /etc/postgresql/14/main/pg_hba.conf
-host    all             all              0.0.0.0/0              scram-sha-256
+host    all             all              0.0.0.0/0              scram-sha-256   # 旧版改为md5
 [root@mystical /etc/postgresql/14/main]# vim postgresql.conf
 listen_addresses = '*' 或者 '0.0.0.0'
 

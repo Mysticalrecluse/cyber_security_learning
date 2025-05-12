@@ -897,6 +897,112 @@ kubectl describe node nodeName
 
 
 
+#### 在 Kubernetes + containerd 环境中使用 GPU 的完整配置流程
+
+**1️⃣ 安装 NVIDIA 驱动（和 Docker 环境相同）**
+
+不管是 Docker 还是 containerd，驱动都必须由主机内核识别
+
+```bash
+# 安装 elrepo 源
+rpm --import https://www.elrepo.org/RPM-GPG-KEY-elrepo.org
+rpm -Uvh http://www.elrepo.org/elrepo-release-7.0-3.el7.elrepo.noarch.rpm
+
+# 安装驱动
+yum install -y kmod-nvidia
+
+# 验证驱动
+nvidia-smi
+
+```
+
+
+
+**2️⃣ 安装 NVIDIA Container Toolkit（适用于 containerd）**
+
+这是代替 `nvidia-docker2` 的关键步骤。
+
+```bash
+# 添加 NVIDIA 软件源
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.repo | \
+  sudo tee /etc/yum.repos.d/nvidia-container-toolkit.repo
+
+# 安装 containerd 所需工具
+yum install -y nvidia-container-toolkit
+```
+
+
+
+**3️⃣ 修改 containerd 配置文件支持 nvidia runtime**
+
+```bash
+# 生成默认 containerd 配置文件（如还没有）
+mkdir -p /etc/containerd
+containerd config default > /etc/containerd/config.toml
+
+# 修改 plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia 配置
+vim /etc/containerd/config.toml
+
+# 添加以下内容
+[plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+  runtime_type = "io.containerd.runc.v2"
+  privileged_without_host_devices = false
+  [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+    BinaryName = "/usr/bin/nvidia-container-runtime"
+
+# 重启 containerd
+systemctl restart containerd
+```
+
+
+
+**4️⃣ 安装 Kubernetes 插件：nvidia-device-plugin**
+
+```bash
+kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.0/nvidia-device-plugin.yml
+```
+
+✅ 版本推荐使用 `v0.14.0` 或更新的版本，支持 containerd 和 CRI-O。
+
+
+
+**5️⃣ 验证 GPU 是否正常识别**
+
+```bash
+kubectl describe node <your-node-name> | grep -A10 "Allocatable"
+
+# 看到如下条目
+nvidia.com/gpu: 1
+
+# 通过测试 Pod 验证
+apiVersion: v1
+kind: Pod
+metadata:
+  name: gpu-test
+spec:
+  containers:
+  - name: cuda-container
+    image: nvidia/cuda:11.0-base
+    resources:
+      limits:
+        nvidia.com/gpu: 1
+    command: ["nvidia-smi"]
+```
+
+
+
+**总结**
+
+| 场景        | Docker 环境            | containerd 环境               |
+| ----------- | ---------------------- | ----------------------------- |
+| GPU 驱动    | ✅ 必须安装             | ✅ 必须安装                    |
+| GPU Runtime | `nvidia-docker2`       | `nvidia-container-toolkit`    |
+| 配置方式    | 修改 `docker` 配置文件 | 修改 `containerd` config.toml |
+| kube plugin | `nvidia-device-plugin` | `nvidia-device-plugin`        |
+
+
+
 ### Kubernetes调度框架
 
 **插件式调度框架**
@@ -926,40 +1032,74 @@ kubectl describe node nodeName
 
 **设定 Pod 满足节点亲和的方式**
 
-- **Node Selector**
+##### **Node Selector**
 
-  - spec.nodeSelector
-  - 定向调度机制的一种实现
+- spec.nodeSelector
+- 定向调度机制的一种实现
 
-  ```bash
-  # 假设有一个Node，打了如下标签
-  kubectl label nodes node1 disktype=ssd
-  ```
+```bash
+# 假设有一个Node，打了如下标签
+kubectl label nodes node1 disktype=ssd
+```
 
-  ```yaml
-  apiVersion: v1
-  kind: Pod
-  metadata:
-    name: nginx-ssd
-  spec:
-    containers:
-    - name: nginx
-      image: nginx
-    nodeSelector:
-      disktype: ssd
-  ```
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-ssd
+spec:
+  containers:
+  - name: nginx
+    image: nginx
+  nodeSelector:
+    disktype: ssd
+```
 
-- ****
+****
 
-  - spec.affinity.nodeAffinity
-  - 支持基于软亲和和硬亲和两种逻辑来实现更精细的控制
+- spec.affinity.nodeAffinity
+- 支持基于软亲和和硬亲和两种逻辑来实现更精细的控制
 
-  - 硬亲和：必须满足的亲和约束，约束评估仅发生在调度期间
-  - 软亲和：有倾向性的亲和约束，不同的约束条件存在不同的权重，约束评估同样仅发生在调度期间
+- 硬亲和：必须满足的亲和约束，约束评估仅发生在调度期间
+- 软亲和：有倾向性的亲和约束，不同的约束条件存在不同的权重，约束评估同样仅发生在调度期间
 
 
 
-**硬亲和与软亲和**
+##### **nodeName**
+
+![image-20250425211604576](../markdown_img/image-20250425211604576.png)
+
+
+
+```yaml
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  labels:
+    app: mystical-tomcat-app2-deployment-label
+  name: mystical-tomcat-app2-deployment
+  namespace: mystical
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mystical-tomcat-app2-selector
+  template:
+    metadata:
+      labels:
+        app: mystical-tomcat-app2-selector
+    spec:
+      nodeName: 172.31.7.111
+      containers:
+      - name: mystical-tomcat-app2-container
+        image: tomcat:7.0.94-alpine
+```
+
+
+
+
+
+##### Node的**硬亲和与软亲和**
 
 Pod与Node的亲和关系存在两种约束强度
 
@@ -1031,6 +1171,203 @@ spec:
 - **Lt**：指定的label的值小于给定值
 - **Exists**：指定label存在于节点上
 - **DoesNotExist**：指定label未存在于节点上
+
+
+
+##### IgnoreDuringExecution
+
+**`IgnoreDuringExecution`** 是 Kubernetes 里的**Pod Tolerations**（容忍）相关的一个配置选项，主要用于控制：
+
+> Pod 已经在节点上运行了，如果后续节点新增了 "污点"（Taint），**Pod要不要立刻被驱逐**？
+
+
+
+**简短总结**
+
+| 术语                    | 意义                                                         |
+| ----------------------- | ------------------------------------------------------------ |
+| `IgnoreDuringExecution` | Pod **不会被立刻驱逐**，即使节点后期新增了匹配的 Taint；但是新调度时依然需要匹配 Tolerations |
+| `NoExecute`             | 通常和 `IgnoreDuringExecution` 相关，是一种 Taint effect，代表“不符合要求的 Pod要被踢掉” |
+
+
+
+**示例 Pod 配置（带 IgnoreDuringExecution）**
+
+比如你写一个 Pod，容忍某个 taint，但**使用 IgnoreDuringExecution**：
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+  tolerations:
+    - key: "key1"
+      operator: "Equal"
+      value: "value1"
+      effect: "NoExecute"
+      tolerationSeconds: 3600
+```
+
+
+
+**解释上面的配置行为：**
+
+| 阶段                                    | 发生了什么                                                   |
+| --------------------------------------- | ------------------------------------------------------------ |
+| Pod 创建阶段                            | 调度器会看 node 上是否有 taint `key1=value1:NoExecute`，如果有且 Pod 有对应的 toleration，才能调度 |
+| Pod 运行中                              | 如果 node 后来打上了 `key1=value1:NoExecute`                 |
+| → 因为 Pod 有 `tolerationSeconds: 3600` | Pod 不会立刻被驱逐，而是**等待 3600秒后**如果还不满足条件再被驱逐 |
+| → 如果没有 tolerationSeconds            | Pod 永久容忍，不会被驱逐                                     |
+| → 如果 Pod 根本没有 toleration          | 会被立刻驱逐                                                 |
+
+所以，**IgnoreDuringExecution**的效果是：**允许 Pod 在节点污点出现后继续运行一段时间（或永久）**。
+
+
+
+**核心知识点总结**
+
+| 项目                                   | 内容                                                         |
+| -------------------------------------- | ------------------------------------------------------------ |
+| `tolerations` 里的 `NoExecute` effect  | 允许 Pod 容忍 NoExecute 污点                                 |
+| 有 `tolerationSeconds`                 | 等待一段时间后驱逐 Pod                                       |
+| 没有 `tolerationSeconds`               | 永久容忍                                                     |
+| `IgnoreDuringExecution` 实际体现在哪？ | 是 Kubernetes 在处理 Pod 已经运行后遇到新 Taint 的行为模式，不是单独一个字段。 |
+
+```ABAP
+注意： IgnoreDuringExecution 这个词更多是描述行为，不是 kube-api 里一个单独字段，它的实际体现就是在 effect: NoExecute + tolerationSeconds 的机制里。
+```
+
+
+
+##### 多条件匹配讲解
+
+```yaml
+......
+spec:
+  containers:
+  - name: mystical-tomcat-app2-container
+    image: tomcat-7.0.94-alpine
+    imagePullPolicy: IfNotPresent
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+      name: http
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIngoreDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:   #匹配条件1，有一个key但是有多个value，则只要匹配成功一个value就可以调度
+          - key: disktype     # 一个matchExpressions有多个key的话，则必须同时满足所有key才能正常调度
+            operator: In
+            values:
+            - ssd             # 一个matchExpressions有多个value的话，则满足其中一个就可以调度
+            - xxx
+          - key: test   
+            operator: In
+            values:
+            - aaa            
+            - bbb
+        - matchExpressions:   # 匹配条件2：有一个key但是有多个value是，则只要匹配成功一个value就可以调度
+          - key: project
+            operator: In
+            values:
+            - mmm
+            - nnn
+```
+
+**总结**
+
+```ABAP
+key之间是and的关系
+value和matchExpressions之间是or的关系
+```
+
+
+
+##### 硬亲和与软亲和混合使用场景案例
+
+```yaml
+spec:
+  containers:
+  - name: mystical-tomcat-app2-container
+    image: tomcat:7.0.94-alpine
+    imagePullPolicy: IfNotPresent
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+      name: http
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:  # 硬亲和
+        nodeSelectorTerms:
+        - matchExpressions
+          - key: "kubernetes.io/role"
+            operator: NotIn
+            values:
+            - "master" # 硬性匹配key的值kubernetes.io/role不包含master的节点，即绝对不会调度到master节点（node反亲和）
+      preferredDuringSchedulingIgnoredDuringExecution:  # 软亲和
+      - weight: 80
+        preference:
+          matchExpressions:
+          - key: project
+            operator: In
+            values:
+              - magedu
+      - weight: 60
+        preference:
+          matchExpressions:
+          - key: disktype
+            operator: In
+            values:
+              - ssd
+```
+
+**思路总结**
+
+在 Kubernetes 中，**硬亲和（`requiredDuringSchedulingIgnoredDuringExecution`）和软亲和（`preferredDuringSchedulingIgnoredDuringExecution`）通常组合使用**，形成一种**先硬性筛选，再软性打分优选**的调度策略：
+
+- **硬亲和（required）**
+  - 起到**强制过滤（Filter）**的作用
+  - Pod 只会被调度到符合条件的节点
+  - 如果没有符合条件的节点，Pod 会**Pending卡住**
+- **软亲和（preferred）**
+  - 起到**加权打分（Score）**的作用
+  - Kubernetes 会在符合硬性筛选条件的节点中，根据软亲和的权重选择最优节点
+  - 如果没有符合软亲和的节点，也**不会阻塞调度**，只是在硬亲和筛选后的节点中随机选一个
+
+
+
+**上述例子分析**
+
+你的配置拆开讲就是：
+
+| 类型     | 规则                              | 目的                                                 |
+| -------- | --------------------------------- | ---------------------------------------------------- |
+| 硬亲和   | `kubernetes.io/role NotIn master` | **绝不调度到 master 节点**，只在 worker 节点上运行 ✅ |
+| 软亲和 1 | `project In magedu` 权重 80       | **优先选择 project=magedu 的节点**                   |
+| 软亲和 2 | `disktype In ssd` 权重 60         | **优先选择磁盘类型是 SSD 的节点**                    |
+
+最终调度过程是这样的：
+
+1. 先筛掉 master 节点（只剩 worker 节点）。
+2. 对每个符合硬亲和的 worker 节点，根据：
+   - 是否有 `project=magedu` ➔ 加 80 分
+   - 是否有 `disktype=ssd` ➔ 加 60 分
+3. 分数最高的节点优先被选中运行 Pod。
+
+
+
+总结一句话
+
+```ABAP
+硬亲和做硬过滤，软亲和在通过硬过滤后的节点里打分择优。
+```
+
+
 
 
 
@@ -1139,6 +1476,14 @@ spec:
     - name: nginx
       image: nginx
 ```
+
+```ABAP
+在requiredDuringSchedulingIgnoredDuringExecution和preferredDuringSchedulingIgnoredDuringExecution中，topologyKey不可以为空（Empty topologyKey is not allowed）
+```
+
+
+
+
 
 
 
@@ -1428,3 +1773,466 @@ spec:
 - node.kubernetes.io/network-unavailable：节点网络不可用
 - node.kubernetes.io/unschedulable：节点不可用于调度
 - node.cloudprovider.kubernetes.io/uninitialized：cloud provider 尚未进行初始化
+
+
+
+##### Taints和cordon的区别
+
+**简明表格对比：cordon vs taint**
+
+| 项目                   | `cordon`                              | `taint`                                        |
+| ---------------------- | ------------------------------------- | ---------------------------------------------- |
+| 作用点                 | Node 本身                             | Node 本身（影响 Pod）                          |
+| 本质                   | 只禁止新 Pod 被调度到 Node 上         | 对 Node 打标记，影响调度和已存在 Pod 的存活    |
+| 对已有 Pod 有影响吗？  | ❌ 没有，已有 Pod 正常运行             | ✅ 有（如果是 NoExecute，可能导致驱逐已有 Pod） |
+| 新 Pod 能调度过来吗？  | ❌ 不能                                | 取决于 Pod 是否有 `tolerations`（有的话可以）  |
+| 是否强制驱逐已有 Pod？ | ❌ 不驱逐                              | ✅ 某些 taint（如 NoExecute）会驱逐             |
+| 典型场景               | 临时维护节点，不再接受新 Pod          | 精细化控制，隔离节点或分组节点                 |
+| 常见命令               | `kubectl cordon` / `kubectl uncordon` | `kubectl taint` / `kubectl untaint`            |
+
+
+
+**1. cordon（封锁节点）**
+
+**概念**
+
+- cordon 的目的是 **"阻止新 Pod 被调度"** 到这个节点上；
+- 但是 **节点上已有的 Pod 不受影响**，继续正常运行。
+
+**使用命令：**
+
+```
+bashCopyEditkubectl cordon node-name
+kubectl uncordon node-name
+```
+
+> cordon 之后，节点的 `spec.unschedulable` 字段被设为 `true`。
+
+**应用场景：**
+
+- 需要维护节点（如打补丁、升级内核），防止新 Pod 被调度到正在维护的节点；
+- 但不想立刻动已经跑着的 Pod。
+
+------
+
+**2. taint（节点打污点）**
+
+**概念：**
+
+- taint 是给节点打上一个标签（Taint），
+- 只有带有对应 toleration 的 Pod 才可以调度过来；
+- 有些 taint 类型（如 NoExecute）**还可以驱逐现有 Pod**。
+
+**使用命令：**
+
+```bash
+kubectl taint nodes node-name key=value:Effect
+kubectl taint nodes node-name key:NoSchedule-  # 移除 taint
+```
+
+- `Effect` 可以是：
+  - `NoSchedule`：禁止没有容忍（toleration）的 Pod 调度到这里；
+  - `PreferNoSchedule`：尽量不调度，但不是绝对禁止；
+  - `NoExecute`：不仅禁止调度，还会**驱逐现有 Pod**。<span style="color:red">**等价于drain**</span>
+
+------
+
+**应用场景：**
+
+- 区分不同类型的节点（比如 GPU 节点、ARM 节点）；
+- 高可用部署，临时驱逐劣质节点上的 Pod；
+- 保持集群弹性，特定应用只能跑特定节点；
+- 在节点坏掉、即将失联时快速清理 Pod（比如 NoExecute 30秒驱逐机制）。
+
+
+
+#### 节点压力驱逐
+
+官网说明
+
+```http
+https://kubernetes.io/zh/docs/concepts/scheduling-eviction/node-pressure-eviction
+```
+
+![image-20250426160502811](../markdown_img/image-20250426160502811.png)
+
+##### 驱逐简介
+
+压力驱逐是由各<span style="color:red">**Kubelet**</span>进程主动终止Pod，以回收节点上的内存，磁盘空间等资源的过程，kubelet监控当前node节点的CPU，内存，磁盘空间和文件系统的inode等资源，当这些资源中的一个或者多个达到特定的消耗水平，kubelet就会主动地将节点上一个或者多个Pod强制驱逐，以防止当前node节点资源无法正常分配而引发的OOM（OutOfMemory）
+
+
+
+##### 驱逐信号和阈值
+
+kubelet 使用各种参数来做出驱逐决定，如下所示：
+
+- 驱逐信号
+- 驱逐条件
+- 监控间隔
+
+
+
+###### 驱逐信号
+
+驱逐信号是特定资源在特定时间点的当前状态。 kubelet 使用驱逐信号，通过将信号与驱逐条件进行比较来做出驱逐决定， 驱逐条件是节点上应该可用资源的最小量。
+
+
+
+**kubelet 使用以下驱逐信号：**
+
+| 驱逐信号                 | 描述                                                         | 仅限于 Linux |
+| ------------------------ | ------------------------------------------------------------ | ------------ |
+| `memory.available`       | `memory.available` := `node.status.capacity[memory]` - `node.stats.memory.workingSet` |              |
+| `nodefs.available`       | `nodefs.available` := `node.stats.fs.available`              |              |
+| `nodefs.inodesFree`      | `nodefs.inodesFree` := `node.stats.fs.inodesFree`            | •            |
+| `imagefs.available`      | `imagefs.available` := `node.stats.runtime.imagefs.available` |              |
+| `imagefs.inodesFree`     | `imagefs.inodesFree` := `node.stats.runtime.imagefs.inodesFree` | •            |
+| `containerfs.available`  | `containerfs.available` := `node.stats.runtime.containerfs.available` |              |
+| `containerfs.inodesFree` | `containerfs.inodesFree` := `node.stats.runtime.containerfs.inodesFree` | •            |
+| `pid.available`          | `pid.available` := `node.stats.rlimit.maxpid` - `node.stats.rlimit.curproc` | •            |
+
+在上表中，**描述**列显示了 kubelet 如何获取信号的值。每个信号支持百分比值或者是字面值。 kubelet 计算相对于与信号有关的总量的百分比值。
+
+
+
+###### 内存信号
+
+在 Linux 节点上，`memory.available` 的值来自 cgroupfs，而不是像 `free -m` 这样的工具。 这很重要，因为 `free -m` 在容器中不起作用，如果用户使用 [节点可分配资源](https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/reserve-compute-resources/#node-allocatable) 这一功能特性，资源不足的判定是基于 cgroup 层次结构中的用户 Pod 所处的局部及 cgroup 根节点作出的。 这个[脚本](https://kubernetes.io/zh-cn/examples/admin/resource/memory-available.sh)或者 [cgroupv2 脚本](https://kubernetes.io/zh-cn/examples/admin/resource/memory-available-cgroupv2.sh) 重现了 kubelet 为计算 `memory.available` 而执行的相同步骤。 kubelet 在其计算中排除了 inactive_file（非活动 LRU 列表上基于文件来虚拟的内存的字节数）， 因为它假定在压力下内存是可回收的。
+
+在 Windows 节点上，`memory.available` 的值来自节点的全局内存提交级别 （通过 [`GetPerformanceInfo()`](https://learn.microsoft.com/windows/win32/api/psapi/nf-psapi-getperformanceinfo)系统调用查询）， 方法是从节点的 [`CommitLimit`](https://learn.microsoft.com/windows/win32/api/psapi/ns-psapi-performance_information)减去节点的全局 [`CommitTotal`](https://learn.microsoft.com/windows/win32/api/psapi/ns-psapi-performance_information)。 请注意，如果节点的页面文件大小发生变化，`CommitLimit` 也会发生变化！
+
+
+
+###### 文件系统信号
+
+kubelet 可识别三个可与驱逐信号一起使用的特定文件系统标识符（`<identifier>.inodesFree` 或 `<identifier>.available`）：
+
+1. `nodefs`：节点的主文件系统，用于本地磁盘卷、 非内存介质的 emptyDir 卷、日志存储、临时存储等。 例如，`nodefs` 包含 `/var/lib/kubelet`。
+
+2. `imagefs`：可供容器运行时存储容器镜像（只读层）和容器可写层的可选文件系统。
+
+   ```bash
+   # 如果是docker，则目录为/var/lib/docker
+   # 如果是containerd，则目录为/var/lib/containerd/
+   # 可以指定containerd的目录
+   [root@master-01 ~]#cat /etc/containerd/config.toml 
+   disabled_plugins = []
+   imports = []
+   oom_score = 0
+   plugin_dir = ""
+   required_plugins = []
+   root = "/var/lib/containerd"   # 这里就是containerd数据目录的指定地址
+   state = "/run/containerd"
+   ......
+   ```
+
+   ```ABAP
+   在公有云上，通常会挂一块云盘作为容器的数据盘，当后期磁盘空间不足时，可以动态扩容，同时云盘的性能更好
+   ```
+
+3. `containerfs`：可供容器运行时存储可写层的可选文件系统。 与主文件系统（参见 `nodefs`）类似， 它用于存储本地磁盘卷、非内存介质的 emptyDir 卷、 日志存储和临时存储，但容器镜像除外。 当使用 `containerfs` 时，`imagefs` 文件系统可以分割为仅存储镜像（只读层）而不存储其他任何内容。
+
+因此，kubelet 通常允许三种容器文件系统选项：
+
+- 所有内容都位于单个 `nodefs` 上，也称为 “rootfs” 或简称为 “root”， 并且没有专用镜像文件系统。
+- 容器存储（参见 `nodefs`）位于专用磁盘上， 而 `imagefs`（可写和只读层）与根文件系统分开。 这通常称为“分割磁盘”（或“单独磁盘”）文件系统。
+- 容器文件系统 `containerfs`（与 `nodefs` 加上可写层相同）位于根文件系统上， 容器镜像（只读层）存储在单独的 `imagefs` 上。 这通常称为“分割镜像”文件系统。
+
+kubelet 将尝试直接从底层容器运行时自动发现这些文件系统及其当前配置，并忽略其他本地节点文件系统。
+
+
+
+**宿主机内存**
+
+```bash
+memory.available  # node节点可用内存，默认 <100Mi
+```
+
+
+
+**Nodefs**
+
+nodefs是节点的主要文件系统，用于保存本地磁盘卷，emptyDir，日志存储等数据，默认是/var/lib/kubelet/，或者是通过kubelet通过`--root-dir所指定的磁盘挂载目录`
+
+```ABAP
+在公有云中，建议该目录单独挂载一块云盘，方便后期扩容，否则很容易导致该资源不足引发驱逐
+```
+
+```bash
+nodefs.inodesFree  # nodefs的可用inode， 默认 <5%
+nodefs.available   # nodefs的可用空间，默认 <10%
+```
+
+
+
+**Imagefs**
+
+imagefs是可选文件系统，用于给容器提供运行时存储容器镜像和容器可写层。
+
+```bash
+imagefs.inodesFree  # imagefs的inode可用百分比
+imagefs.available   # imagefs的磁盘空间可用百分比，默认 <15%
+pid.available       # 可用pid百分比
+```
+
+
+
+##### 硬驱逐配置文件
+
+```bash
+[root@master-01 ~]#cat /etc/systemd/system/kubelet.service
+[Unit]
+Description=Kubernetes Kubelet
+Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+
+[Service]
+WorkingDirectory=/var/lib/kubelet
+ExecStartPre=/bin/mount -o remount,rw '/sys/fs/cgroup'
+ExecStart=/usr/local/bin/kubelet \
+  --config=/var/lib/kubelet/config.yaml \
+  --container-runtime-endpoint=unix:///run/containerd/containerd.sock \
+  --hostname-override=master-01 \
+  --kubeconfig=/etc/kubernetes/kubelet.kubeconfig \
+  --root-dir=/var/lib/kubelet \
+  --v=2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+# 查看配置文件
+[root@master-01 ~]#cat /var/lib/kubelet/config.yaml 
+kind: KubeletConfiguration
+apiVersion: kubelet.config.k8s.io/v1beta1
+address: 0.0.0.0
+authentication:
+  anonymous:
+    enabled: false
+  webhook:
+    cacheTTL: 2m0s
+    enabled: true
+  x509:
+    clientCAFile: /etc/kubernetes/ssl/ca.pem
+authorization:
+  mode: Webhook
+  webhook:
+    cacheAuthorizedTTL: 5m0s
+    cacheUnauthorizedTTL: 30s
+cgroupDriver: systemd 
+cgroupsPerQOS: true
+clusterDNS:
+- 10.100.0.2
+clusterDomain: cluster.local
+configMapAndSecretChangeDetectionStrategy: Watch
+containerLogMaxFiles: 3 
+containerLogMaxSize: 10Mi
+enforceNodeAllocatable:
+- pods
+eventBurst: 10
+eventRecordQPS: 5
+evictionHard:    # 这里配置硬驱逐的阈值
+  imagefs.available: 15%
+  memory.available: 300Mi
+  nodefs.available: 10%
+  nodefs.inodesFree: 5%
+evictionPressureTransitionPeriod: 5m0s
+failSwapOn: true
+fileCheckFrequency: 40s
+hairpinMode: hairpin-veth 
+healthzBindAddress: 0.0.0.0
+healthzPort: 10248
+httpCheckFrequency: 40s
+imageGCHighThresholdPercent: 85
+imageGCLowThresholdPercent: 80
+imageMinimumGCAge: 2m0s
+kubeAPIBurst: 100
+kubeAPIQPS: 50
+makeIPTablesUtilChains: true
+maxOpenFiles: 1000000
+maxParallelImagePulls: 5
+maxPods: 110
+nodeLeaseDurationSeconds: 40
+nodeStatusReportFrequency: 1m0s
+nodeStatusUpdateFrequency: 10s
+oomScoreAdj: -999
+podPidsLimit: -1
+port: 10250
+# disable readOnlyPort 
+readOnlyPort: 0
+resolvConf: /run/systemd/resolve/resolv.conf
+runtimeRequestTimeout: 2m0s
+serializeImagePulls: false
+streamingConnectionIdleTimeout: 4h0m0s
+syncFrequency: 1m0s
+tlsCertFile: /etc/kubernetes/ssl/kubelet.pem
+tlsPrivateKeyFile: /etc/kubernetes/ssl/kubelet-key.pem
+```
+
+
+
+##### 驱逐产生的情况
+
+- kube-controller-manager实现Eviction
+  - node宕机后的驱逐
+- kubelet实现的Eviction
+  - 基于node负载，资源利用率等进行pod驱逐
+
+
+
+##### 发生驱逐时的驱逐策略
+
+详情见[Kubernetes默认调度器的优先级和抢占机制](#Kubernetes默认调度器的优先级和抢占机制)
+
+
+
+##### 软驱逐
+
+软驱逐不会立即驱逐pod，可以自定义宽限期，在条件持续到宽限期还没有恢复，kubelet再强制杀死pod并触发驱逐
+
+软驱逐条件
+
+- eviction-soft：软驱逐触发条件，比如memory.available < 1.5Gi；如果驱逐条件持续时长超过指定的宽限期，可以触发Pod驱逐
+- eviction-soft-grace-period：软驱逐宽限期，如memory.available=1m30s，定义软驱逐条件在触发Pod驱逐之前必须保持多长时间
+- eviction-max-pod-grace-period：终止pod的宽限期，即在满足软驱逐条件而终止Pod时使用的最大运行宽限期（以秒为单位）
+
+**软驱逐示例**
+
+```bash
+[root@master-01 ~]#cat /var/lib/kubelet/config.yaml 
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+evictionSoft:                   # 定义软驱逐的触发阈值
+  memory.available: "1500Mi"
+  nodefs.available: "10%"
+evictionSoftGracePeriod:        # 触发条件持续多长时间后才执行驱逐
+  memory.available: "1m30s"
+  nodefs.available: "1m"
+evictionMaxPodGracePeriod: 60   # 当 pod 被驱逐时，最多给它多长时间去优雅终止（单位：秒）
+......
+```
+
+
+
+##### 驱逐策略优先级
+
+Kubernetes Eviction 机制优先级如下（大致）：
+
+```ABAP
+Hard Eviction > Soft Eviction > Pod QoS（Guaranteed > Burstable > BestEffort）
+```
+
+也就是说，如果你配置了软驱逐：
+
+- Kubelet 会监控资源是否持续低于阈值；
+- 若超出宽限期，**优先驱逐 QoS 较低的 Pod**（如 BestEffort 或没有 limits 的容器）。
+
+
+
+##### 资源预留
+
+官方说明
+
+```http
+https://kubernetes.io/zh-cn/docs/tasks/administer-cluster/reserve-compute-resources/
+```
+
+- `--kube-reserved`  kube-reserved 给kube组件预留的CPU及MEMROY等资源
+- `--system-reserved`  用于为sshd，udev等系统守护进程定义预留资源，用于sshd，udev等进程使用
+- `--eviction-hard` Pod硬驱逐资源阈值
+
+**三个资源预留参数详解**
+
+| 参数                | 含义                                                       | 谁来用                | 会不会触发驱逐       |
+| ------------------- | ---------------------------------------------------------- | --------------------- | -------------------- |
+| `--kube-reserved`   | 给 kubelet、cni、kube-proxy 等 Kubernetes 系统组件保留资源 | kubelet & k8s组件     | ❌ 不驱逐，只影响调度 |
+| `--system-reserved` | 给 systemd、sshd、udev、journald 等守护进程预留资源        | Linux 系统服务        | ❌ 不驱逐，只影响调度 |
+| `--eviction-hard`   | 硬驱逐阈值，节点资源低于此值则立即驱逐 Pod                 | 触发 kubelet 驱逐机制 | ✅ 会驱逐 Pod         |
+
+
+
+###### `--kube-reserved`：Kubernetes 系统组件的资源预留
+
+给运行在节点上的 K8s 系统服务（如 kubelet、cni 插件、kube-proxy 等）预留一定的 CPU、memory、ephemeral storage。
+
+**示例配置：**
+
+```bash
+--kube-reserved=cpu=300m,memory=500Mi,ephemeral-storage=1Gi
+```
+
+意味着：
+
+- 预留 300m CPU 给 kube 组件；
+- 预留 500Mi 内存；
+- 预留 1Gi 临时存储。
+
+这部分资源不会分配给 Pod，但也不会触发驱逐，只影响 **调度可分配资源量**。
+
+
+
+###### `--system-reserved`：为 Linux 系统保留资源
+
+保证像 sshd、udev、journald、systemd、cron 等系统服务的资源不被 Pod 争抢。
+
+**示例配置**
+
+```bash
+--system-reserved=cpu=200m,memory=300Mi,ephemeral-storage=500Mi
+```
+
+这能避免系统级服务因为被 Pod 挤占资源而挂掉（如无法 ssh 登录）
+
+
+
+###### `--eviction-hard`：Pod 强制驱逐阈值
+
+当节点资源 **实际使用** 超过阈值（低于保留值），Kubelet 会立刻驱逐 Pod！
+
+**示例配置**
+
+```bash
+--eviction-hard=memory.available<500Mi,nodefs.available<10%
+```
+
+- 如果 memory 可用量 < 500Mi，立即驱逐最不重要的 Pod；
+- 如果 nodefs（根文件系统）可用空间 < 10%，也立即驱逐。
+
+这个是确保节点不会因为资源枯竭导致系统挂死。
+
+
+
+###### 它们之间的区别与配合
+
+| 场景           | kube-reserved | system-reserved | eviction-hard      |
+| -------------- | ------------- | --------------- | ------------------ |
+| 控制资源可调度 | ✅ 是          | ✅ 是            | ❌ 否               |
+| 会不会驱逐 Pod | ❌ 否          | ❌ 否            | ✅ 会               |
+| 保护谁         | K8s 组件      | 系统守护进程    | 整个系统（防崩溃） |
+
+
+
+###### 配置方式
+
+这些参数可以：
+
+- 直接添加到 kubelet 启动参数中（systemd 文件里）：
+
+  ```bash
+  ExecStart=/usr/bin/kubelet \
+    --kube-reserved=cpu=500m,memory=500Mi \
+    ...
+  ```
+
+- 或统一写入 `/var/lib/kubelet/config.yaml` 中的 `KubeletConfiguration`：
+
+  ```yaml
+  kubeReserved:
+    cpu: "500m"
+    memory: "500Mi"
+  systemReserved:
+    cpu: "300m"
+    memory: "300Mi"
+  evictionHard:
+    memory.available: "500Mi"
+  ```

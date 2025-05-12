@@ -1,59 +1,190 @@
-# 计算机基础
-## CPU设计与结构
-### 计算工具历史
-- 美索不达米亚（主要作用是存储，对计算效率几乎无提高）（公元前2500年）
-- 古希腊算盘（abacus）
-- 中国算盘（除存储作用外，也能提高计算效率）
-- 计算尺（1620-1630）
-- 有电之后
-  - 英国数学家乔治布尔在19世纪第一次将逻辑运算系统化，符号化
-  - 门电路 -> 电子管
-  - ENIAC计算机：第一代电子管计算机（1946-1957）
-  - 晶体管计算机（纸带打孔输入）（1957-1964）
-  - 集成电路计算机（1964-1980）
-  - 超大规模集成电路计算机（1980-now）
+# 计算机组成原理：手动编写CPU
+## 计算机系统概述
 
-### 开关到电子管的演变
-- 门电路
-  - 逻辑与&&（串联门电路）
-  ![Alt text](images/image1.png)
-  - 逻辑非（门电路）
-  ![Alt text](images/image2.png)
-  - 逻辑或 || （并联门电路）
+### 计算机发展史
 
 
-- 电流控制器件（电子管）
-  - 图例
-    ![Alt text](images/image3.png)
-  - 通过加热器控制开关
-  - 通过栅极可以控制电流的大小，后期广泛应用在广播，起到电流放大的作用
-  - 真空三极管
-  - 问题：寿命短
 
-### 半导体
-- 晶体管
-  - 导体（铜）导电及电流的原理
-    ![Alt text](images/image4.png)
-  - 电流（正电的移动方向）和电子的移动方向相反
-  - 绝缘体（橡胶）：
-    - 外部没有飘逸的电子，原子核束缚力强，很难形成电子外流
-  - 半导体（硅）
-    - 纯硅，多个硅元素形成共价键，形成稳定结构，此时电子稳定，导电性很弱
-    - N型参杂：载流子是多出的电子
-      - 当硅中参杂了磷元素，外部就会多出一个电子（磷外部游离5个电子）
-      ![Alt text](images/image5.png)
-    - P型参杂：载流子是多出的空穴
-      - 当硅中参杂硼元素（外部游离3个电子）
-      ![Alt text](images/image6.png)
-    - 一半N型参杂，一半P型参杂，由于N型参杂多出一个电子，P型参杂多出一个空穴，因此电子从N型往P型移动，此时，N区少电子带正电，P区多电子带负电，于是就会形成电场，在电场的作用下，电子会从p型往N型跑（即电子向正电方向移动），此时就会在中间形成平衡，形成一个耗尽层
-    ![Alt text](images/image7.png)
-    - 当这种平衡受到外界影响，比如外部通电后，外部的电流导向不同，会出现两种结果:
-    - p -> N 导通
-    - N -> P 无法导通
-    - 形成二极管的单向导通性
-    - 上述方向指的是电流方向，与电子移动方向相反9
-    - ![Alt text](images/image8.png)
-  
+- **第零代：继电器机械计算机（~1945**）
+- **第一代：电子管计算机（1945~1955）**
+- **第二代：晶体管计算机（1955~1965）**
+- **第三代：集成电路计算机（1965~1980）**
+- **第四代：微型计算机（1980~至今）**
+
+
+
+#### **布尔代数和数字电路**
+
+计算机的基础是数字电路，数字电路的基础是布尔代数
+
+- 1847年英国数学家**乔治布尔**发明布尔代数
+
+![image-20250510003859439](../markdown_img/image-20250510003859439.png)
+
+**布尔代数与数字电路之间的关系**
+
+![image-20250510000041774](../markdown_img/image-20250510000041774.png)
+
+假设：开关断开为0，反之为1，灯灭为0，反之为1
+
+- 图1相当于AND运算的逻辑
+- 图2相当于OR运算的逻辑
+
+
+
+<span style="color:red;font-weight:700">问题：上述的电路只能完成简单的逻辑运算，其他复杂逻辑运算无法实现。比如：要求两个开关断开，灯亮，即 ( 0，0 ) -> 1。因此需要结合继电器来实现</span>
+
+
+
+#### 继电器（relay）
+
+- In：输入小电流，Out：输出大电流，起到中继的作用
+
+![image-20250510001335615](../markdown_img/image-20250510001335615.png)
+
+继电器的原理：当电流从IN输入，电磁铁通电，会将上面的弹片下压，从而将上面的电路打通
+
+图三中（数字电路会将高电压用1表示，低电压用0表示）
+
+- 当两个开关闭合，则灯是灭的
+- 当两个开关都断开或只断开一个，则灯是两的
+
+上述图三符合**NAND**的运算逻辑，即与非门
+
+
+
+<span style="color:red;font-weight:700">从继电器发明之后，没有人将电路与逻辑运算联系起来，直到20世纪30年代</span>
+
+
+
+#### 继电器与开关电路的符号分析
+
+- 1938年英国科学家**克劳德.香浓**发表论文《A Symbolic Analysis of Relay and Switching Circuits》将布尔代数应用到电路中，奠定了数字电路的理论基础
+- 1949年9月香浓信息论《The Mathematical Theory of Communication通讯的数字原理》提出“位”这个单词来表示二进制数字
+- 继电器的组合称为逻辑门，他们构造基本的逻辑电路，也叫**门电路**
+
+![image-20250510002919802](../markdown_img/image-20250510002919802.png)
+
+<span style="color:red;font-weight:700">门电路只是数字电路的最基本部件，如何使用门电路来设计一个计算机，或者计算机应该由哪些部件构成以怎样的方式来运行呢</span>
+
+
+
+#### 图灵机
+
+- 1936年，英国数学家**艾伦图灵**提出了一种抽象的计算机模型，被称为图灵机
+- 图灵机第1次提出程序的概念
+- 图灵机提出了一种使用机器进行计算的简单方法
+
+![image-20250510010218195](D:\git_repository\cyber_security_learning\markdown_img\image-20250510010218195.png)
+
+解析上述图灵机
+
+上面是一个无限长的纸袋，下方有个红色的读写头，读写头上有一个状态码 `q1`，根据程序表来对纸袋进行计算处理
+
+- 比如当前读写头指向1，状态是 `q1`，根据程序表得到 `1Rq1`，这里1表示将当前纸带上的数字变为1，如果是1则不变，R表示向右移动一位（L表示向左移动一位，H表示不动），`q1` 表示状态码变为 `q1`，如果之前就是 `q1`，则不变。
+- 根据上述规则即可将程序执行起来。这就是图灵机
+
+
+
+<span style="color:red;font-weight:700">图灵机为计算机的实现提供了一种重要的思想，肯定了计算机实现的可能，为计算机的实现提供了一种大致的架构</span>
+
+
+
+
+
+#### 冯诺依曼体系结构
+
+- 冯诺依曼于1946年提出冯诺依曼计算机体系结构
+- 制造了第一台现代意义的通用计算机EDVAC
+- 冯诺依曼计算机几大特点：
+  - 五大组成部分（存储器，运算器，控制器，输入，输出设备）
+  - 使用二进制计算（使用二进制可以大大的简化乘法和除法的运算）
+  - 提粗存储程序的概念，自动取指令
+
+![image-20250510012730764](../markdown_img/image-20250510012730764.png)
+
+
+
+<span style="color:red;font-weight:700">冯诺依曼对计算机的影响是巨大的，直到现在绝大多数的计算机，仍然采用的是冯诺依曼体系结构</span>
+
+
+
+
+
+#### 继电器计算机
+
+- 1944年 IBM制造出哈佛Mark1号大约有3500个继电器，1秒能做3次加法或减法运算，乘法要花6秒，除法要花15秒
+- 1947年9月，哈佛Mark2号操作员，从故障继电器中，拔出一只死虫，从那时起，每当电脑出现了问题，我们就说它出了bug（虫子）
+- 继电器1秒能翻转50次
+
+![image-20250510013823797](../markdown_img/image-20250510013823797.png)
+
+
+
+
+
+<span style="color:red;font-weight:700">继电器属于机械设备，随着时间的使用，它会磨损，会变慢甚至损坏，而且机械运动很慢，继电器一秒只能开关50次，所以需要更快更可靠的部件来设计计算机</span>
+
+
+
+#### 真空管
+
+- 热电子发射（爱迪生效应）是指在真空条件下加热金属时，电子从材料表面溢出的现象
+- 真空管属于电子设备，每秒可以开闭数千次
+
+
+![Alt text](images/image3.png)
+
+- 通过加热器控制开关
+- 通过栅极可以控制电流的大小，后期广泛应用在广播，起到电流放大的作用
+- 真空三极管
+  - 当加热器加热，阴极的金属表面会溢出电子（即热电子发射），而阳极有一个正电电压，让阳极带正电荷，此时电子会向阳极移动，而电子的移动就会产生电流，此时阳极就会输出高电压
+  - 栅极是一个金属网，它有一个电压可以让栅极带正电或者负电，如果带正电，电子就会移动，阳级就会输出高电压，如果是负电，则电子停止流动，阳极就会输出低电压，从而实现和继电器类似的开关功能
+- 问题：寿命短
+
+
+
+#### 真空管计算机
+
+- 第一个大规模使用真空管的计算机是“巨人1号”，拥有1600个真空管，完工于1943
+- 1946年在宾夕法尼亚大学完成制作了ENIAC，它是世界上第一台真正通用可编程计算机（采用10进制，其编程是利用电线插入插板完成），使用了18000多只电子管，重130多吨，占地面积170多平方米，每秒钟可作5000多次加法计算
+
+![image-20250510015309252](../markdown_img/image-20250510015309252.png)
+
+
+
+
+
+<span style="color:red;font-weight:700">真空管本身非常脆弱，很容易坏，而且寿命短，因此后面被晶体管所取代</span>
+
+
+
+#### 晶体管
+
+- 1947年，贝尔实验室发明了晶体管，一个全新的计算机时代到来
+
+- 导体（铜）导电及电流的原理
+  ![Alt text](images/image4.png)
+- 电流（正电的移动方向）和电子的移动方向相反
+- 绝缘体（橡胶）：
+  - 外部没有飘逸的电子，原子核束缚力强，很难形成电子外流
+- 半导体（硅）
+  - 纯硅，多个硅元素形成共价键，形成稳定结构，此时电子稳定，导电性很弱
+  - N型参杂：载流子是多出的电子
+    - 当硅中参杂了磷元素，外部就会多出一个电子（磷外部游离5个电子）
+    ![Alt text](images/image5.png)
+  - P型参杂：载流子是多出的空穴
+    - 当硅中参杂硼元素（外部游离3个电子）
+    ![Alt text](images/image6.png)
+  - 一半N型参杂，一半P型参杂，由于N型参杂多出一个电子，P型参杂多出一个空穴，因此电子从N型往P型移动，此时，N区少电子带正电，P区多电子带负电，于是就会形成电场，在电场的作用下，电子会从p型往N型跑（即电子向正电方向移动），此时就会在中间形成平衡，形成一个耗尽层
+  ![Alt text](images/image7.png)
+  - 当这种平衡受到外界影响，比如外部通电后，外部的电流导向不同，会出现两种结果:
+  - p -> N 导通
+  - N -> P 无法导通
+  - 形成二极管的单向导通性
+  - 上述方向指的是电流方向，与电子移动方向相反9
+  - ![Alt text](images/image8.png)
+
 - MOSFET的结果与工作原理
   - NMOS：
     - 当电压高于阈值电压，可以导通
@@ -75,53 +206,53 @@
     - 注意：
       - NMOS中栅极接正电，PMOS中栅极带负电
       - 上面的箭头指的是传统电流方向，即永远是N指向P，因为在NP结中，电流只能从N流向P，从P到N，反过来无法通电，即二极管的单向导电性
-  
+
   下图分析
-  
+
   ![image-20250411220910942](../markdown_img/image-20250411220910942.png)
-  
+
   上图是NMOS，首先漏极侧到源极这条线，形成NP结，这个时候如果给漏极负电，源极正电则直接通电就，但此时G，也就是栅极毫无意义，没有任何控制作用
-  
+
   当漏极是正电，而源极是负电时，此时无法通电，当给栅极G一个正电，形成N沟道，此时从漏极D到源极S就通电了，又因为漏极D是正电，因此电子方向是流向D，而电流方向与电子相反，从D流向S。
-  
+
   ![image-20250411220717008](../markdown_img/image-20250411220717008.png)
-  
+
   上图是PMOS，首先漏极侧到源极这条线，形成NP结，这个时候如果给漏极正电，直接通电，栅极毫无意义，无法起到控制作用
-  
+
   所以一定是漏极是负电，源极S是正电，此时无法通电，当给栅极G一个负电时，此时形成P沟道，漏极D到源极S通电，因为源极S是正电，所以电子从D流向S，也因此电流方向是从S流向D
-  
+
   - 将PMOS和NMOS接在一起，就会形成一个CMOS电路
     ![Alt text](images/image14.png)
-  
+
   上图CMOS分析：
-  
+
   首先如果要看懂上图，要先记得箭头远离G区是PMOS，箭头接近G区是NMOS，根据这个符号规定可以看出
-  
+
   上图中上面的MOS管是PMOS，下面的是NMOS
-  
+
   这里如果给H一个高电平，即+5v，相当于给正电，则PMOS不通，NMOS通，此时上面不通电，下面通电直接接地，此时输出低电平
-  
+
   ```ABAP
   这里给高电平，意味着+5v，给一个电压，而电子是从低电压流向高电压，因此相当于抽离电子，也就是给一个正电
   ```
-  
+
   如果给H一个低电平，相当于给一个负电，则PMOS通，NMOS不同，则上面通电，下面不通电，则输出高电平
-  
+
   ```ABAP
   这里给低电平，意味着0v，相当于处于低电压，而电子是从低电压流向高电压，也就是外面的电压低，则电子向MOS管移动，相当于给一个负电
   ```
-  
+
   **而上述的CMOS，其实就是门电路中的非门**
-  
+
   - MOSFET特性
-  
+
     - 电压控制
     - 高输入阻抗
-  
+
     ```ABAP
     这里低功耗和高阻抗是因为栅极上有绝缘层，而低功耗意味着耗电少，散热少
     ```
-  
+
     - 响应速度快
     - 能耗低
     - 有N型和P型，工作方式相反，组合起来工作
@@ -129,9 +260,9 @@
 
 
 
-### 晶体管详解
+#### 晶体管详解
 
-#### 晶体管是大家族的统称
+##### 晶体管是大家族的统称
 
 “晶体管”（**Transistor**）是指**利用半导体材料控制电流的开关器件**。它们的主要作用有两类：
 
@@ -140,7 +271,7 @@
 
 
 
-#### 晶体管有两大类：
+##### 晶体管有两大类：
 
 | 类型    | 名称                                        | 特点                                 |
 | ------- | ------------------------------------------- | ------------------------------------ |
@@ -149,7 +280,7 @@
 
 
 
-#### MOS管就是一种 FET
+##### MOS管就是一种 FET
 
 MOS 全称是：**Metal–Oxide–Semiconductor Field-Effect Transistor**
 
@@ -161,7 +292,7 @@ MOS 全称是：**Metal–Oxide–Semiconductor Field-Effect Transistor**
 
 
 
-#### 总体结构关系图：
+##### 总体结构关系图：
 
 ```markdown
 晶体管 (Transistor)
@@ -177,7 +308,7 @@ MOS 全称是：**Metal–Oxide–Semiconductor Field-Effect Transistor**
 
 
 
-#### MOSFET 的优势（为什么常用）
+##### MOSFET 的优势（为什么常用）
 
 MOS管（尤其是CMOS）现在广泛用于数字电路，如计算机、手机芯片，因为它：
 
@@ -188,7 +319,1503 @@ MOS管（尤其是CMOS）现在广泛用于数字电路，如计算机、手机�
 
 
 
-### 门电路的推演
+#### 晶体管计算机
+
+- 1955年发布的IBM 608 — 第一台完全使用晶体管的商用计算机。它包含3000个晶体管，每秒可以执行4500次加法，或者大约80次乘法或除法
+- 今天，计算机使用尺寸小于50纳米的晶体管，作为参考，一张纸大约100000纳米厚，它们不仅非常小，而且速度非常快，每秒可以切换数百万次状态，并且可以运行数十年
+
+
+
+![image-20250510021329491](../markdown_img/image-20250510021329491.png)
+
+
+
+#### 集成电路
+
+- 1958年，美国德州仪器的工程师Jack Kilby发明了集成电路（IC）
+- 集成电路（integrated circuit）是一种微型电子器件或部件。采用一定的工艺，把一个电路中所需的晶体管，电阻，电容和电感等独立元件及布线互连在一起，制作在一块芯片上；其中所有元件在结构上已组成了一个整体，变成一个新的独立组件，使电子元件向着微小型化，低功耗，智能化和高可靠性方面迈进了一大步
+- 集成电路具有体积小，重量轻，引出线和焊接点少，寿命长，可靠性高，性能好等优点，同时成本低，便于大规模生产。
+
+
+
+![image-20250510021939357](../markdown_img/image-20250510021939357.png)
+
+
+
+#### 微型计算机
+
+- 微处理器是由一片或少数几片大规模集成电路组成的中央处理器CPU。这些电路执行控制部件和计算逻辑部件的功能
+- Intel于1971年发布第一款微处理器Intel 4004，片内集成了2250个晶体管
+- 微型计算机（Microcomputer,MC）是由微处理器加上同样采用大规模集成电路制成的程序存储器（ROM、EPROM、Flash ROM）和数据存储器（RAM），以及外围设备相连接的输入/输出（I/O）接口电路等构成
+
+
+
+![image-20250510022120906](../markdown_img/image-20250510022120906.png)
+
+
+
+#### 摩尔定律
+
+- 摩尔定律：集成电路上可以容纳的晶体管数目在大约每经过18个月到24个月便会增加一倍。换言之，处理器的性能大约每两年翻一倍，同时价格下降为之前的一半
+- 摩尔定律有英特尔创始人之一**戈登摩尔**提出，它一定程度上揭示了信息技术进步的速度
+
+![image-20250510022523691](../markdown_img/image-20250510022523691.png)
+
+#### 现代计算机结构
+
+![image-20250510023135511](../markdown_img/image-20250510023135511.png)
+
+上述是早期现代计算机结构，它有一个CPU，CPU连接一个北桥芯片，在北桥芯片里面有主存跟显卡控制器，用来访问主存和显示器，北桥芯片再连接一个南桥芯片，在南桥芯片里面有各种IO设备的控制器，有磁盘，USB设备，因为不同的设备，它的构造是不一样的，有的是机械设备，有的是磁性设备，而cpu是电子设备，所以CPU是不能和这些设备进行通信的，每个设备都要有一个对应的控制器，CPU通过控制器跟这些设备进行通信
+
+
+
+采用这种南北桥的架构，CPU在访问主存的时候，首先要经过北桥，然后在访问磁盘的时候，要下先经过北桥，再到南桥。这样性能就会低一些
+
+
+
+#### 现代计算机结构2
+
+![image-20250510023634861](../markdown_img/image-20250510023634861.png)
+
+后面计算机结构做了改进，它把对性能要求高的主存控制器跟显卡控制器还有CPU都集成在同一个芯片里面，这样访问主存跟显示器就会更快一些，然后其他控制器就集成在另一块芯片中
+
+
+
+#### SOC
+
+- 片上系统芯片（System-on-a-Chip,SOC）
+- 将cpu，主存，控制器集成在一个芯片内
+- 广泛应用于手机，平板等移动设备
+
+![image-20250510024106545](../markdown_img/image-20250510024106545.png)
+
+
+
+
+
+
+
+## 门电路的实现 (Verilog)
+
+### 常用门电路符号
+
+![image-20250510100935798](../markdown_img/image-20250510100935798.png)
+
+
+
+### 等价电路
+
+<img src="../markdown_img/image-20250510101217873.png" alt="image-20250510101217873" style="zoom:150%;" />
+
+
+
+### Verilog
+
+- 硬件描述语言HDL是以文本形式来描述数字系统硬件的结构和行为的语言，用它可以表示逻辑电路图
+  - 硬件描述语言（HDL）用来设计硬件电路，HDL语句的顺序无关紧要
+  - Verilog HDL 和 VHDL 是世界上最流行的两种硬件描述语言
+- 使用Verilog编写完代码后，可以使用仿真工具模拟电路的运行情况，验证电路的正确性
+  - 常用的仿真工具有ModelSim，ISE Simulator，iverilog
+
+**示例**
+
+```verilog
+module test(input a,b,c,output sum,carry);
+    wire s1,c1,c2;
+    Xor g1(a,b,s1);
+    Nand g3(a,b,c1);
+    And g4(s1,c,c2);
+    Or g5(c2,c1,carry);
+endmodule
+```
+
+
+
+### FPGA
+
+- 仿真完成后使用综合器将Verilog代码转化为实际电路表示，也称为网表，烧写到FPGA开发板中验证
+- 现场可编程门阵列（Field-Programmable Gate Array）
+- 查找表（Look-up-Table）简写为LUT，LUT本质上就是一个RAM，多个LUT和寄存器的组合，也被叫做CLB（Configurable Logic Block，可配置逻辑块）
+  - 通过Verilog转换成的网表，就是下载到LUT中，去配置LUT里面的内容，这样我们就可以在不改变硬件焊接逻辑的情况下，去实现不同的逻辑
+
+- 多个CLB组合构成FPGA
+
+![image-20250510103146687](../markdown_img/image-20250510103146687.png)
+
+
+
+
+
+### 与非门Verilog HDL表示
+
+![image-20250411234511798](../markdown_img/image-20250411234511798.png)
+
+
+
+```verilog
+// nand.v
+module Nand(input a, b, output out);    // 定义一个与非门的模块
+    nmos n1(o1, 0, b);                 // n1即为图中BG4,BG4是一个nmos管，这个gate（栅极）输入是b，源级接地，所以输入为0，输出是o1
+                                       // 括号里的顺序是漏极，源极，栅极
+    nmos n2(out, o1, a);
+    
+    pmos p1(out, 1, a);                // pmos的源极接电源，nmos源极接地，括号里顺序是一样的
+    pmos p2(out, 1, b);
+endmodule
+```
+
+
+
+对于每个模块，都要定义一个对应的测试模块
+
+```verilog
+// nand_tb.v
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+module nand_tb;
+    reg a, b;                   // 定义输入信号a, b
+    wire out;                   // wire表示连线或逻辑组合，代表自动随驱动变化而变化的信号
+    Nand obj(a, b, out);        // 调用被测试模块
+    
+    initial begin
+        a=0;
+        b=0;
+        #10 b=1;                // # 10表示延迟10个时间单位，把b设为1，时间单位长度取决于timescale指令，如未设定，通常仿真默认单位1ns
+        #10 a=1;                // # 再过10个时间段，把a设为1,b设为0
+          b=0;
+        #10 a=1                 // # 再过10个时间段，把a设为1，b设为1
+          b=1;
+    end
+    
+    initial begin
+        $monitor("a=%d b=%d out=%d\n", a, b, out);
+    end
+endmodule
+```
+
+
+
+仿真编译，执行
+
+```bash
+[root@devops-custom]# iverilog nand_tb.v 
+[root@devops-custom]# ls
+a.out  nand_tb.v  nand.v
+[root@devops-custom]# ./a.out 
+a=0 b=0 out=1
+
+a=0 b=1 out=1
+
+a=1 b=0 out=1
+
+a=1 b=1 out=0
+```
+
+
+
+**补充：timescale用法**
+
+```verilog
+// timescale <time_unit> / <time_percision>
+// time_unit (时间单位)
+// time_percision (时间精度)
+
+// 示例
+`timescale 1ns / 1ps  // 表示时间单位是1ns，精确到1ps
+                      // verilog中，单反引号是预处理指令的固定格式
+
+// 单位转换
+1s = 1000ms
+1ms = 1000us
+1us = 1000ns
+1ns = 1000ps
+```
+
+
+
+### 门电路Verilog表示
+
+![image-20250510114007222](../markdown_img/image-20250510114007222.png)
+
+
+
+#### 与门实现
+
+使用两个与非门，得到**与门**
+
+```verilog
+module And(input a, b, output out);
+    Nand g1(a, b, AnandB);
+    Nand g2(AnandB, AnandB, outp);
+endmodule
+```
+
+```verilog
+// 测试模块
+[root@devops-custom]$ cat and_tb.v 
+`include "nand.v"           
+`include "and.v"           
+module and_tb;
+    reg a, b;                   // 定义输入值a, b
+    wire out;
+    And obj(a, b, out);        // 调用被测试模块
+    
+    initial begin
+        a=0;
+        b=0;
+        #10 b=1;                // # 10表示延迟10个时间单位，把b设为1，时间单位长度取决于timescale指令，如未设定，通常仿真默认单位1ns
+        #10 a=1;                // # 再过10个时间段，把a设为1,b设为0
+          b=0;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+          b=1;
+    end
+    
+    initial begin
+        $monitor("a=%d b=%d out=%d\n", a, b, out);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom]# iverilog and_tb.v
+[root@devops-custom]# ./a.out 
+a=0 b=0 out=0
+
+a=0 b=1 out=0
+
+a=1 b=0 out=0
+
+a=1 b=1 out=1
+```
+
+
+
+#### 非门实现
+
+```verilog
+// not.v
+module Not(input a, output out);
+    pmos(out,1,a);
+    nmos(out,0,a);
+endmodule
+```
+
+```verilog
+// 测试模块，not_tb.v
+`include "not.v" 
+module not_tb;
+    reg a;
+    wire out;
+    Not obj(a, out);
+    
+    initial begin
+        a=0;
+        #10 a=1;
+    end
+    
+    initial begin
+        $monitor("a=%d out=%d\n", a, out);
+    end
+endmodul
+```
+
+
+
+#### 或门实现
+
+```verilog
+// or.v
+[root@devops-custom ~/verilog]# cat or.v 
+module Or(input a, b, output out);
+    Not g1(a, NotA);
+    Not g2(b, NotB);
+    Nand g3(NotA, NotB, out);
+endmodule
+[root@devops-cu
+```
+
+```verilog
+// 测试模块
+// or_tb.v
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+module or_tb;
+    reg a, b;                   // 定义输入值a, b
+    wire out;
+    Or obj(a, b, out);        // 调用被测试模块
+    
+    initial begin
+        a=0;
+        b=0;
+        #10 b=1;                // # 10表示延迟10个时间单位，把b设为1，时间单位长度取决于timescale指令，如未设定，通常仿真默认单位1ns
+        #10 a=1;                // # 再过10个时间段，把a设为1,b设为0
+          b=0;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+          b=1;
+    end
+    
+    initial begin
+        $monitor("a=%d b=%d out=%d\n", a, b, out);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog or_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+a=0 b=0 out=0
+
+a=0 b=1 out=1
+
+a=1 b=0 out=1
+
+a=1 b=1 out=1
+```
+
+
+
+#### 异或门实现
+
+```verilog
+// xor.v
+module Xor(input a, b, output out);
+    Or g1(a, b, AOrB);
+    Nand g2(a, b, ANandB);
+    And g3(AOrB, ANandB, out);
+endmodule
+```
+
+```verilog
+// xor_tb.v
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+module xor_tb;
+    reg a, b;                   // 定义输入值a, b
+    wire out;
+    Xor obj(a, b, out);        // 调用被测试模块
+    
+    initial begin
+        a=0;
+        b=0;
+        #10 b=1;                // # 10表示延迟10个时间单位，把b设为1，时间单位长度取决于timescale指令，如未设定，通常仿真默认单位1ns
+        #10 a=1;                // # 再过10个时间段，把a设为1,b设为0
+          b=0;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+          b=1;
+    end
+    
+    initial begin
+        $monitor("a=%d b=%d out=%d\n", a, b, out);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog xor_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+a=0 b=0 out=0
+
+a=0 b=1 out=1
+
+a=1 b=0 out=1
+
+a=1 b=1 out=0
+```
+
+
+
+## 加法器实现
+
+### 数字电路类型
+
+- **组合逻辑电路**
+  - 没有存储功能，其输出仅依赖于当前输入
+  - 如：运算器（加减乘除法器），ALU
+- **时序逻辑电路**
+  - 具有存储功能，电路可以存储或记住信息，其输出不仅依赖于当前输入，还依赖于存储单元的当前状态
+  - 如：寄存器，存储器
+
+
+
+### 半加器
+
+半加器就是没有考虑进位的加法器
+
+![image-20250510145657243](../markdown_img/image-20250510145657243.png)
+
+
+
+```verilog
+// halfadder.v
+module HalfAddr(input a, b, output sum, carry);
+    And g1(a, b, carry);
+    Xor g2(a, b, sum);
+endmodule
+```
+
+```verilog
+// halfadder_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "halfaddr.v"                // 在测试模块中，首先include被测试模块
+module halfaddr_tb;
+    reg a, b;                   // 定义输入值a, b
+    wire carry, sum;
+    HalfAddr obj(a, b, sum, carry);        // 调用被测试模块
+    
+    initial begin
+        a=0;
+        b=0;
+        #10 b=1;                // # 10表示延迟10个时间单位，把b设为1，时间单位长度取决于timescale指令，如未设定，通常仿真默认单位1ns
+        #10 a=1;                // # 再过10个时间段，把a设为1,b设为0
+          b=0;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+          b=1;
+    end
+    
+    initial begin
+        $monitor("a=%d b=%d sum=%d carry=%d\n", a, b, sum, carry);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog halfadder_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+a=0 b=0 sum=0 carry=0
+
+a=0 b=1 sum=1 carry=0
+
+a=1 b=0 sum=1 carry=0
+
+a=1 b=1 sum=0 carry=1
+```
+
+
+
+### 全加器
+
+![image-20250510151125722](../markdown_img/image-20250510151125722.png)
+
+```verilog
+// fulladder.v
+module FullAdder(input a, b, c, output sum, carry);
+    Xor g1(a, b, AxorB);
+    Xor g2(c, AxorB, sum);
+    And g3(a, b, AandB);
+    And g4(AxorB, c, AxorBandC);
+    Or g5(AandB, AxorBandC, carry);
+endmodule
+```
+
+```verilog
+// fulladder_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder.v"                // 在测试模块中，首先include被测试模块
+module fulladder_tb;
+    reg a, b, c;                   // 定义输入值a, b
+    wire carry, sum;
+    FullAdder obj(a, b, c, sum, carry);        // 调用被测试模块
+    
+    initial begin
+        a=0;
+        b=0;
+        c=0;
+        #10 c=1;                // # 10表示延迟10个时间单位，把b设为1，时间单位长度取决于timescale指令，如未设定，通常
+仿真默认单位1ns
+        #10 b=1;
+            c=0;
+        #10 b=1;                // # 再过10个时间段，把a设为1,b设为0
+            c=1;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+            b=0;
+            c=0;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+            b=0;
+            c=1;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+            b=1;
+            c=0;
+        #10 a=1;
+            b=1;
+            c=1;
+
+    end
+    
+    initial begin
+        $monitor("a=%d b=%d c=%d sum=%d carry=%d\n", a, b, c, sum, carry);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog fulladder_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+a=0 b=0 c=0 sum=0 carry=0
+
+a=0 b=0 c=1 sum=1 carry=0
+
+a=0 b=1 c=0 sum=1 carry=0
+
+a=0 b=1 c=1 sum=0 carry=1
+
+a=1 b=0 c=0 sum=1 carry=0
+
+a=1 b=0 c=1 sum=0 carry=1
+
+a=1 b=1 c=0 sum=0 carry=1
+
+a=1 b=1 c=1 sum=1 carry=1
+```
+
+**优化后**
+
+```verilog
+// fulladder_2.v
+module FullAdder(input a, b, c, output sum, carry);
+    wire s1, c1, c2;       //使用wire接收中间值
+    Xor g1(a, b, s1);
+    Xor g2(c, s1, sum);
+    And g3(a, b, c1);
+    And g4(s1, c, c2);
+    Or g5(c1, c2, carry);
+endmodule
+```
+
+```verilog
+// fulladder_2_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder_2.v"                // 在测试模块中，首先include被测试模块
+module fulladder_2_tb;
+    reg a, b, c;                   // 定义输入值a, b
+    wire carry, sum;
+    FullAdder obj(a, b, c, sum, carry);        // 调用被测试模块
+    
+    initial begin
+        a=0;
+        b=0;
+        c=0;
+        #10 c=1;                // # 10表示延迟10个时间单位，把b设为1，时间单位长度取决于timescale指令，如未设定，通常仿真默认单位1ns
+        #10 b=1;
+            c=0;
+        #10 b=1;                // # 再过10个时间段，把a设为1,b设为0
+            c=1;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+            b=0;
+            c=0;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+            b=0;
+            c=1;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+            b=1;
+            c=0;
+        #10 a=1;
+            b=1;
+            c=1;
+
+    end
+    
+    initial begin
+        $monitor("a=%d b=%d c=%d sum=%d carry=%d\n", a, b, c, sum, carry);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog fulladder_2_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+a=0 b=0 c=0 sum=0 carry=0
+
+a=0 b=0 c=1 sum=1 carry=0
+
+a=0 b=1 c=0 sum=1 carry=0
+
+a=0 b=1 c=1 sum=0 carry=1
+
+a=1 b=0 c=0 sum=1 carry=0
+
+a=1 b=0 c=1 sum=0 carry=1
+
+a=1 b=1 c=0 sum=0 carry=1
+
+a=1 b=1 c=1 sum=1 carry=1
+```
+
+
+
+### 十六位全加器
+
+```verilog
+// add16.v
+module Add16(input[15:0] a, b, output[15:0] out);
+    wire[15:0] c;
+    // 1'b0 : <位宽>'<基数><值>，其中b表示二进制，h表示十六进制,d表示十进制,o表示八进制
+    FullAdder g01(a[0],b[0],1'b0, out[0], c[0]);   
+    FullAdder g02(a[1],b[1],c[0], out[1], c[1]);
+    FullAdder g03(a[2],b[2],c[1], out[2], c[2]);
+    FullAdder g04(a[3],b[3],c[2], out[3], c[3]);
+    FullAdder g05(a[4],b[4],c[3], out[4], c[4]);
+    FullAdder g06(a[5],b[5],c[4], out[5], c[5]);
+    FullAdder g07(a[6],b[6],c[5], out[6], c[6]);
+    FullAdder g08(a[7],b[7],c[6], out[7], c[7]);
+    FullAdder g09(a[8],b[8],c[7], out[8], c[8]);
+    FullAdder g10(a[9],b[9],c[8], out[9], c[9]);
+    FullAdder g11(a[10],b[10],c[9], out[10], c[10]);
+    FullAdder g12(a[11],b[11],c[10], out[11], c[11]);
+    FullAdder g13(a[12],b[12],c[11], out[12], c[12]);
+    FullAdder g14(a[13],b[13],c[12], out[13], c[13]);
+    FullAdder g15(a[14],b[14],c[13], out[14], c[14]);
+    FullAdder g16(a[15],b[15],c[14], out[15], c[15]);
+endmodule
+```
+
+```verilog
+// add16_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder_2.v"                // 在测试模块中，首先include被测试模块
+`include "add16.v"                // 在测试模块中，首先include被测试模块
+module add16_tb;
+    reg  [15:0] a, b;                   // 定义输入值a, b
+    wire [15:0] out;
+    Add16 obj(a, b, out);        // 调用被测试模块
+    
+    initial begin
+        a=16'h0001;
+        b=16'h1080;
+    end
+    
+    initial begin
+        $monitor("%x + %x = %x, %d + %d = %d\n", a, b, out, a, b, out);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# ./a.out 
+0001 + 1080 = 1081,     1 +  4224 =  4225
+```
+
+
+
+### 减法
+
+负数的补码由它的正数按位取反加1，cpu不区分有符号数和无符号数
+
+整体设计没有变化，有无符号数是编程语言决定的，在Verilog中，通过`signed`
+
+```verilog
+// add16.v不变
+// add16_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder_2.v"                // 在测试模块中，首先include被测试模块
+`include "add16.v"                // 在测试模块中，首先include被测试模块
+module add16_tb;
+    reg signed [15:0] a, b;                   // 定义输入值a, b
+    wire signed [15:0] out;
+    Add16 obj(a, b, out);        // 调用被测试模块
+    
+    initial begin
+        a=16'h0001;
+        b=16'h1080;
+        #10 a=16'h8001;
+            b=16'h4001;
+        #10 a=16'ha211;
+            b=16'h0730;
+    end
+    
+    initial begin
+        $monitor("%x + %x = %x, %d + %d = %d\n", a, b, out, a, b, out);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog add16_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+0001 + 1080 = 1081,      1 +   4224 =   4225
+
+8001 + 4001 = c002, -32767 +  16385 = -16382
+
+a211 + 0730 = a941, -24047 +   1840 = -22207
+```
+
+
+
+### 带溢出判断的加减法器
+
+- 两个正数相加结果为负称为正溢，两个负数相加结果为正称为负溢
+  - `010010 + 010101 = 100111(正溢)`， `101110 + 101011 = 011001(负溢)`
+- 检测方法：当最高有效位相加产生进位，而符号位相加无进位时，产生正溢，当最高有效位相加无进位而符号位相加有进位时产生负溢
+  - 最高位就是符号位，倒数第二位就是最高有效位
+
+```verilog
+// add16.v
+module Add16(input[15:0] a, b, output[15:0] out, output overflow);  // 将数据和标记位分离，接口清晰，便于数据格式化
+    wire[15:0] c;
+    FullAdder g01(a[0],b[0],1'b0, out[0], c[0]);
+    FullAdder g02(a[1],b[1],c[0], out[1], c[1]);
+    FullAdder g03(a[2],b[2],c[1], out[2], c[2]);
+    FullAdder g04(a[3],b[3],c[2], out[3], c[3]);
+    FullAdder g05(a[4],b[4],c[3], out[4], c[4]);
+    FullAdder g06(a[5],b[5],c[4], out[5], c[5]);
+    FullAdder g07(a[6],b[6],c[5], out[6], c[6]);
+    FullAdder g08(a[7],b[7],c[6], out[7], c[7]);
+    FullAdder g09(a[8],b[8],c[7], out[8], c[8]);
+    FullAdder g10(a[9],b[9],c[8], out[9], c[9]);
+    FullAdder g11(a[10],b[10],c[9], out[10], c[10]);
+    FullAdder g12(a[11],b[11],c[10], out[11], c[11]);
+    FullAdder g13(a[12],b[12],c[11], out[12], c[12]);
+    FullAdder g14(a[13],b[13],c[12], out[13], c[13]);
+    FullAdder g15(a[14],b[14],c[13], out[14], c[14]);
+    FullAdder g16(a[15],b[15],c[14], out[15], c[15]);
+    Xor g17(c[14], c[15], overflow);
+    // assign overflow = c[14] ^ c[15]; 独立标志位
+endmodule
+```
+
+```verilog
+// add16_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder_2.v"                // 在测试模块中，首先include被测试模块
+`include "add16.v"                // 在测试模块中，首先include被测试模块
+module add16_tb;
+    reg signed [15:0] a, b;                   // 定义输入值a, b
+    wire signed [15:0] out;
+    wire overflow;
+    Add16 obj(a, b, out, overflow);        // 调用被测试模块
+    
+    initial begin
+        a=16'h0001;
+        b=16'h1080;
+        #10 a=16'h8001;
+            b=16'h4001;
+        #10 a=16'ha211;
+            b=16'h0730;
+    end
+    
+    initial begin
+        $monitor("%d + %d = %d, overflow=%d", a, b, out, overflow);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog add16_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+     1 +   4224 =   4225, overflow=0
+-32767 +  16385 = -16382, overflow=0
+-24047 +   1840 = -22207, overflow=0
+```
+
+
+
+
+
+### 在输入端添加M控制位实现
+
+```verilog
+// add16.v
+[root@devops-custom ~/verilog]# cat add16.v 
+module Add16(input[15:0] a, b, input m, output[15:0] out, output overflow);
+    wire[15:0] c;
+    wire[15:0] tmpd;
+    assign tmpd = b ^ {16{m}};
+    FullAdder g01(a[0],tmpd[0],m, out[0], c[0]);
+    FullAdder g02(a[1],tmpd[1],c[0], out[1], c[1]);
+    FullAdder g03(a[2],tmpd[2],c[1], out[2], c[2]);
+    FullAdder g04(a[3],tmpd[3],c[2], out[3], c[3]);
+    FullAdder g05(a[4],tmpd[4],c[3], out[4], c[4]);
+    FullAdder g06(a[5],tmpd[5],c[4], out[5], c[5]);
+    FullAdder g07(a[6],tmpd[6],c[5], out[6], c[6]);
+    FullAdder g08(a[7],tmpd[7],c[6], out[7], c[7]);
+    FullAdder g09(a[8],tmpd[8],c[7], out[8], c[8]);
+    FullAdder g10(a[9],tmpd[9],c[8], out[9], c[9]);
+    FullAdder g11(a[10],tmpd[10],c[9], out[10], c[10]);
+    FullAdder g12(a[11],tmpd[11],c[10], out[11], c[11]);
+    FullAdder g13(a[12],tmpd[12],c[11], out[12], c[12]);
+    FullAdder g14(a[13],tmpd[13],c[12], out[13], c[13]);
+    FullAdder g15(a[14],tmpd[14],c[13], out[14], c[14]);
+    FullAdder g16(a[15],tmpd[15],c[14], out[15], c[15]);
+    Xor g17(c[14], c[15], overflow);
+    // assign overflow = c[14] ^ c[15]; 独立标志位
+endmodule
+```
+
+```verilog
+// add16_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder_2.v"                // 在测试模块中，首先include被测试模块
+`include "add16.v"                // 在测试模块中，首先include被测试模块
+module add16_tb;
+    reg signed [15:0] a, b;                   // 定义输入值a, b
+    reg m;
+    wire signed [15:0] out;
+    wire overflow;
+    Add16 obj(a, b, m, out, overflow);        // 调用被测试模块
+    
+    initial begin
+        m=0;
+        a=16'h0001;
+        b=16'h1080;
+        #10 a=16'h8001;
+            b=16'h4001;
+        #10 a=16'ha211;
+            b=16'h0730;
+            m=1;
+    end
+    
+    initial begin
+        $monitor("%d + %d = %d, mark=%b, overflow=%b", a, b, out, m, overflow);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog add16_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+     1 +   4224 =   4225, mark=0, overflow=0
+-32767 +  16385 = -16382, mark=0, overflow=0
+-24047 +   1840 = -25887, mark=1, overflow=0
+```
+
+
+
+### 带标志的加法器
+
+- **溢出标志OF**：Cn 和 Cn-1 异或
+- **符号标志SF**：SF=Fn-1
+- **零标志ZF**=1当且仅当F=0
+- **进位标志CF**：CF=Cout
+
+
+
+#### 先配置或非门
+
+```verilog
+// nor.v
+module Nor(input a, b, output out);
+    Or g1(a, b, AOrB);
+    Not g2(AOrB, out);
+endmodule
+```
+
+```verilog
+// nor_tb.v
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "nor.v"                // 在测试模块中，首先include被测试模块
+module nor_tb;
+    reg a, b;                   // 定义输入值a, b
+    wire out;
+    Nor obj(a, b, out);        // 调用被测试模块
+    
+    initial begin
+        a=0;
+        b=0;
+        #10 b=1;                // # 10表示延迟10个时间单位，把b设为1，时间单位长度取决于timescale指令，如未设定，通常仿真默认单位1ns
+        #10 a=1;                // # 再过10个时间段，把a设为1,b设为0
+          b=0;
+        #10 a=1;                 // # 再过10个时间段，把a设为1，b设为1
+          b=1;
+    end
+    
+    initial begin
+        $monitor("a=%d b=%d out=%d\n", a, b, out);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog nor_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+a=0 b=0 out=1
+
+a=0 b=1 out=0
+
+a=1 b=0 out=0
+
+a=1 b=1 out=0
+```
+
+
+
+#### 实现带标志加法器
+
+```verilog
+// add16.v
+module Add16(input[15:0] a, b, input m, output[15:0] out, output overflow, output sf, output zf, output cf);
+    wire[15:0] c;
+    wire[15:0] tmpd;
+    assign tmpd = b ^ {16{m}};
+    FullAdder g01(a[0],tmpd[0],m, out[0], c[0]);
+    FullAdder g02(a[1],tmpd[1],c[0], out[1], c[1]);
+    FullAdder g03(a[2],tmpd[2],c[1], out[2], c[2]);
+    FullAdder g04(a[3],tmpd[3],c[2], out[3], c[3]);
+    FullAdder g05(a[4],tmpd[4],c[3], out[4], c[4]);
+    FullAdder g06(a[5],tmpd[5],c[4], out[5], c[5]);
+    FullAdder g07(a[6],tmpd[6],c[5], out[6], c[6]);
+    FullAdder g08(a[7],tmpd[7],c[6], out[7], c[7]);
+    FullAdder g09(a[8],tmpd[8],c[7], out[8], c[8]);
+    FullAdder g10(a[9],tmpd[9],c[8], out[9], c[9]);
+    FullAdder g11(a[10],tmpd[10],c[9], out[10], c[10]);
+    FullAdder g12(a[11],tmpd[11],c[10], out[11], c[11]);
+    FullAdder g13(a[12],tmpd[12],c[11], out[12], c[12]);
+    FullAdder g14(a[13],tmpd[13],c[12], out[13], c[13]);
+    FullAdder g15(a[14],tmpd[14],c[13], out[14], c[14]);
+    FullAdder g16(a[15],tmpd[15],c[14], out[15], c[15]);
+    Xor g17(c[14], c[15], overflow);
+    // assign overflow = c[14] ^ c[15]; 独立标志位
+    assign sf = out[15];
+    // 逐步归约
+    Not n1(out[0], Not1);
+    Not n2(out[1], Not2);
+    Not n3(out[2], Not3);
+    Not n4(out[3], Not4);
+    Not n5(out[4], Not5);
+    Not n6(out[5], Not6);
+    Not n7(out[6], Not7);
+    Not n8(out[7], Not8);
+    Not n9(out[8], Not9);
+    Not n10(out[9], Not10);
+    Not n11(out[10], Not11);
+    Not n12(out[11], Not12);
+    Not n13(out[12], Not13);
+    Not n14(out[13], Not14);
+    Not n15(out[14], Not15);
+    Not n16(out[15], Not16);
+    And a1(Not1, Not2, And2);
+    And a2(Not3, And2, And3);
+    And a3(Not4, And3, And4);
+    And a4(Not5, And4, And5);
+    And a5(Not6, And5, And6);
+    And a6(Not7, And6, And7);
+    And a7(Not8, And7, And8);
+    And a8(Not9, And8, And9);
+    And a9(Not10, And9,And10);
+    And a10(Not11, And10, And11);
+    And a11(Not12, And11, And12);
+    And a12(Not13, And12, And13);
+    And a13(Not14, And13, And14);
+    And a14(Not15, And14, And15);
+    And a15(Not16, And15, zf);
+
+    // 内置归约运算符
+    // assign zf = ~(|out); // 与上面的逐步归约等价
+    assign cf = c[15];
+endmodule
+```
+
+```verilog
+// add16_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nor.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder_2.v"                // 在测试模块中，首先include被测试模块
+`include "add16.v"                // 在测试模块中，首先include被测试模块
+module add16_tb;
+    reg signed [15:0] a, b;                   // 定义输入值a, b
+    reg m;
+    wire signed [15:0] out;
+    wire overflow;
+    wire sf, zf, cf;
+    Add16 obj(a, b, m, out, overflow, sf, zf, cf);        // 调用被测试模块
+    
+    initial begin
+        m=0;
+        a=16'h0001;
+        b=16'h1080;
+        #10 a=16'h8001;
+            b=16'h4001;
+        #10 a=16'ha211;
+            b=16'h0730;
+            m=1;
+    end
+    
+    initial begin
+        $monitor("%d + %d = %d, mark=%b, overflow=%b, sf=%b, zf=%b, cf=%b", a, b, out, m, overflow, sf, zf, cf);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog add16_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+     1 +   4224 =   4225, mark=0, overflow=0, sf=0, zf=0, cf=0
+-32767 +  16385 = -16382, mark=0, overflow=0, sf=1, zf=0, cf=0
+-24047 +   1840 = -25887, mark=1, overflow=0, sf=1, zf=0, cf=1
+```
+
+
+
+## 乘除法器实现
+
+早期的乘法器使用的是循环累加法
+
+![image-20250511013004220](../markdown_img/image-20250511013004220.png)
+
+4位乘法的运算需要8位被乘数，4位乘数，8位加法器，和8位记录乘积，因为每次计算需要被乘数向左移动一位，乘数向右移动一位
+
+上述循环累加的方式是串行的方式，4位乘法，需要4次操作才能完成计算
+
+
+
+随着工业的发展，芯片里即使部件很多，它的体积和功耗也不会很大，因此，可以使用并行的方式，就相当于把前面的循环展开
+
+
+
+### 阵列乘法器实现
+
+![image-20250511014308390](../markdown_img/image-20250511014308390.png)
+
+```verilog
+// multi.v
+module Multi(input[3:0] a, b, output[7:0] out);
+    wire[3:0] tmp1, tmp2, tmp3, tmp4;
+    And g1(a[0], b[0], out[0]);
+    And g2(a[1], b[0], tmp1[1]);
+    And g3(a[2], b[0], tmp1[2]);
+    And g4(a[3], b[0], tmp1[3]);
+
+    And g5(a[0], b[1], tmp2[0]);
+    And g6(a[1], b[1], tmp2[1]);
+    And g7(a[2], b[1], tmp2[2]);
+    And g8(a[3], b[1], tmp2[3]);
+
+    And g9(a[0], b[2], tmp3[0]);
+    And g10(a[1], b[2], tmp3[1]);
+    And g11(a[2], b[2], tmp3[2]);
+    And g12(a[3], b[2], tmp3[3]);
+
+    And g13(a[0], b[3], tmp4[0]);
+    And g14(a[1], b[3], tmp4[1]);
+    And g15(a[2], b[3], tmp4[2]);
+    And g16(a[3], b[3], tmp4[3]);
+
+    FullAdder g17(tmp1[1], tmp2[0], 1'b0, out[1], c1);
+    
+    FullAdder g18(tmp1[2], tmp2[1], c1, s1, c2);
+    FullAdder g19(tmp3[0], s1, 1'b0, out[2], c3);  // 这里的c2, c3是传给下一列
+
+    FullAdder g20(tmp1[3], tmp2[2], c2, s2, c4); // 这里c4, c5, c6是传给下一列的
+    FullAdder g21(tmp3[1], s2, c3, s3, c5);   
+    FullAdder g22(tmp4[0], s3, 1'b0, out[3], c6);  
+
+    FullAdder g23(tmp2[3], tmp3[2], c4, s4, c7);
+    FullAdder g24(tmp4[1], s4, c5, s5, c8);
+    FullAdder g25(s5, c6, 1'b0, out[4], c9);
+
+
+    FullAdder g26(tmp3[3], tmp4[2], c7, s6, c10);
+    FullAdder g27(s6, c8, 1'b0, s7, c11);
+    FullAdder g28(s7, c9, 1'b0, out[5], c12);
+
+    FullAdder g29(tmp4[3], c10, 1'b0, out[6], out[7]);
+endmodule
+```
+
+```verilog
+// multi_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nor.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder_2.v"                // 在测试模块中，首先include被测试模块
+`include "multi.v"                // 在测试模块中，首先include被测试模块
+module multi_tb;
+    reg [3:0] a, b;                   // 定义输入值a, b
+    wire [7:0] out;
+    Multi obj(a, b, out);        // 调用被测试模块
+    
+    initial begin
+        a=4'h2;
+        b=4'h3;
+        #10 a=4'h5;
+            b=4'h2;
+    end
+    
+    initial begin
+        $monitor("%d * %d = %d", a, b, out);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog multi_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+ 2 *  3 =   6
+ 5 *  2 =  10
+```
+
+
+
+### 有符号数的乘法
+
+![image-20250511024328845](../markdown_img/image-20250511024328845.png)
+
+
+
+#### 4位求补器实现
+
+```verilog
+// complementer.v
+module Complementer(input[3:0] a, output[3:0] out);
+    wire[3:0] tmp, c;
+    Xor g1(a[0], a[3], tmp[0]);
+    Xor g2(a[1], a[3], tmp[1]);
+    Xor g3(a[2], a[3], tmp[2]);
+    Xor g4(a[3], a[3], tmp[3]);
+    
+    FullAdder g5(tmp[0], a[3], 1'b0, out[0], c[0]);
+    FullAdder g6(tmp[1], c[0], 1'b0, out[1], c[1]);
+    FullAdder g7(tmp[2], c[1], 1'b0, out[2], c[2]);
+    FullAdder g8(tmp[3], c[2], 1'b0, out[3], c[3]);
+endmodule
+```
+
+```verilog
+[root@devops-custom ~/verilog]# cat complementer_tb.v 
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nor.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder_2.v"                // 在测试模块中，首先include被测试模块
+`include "complementer.v"                // 在测试模块中，首先include被测试模块
+module complementer_tb;
+    reg signed[3:0]  a;
+    wire signed [3:0] out;
+    Complementer obj(a, out);        // 调用被测试模块
+    
+    initial begin
+        a=4'd6;
+        #10 a=4'ha;
+    end
+    
+    initial begin
+        $monitor("%d -> %d", a, out);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog complementer_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+ 6 ->  6
+-6 ->  6
+```
+
+
+
+#### 8位求补器实现
+
+```verilog
+// complementer8.v
+module Complementer8(input[7:0] a, input b, output[7:0] out);
+    wire[7:0] tmp, c;
+    Xor g1(a[0], b, tmp[0]);
+    Xor g2(a[1], b, tmp[1]);
+    Xor g3(a[2], b, tmp[2]);
+    Xor g4(a[3], b, tmp[3]);
+    Xor g5(a[4], b, tmp[4]);
+    Xor g6(a[5], b, tmp[5]);
+    Xor g7(a[6], b, tmp[6]);
+    Xor g8(a[7], b, tmp[7]);
+    
+    FullAdder n1(tmp[0], b, 1'b0, out[0], c[0]);
+    FullAdder n2(tmp[1], c[0], 1'b0, out[1], c[1]);
+    FullAdder n3(tmp[2], c[1], 1'b0, out[2], c[2]);
+    FullAdder n4(tmp[3], c[2], 1'b0, out[3], c[3]);
+    FullAdder n5(tmp[4], c[3], 1'b0, out[4], c[4]);
+    FullAdder n6(tmp[5], c[4], 1'b0, out[5], c[5]);
+    FullAdder n7(tmp[6], c[5], 1'b0, out[6], c[6]);
+    FullAdder n8(tmp[7], c[6], 1'b0, out[7], c[7]);
+endmodule
+```
+
+
+
+#### 有符号乘法器实现
+
+```verilog
+// sigmulti.v
+module SigMulti(input[3:0] a, b, output[7:0] out);
+    wire[7:0] tmp;
+    wire[3:0] a2, b2;
+    wire j;
+    Complementer n1(a, a[3], a2);
+    Complementer n2(b, b[3], b2);
+    Multi g1(a2, b2, tmp);
+    Xor g2(a[3], b[3], j);
+    Complementer8 g3(tmp, j, out);
+endmodule
+```
+
+```verilog
+// sigmulti_tb.v
+`include "and.v"                // 在测试模块中，首先include被测试模块
+`include "nor.v"                // 在测试模块中，首先include被测试模块
+`include "nand.v"                // 在测试模块中，首先include被测试模块
+`include "or.v"                // 在测试模块中，首先include被测试模块
+`include "not.v"                // 在测试模块中，首先include被测试模块
+`include "xor.v"                // 在测试模块中，首先include被测试模块
+`include "fulladder_2.v"                // 在测试模块中，首先include被测试模块
+`include "complementer.v"                // 在测试模块中，首先include被测试模块
+`include "complementer8.v"                // 在测试模块中，首先include被测试模块
+`include "multi0.v"                // 在测试模块中，首先include被测试模块
+`include "sigmulti.v"                // 在测试模块中，首先include被测试模块
+module sigmulti_tb;
+    reg signed [3:0] a, b;                   // 定义输入值a, b
+    wire signed [7:0] out;
+    SigMulti obj(a, b, out);        // 调用被测试模块
+    
+    initial begin
+        a=4'hd;
+        b=4'h3;
+        #10 a=4'h5;
+            b=4'h2;
+    end
+    
+    initial begin
+        $monitor("%d * %d = %d", a, b, out);
+    end
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog sigmulti_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+-3 *  3 =   -9
+ 5 *  2 =   10
+```
+
+
+
+### 除法器实现
+
+![image-20250511220206899](../markdown_img/image-20250511220206899.png)
+
+
+
+### 阵列除法器实现
+
+![image-20250511221802092](../markdown_img/image-20250511221802092.png)
+
+
+
+
+
+## 寄存器与存储器的实现
+
+### 时钟
+
+![image-20250511225458155](../markdown_img/image-20250511225458155.png)
+
+
+
+
+
+### 多路选择器(MultiPlexor)
+
+```verilog
+/**
+* if(sel==0) out=a
+* if(sel==1) out=b
+*/
+
+module Mux(input a, b, sel, output out);
+    Not g1(sel, nsel);
+    And g2(a, nsel, o1);
+    And g3(b, sel, o2);
+    Or g4(o1, o2, out);
+endmodule
+```
+
+
+
+#### 16位多路选择器
+
+```verilog
+//16-bit mulitplexor:
+//for i = 0..15 out[i]=a[i] if sel == 0
+//               b[i] if sel == 1
+module Mux16(input[15:0] a, b, input sel, output[15:0] out);
+    Mux g15(a[15],b[15],sel,out[15]);
+    Mux g14(a[14],b[14],sel,out[14]);
+    Mux g13(a[13],b[13],sel,out[13]);
+    Mux g12(a[12],b[12],sel,out[12]);
+    Mux g11(a[11],b[11],sel,out[11]);
+    Mux g10(a[10],b[10],sel,out[10]);
+    Mux g09(a[9],b[9],sel,out[9]);
+    Mux g08(a[8],b[8],sel,out[8]);
+    Mux g07(a[7],b[7],sel,out[7]);
+    Mux g06(a[6],b[6],sel,out[6]);
+    Mux g05(a[5],b[5],sel,out[5]);
+    Mux g04(a[4],b[4],sel,out[4]);
+    Mux g03(a[3],b[3],sel,out[3]);
+    Mux g02(a[2],b[2],sel,out[2]);
+    Mux g01(a[1],b[1],sel,out[1]);
+    Mux g00(a[0],b[0],sel,out[0]); 
+endmodule
+```
+
+
+
+#### 4way多路选择器
+
+```verilog
+/**
+ * 4-way 16-bit multiplexor:
+ * out = a if sel == 00
+ *    b if sel == 01
+ *    c if sel == 10
+ *    d if sel == 11
+ */
+
+module Mux4Way16(input[15:0] a, b, c, d, input[1:0] sel, ouput[15:0] out);
+    wire[15:0] outab, outcd;
+    Mux16 g1(a, b, sel[0], outab);
+    Mux16 g2(c, d, sel[0], outcd);
+    Mux16 g3(outab, outcd, sel[1], out);
+endmodule
+```
+
+
+
+#### 8way多路选择器
+
+```verilog
+/**
+ * 8-way 16-bit multiplexor:
+ * out = a if sel == 000
+ *    b if sel == 001
+ *    etc
+ *    h if sel == 111
+ */
+
+module Mux8Way16(input[15:0] a, b, c, d, e, f, g, h, input[2:0] sel, output[15:0] out);
+    wire[15:0] outad, outeh;
+    Mux4Way16 g1(a, b, c, d, sel[1:0], outad);
+    Mux4Way16 g2(e, f, g, h, sel[1:0], outeh);
+    Mux16 g3(outad, outeh, sel[2], out);
+endmodule
+```
+
+
+
+### 多路复用器（Demultiplexor）
+
+```verilog
+/**
+ * if sel == 0, a = in, b = 0;
+ * if sel == 1, a = 0, b = in;
+ */
+
+module DMux(input in, sel, output a, b);
+    Not g1(sel, nsel);
+    And g2(nsel, in, a);
+    And g3(sel, in, b);
+endmodule
+```
+
+
+
+#### 4way多路复用
+
+```verilog
+/**
+ * 4-way demultiplexor:
+ * {a,b,c,d}={in,0,0,0} if sel == 00;
+ *           {0,in,0,0} if sel == 01;
+ *           {0,0,in,0} if sel == 10;
+ *           {0,0,0,in} if sel == 11;
+ */
+
+module DMux4Way(input in, input[1:0] sel, output a, b, c, d);
+    Not g1(sel[1], nsel1);
+    Not g2(sel[0], nsel0);
+    And g3(nsel1, nsel0, sel00);
+    And g4(nsel1, sel[0], sel01);
+    And g5(sel[1], nsel0, sel10);
+    And g6(sel[1], sel[0], sel11);
+    
+    DMux g7(in, sel00, d0, a);
+    DMux g8(in, sel01, d1, b);
+    DMux g9(in, sel10, d2, c);
+    DMux g10(in, sel11, d3, d);
+endmodule
+```
+
+
+
+#### 8way多路复用
+
+```verilog
+/**
+ * 8-way demultiplexor:
+ * {a, b, c, d, e, f, g, h} = {in, 0, 0, 0, 0, 0, 0, 0} if sel == 000
+ *                            {0, in, 0, 0, 0, 0, 0, 0} if sel == 001
+ *                            etc
+ *                            {0, 0, 0, 0, 0, 0, 0, in} if sel == 111
+ */
+
+module DMux8Way(input in, input[2:0] sel, output a, b, c, d, e, f, g, h);
+    Not g1(sel[2], nsel2);
+    And g2(in, sel[2], s2h);
+    And g3(in, nsel2, s2l);
+    DMux4Way g4(s2h, sel[1:0], e, f, g, h);
+    DMux4Way g5(s2l, sel[1:0], a, b, c, d);
+endmodule
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+## 门电路的推演（DLS）
 
 **Digital Logic Sim (v1) 下载地址**
 
@@ -642,7 +2269,54 @@ DIE（芯片）是在硅片上面，通过激光蚀刻的方式去加工出来�
   这个过程 由 Ring 节点的硬件逻辑自动完成，无需 CPU 软件干预
   ```
 
-  
+
+
+
+**Slice是什么？**
+
+**L3 Cache Slice（切片）** 指的是 **L3 Cache 被分割成的物理分区**，
+ 通常是 **“按核心分布”** 的。
+ 比如：
+
+- 8 核 CPU，通常会有 **8 个 L3 Slice**，每个核心对应一个 Slice。
+- 每个 Slice 提供 **部分 L3 Cache 存储空间**（例如 2MB）。
+
+它们 **逻辑上组成一个大 L3 Cache（共享 16MB）**，但 **物理上是分散在每个核心附近的**。
+
+
+
+**Slice 和 Ring Bus 的关系**
+
+- 每个 Slice **挂在 Ring Bus** 上。
+- 不管哪个核心发出访问请求，都会 **通过 Ring Bus 定位到对应的 Slice**。
+
+
+
+**路由过程解析**
+
+举个例子：
+
+| 场景                            | 说明                                |
+| ------------------------------- | ----------------------------------- |
+| **C1 需要访问 L3 Cache 地址 X** | 地址 X 通过 Hash 算法映射到 Slice 5 |
+| **C1 发起访问请求**             | 请求沿 Ring Bus 传递到 Slice 5      |
+| **Slice 5 响应数据**            | 数据再通过 Ring Bus 回传给 C1       |
+| **过程特点**                    | **全硬件实现，无需软件干预**        |
+
+
+
+**为什么要划分 Slice？**
+
+1. **物理分布提升带宽与延迟特性**
+   - 各核心就近访问自己的 Slice 较快。
+2. **易于扩展**
+   - 多核 CPU 通过增加 Slice 扩展 L3 容量。
+3. **并行性更高**
+   - 多个 Slice 可并行响应不同核心的访问请求。
+4. **配合一致性协议**
+   - 确保 L3 Cache 作为共享资源的一致性和正确性。
+
+
 
 这种方式叫做：
 
@@ -2443,4 +4117,78 @@ PCB是给操作系统用的，程序段、数据段是给进程自己用的
 
 ### 进程组织
 操作系统为了能够管理进程的各种状态切换，他就需要一种方式把不同状态的进程组织起来
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

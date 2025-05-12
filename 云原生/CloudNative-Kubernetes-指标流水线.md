@@ -1422,6 +1422,67 @@ HPA 默认依赖 metrics.k8s.io API 来获取 Pod 的资源使用情况（如 CP
 
 #### kube-controller-manager的启动参数调优示例
 
+**找到 kube-controller-manager 的 systemd 文件**
+
+如果是用 `kubeadm` 部署的集群，一般是在这：
+
+```bash
+/etc/kubernetes/manifests/kube-controller-manager.yaml
+```
+
+这是一个 **static Pod** 的配置文件，由 `kubelet` 管理，修改后会**自动生效**。
+
+
+
+**示例修改内容**
+
+打开文件：
+
+```bash
+vim /etc/kubernetes/manifests/kube-controller-manager.yaml
+```
+
+找到 `command:` 字段，添加以下参数：
+
+```yaml
+    - --horizontal-pod-autoscaler-downscale-stabilization=2m
+    - --horizontal-pod-autoscaler-initial-readiness-delay=10s
+    - --horizontal-pod-autoscaler-sync-period=10s
+    - --horizontal-pod-autoscaler-upscale-delay=30s
+```
+
+示例片段如下（截取）：
+
+```yaml
+spec:
+  containers:
+  - command:
+    - kube-controller-manager
+    - --allocate-node-cidrs=true
+    - --horizontal-pod-autoscaler-downscale-stabilization=2m
+    - --horizontal-pod-autoscaler-initial-readiness-delay=10s
+    - --horizontal-pod-autoscaler-sync-period=10s
+    - --horizontal-pod-autoscaler-upscale-delay=30s
+    ...
+```
+
+**保存后自动生效：**
+
+这是 static pod 配置，修改后 **无需手动重启**，`kubelet` 会检测文件变化并自动重建该组件
+
+可以通过以下命令查看是否重启并应用成功：
+
+```bash
+kubectl -n kube-system get pods | grep controller-manager
+kubectl -n kube-system logs -l component=kube-controller-manager
+```
+
+也可以通过 `ps -ef | grep kube-controller-manager` 在主节点确认参数是否生效。
+
+```ABAP
+注意；如果是多 master 高可用架构，要在每个主节点都修改
+```
+
 
 
 

@@ -768,6 +768,18 @@ node3     Ready    <none>          92m   v1.30.8
 
 #### 启用自动补全脚本
 
+```bash
+# 在 Ubuntu / Debian 系统上
+apt install -y bash-completion
+
+# 在 CentOS / Rocky Linux 上
+yum install -y bash-completion
+
+# 给 kubectl 开启补全功能
+echo "source <(kubectl completion bash)" >> /root/.bashrc
+source /root/.bashrc
+```
+
 
 
 

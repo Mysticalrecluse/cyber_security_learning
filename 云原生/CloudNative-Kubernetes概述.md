@@ -191,6 +191,64 @@ API 聚合器是 **kube-apiserver 的一个逻辑组件**，它的主要职责�
 
 
 
+#### Front-proxy-ca的实际案例
+
+`metrics-server` 作为 Aggregated API Server 将其 API（如 `/apis/metrics.k8s.io/v1beta1`）注册到 `kube-apiserver` 时，确实是通过 `front-proxy-ca` 实现安全信任和用户身份传递的。
+
+
+
+##### 背景：API Aggregation 机制
+
+- Kubernetes 支持通过扩展 API Server 的方式，将外部组件（如 `metrics-server`）注册为集群内的“原生 API”；
+
+- `metrics-server` 并不是 kube-apiserver 内部的一部分，它以 Pod 形式运行；
+
+- 但你执行：
+
+  ```bash
+  kubectl get --raw /apis/metrics.k8s.io/v1beta1/nodes
+  ```
+
+  看起来它就是 kube-apiserver 提供的接口，这就是 **API Aggregation Layer** 的作用。
+
+
+
+##### 注册过程：
+
+1. `metrics-server` 在集群中部署后，会创建一个类型为 `APIService` 的资源对象，例如：
+
+```
+yamlCopyEditapiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.metrics.k8s.io
+spec:
+  group: metrics.k8s.io
+  version: v1beta1
+  service:
+    name: metrics-server
+    namespace: kube-system
+  caBundle: <base64-encoded front-proxy-ca.crt>
+```
+
+1. `kube-aggregator`（apiserver 内部 aggregator 模块）拦截对这个 API 的请求；
+2. `kube-aggregator` 使用 `front-proxy-client.crt`（由 `front-proxy-ca` 签发）访问 `metrics-server`；
+3. `metrics-server` 验证该证书是否由 `front-proxy-ca` 签发，并信任它；
+4. `kube-aggregator` 将原始用户身份（如 `X-Remote-User`, `X-Remote-Groups`）以 HTTP header 形式转发过去；
+5. `metrics-server` 可使用 `requestheader-*` 参数配置接收这些头部信息。
+
+
+
+##### 关键配置路径
+
+| 项目                                 | 参数                                                         |
+| ------------------------------------ | ------------------------------------------------------------ |
+| `kube-apiserver` 启动参数            | `--requestheader-client-ca-file=<front-proxy-ca.crt>`        |
+| apiserver 中 aggregator 的客户端证书 | `front-proxy-client.crt` / `front-proxy-client.key`          |
+| metrics-server 的信任配置            | `--requestheader-client-ca-file` 等参数，或者 APIService 中的 `caBundle` |
+
+
+
 
 
 ## Kubernetes 版本
