@@ -125,15 +125,139 @@ CSI 主要包含两个部分：**CSI Controller Server** 与 **CSI Node Server**
 
 ![image-20241225150025215](../markdown_img/image-20241225150025215.png)
 
-- **AD控制器**：负责存储设备的Attach/Detach操作
-  - Attach：将设备附加到目标节点
-  - Detach：将设备从目标节点上卸载
-- **Volume Manager**：存储卷管理器，负责完成卷的Mount/Umount操作，以及设备的格式化操作等
-- **PV Controller** ：负责PV/PVC的绑定、生命周期管理，以及存储卷的Provision/Delete操作
-- **volume plugins**：包含k8s原生的和各厂商的的存储插件，扩展各种存储类型的卷管理能力
-  - 原生的包括：emptydir、hostpath、csi等
-  - 各厂商的包括：aws-ebs、azure等
-- scheduler：实现Pod的调度，涉及到volume的调度。比如ebs、csi关于单node最大可attach磁盘 数量的predicate策略，scheduler的调度至哪个指定目标节点也会受到存储插件的影响
+**Controller-Manager中的组件**
+
+- **Attach/Detach Controller**
+  - **职责**：管理“远程存储卷”（如 iSCSI、NFS、云盘等）与节点之间的“挂载声明”。
+  - **作用**：决定将卷“附加”到哪个节点或“卸载”从哪个节点移除。
+  - **举例**：在阿里云、AWS、GCE 等云盘存储，**先 Attach 到 Node，再挂载给 Pod**。
+
+- **PersistentVolume Controller**
+  - **职责**：管理 **PV（Persistent Volume）** 与 **PVC（Persistent Volume Claim）** 的**生命周期和绑定关系**。
+  - **作用**：自动绑定符合 PVC 需求的 PV，或根据 StorageClass 动态创建 PV。
+
+- **VolumeBinding Controller**
+  - **职责**：在 **Pod 调度之前** 预先确定 PVC 与 PV 的绑定关系。
+  - **作用**：解决卷调度与 Pod 调度的一致性问题，保证卷和 Pod 调度到同一节点或可访问的节点
+
+- **PVC Protection Controller**
+  - **职责**：防止正在被 Pod 使用的 PVC 被误删。
+  - **作用**：保证卷的安全性和数据完整性。
+
+- **StorageClass Controller（如果使用）**
+  - **职责**：管理存储策略（如存储类型、性能等级、回收策略）
+  - **作用**：根据 PVC 请求自动选择或创建符合策略的存储卷。
+
+
+
+**kubelet中的存储组件**
+
+- **Volume Manager (Kubelet 内部模块)**
+
+  - **职责**：管理节点上的卷挂载、卸载、格式化等操作。
+  - **作用**：
+    - **感知 Pod 生命周期**；
+    - **协调卷与节点的关系**；
+    - **驱动挂载操作（通过插件）**
+
+- **Volume Plugin**
+
+  - **In-Tree Plugin**：Kubelet内置了In-Tree的插件逻辑（逐步废弃）
+  - **CSI Plugin**: Kubelet作为客户端，调用用独立部署的 CSI 插件 DaemonSet（比如 ceph-csi、nfs-csi）
+
+  ```ABAP
+  无论是内置插件还是 CSI 插件，kubelet 统一负责调用
+  ```
+
+  - **作用**
+    - **Node Plugin** 提供挂载操作接口；
+    - **Controller Plugin** 提供卷创建、删除、扩容等接口。
+
+
+
+**CSI插件的典型架构**
+
+- **Node Plugin（DaemonSet）**：运行在每个 Node 上，提供挂载/卸载操作能力。
+
+- **Controller Plugin（Deployment/StatefulSet）**：集群级别，提供卷创建、删除、快照等控制操作。
+
+- **示例**
+
+  ```bash
+  ceph-csi-cephfs-nodeplugin-xxxxx   # Node DaemonSet
+  ceph-csi-cephfs-provisioner-xxxxx  # Controller Deployment
+  ```
+
+  
+
+#### 存储全链路架构交互图
+
+![image-20241229204254515](../markdown_img/image-20241229204254515.png)
+
+
+
+#### 完整、准确的 **Kubernetes 存储交互流程（控制面 + 数据面）**
+
+**1️⃣ 用户提交 PVC 和 Pod**
+
+- 用户通过 `kubectl apply` 提交 **PVC 和 Pod 定义**。
+- **kube-apiserver** 接收到这些资源，并持久化到 etcd。
+
+**2️⃣ PV Controller 监听 PVC**
+
+- **PV Controller（Controller-Manager）** 发现 PVC 未绑定。
+
+  - 如果 PVC 绑定了 StorageClass，则 **调用 CSI Controller Plugin 的 `CreateVolume` 接口** 创建物理存储卷。具体流程如下
+    - **PV Controller 调用 CSI Controller Plugin（CreateVolume）**
+      - CSI Controller Plugin **并不直接创建存储数据**，它调用的是：
+        - Ceph 集群 API
+        - NFS Provisioner API
+        - AWS EBS API
+      - **存储系统** 负责实际分配卷或创建后端存储资源
+    - **CSI Controller Plugin 将状态返回 PV Controller**
+      - 比如，返回卷 ID、容量等信息
+    - **PV Controller 创建 PV 资源声明**
+      - 包含存储卷 ID、StorageClass、容量等描述信息
+      - 同步到 kube-apiserver
+
+  ```ABAP
+  PV Controller 发起请求 → CSI Controller Plugin 调用存储系统 → 返回结果给 PV Controller → PV Controller 创建 PV 资源
+  
+  这里 PV Controller 是请求的发起者，
+  CSI Controller Plugin 是执行者，
+  存储系统是最终提供者。
+  ```
+
+**3️⃣ VolumeBinding Controller 绑定 PVC 和 PV**
+
+- **VolumeBinding Controller（Controller-Manager）** 发现有可用的 PVC 和 PV。
+  - 将 **PVC 和 PV 进行绑定**。
+  - 更新 PVC 的 `spec.volumeName` 字段。
+  - 绑定信息同步回 kube-apiserver。
+
+**4️⃣ Scheduler 调度 Pod 到节点**
+
+- Scheduler 发现 Pod 绑定了 PVC，**结合 PVC 选择合适的 Node**（比如基于存储亲和性）。
+- Pod 被调度到目标 Node。
+
+**5️⃣ Attach/Detach Controller 介入（针对远程存储）**
+
+- 如果使用的是 **远程存储**（如 iSCSI、EBS、NFS），
+  **Attach/Detach Controller（Controller-Manager）** 会：
+  - 标记需要将卷“附加（Attach）”到目标 Node。
+  - 这个操作最终也是通过 **CSI Controller Plugin** 调用 `ControllerPublishVolume`。
+- 这一阶段的目的是 **让云平台或存储系统将卷与 Node 绑定**（在 Node 上“看得见”这个卷）。
+
+```ABAP
+“Attach/Detach Controller 的作用是让 Node 能够看到远程存储卷，这样 Node 才能后续完成挂载。
+```
+
+**6️⃣ Kubelet - VolumeManager 启动挂载**
+
+- Pod 被拉起之前，**Kubelet 的 VolumeManager 发现挂载需求**。
+- Kubelet 通过 **CSI Node Plugin（DaemonSet）** 调用：
+  - `NodeStageVolume`（预挂载到 Node）
+  - `NodePublishVolume`（最终挂载到 Pod 的目录）
 
 
 
@@ -1455,7 +1579,7 @@ containers:
 
 #### storageClass说明
 
-对于 PV 和 PVC 的使用整个过程是比较繁琐的，不仅需要自己定义PV和PVC还需要将其与Pod进行关 联，而且对于PV和PVC的适配我们也要做好前提规划，而生产环境中，这种繁琐的事情是有悖于我们使 用kubernetes的原则的，而且这种方式在很大程度上并不能满足我们的需求，而且不同的应用程序对于 存储性能的要求可能也不尽相同，比如读写速度、并发性能等，比如我们有一个应用需要对存储的并发 度要求比较高，而另外一个应用对读写速度又要求比较高，特别是对于 StatefulSet 类型的应用简单的来 使用静态的 PV 就很不合适了，这种情况下就需要用到**动态 PV**。
+对于 PV 和 PVC 的使用整个过程是比较繁琐的，不仅需要自己定义PV和PVC还需要将其与Pod进行关联，而且对于PV和PVC的适配我们也要做好前提规划，而生产环境中，这种繁琐的事情是有悖于我们使 用kubernetes的原则的，而且这种方式在很大程度上并不能满足我们的需求，而且不同的应用程序对于 存储性能的要求可能也不尽相同，比如读写速度、并发性能等，比如我们有一个应用需要对存储的并发度要求比较高，而另外一个应用对读写速度又要求比较高，特别是对于 StatefulSet 类型的应用简单的来使用静态的 PV 就很不合适了，这种情况下就需要用到**动态 PV**。
 
 
 
@@ -1463,7 +1587,7 @@ Kubernetes 引入了一个**新的资源对象：StorageClass**，通过 Storage
 
 所以,StorageClass提供了一种资源使用的描述方式，使得管理员能够描述提供的存储的服务质量和等级，进而做出不同级别的存储服务和后端策略。
 
-StorageClass 用于定义不同的存储配置和属性，以供 PersistentVolume（PV）的动态创建和管理。它 为开发人员和管理员提供了一种在不同的存储提供商之间抽象出存储配置的方式。
+StorageClass 用于定义不同的存储配置和属性，以供 PersistentVolume（PV）的动态创建和管理。它为开发人员和管理员提供了一种在不同的存储提供商之间抽象出存储配置的方式。
 
 **在 Kubernetes 中，StorageClass 是集群级别的资源，而不是名称空间级别。**
 

@@ -1403,19 +1403,26 @@ data:
       listen 443 ssl;
       server_name web.k8snginx.local;
 
-      ssl_certificate /etc/nginx/ssl/tls.crt;
+      ssl_certificate /etc/nginx/ssl/tls.crt;CAT
       ssl_certificate_key /etc/nginx/ssl/tls.key;
 
       ssl_protocols TLSv1.3;  # 更改这里，删掉TLSv1.2
       ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256';
 ......
+  name: nginx-config2  # 更改configmap名称
+  namespace: nginx-static
+......
 
 candidate@master01:~# kubectl apply -f config.yaml 
-configmap/nginx-config created
+configmap/nginx-config2 created
 
-# 重启pod
-candidate@master01:~# kubectl rollout restart -n nginx-static deployment nginx-static 
-deployment.apps/nginx-static restarted
+# 修改deploy
+candidate@master1:~# kubectl edit deployments.apps -n nginx-static nginx-static 
+deployment.apps/nginx-static edited
+......
+    - configMap:
+        defaultMode: 420
+        name: nginx-config2    # 更改configmap名称
 
 # 检查：确保新的pod是running的
 candidate@master01:~$ kubectl get pod -n nginx-static 
@@ -1423,12 +1430,31 @@ NAME                            READY   STATUS    RESTARTS   AGE
 nginx-static-7885fbc486-vjfls   1/1     Running   0          16m
 
 # 测试
-candidate@master01:~$ curl -k --tls-max 1.2 https://web.k8snginx.local 
-Hello World ^_^ My Wechat is shadowooom
+candidate@master1:~$ curl -k --tls-max 1.2 https://web.k8snginx.local 
+curl: (35) error:0A00042E:SSL routines::tlsv1 alert protocol version
 
 # 别忘记，做完后，退回到base节点，这样下一道题才能继续切节点。
 candidate@master01:~# exit
 ```
+
+```ABAP
+注意：当 ConfigMap 设置了 immutable: true 后：
+Deployment 加载修改后的 ConfigMap 只有两种方法：
+
+修改 ConfigMap 名称
+- 创建一个新的 ConfigMap（使用新名称）；
+- 同步修改 Deployment 中挂载的 configMap.name 字段；
+- 重新部署或 rollout restart Deployment；
+- ✅ 不会中断服务，推荐方式。
+
+删除并重建 Deployment
+- 删除原 Deployment；
+- 保证 ConfigMap 在此之前已经更新；
+- 重新创建 Deployment；
+- ⚠️ 会影响服务可用性，仅适用于非生产或可容忍场景。
+```
+
+
 
 
 

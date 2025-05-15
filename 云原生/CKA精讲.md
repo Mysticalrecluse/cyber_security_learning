@@ -813,36 +813,7 @@ Kubernetes 卷（Volume） 这一抽象概念能够解决这两个问题
 
 #### 存储全链路架构交互图
 
-```less
-[ User / DevOps ]
-        |
-        v
-[ kube-apiserver ]
-        |
-        +------------------> [ PV Controller (Controller-Manager) ]
-        |                               |
-        |                          CreateVolume
-        |                               v
-        |                [ CSI Controller Plugin (Deployment) ]
-        |
-        +------------------> [ VolumeBinding Controller (Controller-Manager) ]
-        |                               |
-        |                          Bind Volumes
-        |                               v
-        +------------------> [ Attach/Detach Controller (Controller-Manager) ]
-                                        |
-                                   Attach Volume
-                                        v
-                            [ kubelet - VolumeManager ]
-                                        |
-                       +----------------+------------------+
-                       |                                   |
-             NodeStage/NodePublishVolume            Mount to Pod
-                       |                                   |
-                       v                                   v
-       [ CSI Node Plugin (DaemonSet) ]                [ Pod ]
-
-```
+![image-20241229204254515](../markdown_img/image-20241229204254515.png)
 
 
 
@@ -911,15 +882,297 @@ Kubernetes 卷（Volume） 这一抽象概念能够解决这两个问题
 
 
 
+#### PV-Persistent-Volume定义
+
+工作中的存储资源一般都是独立于Pod的，将之称为资源对象Persistent Volume(PV)，是由管理员设置的存储，它是kubernetes集群的一部分，PV 是 Volume 之类的卷插件，**但具有独立于使用 PV 的 Pod  的生命周期**
+
+
+
+**Persistent Volume 跟 Volume类似，区别就是：**
+
+- PV 是集群级别的资源，负责将存储空间引入到集群中，通常由管理员定义
+- PV 就是Kubernetes集群中的网络存储，不属于Namespace、Node、Pod等资源，但可以被它们访问
+- **PV 属于Kubernetes 整个集群,即可以被所有集群的Pod访问**
+- **PV是独立的网络存储资源对象，有自己的生命周期**
+- PV 支持很多种volume类型,PV对象可以有很多常见的类型：本地磁盘、NFS、分布式文件系统...
+
+
+
+#### PVC-Persistent-Volume-Claim定义
+
+Persistent Volume Claim(PVC) 是一个网络存储服务的**请求**。
+
+**PVC 属于名称空间级别的资源**，只能被同一个名称空间的Pod引用
+
+由用户定义，用于在空闲的PV中申请使用符合过滤条件的PV之一，与选定的PV是“一对一”的关系
+
+用户在Pod上**通过pvc插件**请求绑定使用定义好的PVC资源
+
+Pod能够申请特定的CPU和MEM资源，但是Pod只能通过PVC到PV上请求一块独立大小的网络存储空 间，而PVC 可以动态的根据用户请求去申请PV资源，不仅仅涉及到存储空间，还有对应资源的访问模 式，对于真正使用存储的用户不需要关心底层的存储实现细节，只需要直接使用 PVC 即可。
+
+
+
+#### Pod、PV、PVC 关系
+
+![image-20241228172519330](../markdown_img/image-20241228172519330.png)
+
+
+
+·**前提：**
+
+- 存储管理员配置各种类型的PV对象
+- Pod、PVC 必须在同一个命名空间
+
+
+
+**用户需要存储资源的时候：**
+
+- 用户根据资源需求创建PVC，由PVC自动匹配(权限、容量)合适的PV对象
+- PVC 允许用户按需指定期望的存储特性，并以之为条件，按特定的条件顺序进行PV的过滤 
+  - VolumeMode → LabelSelector → StorageClassName → AccessMode → Size 
+- 在Pod内部通过 PVC 将 PV 绑定到当前的空间，进行使用
+- 如果用户不再使用存储资源，解绑 PVC 和 Pod 即可
+
+
+
 ## 8. storageClass
+
+#### storageClass说明
+
+对于 PV 和 PVC 的使用整个过程是比较繁琐的，不仅需要自己定义PV和PVC还需要将其与Pod进行关联，而且对于PV和PVC的适配我们也要做好前提规划，而生产环境中，这种繁琐的事情是有悖于我们使 用kubernetes的原则的，而且这种方式在很大程度上并不能满足我们的需求，而且不同的应用程序对于 存储性能的要求可能也不尽相同，比如读写速度、并发性能等，比如我们有一个应用需要对存储的并发度要求比较高，而另外一个应用对读写速度又要求比较高，特别是对于 StatefulSet 类型的应用简单的来使用静态的 PV 就很不合适了，这种情况下就需要用到**动态 PV**。
+
+
+
+Kubernetes 引入了一个**新的资源对象：StorageClass**，通过 StorageClass 的定义，管理员可以将存储资源定义为某种类型的资源，比如存储质量、快速存储、慢速存储等，为了满足不同用户的多种多样的 需求，用户根据 StorageClass 的描述就可以非常直观的知道各种存储资源的具体特性了，这样就可以根据应用的特性去申请合适的存储资源了。
+
+所以,StorageClass提供了一种资源使用的描述方式，使得管理员能够描述提供的存储的服务质量和等级，进而做出不同级别的存储服务和后端策略。
+
+StorageClass 用于定义不同的存储配置和属性，以供 PersistentVolume（PV）的动态创建和管理。它为开发人员和管理员提供了一种在不同的存储提供商之间抽象出存储配置的方式。
+
+**在 Kubernetes 中，StorageClass 是集群级别的资源，而不是名称空间级别。**
+
+PVC和PV可以属于某个SC，也可以不属于任何SC,PVC只能够在同一个storageClass中过滤PV
+
+
+
+**能建立绑定关系的PVC和PV一定满足如下条件：**
+
+- 二者隶属于同个SC
+- 二者都不属于任何SC
+
+
+
+**StorageClass这个API对象可以自动创建PV的机制,即:Dynamic Provisioning**
+
+
+
+**StorageClass对象会定义下面两部分内容:**
+
+- PV的属性.比如,存储类型,Volume的大小等
+- 创建这种PV需要用到的存储插件
+
+提供以上两个信息,Kubernetes就能够根据用户提交的PVC,找到一个对应的StorageClass,之后 Kubernetes就会调用该StorageClass声明的存储插件,进而创建出需要的PV.
+
+
+
+要使用 StorageClass，就得**安装对应的自动配置程序**，比如存储后端使用的是 nfs，那么就需要使用到 一个 nfs-client 的自动配置程序，也称为 Provisioner，这个程序使用已经配置好的 nfs 服务器，来自动 创建持久卷 PV。
+
+
+
+#### storageClass-API
+
+每个 StorageClass 都包含 **provisioner** 、 **parameters** 和 **reclaimPolicy** 字段， 这些字段会在 StorageClass 需要动态制备 PersistentVolume 时会使用到。
+
+StorageClass 对象的命名很重要，用户使用这个命名来请求生成一个特定的类。 当创建 StorageClass  对象时，管理员设置 StorageClass 对象的命名和其他参数。
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: standard
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp2
+reclaimPolicy: Retain
+# 允许 PVC 进行在线扩容，即在不删除 PVC 的情况下，调整存储大小
+# 适用于支持在线扩容的存储提供程序，如 AWS EBS、GCE Persistent Disk、Ceph RBD 等。
+# 仅适用于 支持动态存储扩容的存储提供商。
+# 某些存储（如本地存储）不支持扩展，即使设置 allowVolumeExpansion: true 也无效。
+# 扩容后，Pod 可能需要重新挂载 PVC 才能生效。
+allowVolumeExpansion: true
+mountOptions:
+- discard   # discard 选项用于 TRIM 操作，适用于支持 SSD 硬盘 的存储系统。
+            # 当 Kubernetes 释放块存储上的空间时，discard 允许操作系统通知存储设备，释放已删除的数据块，从而提高存储效率和               性能。
+            # ✅ 适用于 SSD 存储（如 AWS EBS gp3、GCE PD SSD、Ceph RBD）
+            # ❌ 不适用于机械硬盘（HDD），HDD 不支持 TRIM。
+volumeBindingMode: Immediate | WaitForFirstConsumer（延迟绑定，只有Pod准备好才绑定）
+# 如果使用 SSD 存储，建议 discard 选项。
+# 如果需要保证存储性能，使用 guaranteedReadWriteLatency: "true"。
+
+
+
+# 管理员可以为没有申请绑定到特定StorageClass的PVC指定一个默认的存储类
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+spec:
+  accessModes:
+  - ReadWriteOnce
+  volumeMode: Filesystem
+  resources:
+    requests:
+      storage: 8Gi
+  storageClassName: standard
+  selector:
+    matchLabels:
+      release: "stable"
+    matchExpressions:
+      - {key: environment, operator: In, values: [dev]}
+```
+
+
+
+##### 补充：Kubernetes **Persistent Volume (PV) 绑定模式 (`volumeBindingMode`)** 
+
+**volumeBindingMode: Immediate**
+
+**工作机制**
+
+- **PV 和 PVC 会立即绑定**，无论 Pod 是否已创建。
+- **PVC 绑定后，PV 可能会被调度到与 Pod 运行的节点不匹配的存储上**。
+- 适用于 **共享存储（Networked Storage），如 NFS、Ceph、EBS（非本地存储）**，因为这些存储不依赖特定节点。
+
+**使用场景**
+
+✅ **网络存储 (NFS, Ceph, AWS EBS, GCE Persistent Disk)**
+
+- 这些存储可以跨多个节点访问，因此 PVC 立即绑定后，不会影响 Pod 的调度。
+
+❌ **本地存储 (HostPath, Local SSD, Node-specific Storage)**
+
+- 由于 PVC 可能绑定到不合适的 PV，导致 Pod 无法正确调度。
+
+
+
+**volumeBindingMode: WaitForFirstConsumer**
+
+**工作机制**
+
+- **PVC 不会立即绑定 PV，直到 Pod 被调度到某个节点。**
+- **存储调度会在 Pod 绑定节点后进行**，确保存储和计算节点匹配。
+- 适用于 **本地存储（Local Storage, SSD, Node-specific Storage, EBS GP3/IO2等）**。
+
+**使用场景**
+
+✅ **本地存储 (Local SSD, Local Persistent Volumes)**
+
+- 只有在 Pod 确定运行在哪个节点后，PVC 才绑定到该节点的 PV，防止存储和计算不匹配的问题。
+
+✅ **Kubernetes 资源调度优化**
+
+- 允许 Kubernetes **在调度 Pod 时综合考虑存储位置**，减少数据传输延迟。
+
+❌ **共享存储 (NFS, Ceph, AWS EBS)**
+
+- 这些存储没有节点限制，不需要延迟绑定
+
+
+
+**`Immediate` vs `WaitForFirstConsumer` 对比总结**
+
+| 绑定模式               | 绑定时间                             | 适用存储类型                          | 适用场景                                         | 主要问题                                |
+| ---------------------- | ------------------------------------ | ------------------------------------- | ------------------------------------------------ | --------------------------------------- |
+| `Immediate`            | PVC 立即绑定 PV                      | 共享存储 (NFS, Ceph, AWS EBS, GCE PD) | **云存储、网络存储**，PVC 可以提前绑定           | **本地存储可能导致 PVC 绑定到错误节点** |
+| `WaitForFirstConsumer` | **Pod 运行在哪个节点，PVC 才会绑定** | 本地存储 (Local SSD, NVMe, EBS GP3)   | **本地存储或高性能 SSD**，确保存储与计算节点一致 | **Pod 需要先调度，PVC 才能绑定**        |
+
+
+
+#### 存储制备器
+
+每个 StorageClass 都有**一个制备器（Provisioner）**，用于提供存储驱动，用来决定使用哪个卷插件制备 PV。 **该字段必须指定**
+
+| 卷插件         | 内置制备器 |                           配置示例                           |
+| :------------- | :--------: | :----------------------------------------------------------: |
+| AzureFile      |     ✓      | [Azure File](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#azure-file) |
+| CephFS         |     -      |                              -                               |
+| FC             |     -      |                              -                               |
+| FlexVolume     |     -      |                              -                               |
+| iSCSI          |     -      |                              -                               |
+| Local          |     -      | [Local](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#local) |
+| NFS            |     -      | [NFS](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#nfs) |
+| PortworxVolume |     ✓      | [Portworx Volume](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#portworx-volume) |
+| RBD            |     ✓      | [Ceph RBD](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#ceph-rbd) |
+| VsphereVolume  |     ✓      | [vSphere](https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#vsphere) |
+
+
 
 
 
 ## 9. Sidecar
 
+### emptyDir
+
+一个emptyDir volume在pod被调度到某个Node时候自动创建的，无需指定宿主机上对应的目录。 适用于在一个**Pod中不同容器间的临时数据的共享**
 
 
 
+**emptyDir 数据存放在宿主机的路径如下**
+
+```bash
+/var/lib/kubelet/pods/<pod_id>/volumes/kubernetes.io~empty-dir/<volume_name>/<FILE>
+
+#注意：此目录随着Pod删除，也会随之删除，不能实现持久化
+
+# 查看pod所在节点
+[root@master1 pods]#kubectl get pods -o wide
+NAME                     READY   STATUS    RESTARTS        AGE   IP             NODE    NOMINATED NODE   READINESS GATES
+myweb-565cb68445-btlj8   1/1     Running   1 (7h25m ago)   24h   10.244.2.56    node2   <none>           <none>
+myweb-565cb68445-c8drb   1/1     Running   1 (7h26m ago)   24h   10.244.1.104   node1   <none>           <none>
+myweb-565cb68445-lj7bq   1/1     Running   1 (7h25m ago)   24h   10.244.3.111   node3   <none>           <none>
+
+# 查看pod节点上emptyDir数据存放的路径
+[root@master1 pods]#ssh 10.0.0.203 ls /var/lib/kubelet/pods/
+242cc64b-4330-4c00-ba80-9228f2186367
+4a737c21-36e2-413d-a53f-ce65b9b4698e
+9fe61621-a076-4d35-add9-c329ca6b12db
+eed8a3fa-73e0-4a1e-b897-4235d77cae66
+
+# 查看对应的pod的uid
+[root@master1 pods]#kubectl get pod myweb-565cb68445-btlj8 -o yaml|grep -i uid
+    uid: 4db8879a-ee0d-48d3-8b7e-675581eb4fa2
+  uid: eed8a3fa-73e0-4a1e-b897-4235d77cae66      # -------- 匹配上面的路径uid
+```
+
+
+
+**emptyDir 特点如下：**
+
+- 此为**默认存储类型**
+- 此方式只能临时存放数据，不能实现数据持久化
+- 跟随Pod初始化而来，开始是空数据卷
+- Pod 被删除，emptyDir对应的宿主机目录也被删除，当然目录内的数据随之永久消除
+- emptyDir 数据卷介质种类跟当前主机的磁盘一样。
+- emptyDir 主机可以为同一个Pod内多个容器共享
+- emptyDir 容器数据的临时存储目录主要用于数据缓存和**同一个Pod内的多个容器共享使用**
+
+
+
+**emptyDir属性解析**
+
+```bash
+kubectl explain pod.spec.volumes.emptyDir
+    medium       # 指定媒介类型，主要有default和memory两种
+                 # 默认情况下，emptyDir卷支持节点上的任何介质，SSD、磁盘或网络存储，具体取决于自身所在Node的环境
+                 # 将字段设置为Memory，让K8S使用tmpfs，虽然tmpfs快，但是Pod重启时，数据会被清除，并且设置的大小会被计入                    # Container的内存限制当中
+    sizeLimit    # 当前存储卷的空闲限制，默认值为nil表示不限制
+    
+kubectl explain pod.spec.containers.volumeMounts
+    mountPath    # 挂载到容器中的路径,此目录会自动生成
+    name         # 指定挂载的volumes名称
+    readOnly     # 是否只读挂载
+    subPath      # 是否挂载子目录的路,默认不挂载子目录
+```
 
 
 
@@ -927,7 +1180,65 @@ Kubernetes 卷（Volume） 这一抽象概念能够解决这两个问题
 
 ## 10. ConfigMap
 
+### ConfigMap的作用
 
+**ConfigMap** 是 Kubernetes 中用于将配置信息（通常是纯文本）传入容器的机制，用来解耦代码和配置。
+
+- 动机：配置不写死在镜像里（可修改、可复用）
+- 应用场景：环境变量、配置文件、启动参数、脚本、证书等
+
+
+
+### 清单文件基本结构组成
+
+ConfigMap 是一组 key-value 组成的配置资源。
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-config
+data:
+  key1: value1
+  key2: |
+    multi-line
+    value block
+```
+
+说明：
+
+- 每一个 `key` 都可以是一个独立配置项
+- `value` 可以是一行字符串，也可以是多行配置内容
+
+
+
+### `data` 字段的使用方式
+
+ConfigMap **从 Kubernetes 角度**有**两种注入方式**：
+
+| 分类                    | 具体表现                             | 适用场景                           |
+| ----------------------- | ------------------------------------ | ---------------------------------- |
+| **1. 作为环境变量注入** | `envFrom` / `env`                    | 适合少量、简单、键值型配置         |
+| **2. 作为文件挂载注入** | `volumes.configMap` + `volumeMounts` | 适合配置文件、脚本、参数段、证书等 |
+
+
+
+### 考试重点：immutable字段
+
+**当 `ConfigMap` 设置了 `immutable: true` 后：**
+
+Deployment **加载修改后的 ConfigMap** 只有两种方法：
+
+1. **修改 ConfigMap 名称**
+   - 创建一个新的 ConfigMap（使用新名称）；
+   - 同步修改 Deployment 中挂载的 `configMap.name` 字段；
+   - 重新部署或 `rollout restart` Deployment；
+   - **不会中断服务**，推荐方式。
+2. **删除并重建 Deployment**
+   - 删除原 Deployment；
+   - 保证 ConfigMap 在此之前已经更新；
+   - 重新创建 Deployment；
+   - **会影响服务可用性**，仅适用于非生产或可容忍场景。
 
 
 

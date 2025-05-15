@@ -1640,7 +1640,7 @@ endmodule
 
 
 
-## 寄存器与存储器的实现
+## 寄存器REG与存储器RAM的实现
 
 ### 时钟
 
@@ -1805,11 +1805,452 @@ endmodule
 
 
 
+### SR锁存器
+
+![image-20250512233045047](../markdown_img/image-20250512233045047.png)
+
+### SR锁存器实现
+
+![image-20250513001210567](../markdown_img/image-20250513001210567.png)
+
+
+
+#### 补充知识：为什么必须要有Q'的存在？
+
+**状态验证能力（错误检测）**
+
+S表示置位，当S为1，则Q置为1
+
+R表示复位，当R为1，则Q归0
+
+但是如果只有Q，当Q出现意外掉电，受干扰，驱动失败变成0，如果没有Q'，则根本无法知道Q是否是合法的，当Q为0时，是正常复位，还是意外掉电都不知道
+
+如果有Q'，则当S=1时，Q置为1，Q'为0，此时Q和Q'互补，说明没问题，如果Q出现意外掉电的情况，则 Q变为0 ，但此时Q'为0，此时Q和Q'都为0，非互补，可以判断此时结果异常。
+
+<span style="color:red">**因此Q'用来帮助电路检测“当前状态是否一致可靠”。没有 Q'，任何单独的 Q 状态都无法被电路本身验证合法性。**</span>    
+
+
+
+**驱动优势（省资源 + 提高性能）**
+
+在一些电路设计中，有**正逻辑和负逻辑两种需求**：
+
+- 正逻辑：用 Q = 1 表示激活
+- 负逻辑：用 Q' = 0 表示激活
+
+如果没有 Q'，你需要**增加额外反相器**，
+
+- **消耗更多资源**
+- **增加电路延迟**
+
+而直接提供 Q'
+
+- **节省资源**
+- **响应更快**
 
 
 
 
 
+![image-20250513021450615](../markdown_img/image-20250513021450615.png)
+
+​                                                                          
+
+实际在使用SR锁存器的时候，还会增加一个控制信号，通常是一个时钟
+
+- 当这个时钟信号为1的时候，输出才受r跟s的影响
+- 当这个时钟信号为0的时候，输出保持之前的值 
+
+后面会使用这个特性来简化电路分析
+
+```verilog
+// srff.v
+module SRFF(input R, clock, S, output Q, Q_dot);
+    And g1(R, clock, Rout);
+    And g2(S, clock, Sout);
+    Nor g3(Rout, Q_dot, Q);
+    Nor g3(Sout, Q, Q_dot);
+endmodule
+```
+
+```verilog
+// srff_tb.v
+`include "nand.v"
+`include "not.v"
+`include "or.v"
+`include "nor.v"
+`include "and.v"
+`include "srff.v"
+
+module srff_tb;
+    reg R, clk,S;
+    wire Q,Q_dot;
+    SRFF obj(R, clk, S, Q, Q_dot);
+
+    always #10 clk=~clk;
+
+    initial begin
+        clk=0;
+        R=0;
+        S=1;
+        #10
+        R=0;
+        S=1;
+        #10
+        S=0;
+        R=1;
+        #10
+        R=0;
+        S=1;
+        #10
+        R=0;
+        S=1;
+        #10
+        R=1;
+        S=0;
+        #10
+        R=0;
+        S=1;
+        #10
+        R=0;
+        S=1;
+        #10 $finish;
+    end
+
+    initial begin
+        $monitor($time,,,"R=%d clk=%d S=%d Q=%d Q_dot=%d\n", R, clk, S, Q, Q_dot);
+    end
+
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog srff_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+                   0  R=0 clk=0 S=1 Q=x Q_dot=x
+
+                  10  R=0 clk=1 S=1 Q=1 Q_dot=0
+
+                  20  R=1 clk=0 S=0 Q=1 Q_dot=0
+
+                  30  R=0 clk=1 S=1 Q=1 Q_dot=0
+
+                  40  R=0 clk=0 S=1 Q=1 Q_dot=0
+
+                  50  R=1 clk=1 S=0 Q=0 Q_dot=1
+
+                  60  R=0 clk=0 S=1 Q=0 Q_dot=1
+
+                  70  R=0 clk=1 S=1 Q=1 Q_dot=0
+
+                  80  R=0 clk=0 S=1 Q=1 Q_dot=0
+```
+
+
+
+### D锁存器
+
+![image-20250513024519332](../markdown_img/image-20250513024519332.png)
+
+D锁存器的本质就是将之前的两个输入，变成一个输入，同时通过非门，保证R和S的输入绝对互斥，防止R,S相同的这种非法情况出现
+
+```verilog
+// dl.v
+module DL(input S, clock, output Q, Q_dot);
+    Not g1(S, R);
+    And g2(R, clock, Rout);
+    And g3(S, clock, Sout);
+    Nor g4(Rout, Q_dot, Q);
+    Nor g5(Sout, Q, Q_dot);
+endmodule
+```
+
+```verilog
+// dl_tb.v
+`include "nand.v"
+`include "not.v"
+`include "or.v"
+`include "nor.v"
+`include "and.v"
+`include "dl.v"
+
+module dff_tb;
+    reg S, clk;
+    wire Q,Q_dot;
+    DL obj(S, clk, Q, Q_dot);
+
+    always #10 clk=~clk;
+
+    initial begin
+        clk=0;
+        S=0;
+        #10
+        S=0;
+        #10
+        S=1;
+        #10
+        S=1;
+        #10
+        S=0;
+        #10
+        S=0;
+        #10
+        S=1;
+        #10
+        S=1;
+        #10 $finish;
+    end
+
+    initial begin
+        $monitor($time,,,"S=%d clk=%d Q=%d Q_dot=%d\n", S, clk, Q, Q_dot);
+    end
+
+endmodule
+```
+
+```verilog
+[root@devops-custom ~/verilog]# iverilog dl_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+                   0  S=0 clk=0 Q=x Q_dot=x
+
+                  10  S=1 clk=0 Q=0 Q_dot=1
+
+                  20  S=0 clk=1 Q=0 Q_dot=1
+
+                  30  S=1 clk=1 Q=1 Q_dot=0
+
+                  40  S=0 clk=0 Q=1 Q_dot=0
+
+                  50  S=1 clk=0 Q=0 Q_dot=1
+
+                  60  S=0 clk=1 Q=0 Q_dot=1
+
+                  70  S=1 clk=1 Q=1 Q_dot=0
+
+                  80  S=0 clk=1 Q=1 Q_dot=0
+```
+
+
+
+当时钟保持1的时候，它的输出等于输入，这种方式也叫做电平触发
+
+
+
+### D触发器
+
+D触发器，它是属于边沿触发，就是当时钟从0到1以后，它的输出才等于输入，其他情况输出都不受输入的影响
+
+D触发器，本质上是由**两个时钟SR锁存器**构成
+
+![image-20250513092453407](../markdown_img/image-20250513092453407.png)
+
+
+
+![image-20250513093019981](../markdown_img/image-20250513093019981.png)
+
+
+
+
+
+### D触发器的实现
+
+![image-20250513093647711](../markdown_img/image-20250513093647711.png)
+
+
+
+上述D触发器本质由两个时钟SR锁存器构成
+
+- 第一个时钟SR锁存器的R端输入是in，S端是inNot，时钟是clockNot，输出是Q
+- 第二个时钟SR锁存器的R端输入是Q，S端是Q'，时钟是clock，输出是out
+
+```verilog
+// dff.v
+module Dff(input in, clock, load, output out);
+    wire t1, t2;
+    Mux g1(out, in, load, in1);
+    Not g2(clock, clockNot);
+    Not g3(in1, in1not);
+    DL g4(in1not, clockNot, Q, Q_dot);
+    SRFF g5(Q, clock, Q_dot, out, Q1_dot);
+endmodule
+```
+
+```verilog
+`include "nand.v"
+`include "not.v"
+`include "or.v"
+`include "nor.v"
+`include "and.v"
+`include "mux.v"
+`include "dl.v"
+`include "srff.v"
+`include "dff.v"
+
+module dff_tb;
+    reg in, clk, load;
+    wire Q, Q_dot;
+    Dff obj(in, clk, load, Q, Q_dot);
+
+    always #10 clk=~clk;
+
+    initial begin
+        clk=0;
+        in=1;
+        load=1;
+        #10
+        #10
+        #10
+        in=0;
+        #10
+        #10
+        #10
+        #10
+        load=0;
+        #10
+        in=1;
+        #10
+        #10 $finish;
+    end
+
+    initial begin
+        $monitor($time,,,"IN=%d clk=%d Load=%d Q=%d Q_dot=%d\n", in, clk, load, Q, Q_dot);
+    end
+
+endmodule
+```
+
+```bash
+[root@devops-custom ~/verilog]# iverilog dff_tb.v 
+[root@devops-custom ~/verilog]# ./a.out 
+                   0  IN=1 clk=0 Load=1 Q=x
+
+                  10  IN=1 clk=1 Load=1 Q=1
+
+                  20  IN=1 clk=0 Load=1 Q=1
+
+                  30  IN=0 clk=1 Load=1 Q=1
+
+                  40  IN=0 clk=0 Load=1 Q=1
+
+                  50  IN=0 clk=1 Load=1 Q=0
+
+                  60  IN=0 clk=0 Load=1 Q=0
+
+                  70  IN=0 clk=1 Load=0 Q=0
+
+                  80  IN=1 clk=0 Load=0 Q=0
+
+                  90  IN=1 clk=1 Load=0 Q=0
+
+                 100  IN=1 clk=0 Load=0 Q=0
+```
+
+
+
+### 寄存器
+
+```verilog
+// register.v
+module Register(input[15:0] in, input clock, load, output[15:0] out);
+    DFF g01(in[15], clock, load, out[15]);
+    DFF g02(in[14], clock, load, out[14]);
+    DFF g03(in[13], clock, load, out[13]);
+    DFF g04(in[12], clock, load, out[12]);
+    DFF g05(in[11], clock, load, out[11]);
+    DFF g06(in[10], clock, load, out[10]);
+    DFF g07(in[9], clock, load, out[9]);
+    DFF g08(in[8], clock, load, out[8]);
+    DFF g09(in[7], clock, load, out[7]);
+    DFF g10(in[6], clock, load, out[6]);
+    DFF g11(in[5], clock, load, out[5]);
+    DFF g12(in[4], clock, load, out[4]);
+    DFF g13(in[3], clock, load, out[3]);
+    DFF g14(in[2], clock, load, out[2]);
+    DFF g15(in[1], clock, load, out[1]);
+    DFF g16(in[0], clock, load, out[0]);
+endmodule
+```
+
+
+
+### 存储器
+
+#### 2B存储器
+
+8个地址，但是每个地址存放16bit数据
+
+将8个寄存器组合构成一个RAM8，它通过<span style="color:red">**地址寻址**</span>，地址的范围是3位，也就是8个地址，8个地址对应8个寄存器
+
+最下面有一个多路选择器，通过地址来选择把哪个寄存器的值作为输出，比如地址是1，那么选择的输出就是寄存器1的输出作为地该地址的输出
+
+```verilog
+//RAM8.v
+module RAM8(input[15:0] in, input clk, load, input[2:0] address, output[15:0] out);
+  wire[15:0] o0,o1,o2,o3,o4,o5,o6,o7;
+  // 多路复用器，当load=1时，选择把输入存储到哪个寄存器里面
+  DMux8Way g0(load, address, loadA, loadB, loadC, loadD, loadE, loadF, loadG, loadH);
+  
+  Register r0(in, clk, loadA, o0);
+  Register r1(in, clk, loadB, o1);
+  Register r2(in, clk, loadC, o2);
+  Register r3(in, clk, loadD, o3);
+  Register r4(in, clk, loadE, o4);
+  Register r5(in, clk, loadF, o5);
+  Register r6(in, clk, loadG, o6);
+  Register r7(in, clk, loadH, o7);
+  
+  Mux8Way16 g1(o0, o1, o2, o3, o4, o5, o6, o7, address, out);
+endmodule
+```
+
+
+
+<span style="color:red">**现代DDR4-4G内存条，每个地址8位，有4G的地址**</span>
+
+![image-20250513113720795](../markdown_img/image-20250513113720795.png)
+
+#### 128B存储器
+
+64个地址，但是每个地址存放16bit数据
+
+```verilog
+// RAM64.v
+module RAM64(input[15:0] in, input clk, load, input[5:0] address, output[15:0] out);
+    wire[15:0] o1, o2, o3, o4, o5, o6, o7, o8;
+    DMux8Way d1(load, address[5:3], loadA, loadB, loadC, loadD, loadE, loadF, loadG, loadH);
+    RAM8 r1(in, clk, loadA, address[2:0], o1);
+    RAM8 r2(in, clk, loadB, address[2:0], o2);
+    RAM8 r3(in, clk, loadC, address[2:0], o3);
+    RAM8 r4(in, clk, loadD, address[2:0], o4);
+    RAM8 r5(in, clk, loadE, address[2:0], o5);
+    RAM8 r6(in, clk, loadF, address[2:0], o6);
+    RAM8 r7(in, clk, loadG, address[2:0], o7);
+    RAM8 r8(in, clk, loadH, address[2:0], o8);
+    Mux8Way16 m1(o1, o2, o3, o4, o5, o6, o7, o8, address[5:3], out);
+endmodule
+```
+
+
+
+#### 1K存储器
+
+512个地址，每个地址存放16bit数据
+
+```verilog
+module RAM512(intput[15:0]in, input clk, load, input[8:0] address, output[15:0] out);
+    wire[15:0] o1, o2, o3, o4, o5, o6, o7, o8;
+    DMux8Way d1(load, address[8:6], loadA, loadB, loadC, loadD, loadE, loadF, loadG, loadH);
+    RAM64 r1(in, clk, loadA, address[5:0], o1);
+    RAM64 r2(in, clk, loadB, address[5:0], o2);
+    RAM64 r3(in, clk, loadC, address[5:0], o3);
+    RAM64 r4(in, clk, loadD, address[5:0], o4);
+    RAM64 r5(in, clk, loadE, address[5:0], o5);
+    RAM64 r6(in, clk, loadF, address[5:0], o6);
+    RAM64 r7(in, clk, loadG, address[5:0], o7);
+    RAM64 r8(in, clk, loadH, address[5:0], o8);
+    Mux8Way16 m1(o1, o2, o3, o4, o5, o6, o7, o8, address[8:6], out);
+endmodule
+```
 
 
 
@@ -2045,6 +2486,892 @@ ALU（ARITHMETIC AND LOGIC UNIT），又叫做算术逻辑单元，可以做加�
 ![image-20250412170719971](../markdown_img/image-20250412170719971.png)
 
 
+
+## 存储器层次结构
+
+### 存储器分类
+
+- 常见存储器
+  - 寄存器，高速缓存，主存，硬盘，光盘
+- 按存储介质分
+  - 磁性材料，半导体，光存储
+- 按存取方式分
+  - 随机存储器，顺序存储器
+- 读写功能
+  - 随机读写存储器RAM，只读存储器ROM
+- 信息易失性
+  - 易失性存储器，非易失性存储器
+
+
+
+### 存储器层次结构
+
+![image-20250513154112963](../markdown_img/image-20250513154112963.png)
+
+
+
+这里CPU和内存之间的性能差距，是冯诺依曼体系结构的主要瓶颈（即著名的**冯诺依曼瓶颈**），大部分的优化就是为了解决这个问题
+
+**常见优化手段**
+
+| 优化手段                        | 解决点                                 |
+| ------------------------------- | -------------------------------------- |
+| **Cache（L1/L2/L3 缓存）**      | 将高频数据提前缓存到更快的存储中       |
+| **指令预取、乱序执行**          | 隐藏访问延迟                           |
+| **内存控制器优化**              | 提高带宽利用率                         |
+| **总线协议优化（AXI、PCIe）**   | 提高数据传输效率                       |
+| **存算一体、HBM（高带宽内存）** | 试图突破冯诺依曼架构限制，减少数据移动 |
+
+
+
+### 存储器对比
+
+![image-20250513154956885](../markdown_img/image-20250513154956885.png)
+
+### 每个层次的**控制者**和**影响要素**
+
+| 传输路径                        | 传输块大小主要由谁决定                       | 受哪些因素影响                                               |
+| ------------------------------- | -------------------------------------------- | ------------------------------------------------------------ |
+| **硬盘 ➡ 内存**                 | **操作系统、文件系统、硬盘控制器**           | 磁盘扇区大小（通常 512B/4KB）、文件系统块大小、页大小（4KB/2MB/1GB）、I/O调度 |
+| **内存 ➡ CPU 缓存（L1/L2/L3）** | **硬件架构设计者（固定的 Cache Line 大小）** | CPU 架构（如 64B cache line）、总线宽度、预取策略            |
+| **CPU 缓存 ➡ CPU 寄存器**       | **CPU 指令集和硬件设计**                     | 寄存器位宽（如 32bit/64bit/128bit）、指令操作数宽度          |
+
+
+
+#### 硬盘到内存
+
+- **块大小是“可变的”**，可以被**文件系统**或**操作系统调度策略**影响。
+  - 例如 Linux 默认按 **4KB 页（Page）** 读入。
+  - 但硬盘控制器可能 **最小只支持 512B 或 4KB 扇区**。
+- 这层数据传输块是**软件和硬件共同决定的**，比较灵活。
+
+
+
+#### 内存到缓存
+
+- **固定的 Cache Line 大小**（比如 64 Byte）由**硬件架构设计者**决定。
+- 程序无法改变这个大小。
+- **CPU 预取机制** 可能影响**一次取几行**，但**单行大小不变**。
+
+
+
+#### 缓存到寄存器
+
+- 决定因素是**指令集（ISA）\**和\**寄存器大小**。
+- 比如 `MOV` 指令决定拷贝多少位（8位/16位/32位/64位）。
+- **程序可以控制**每次用多大的寄存器操作（如 int32 vs int64）。
+
+
+
+
+
+### 缓存结构
+
+![image-20250513154627296](../markdown_img/image-20250513154627296.png)
+
+
+
+## 随机存储器
+
+### 随机存储器（RAM）
+
+- 每个存储单元的读写时间一样，与存储单元的位置无关，比如上面verilog写的RAM就是随机存储器，寻址时间和读写位置无关，**不管地址大小，寻址时间相同**
+- 易失性存储器，半导体材料
+- 静态随机存储器（**SRAM**），用作**高速缓存**
+  - 存储原理是**触发器**
+  - 静态的，不断电信息就不会丢失
+- 动态随机存储器（DRAM），用作**内存**
+  - 存储原理是**电容器**
+  - 电容容易丢失电荷，需要定时刷新
+  - SDRAM
+  - DDR、DDR2、DDR3、DDR4、DDR5
+
+
+
+#### **DDR2 / DDR3 / DDR4 区别主要在以下几个方面**
+
+| 对比项           | DDR2          | DDR3                | DDR4            |
+| ---------------- | ------------- | ------------------- | --------------- |
+| **发布时间**     | 2003          | 2007                | 2014            |
+| **电压**         | 1.8V          | 1.5V / 1.35V (低压) | 1.2V            |
+| **引脚数**       | 240           | 240                 | 288             |
+| **时钟频率**     | 400-1066 MHz  | 800-2133 MHz        | 2133-3200+ MHz  |
+| **带宽**         | 6.4-8.5 GB/s  | 12.8-17 GB/s        | 25.6-28.8 GB/s  |
+| **刷新频率**     | 普通          | 增强的自刷新        | 自适应刷新优化  |
+| **功耗**         | 高            | 较低                | 更低            |
+| **数据传输速率** | 800-2133 MT/s | 1600-4266 MT/s      | 3200-6400+ MT/s |
+
+
+
+#### 为什么内存和CPU要匹配？
+
+因为：
+
+1. **内存控制器（Memory Controller）通常集成在CPU上**（从Intel Nehalem、AMD Zen开始都是这样）。
+   - 控制器决定支持的内存代际（DDR3、DDR4、DDR5）。
+   - 决定**支持的最高时钟频率和容量**。
+2. **内存槽（主板电气规格）必须匹配内存代际和频率**。
+   - DDR3、DDR4、DDR5 的物理接口、信号、电压都不兼容。
+   - 主板声明支持的频率范围也有限。
+
+
+
+#### CPU主频 vs 内存时钟频率
+
+| 对比点   | CPU主频                                      | 内存时钟频率                       |
+| -------- | -------------------------------------------- | ---------------------------------- |
+| 定义     | CPU 内部**执行指令的速度**                   | 内存控制器与内存**交换数据的速度** |
+| 单位     | GHz（十亿次每秒）                            | MHz（百万次每秒）或 MT/s           |
+| 控制者   | CPU 内部时钟                                 | 内存控制器（在 CPU 上）            |
+| 互相独立 | 是                                           | 是                                 |
+| 关联     | 通过**总线（如Infinity Fabric/Uncore）**桥接 |                                    |
+| 实际表现 | CPU算得快但取数据慢就是“性能瓶颈”            |                                    |
+
+- **CPU 与内存必须匹配代际（DDR3/DDR4/DDR5）和主板支持的频率**。
+
+- **CPU主频和内存频率独立，但通过内存控制器桥接**。
+
+- **带宽差异决定了内存是性能瓶颈，缓存是缓解手段**。
+
+
+
+#### 带宽详解
+
+**带宽的定义**
+
+**带宽**指的是 **单位时间内** 允许传输的 **数据量**，通常以 **GB/s（GigaBytes per second）** 表示。
+
+
+
+**带宽 ≠ 频率**
+
+- 频率是 "每秒钟的传输次数"（单位 Hz）
+- 带宽是 "每秒钟总共传输了多少数据"（单位 GB/s）
+- 两者关系：
+   带宽 = 频率 × 数据总线宽度（每次传输的数据位宽）
+
+例如：
+
+- DDR4 3200 频率 = 3200 MT/s
+   数据总线宽度 = 64 bit = 8 Bytes
+   理论带宽 = 3200 × 8 / 8 = **25.6 GB/s**
+
+
+
+**内存带宽 vs 缓存带宽对比**
+
+| 存储层次  | 典型带宽（GB/s） | 访问延迟（ns） |
+| --------- | ---------------- | -------------- |
+| L1 Cache  | 1000+            | 1              |
+| L2 Cache  | 500+             | 3~5            |
+| L3 Cache  | 100~200          | 10~20          |
+| DDR4 内存 | 25~50            | 50~100         |
+| 硬盘 SSD  | 0.5~5            | 100000+        |
+
+你会发现：
+
+- **带宽从 Cache 到 内存 下降了 10 倍以上**
+- **访问延迟提升了 10~100 倍**
+
+
+
+<span style="color:red">**访问延迟来源于 距离、物理限制、总线仲裁、电子信号传播速度和协议开销**。</span>
+
+
+
+#### 访问延迟
+
+**为什么会有访问延迟**
+
+1. **物理距离**
+   - Cache 和 CPU 同芯片，纳米级距离，电信号几乎瞬达。
+   - 内存（DDR）在主板上，信号通过**内存总线**传输，距离远，信号衰减、干扰都更严重。
+   - 硬盘更远，要经过 **I/O 控制器** 或 **PCIe 总线**，甚至是网络传输（比如 iSCSI）。
+2. **总线仲裁**
+   - 多个设备或 CPU 需要访问内存，必须**排队仲裁**，这增加等待时间。
+   - Cache 是专属的，几乎无等待。
+3. **协议和控制逻辑开销**
+   - Cache 访问几乎是裸数据访问，简单直接。
+   - DDR 内存遵循**复杂的访问协议（如 DDR Timing）**，要完成行选通、列选通、预充电等操作。
+   - 硬盘遵循 SATA/NVMe 等协议，带来控制指令和握手开销。
+4. **信号完整性和稳定性要求**
+   - 远距离传输需要额外的信号增强、校验等逻辑，牺牲时延换取可靠性。
+5. **电子信号物理极限**
+   - 电信号在 PCB 上传播速度接近光速，但由于走线弯曲、反射、干扰，**实际稳定速率有限**。
+   - Cache 几乎没有这些限制。
+
+
+
+**访问延迟的量化（示意）**
+
+| 层次              | 访问延迟      | 说明                             |
+| ----------------- | ------------- | -------------------------------- |
+| L1 Cache          | 1 ns          | 芯片内部直接访问                 |
+| L2 Cache          | 3~5 ns        | 稍远，但仍在芯片内部             |
+| L3 Cache          | 10~20 ns      | 跨核共享缓存，稍慢               |
+| DDR4 内存         | 50~100 ns     | 需要走总线、控制器仲裁、协议处理 |
+| NVMe SSD          | 100,000 ns    | 走 PCIe 总线，复杂协议，设备交互 |
+| 网络存储（iSCSI） | 1,000,000 ns+ | 经过网络堆栈、协议、多设备交互   |
+
+
+
+### SRAM的1bit存储单元
+
+![image-20250513202350281](../markdown_img/image-20250513202350281.png)
+
+
+
+注解：M6是NMOS（加电压，正电导通），M4是PMOS（与之NMOS相反）
+
+**上图核心结构**
+
+- 两个**交叉反相器**构成稳态锁存电路（保持 0 或 1）。
+- 两个**nmos访问管**受 `WL` 控制决定是否允许 BL 传递数据。
+
+**交叉反相器部分**
+
+- `p1/n1`、`p2/n2` 交叉形成 **锁存结构**（保持数据）。
+- PMOS 连接到电源 `1'b1`(即VDD上高电位)，NMOS 连接到地 `1'b0`。
+
+**访问晶体管部分**
+
+- `n3/n4` 受控于 **字线 WL**，控制读写操作。
+
+**读写机制**
+
+- **写入时**：BL、BL_bar 提供数据，WL 打开使数据写入。
+- **读取时**：WL 打开，把锁存的数据传到 BL、BL_bar。
+
+```verilog
+// sram1bit.v
+module Sram1bit(input bl, bl_dot, wl, output Q, Q_dot);
+    wire n1_out, n2_out;
+    
+    // 交叉耦合反相器对
+    pmos p1(Q, 1'b1, Q_bar);
+    nmos n1(Q, 1'b0, Q_bar);
+    pmos p2(Q_dot, 1'b1, Q);
+    pmos n2(Q_dot, 1'b0, Q);
+    
+    // 访问晶体管（通过WL控制）
+    nmos n3(Q, bl, wl);
+    nmos n4(Q_dot, bl_dot, wl);
+    
+endmodule
+```
+
+
+
+
+
+### 静态随机存储器（SRAM）
+
+将多个1位的SRAM组合起来，就构成了SRAM大致的内部结构
+
+- 一个1bit存储单元6个晶体管
+- 速度较快
+- 密度低，功耗较高，价格较贵
+- 对个存储单元构成存储阵列
+
+
+
+![image-20250513235837957](../markdown_img/image-20250513235837957.png)
+
+
+
+SRAM有一个地址译码器对地址进行译码，译码成对应的选择线，去选择一行的数据。比如你的地址线是6位（如上图），那么它对应的选择线就是2^6=64根，
+
+每一根选择线上可以选择一位或者多位，比如可以是8位，16位，32位，下面有一个数据线进行数据的输入输出，控制线用来控制读或者写
+
+<span style="color:red">**数据译码器本质上是一个多路复用器，而数据输入输出，本质上是一个多路选择器，且地址线的宽度和数据线并无直接关系**</span>
+
+数据线的宽度和一行的存储单元的个数相关，而地址线的宽度和地址范围相关
+
+
+
+#### SRAM实现
+
+```verilog
+// 即之前的RAM64
+module RAM64(input[15:0] in, input clk, load, input[5:0] address, output[15:0] out);
+```
+
+
+
+### 译码方式
+
+上述译码方式也叫做**单地址译码**
+
+![image-20250514005941227](../markdown_img/image-20250514005941227.png)
+
+
+
+<span style="color:red">**注意：双译码器一次只能定位1位数据，所以如果想要同时定位多位数据，需要使用存储阵列**</span>
+
+<span style="color:red">**双译码器的本质就是两个多路复用器**</span>
+
+
+
+### 存储阵列
+
+![image-20250514010519924](../markdown_img/image-20250514010519924.png)
+
+
+
+#### 存储阵列实现
+
+```verilog
+// StorageArray1bit.v
+module StorageArray1bit(input in, clk, load, input[1:0] x, y, output out);
+    wire loadA, loadB, loadC, loadD;
+    wire loada1, loadb1, loadc1, loadd1;
+    wire loada2, loadb2, loadc2, loadd2;
+    wire loada3, loadb3, loadc3, loadd3;
+    wire loada4, loadb4, loadc4, loadd4;
+    wire o1, o2, o3, o4, o5, o6, o7, o8, o9, o10, o11, o12, o13, o14, o15, o16;
+    
+    DMux4Way g0(load, x, loadA, loadB, loadC, loadD);
+    
+    // 不要电路复用，否则可能导致线路冲突
+    DMux4Way g1(loadA, y, loada1, loadb1, loadc1, loadd1);
+    DFF n1(in, clk, loada1, o1);
+    DFF n2(in, clk, loadb1, o2);
+    DFF n3(in, clk, loadc1, o3);
+    DFF n4(in, clk, loadd1, o4);
+    
+    DMux4Way g2(loadB, y, loada2, loadb2, loadc2, loadd2);
+    DFF n5(in, clk, loada2, o5);
+    DFF n6(in, clk, loadb2, o6);
+    DFF n7(in, clk, loadc2, o7);
+    DFF n8(in, clk, loadd2, o8);
+    
+    DMux4Way g3(loadC, y, loada3, loadb3, loadc3, loadd3);
+    DFF n9(in, clk, loada3, o9);
+    DFF n10(in, clk, loadb3, o10);
+    DFF n11(in, clk, loadc3, o11);
+    DFF n12(in, clk, loadd3, o12);
+    
+    DMux4Way g4(loadD, y, loada4, loadb4, loadc4, loadd4);
+    DFF n13(in, clk, loada4, o13);
+    DFF n14(in, clk, loadb4, o14);
+    DFF n15(in, clk, loadc4, o15);
+    DFF n16(in, clk, loadd4, o16);
+    
+    wire [3:0] z = {x, y};  // 表示x和y直接拼接
+    
+    Mmux16Way g5(o1, o2, o3, o4, o5, o6, o7, o8, o9, o10, o11, o12, o13, o14, o15, o16, z, out);
+endmodule
+```
+
+
+
+#### 4bit的存储阵列实现
+
+```verilog
+// StorageArray4bit.v
+module StorageArray4bit(input[3:0] in, clk, load, input[1:0] x, y, output[3:0] out);
+    StorageArray1bit(in[0], clk, load, x, y, out[0]);
+    StorageArray1bit(in[1], clk, load, x, y, out[1]);
+    StorageArray1bit(in[2], clk, load, x, y, out[2]);
+    StorageArray1bit(in[3], clk, load, x, y, out[3]);
+endmodule
+```
+
+
+
+
+
+### 动态随机存储器（DRAM）
+
+![image-20250514022740001](../markdown_img/image-20250514022740001.png)
+
+
+
+如上图所示，DRAM的一位存储单元，有一个**晶体管T**，和一个**电容C**构成，同时还有一个**行在选择信号**和一个**列选择信号**，只有当行选择信号和列选择信号都为1时，才能对这1位存储单元进行读写的操作
+
+- **写入**：数据写1， 0对电容C进行充放电
+- **读出**：电容放电，电流经过T到数据线
+- **刷新放大器作用**：
+  - **重写：**破坏性读出，需要重写
+  - **放大：**电容放电产生的电流很小，需要进行放大
+  - **刷新：**电容会放电只能存**10ms**，需要定时补充电荷
+- **密度高**（一位存储单元：一个晶体管 + 一个电容）
+- **功耗较低**（晶体管少，电容稳定时，没有电流流动）
+- **价格相对便宜**
+- **访问速度相对慢**（电荷充电慢）
+
+
+
+### DRAM刷新：按行刷新
+
+DRAM中每一行是一个地址，侧面没画出来的有译码器，本质上是多路复用器
+
+![image-20250514025051545](../markdown_img/image-20250514025051545.png)
+
+### DDR
+
+- **SDRAM (Synchronous DRAM)**：同步动态随机存储器，同步是指存储器的工作受时钟控制，内部的命令的发送与数据的传输都以它为基准
+- **DDR SDRAM (Double Date Rate)**：即双倍速率同步动态随机存储器，它表示每一个时钟时钟传输两次数据，分别在时钟脉冲的上升沿和下降沿各传输一次数据，因此称为双倍速率的SDRM
+
+![image-20250514031050313](../markdown_img/image-20250514031050313.png)
+
+之前传统的DRAM的方式，它是不受时钟控制的，所以发送命令和地址信号以后，CPU不知道要等到多长时间，数据才会输出，那么CPU就需要不断地去查询，看数据是否准备好，而在这个查询的过程中，CPU就不能做其他事情
+
+而采用SDRAM的方式，CPU就可以知道命令跟地址发送以后，需要等两个确切的时钟周期以后数据才会输出，那么这两个时钟周期，CPU就可以做其他事情，那么效率就会高很多
+
+
+
+#### CPU上时钟和内存所谓受时钟控制的联系
+
+**物理上不是同一个时钟**
+
+- **CPU** 有自己的**CPU主频时钟**（比如 3.5 GHz）。
+- **内存（SDRAM）** 有自己的**内存时钟**（比如 1600 MHz）。
+- 这两个**物理上是不同的振荡源**，但必须通过控制器协调**保持同步时序关系**。
+
+
+
+**逻辑上是“时序同步”**
+
+- SDRAM 之所以叫**同步 DRAM（SDRAM）**，是因为它接受来自**内存控制器**的**统一时钟信号**进行所有命令和数据操作的定序。
+- **CPU通过内存控制器（Memory Controller）给SDRAM发时钟**，SDRAM工作基于这个控制器提供的**同步时钟**。
+- 所以 CPU 和 SDRAM **通过内存控制器建立了时序同步**，但它们的物理时钟源可以不同。
+
+
+
+**内存控制器的作用**
+
+- **位于 CPU 内部或主板芯片组上**（现代多为集成在 CPU 内部）。
+- 它负责协调：
+  - CPU 的指令节拍（主频）
+  - 内存的时序节拍（内存时钟）
+  - 命令、地址、数据流转的同步
+- 这样 CPU 和内存虽然时钟不同，但**通过控制器形成同步访问协议**。
+
+
+
+### DDR发展
+
+SDRAM从发展到现在已经经历了五代，分别是：第一代SDR SDRAM，第二代DDR SDRAM，第三代DDR2 SDRAM，第四代DDR3 SDRAM，第五代，DDR4 SDRAM
+
+**示例**：DDR3-1600
+
+- 等效时钟频率1600MHz
+- 位宽64位
+- 传输带宽12.8GB/s
+- 1600MHz * 64bit / 8
+
+
+
+### 只读存储器（ROM）
+
+- 非易失性存储器，半导体材料
+- **ROM**用来存放固件，引导程序
+- **PROM**（可编程只读存储器）
+  - 只可编程一次
+- **EPROM**（可擦除可编程只读存储器）
+  - 使用紫外线灯照擦除，一次需要擦除所有信息
+- **EEPROM**（电可擦除可编程只读存储器）
+  - 使用电擦除，一次可以只擦除可别内容，写入前要先执行擦除操作
+- **flash memory**（闪存），广泛应用于U盘，数码相机，手机，音乐播放器
+  - 基于EEPROM，擦除写入更快
+  - 读取速度与RAM相当，写入速度（擦除-编程）与磁盘相当
+
+
+
+## 高速缓存
+
+- 解决CPU和内存之间速度不匹配，现在CPU比内存快120倍
+  - 根据摩尔定律，CPU每年大概速度提升60%，而内存大概会提升7%
+- Cache由SRAM构成，直接作用在CPU芯片内，速度几乎与CPU一样快
+- 含有内存中的一部分内容副本
+- 利用程序时间和空间局部性特点
+
+![image-20250514090837511](../markdown_img/image-20250514090837511.png)
+
+
+
+### 程序局部性原理
+
+- **时间局部性**
+
+  - 最近被访问的存储单元可能很快还会被访问
+
+    ```C
+    sum = 0
+    for (i = 0; i < n; i++) {
+        sum += a[i];
+    }
+    ```
+
+    在程序中有大量的循环结构，那么在循环结构中的指令和数据，就会被反复调用，此时就呈现出比较高的时间局部性
+
+  - cache会保存近期频繁被访问的内存单元的数据
+
+- **空间局部性**
+
+  - 正在被访问的存储器单元附近的单元可能很快会被访问
+    - 比如在程序中程序的指令都是按照顺序去存放的，每个指令之间是相邻的，我们在访问指令的时候也是按顺序去取每个指令然后执行
+    - 数组中的元素在内存中也是顺序存放，这样就呈现出比较高的空间局部性
+  - cache从内存中取回数据时，会同时取回与位置相邻的内存单元的数据，以数据库（Block）为单位存取
+
+
+
+### 缓存友好代码
+
+**示例A**
+
+```C
+sum = 0;
+a[M][N];
+for (i = 0; i < M; i++) {
+    for (j = 0; j < N; j++) {
+        sum += a[i][j];
+    };
+}
+```
+
+**示例B**
+
+```C
+sum = 0;
+a[M][N];
+for (i = 0; i < N; i++) {
+    for (j = 0; j < M; j++) {
+        sum += a[i][j];
+    };
+}
+```
+
+上述两个示例中，示例A就是缓存友好代码，因为它在访问数组的时候，是按顺序访问的，因此**缓存命中率高，访问效率好**，被称为“缓存友好”。
+
+注解：C 语言中二维数组是 **按行优先（Row-major order）** 存储的，也就是说 `a[i][j]` 实际在内存中是线性排列的。访问顺序是 `a[0][0]`, `a[0][1]`, `a[0][2]`, ..., `a[0][N-1]`, 然后是 `a[1][0]`, `a[1][1]`, ..., 依次类推。这个顺序与内存布局完全一致，是连续访问。因此**缓存命中率高，访问效率好**。
+
+
+
+### 高速缓存结构
+
+- 直接映射 E=1
+- 组相联映射 1< E < C/B（高速缓存通常都是使用组相联的映射方式）
+- 全相联映射S = 1, E = C/B
+
+![image-20250514094554782](../markdown_img/image-20250514094554782.png)
+
+
+
+如上图所示，高速缓存的结构，它分为很多个组（**Set**），每个组有很多行，每行数据分三部分：（**Valid**, **Tag**, **cacheblock**）
+
+- **Valid**：一位有效位，用来看该行缓存数据是否有效
+- **Tag**：t位，用来跟地址的tag位进行比较
+- **cacheblock**：缓存块，用来存放具体的数据】
+
+
+
+解析：每组Set中数据行的本质是：主存和CPU之间数据交换的基本单位
+
+例如：Block Size = 64 字节
+
+- 说明 **每次从主存读入或写回缓存** 都是 **64 字节** 为单位。
+
+
+
+#### 关于缓存行详解
+
+Cache里一个缓存行的大小是**valid + Tag + CacheBlock**，<span style="color:red">**但是 :**</span> 
+
+**Valid + Tag 是**
+
+- **元数据（Metadata）**
+- **和数据块（Block Size）物理上分开存放**
+   （在硬件 Cache 结构里通常是分布式存储或紧凑存储，但逻辑上是独立管理的）
+
+**Cache Line 大小 = Valid + Tag + Block Size**
+
+- **这是逻辑概念**，描述 Cache 行**整体需要管理的内容**
+- **并不意味着它们物理上必须连在一起排布**
+  - 实际硬件实现里经常**分区存储**：Tag 区、Valid 位区、数据区等分开放置。
+  - 这样可以优化访问 Tag 匹配效率或数据带宽。
+
+
+
+**硬件实现示意**
+
+```sql
++---------+---------+---------------------------------+
+| Valid   | Tag     |            Block Data           |
++---------+---------+---------------------------------+
+```
+
+但硬件内部通常是这样拆开的：
+
+```scss
+Tag Array (保存 Tag 和 Valid)
+    - Valid Bit
+    - Tag Bits
+Data Array (保存 Block 数据)
+    - Data Block (64B / 128B ...)
+```
+
+- **Tag Array 和 Data Array 物理上分开存放**
+
+- **访问 Tag 时不需要立刻访问数据块，提高效率**
+
+```ABAP
+可以这样类比：像一本书的目录（Tag + Valid）和正文内容（Block Data）；目录和正文不一定物理相邻，但逻辑上是一一对应的。
+```
+
+
+
+高速缓存内部结构是按地址划分的，分三部分：
+
+- **Tag**：这里Tag对应上面的Tag位
+- **Set index**：根据set index判断数据在哪个组
+- **Block offset**：根据偏移量在cache block中找到具体数据
+- 因此高速缓存的大小Cache size = B * E * S
+
+
+
+<span style="color:red">注意： **缓存的最小传输和存储单位是字节（Byte），现代计算机都是字节寻址**</span>
+
+
+
+#### 主存映射到高速缓存的完整过程
+
+- **CPU 访问地址 0x1024**
+
+- 拆分为：
+
+  - Tag = X
+
+  - Set Index = Y
+
+  - Block Offset = 0x24 - 0x00 = 36
+
+- 查找 Cache：
+
+  - 定位到 Set Y
+
+  - 在 Set Y 里查找 Tag X
+
+  - 找到后，从块首地址 `0x1000` 开始，偏移 36 字节处读取数据
+
+
+
+### 直接映射
+
+![image-20250514143858892](../markdown_img/image-20250514143858892.png)
+
+
+
+**直接映射中，一组只有一行**
+
+**为什么用中间为做组索引**
+
+- 因为如果高位做组索引，很容易发生相邻数据在同一组的情况，会导致空间局限性失效
+
+**为什么直接映射必须用Tag**
+
+- 虽然 **Set Index** 确定了唯一的一行（Way=1），
+   但这个行**可能会被多个地址反复覆盖使用**，必须靠 **Tag 来区分“这行里现在是谁的数据”**。
+
+
+
+### 全相联映射
+
+![image-20250514144623894](../markdown_img/image-20250514144623894.png)
+
+
+
+所有缓存行都在一个组里，因此直接根据Tag遍历，查找缓存中和主存数据对应的缓存行
+
+适合小的高速缓存如（**TLB**）
+
+
+
+### cache替换策略
+
+- 先进先出FIFO（first-in-first-out）
+- 随机替换算法（Random）
+- 最不经常用LFU（least-frequently used）
+  - 将一段时间内被访问次数最少的行换出。每行设置一个计数器，新行计数0，cache每命中一次，命中行计数加1，当需要替换时将计数值最小的行换出
+
+- **最近最少用LRU（least-recently used）**
+  - 将长久未被访问的行换出。每行设置一个计数器，新行计数0，cache每命中一次，命中行计数清零，其他各行加1，当需要替换时，将计数值最大的行换出，保护了新行
+
+
+
+### cache写策略
+
+- 写命中（Write Hit）：要写的单元已经在Cache中
+  - Write Through（写直达）— 同时写cache和主存单元
+  - **Write Back（写返回）— 只写cache不写主存**（稍后写内存（性能好，但数据暂时只在 Cache）。）
+- 写不命中（Write Miss）：要写的单元不在Cache中
+  - Not Write Allocate（非写分配）— 直接写主存单元，不把主存块装入到Cache
+  - **Write Allocate（写分配）— 将主存块装入Cache，在Cache中更新内容**（写的时候可能比非写分配慢，但是后续读会很快）
+
+**所以高速缓存通常采用 Write Back（写返回）和Write Allocate（写分配）**
+
+
+
+### Intel Core i7缓存结构
+
+![image-20250514153946336](../markdown_img/image-20250514153946336.png)
+
+- **缓存等级**
+
+  - **一级缓存**
+
+    - **指令Cache（i-cache）**，**数据Cache（d-cache）**，CPU可以并行读取指令和数据
+    - 一级缓存每个CPU有两个
+
+    ```bash
+    [root@master1 ~]#cat /sys/devices/system/cpu/cpu0/cache/index0/size
+    48K
+    
+    [root@master1 ~]#cat /sys/devices/system/cpu/cpu0/cache/index1/size
+    32K
+    ```
+
+  - **二级缓存**
+
+    - 同样每个CPU独立拥有，但只有1个二级缓存
+
+    ```bash
+    [root@master1 ~]# cat /sys/devices/system/cpu/cpu0/cache/index2/size
+    2048K
+    ```
+
+  - **三级缓存**
+
+    - 多个CPU高享三级缓存
+    - CPU 与主存之间数据交换的基本块大小
+
+    ```bash
+    [root@master1 ~]# cat /sys/devices/system/cpu/cpu0/cache/index3/size
+    24576K
+    ```
+
+  CPU 与主存之间数据交换的基本块大小
+
+  ```bash
+  [root@master1 ~] $cat /sys/devices/system/cpu/cpu0/cache/index0/coherency_line_size 
+  64
+  ```
+
+  
+
+  
+
+### 多核CPU缓存一致性
+
+- CPU的每个核都有各自的缓存，相互之间的操作又是各自独立的，就会带来缓存一致性（Cache Coherence）的问题
+- 通过**MESI协议**保证缓存一致性
+  - **写传播：**在一个CPU核心写入的内容，需要传播到其他CPU核心里
+  - **保障事务的串行化**：如果两个CPU核心里有相同的数据的Cache，那么对于这个Cache数据的更新，只有拿到了锁，才能进行对应的数据更新
+
+
+
+![image-20250514160045260](../markdown_img/image-20250514160045260.png)
+
+
+
+## 辅助存储器
+
+- **机械硬盘（磁盘）**
+- **固态硬盘（SSD）**
+- **CD/DVD/CD-ROM/磁带**
+
+
+
+![image-20250514162310895](../markdown_img/image-20250514162310895.png)
+
+### 磁盘结构
+
+![image-20250514162928034](../markdown_img/image-20250514162928034.png)
+
+
+
+### 磁盘容器
+
+- 磁盘容量 = 一个扇区字节数 * 一个磁盘平均扇区数 * 一个表面磁盘书 * 2（1盘片2个盘面） * 盘片个数
+- 磁盘容器 = 512 * 300 * 2000 * 2 * 5 = 30.72Gb
+
+![image-20250514163459876](../markdown_img/image-20250514163459876.png)
+
+
+
+### 磁盘访问时间
+
+![image-20250514163642093](../markdown_img/image-20250514163642093.png)
+
+
+
+### 固态硬盘SSD
+
+![image-20250514164027214](../markdown_img/image-20250514164027214.png)
+
+
+
+### 辅助存储接口
+
+- **IDE（并行接口，排线接口）**
+- **SCSI、SAS、串行SCSI**
+- **SATA、mSATA（600Mbps）**
+- **PCIe（X4,16/32Gbps）**
+- **M.2（NGFF,PCIe M.2, NVMe）**
+
+![image-20250514173332311](../markdown_img/image-20250514173332311.png)
+
+![image-20250514174401717](../markdown_img/image-20250514174401717.png)
+
+
+
+| 协议（管规则） | 物理接口（管样子）  | 备注                             |
+| -------------- | ------------------- | -------------------------------- |
+| SATA 协议      | SATA 7+15 针接口    | 符合 SATA 传输规则               |
+| PCIe 协议      | PCIe x1/x4/x16 插槽 | 符合 PCIe 传输规则               |
+| PCIe 协议      | M.2 插槽            | 符合 PCIe 传输规则，只是形状不同 |
+| SATA 协议      | M.2 插槽            | 也是 SATA 规则，只是形状不同     |
+
+- **协议**：决定 **数据如何传输**。
+- **接口/插槽**：决定 **物理连接长什么样子**。
+- 有些术语是 **协议+插槽合一**（SATA、SAS）
+- 有些术语是 **纯插槽规格**（M.2）
+
+
+
+**PCIe协议的承载介质**
+
+- 物理上，PCIe 协议的信号是通过 **主板走线、插槽、接口** 传输的。
+- 常见的几种“承载 PCIe 协议信号”的硬件接口有：
+
+| 物理接口类型             | 传输的协议            | 说明                    |
+| ------------------------ | --------------------- | ----------------------- |
+| **PCIe 长条插槽**        | PCIe 协议             | 显卡、网卡、RAID 卡常用 |
+| **M.2 插槽（Key M/B）**  | PCIe 协议 / SATA 协议 | NVMe SSD、Wi-Fi 卡常用  |
+| **U.2 接口（企业存储）** | PCIe 协议             | 企业级 NVMe SSD 常用    |
+| **板载直连（BGA 封装）** | PCIe 协议             | 高端服务器/嵌入式直焊   |
+
+
+
+### 磁盘阵列RAID
+
+- 独立磁盘冗余阵列：用多张磁盘代替一张磁盘存储数据
+- 通过冗余提高可靠性
+  - 可采用镜像的方式，相同内容同时存放在两张物理磁盘上
+- 通过并行提高读写性能
+  - 把大的文件拆分为多个快，存放在不同的磁盘上
+- 磁盘阵列管理
+  - 软件方式：由操作系统负责逻辑磁盘到物理磁盘的转换
+  - 硬件方式：由专门的RAID控制器负责逻辑磁盘到物理磁盘的转换
+- RAID级别：
+  - RAID0, RAID1, RAID4, RAID5,RAID10, RAID01
+
+
+
+
+
+## CPU介绍
 
 ### 冯诺依曼架构
 
@@ -3267,28 +4594,7 @@ TLB 是 CPU 内部的一个硬件高速缓存，专用于存储热门的页表�
 
 - 在页表/段表项中，有权限数据，用来对不同段空间的访问权限进行限制，从而区分用户权限和管理员权限，进而保护系统
 
-## 辅助存储器
-### Flash
-- SSD固定硬盘
-  - nand：目前最新技术是3Dnandflash
-  - nor：多用于路由，机顶盒，嵌入式
 
-### 磁盘
-- 盘面，柱面，磁道，扇区
-- 磁头在每次操作中会处理一个扇区（Sector）的数据，而一个扇区通常包含 512 字节（即 4096 bits）或者更多（比如现代硬盘中常见的 4K 扇区）。
-- 在一个有多个盘面（Platters）的硬盘中，每个盘面都有自己的读写磁头。但这些磁头通常是联动的，它们在同一时间只能读写一个盘面上的一个扇区。也就是说，虽然有多个盘面和磁头，但它们在同一时刻只能读写一个扇区的数据。
-
-### 辅存数据接口
-![Alt text](images/image46.png)
-
-### 磁盘阵列 RAID
-![Alt text](images/image47.png)
-- RAID0：容量和速度提高，容错性不变
-- RAID0: 容量和速度不变，提高容错，空间利用率1/2
- ![Alt text](images/image48.png)
-- RAID0：空间利用率：3/4；容错率也调高了
-- 组合：RAID 1+0
-- 组合：RAID 5+0
 
 
 ## 指令系统设计与执行
@@ -4126,7 +5432,7 @@ PCB是给操作系统用的，程序段、数据段是给进程自己用的
 
 
 
-
+![image-20250514173001518](D:\git_repository\cyber_security_learning\markdown_img\image-20250514173001518.png)
 
 
 

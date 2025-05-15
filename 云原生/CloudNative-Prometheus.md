@@ -2034,12 +2034,16 @@ scrape_configs:
       - targets: ["pushgateway:9091"]
         labels:
           instance: "prometheus-instance"
+        # 如果整体讲解比较乱，以下两行为准
+        # 如果不写任何labels，则自动被instance="pushgateway_IP:9091",和job="pushgateway"替换
+        # 如果原pushgateway上没有instance和job，则在后面追加instance="pushgateway_IP:9091",和job="pushgateway"，
+        # 而原值加exported_前缀，补在前面
 ```
 
 🔹 **最终 Prometheus 采集的结果是：**
 
 ```bash
-my_metric{instance="prometheus-instance", job="pushgateway"}  42
+my_metric{exported_instance="pushgateway:9091",exported_job="my_job",instance="prometheus-instance", job="pushgateway"}  42
 ```
 
 📌 **`instance="pushgateway:9091"` 被 `instance="prometheus-instance"` 覆盖了！**
