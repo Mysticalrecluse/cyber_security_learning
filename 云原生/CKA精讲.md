@@ -2,7 +2,74 @@
 
 
 
-## Kubernetes介绍
+## Kubernetes概述
+
+### 传统运维痛点
+
+
+
+- **虚拟机资源浪费**
+- **运维管理复杂**
+- **扩缩容低效**
+- **服务隔离差**
+
+
+
+在传统服务管理模式下，为了避免服务间环境相互干扰，通常采用**一台虚拟机只部署一个服务或一组强相关服务**的策略，借助虚拟机级别的隔离来保障服务稳定运行。
+ 然而，这种方式的**代价巨大**：
+
+- **资源浪费**：每个虚拟机都需要单独分配内核和系统资源，造成大量冗余。
+- **运维复杂**：服务的部署、扩容、访问控制、权限管理等操作高度依赖人工干预，效率低下且易出错。
+
+
+
+Kubernetes 正是为了解决这些问题而设计的。 
+
+
+
+### Kubernetes是什么？
+
+面向应用生命周期管理的“云原生操作系统”。
+
+
+
+### Kubernetes要解决的问题
+
+运行在大规模集群中的各种任务之间，实际存在各种各样的关系。这些关系的处理，才是作业编排和管理系统最困难的地方
+
+其实这种任务与任务之间的关系，在我们平常的各种技术场景中随处可见。比如：
+
+- 一个web应用与数据库之间的访问关系
+- 一个负载均衡器和它后端服务之间的代理关系
+- 一个门户应用与授权组件之间的调用关系
+
+
+
+Kubernetes被要求能够处理前面提到的所有类型的关系，甚至还要能够支持未来可能出现的更多种类的关系
+
+Kubernetes项目最主要的设计思想是，从更宏观的角度，以统一的方式来定义任务之间的各种关系，并且为将来支持更多种类的关系留有余地
+
+| 关系类型                  | 相关对象                                              |
+| ------------------------- | ----------------------------------------------------- |
+| **与配置的关系**          | ConfigMap、Secret                                     |
+| **与存储的关系**          | PV、PVC、StorageClass                                 |
+| **与访问路径的关系**      | Service、Ingress、NetworkPolicy                       |
+| **与计算资源的关系**      | Deployment、HPA、Affinity、ResourceQuota              |
+| **与身份权限的关系**      | ServiceAccount、RBAC（Role/RoleBinding）              |
+| **与生命周期控制的关系**  | LivenessProbe、StartupProbe、Job、CronJob             |
+| **与网络策略/安全的关系** | NetworkPolicy、PodSecurityPolicy（已废弃，替代为PSA） |
+| **与外部集成/扩展的关系** | CRD、Webhook、Operator、Controller                    |
+
+
+
+- Kubernetes 的**设计目的**可以概括为两大部分：
+
+  1. **基于应用运行形态，提供对 Pod 生命周期的统一管理能力** —— 使应用具备声明式、可编排、可伸缩、可恢复的运行保障。
+  2. **围绕 Pod 建模并管理其与外部环境的所有动态关系** —— 包括与配置、存储、网络、访问策略、安全权限、资源调度等各类基础设施能力的连接与治理，同时为未来更多关系预留统一扩展入口。
+
+  
+
+### Kubernetes架构
 
 
 
@@ -103,6 +170,63 @@ Kubernetes**集群分为两个角色**，分别是Master节点和Worker节点
 #### kubelet
 
 kubelet 是 Kubernetes 每个节点上的核心 agent，负责与 API Server 通信，并通过调用容器运行时（如 containerd、Docker）来管理该节点上所有 Pod 的生命周期。
+
+
+
+### Kubernetes 典型工作流：从 Deployment 到应用对外访问
+
+**创建 Deployment（描述期望状态）**
+
+- 用户使用 YAML 定义 Deployment 资源，指定副本数、镜像、端口等。
+- 使用**Kubectl**客户端工具将信息提交给 **Kubernetes API Server**。
+- **API Server** 记录到 **etcd**。
+- **Controller Manager** 监控到期望副本 3。
+
+
+
+**调度到具体 Node**
+
+- **Kube-Scheduler** 监听未调度的 Pod。
+- 选择合适的 Node（基于资源、污点、亲和性等）。
+- 将调度结果同步到**API Server**，然后更新到 **etcd**。
+
+
+
+**Node 本地创建 Pod**
+
+- **Kubelet** 监听到自己 Node 上分配的 Pod。
+
+- 调用 **Container Runtime** 拉取镜像，创建容器。
+
+- 设置 **cgroup、namespace** 实现资源隔离。
+
+
+
+**加入容器网络（CNI）**
+
+- **Kubelet** 调用 **CNI 插件**（如 Calico/Flannel）：
+  - 分配 Pod IP。
+  - 将 Pod 接入 Overlay 网络。
+  - 生成路由规则，保障 Pod 到 Pod 通信。
+
+
+
+**通过 Service 暴露访问入口**
+
+- 创建 Service 资源，**kubectl**将service资源发送给**apiServer**，**在apiserver上生成资源对象**
+- **Kube-Proxy** 监听 Service 变化，配置 iptables 或 IPVS 规则，实现 **负载均衡**。
+
+
+
+**DNS 名称解析（CoreDNS）**
+
+- CoreDNS 监听 Service 资源，自动生成解析记录：
+  - 例如 `my-app-svc.default.svc.cluster.local` 解析为 ClusterIP。
+- Pod 内解析时：
+  - 查询 CoreDNS。
+  - 返回 ClusterIP。
+
+
 
 
 
@@ -248,6 +372,548 @@ HPA通过 API Server 查询
 
 
 
+### Pod资源限制
+
+kubernetes 可以支持在**容器级**及**namespace级**分别实现资源限制
+
+
+
+Kubernetes 已经对Pod做了相应的资源配额设置，这些资源主要体现在：CPU和内存、存储，因为存储 在k8s中有专门的资源对象（PV,PVC）来进行管控，所以当前的pod资源限制，主要指的计算资源，即**CPU和内存。**
+
+
+
+为了方便与k8s的其他单独的资源对象区分开来，一般将**CPU和内存**其称为**计算资源**。
+
+如果运行的Pod使用的资源超过宿主机的最大可用资源,会导致**OOM**和**Pod驱逐**到其它宿主机
+
+
+
+##### 可限制的资源单位
+
+常见在容器级别的CPU和内存的限制
+
+
+
+- **CPU**
+  - 特点：是一种可压缩资源，cpu资源是支持抢占的
+  - 单位：CPU的资源单位是CPU(Core)的数量,是一个绝对
+  - 大小：在Kubernetes中通常以千分之一的CPU(Core)为最小单位，用毫 m 表示,即**一个CPU核心表示为1000m**
+  - 经验：**一个资源占用不多的容器占用的CPU**通常在100~300m，即**0.1-0.3个CPU**
+  - 注意：mi 代表是1024进制的
+
+
+
+- **内存**
+  - 特点：是不可压缩资源，当pod资源扩展的时候，如果node上资源不够，那么就会发生资源抢占， 或者OOM问题
+  - 单位：内存的资源以字节数为单位，是一个绝对值
+  - 大小：内存配额对于绝大多数容器来说很重要，在Kubernetes中通常以Mi,Gi为单位来分配。通常 分配置1G,2G,最多16G或32G
+  - 注意：如果内存分配不足,可能会出现OOM现象（Java程序常见）
+
+
+
+- **注意**
+  - CPU属于可压缩（compressible）型资源，即资源额度可按需收缩
+  - 内存（当前）则是不可压缩型资源，对其执行收缩操作可能会导致某种程度的问题，例如进程崩溃 等。
+
+
+
+- **Extended Resources 扩展资源限制（常见：GPU资源）**
+  - 所有不属于kubernetes.io域的资源,为扩展资源,如:"**nvidia.com/gpu**"
+  - kubernetes 也支持针到扩展资源限制
+
+
+
+
+
+##### 配额限制参数
+
+Kubernetes中，对于每种资源的配额限定都需要两个参数：**Requests和Limits**
+
+![image-20241218152631838](D:\git_repository\cyber_security_learning\markdown_img\image-20241218152631838-1747388053526-1.png)
+
+
+
+
+
+- **资源需求Requests**
+  - 业务运行时资源预留的最小使用量，即所需资源的**最低下限**，**该参数的值必须满足，若不满足，业务无法运行**。
+  - 容器运行时可能用不到这些额度的资源，但用到时必须确保有相应数量的资源可用
+  - 资源需求的定义会影响调度器的决策,只会将Pod调度至满足所有容器总的资源需求的节点
+  - 当资源不足时，**实际使用的资源超出 Requests 的部分，可能会被回收**
+  - **不能超过对应的limits值**
+  - **不能超过物理节点可用分配的资源值**
+
+
+
+- **资源限制 Limits**
+  - 运行时资源允许使用最大可用量，即所需资源的最高上限，该参数的值不能被突破，超出该额度的资源使用请求通常会被拒绝
+  - **该限制需要大于等于requests的值**，但系统在其某项资源紧张时，会从容器那里回收其使用的超出 其requests值的那部分
+  - 针对内存而言,为防止上面回收情况的发生,一般**建议将内存的 Requests 和 Limits 设为相同**
+  - 资源限制**Limit**的定义**不影响调度器的决策**
+  - 不能低于对应的limits值
+  - 可以超过物理节点可用分配的资源值
+  - **提示:为保证性能,生产推荐Requests和Limits设置为相同的值**
+
+
+
+##### k8s资源查看
+
+要实现资源限制,需要先**安装metrics-server**
+
+```bash
+[root@master1 ~]# curl -LO https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+#默认文件需要修改才能工作,因为默认需要内部证书验证和镜像地址k8s.gcr.io所以修改
+# vim components.yaml
+spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=10250
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        - --kubelet-insecure-tls
+        #image: registry.cn-hangzhou.aliyuncs.com/google_containers/metricsserver:v0.7.1 # 可以添加国内源
+        image: registry.k8s.io/metrics-server/metrics-server:v0.7.2
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: https
+            scheme: HTTPS
+          periodSeconds: 10
+        name: metrics-server
+        ports:
+        - containerPort: 10250
+          name: https
+          protocol: TCP
+          
+[root@master1 yaml]# kubectl apply -f components.yaml 
+serviceaccount/metrics-server created
+clusterrole.rbac.authorization.k8s.io/system:aggregated-metrics-reader created
+clusterrole.rbac.authorization.k8s.io/system:metrics-server created
+rolebinding.rbac.authorization.k8s.io/metrics-server-auth-reader created
+clusterrolebinding.rbac.authorization.k8s.io/metrics-server:system:auth-delegator created
+clusterrolebinding.rbac.authorization.k8s.io/system:metrics-server created
+service/metrics-server created
+deployment.apps/metrics-server created
+apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io created
+
+
+root@master1 yaml]#kubectl get pod -n kube-system metrics-server-b79d5c976-hqrct 
+NAME                             READY   STATUS    RESTARTS   AGE
+metrics-server-b79d5c976-hqrct   1/1     Running   0          60s
+[root@master1 yaml]#kubectl top node
+NAME      CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%   
+master1   62m          3%     910Mi           49%       
+node1     30m          1%     669Mi           36%       
+node2     20m          1%     927Mi           50%       
+node3     27m          1%     715Mi           39% 
+```
+
+
+
+### metrics-server解读
+
+**metrics-server采集指标的全过程，和这个过程中的重点资源**
+
+-  `APIService` 对象
+- `deployment`对象
+
+metrics-server 的 API 是通过创建 `APIService` 对象，注册到 kube-apiserver 的聚合层（kube-aggregator）中。
+
+**具体行为是：**
+
+- kube-apiserver **WATCH 监听** `apiservice` 资源对象。
+
+  聚合层（Aggregation Layer）本质上是 **kube-apiserver 内置的一个 HTTP 反向代理功能模块**。
+
+- 解析 `apiservice.spec.service.name` 和 `service.namespace`，
+   **通过 Kubernetes Service 反向代理到对应扩展 API Server（如 metrics-server）**。
+
+- **HTTP/HTTPS 代理请求到扩展 API Server**，从而把它提供的 API 合并到自己的 `/apis/...` 路径空间里。
+
+**总结：**
+
+kube-apiserver 内置的聚合层是一个 **"反向代理和路由机制"**， 它通过 **监听 APIService 资源对象**， **解析出目标扩展 API Server 的 Service 地址**， 然后把外部请求 **代理到真正提供该 API 的服务上**（如 metrics-server）， 这样客户端访问时就像访问 kube-apiserver 自己提供的 API 一样无感知。
+
+```bash
+# apiservice.apiregistration.k8s.io/v1beta1.metrics.k8s.io
+# 查看metrics-server的apiserver对象
+[root@master1 ~]# kubectl get apiservices.apiregistration.k8s.io -n kube-system v1beta1.metrics.k8s.io 
+NAME                     SERVICE                      AVAILABLE   AGE
+v1beta1.metrics.k8s.io   kube-system/metrics-server   True        6d1h
+
+# 查看资源清单
+[root@master1 ~]# kubectl get apiservices.apiregistration.k8s.io -n kube-system v1beta1.metrics.k8s.io -o yaml
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apiregistration.k8s.io/v1","kind":"APIService","metadata":{"annotations":{},"labels":{"k8s-app":"metrics-server"},"name":"v1beta1.metrics.k8s.io"},"spec":{"group":"metrics.k8s.io","groupPriorityMinimum":100,"insecureSkipTLSVerify":true,"service":{"name":"metrics-server","namespace":"kube-system"},"version":"v1beta1","versionPriority":100}}
+  creationTimestamp: "2025-05-02T06:13:47Z"
+  labels:
+    k8s-app: metrics-server
+  name: v1beta1.metrics.k8s.io
+  resourceVersion: "348056"
+  uid: d7c94e84-00a7-47e1-a16a-dbc3c41017b4
+spec:
+  group: metrics.k8s.io
+  groupPriorityMinimum: 100
+  insecureSkipTLSVerify: true     # 跳过了front-proxy-ca的验证，测试环境使用，生产环境不安全
+  # insecureSkipTLSVerify: false
+  # caBundle: <base64-encoded front-proxy-ca.crt>
+  service:
+    name: metrics-server
+    namespace: kube-system
+    port: 443
+  version: v1beta1
+  versionPriority: 100
+```
+
+metrics-server 通过HTTPS会向每个节点的 kubelet 的10250端口发出请求，访问 `/stats/summary` 接口（这些API由kubelet通过cAdvisor提供数据），这是采集 **Pod 和 Node 的 CPU/内存等资源使用情况** 的关键数据源。
+
+#### metrics-server的数据采集过程
+
+**CPU 和 Memory 的数据来源**
+
+- **数据源**是 **Kubelet 的 `/metrics/resource` 或 `/stats/summary` 接口**。
+- Kubelet 本身会从 **cAdvisor**（内置在 Kubelet 里） 获取节点上 **Pod 和容器的资源指标**。
+
+```css
+Linux Kernel (cgroups, /proc)
+     ↓
+cAdvisor（Kubelet内置）
+     ↓
+Kubelet /stats/summary 或 /metrics/resource
+     ↓
+metrics-server 访问这些接口
+```
+
+**详细指标采集链路**
+
+| 采集阶段                        | 说明                                                         |
+| ------------------------------- | ------------------------------------------------------------ |
+| **Kubelet 采集**                | Kubelet 从 cAdvisor 读取本机节点上所有 Pod 和容器的资源使用情况（CPU、内存） |
+| **metrics-server 访问 Kubelet** | metrics-server 调用每个 Node 的 Kubelet `/stats/summary` 接口 |
+| **上报到 kube-apiserver**       | metrics-server 聚合数据后通过 Aggregation Layer 提供 `/apis/metrics.k8s.io/v1beta1` 接口 |
+| **kubectl top 查询**            | kubectl top 通过调用 kube-apiserver 这个聚合接口返回实时指标 |
+
+```bash
+# metrics-server的pod，与kubelet通信，需要Kubernetes-ca证书验证kubelet的客户端证书
+# 查看metrics-server的pod
+[root@master1 ~]# kubectl get pod -n kube-system metrics-server-6b66984b5c-76n6k 
+NAME                              READY   STATUS    RESTARTS   AGE
+metrics-server-6b66984b5c-76n6k   1/1     Running   0          4d
+
+# 查看资源清单
+[root@master1 ~]# kubectl get pod -n kube-system metrics-server-6b66984b5c-76n6k -o yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    cni.projectcalico.org/containerID: 6b5f240b002dce5021d1b18c5e1ccfee524869a947a3ef8
+117a7d99f302f969f
+    cni.projectcalico.org/podIP: 10.200.200.1/32
+    cni.projectcalico.org/podIPs: 10.200.200.1/32
+  creationTimestamp: "2025-05-04T07:31:19Z"
+  generateName: metrics-server-6b66984b5c-
+  labels:
+    k8s-app: metrics-server
+    pod-template-hash: 6b66984b5c
+  name: metrics-server-6b66984b5c-76n6k
+  namespace: kube-system
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: metrics-server-6b66984b5c
+    uid: b9dc4666-3d11-47ef-8253-8941829d4767
+  resourceVersion: "348040"
+  uid: 2ae17462-194f-47d0-b21c-f541ab005445
+spec:
+  containers:
+  - args:
+    - --cert-dir=/tmp
+    - --secure-port=10250
+    - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+    - --kubelet-use-node-status-port
+    - --metric-resolution=15s
+    - --kubelet-insecure-tls    # 这里不安全，生产环境不建议
+    # - --kubelet-certificate-authority=/etc/kubernetes/pki/ca.crt
+    image: harbor.magedu.mysticalrecluse.com/k8simage/metrics-server:v0.7.2
+    imagePullPolicy: IfNotPresent
+    livenessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: /livez
+        port: https
+        scheme: HTTPS
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+    name: metrics-server
+    ports:
+    - containerPort: 10250
+      name: https
+      protocol: TCP
+    readinessProbe:
+      failureThreshold: 3
+      httpGet:
+        path: /readyz
+        port: https
+        scheme: HTTPS
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+    resources:
+      requests:
+        cpu: 100m
+        memory: 200Mi
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /tmp
+      name: tmp-dir
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-zvfff
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  nodeName: work2.mystical.org
+  nodeSelector:
+    kubernetes.io/os: linux
+  preemptionPolicy: PreemptLowerPriority
+  priority: 2000000000
+  priorityClassName: system-cluster-critical
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: metrics-server
+  serviceAccountName: metrics-server
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - emptyDir: {}
+    name: tmp-dir
+  - name: kube-api-access-zvfff
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+```
+
+
+
+##### 资源限制实现
+
+范例：limits和requests值大小
+
+```yaml
+# [root@master1 yaml]# cat pod-limit-request.yaml 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-limit-request
+spec:
+  containers:
+  - name: pod-limit-request-container
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/nginx:1.20.0
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        memory: "500Mi"
+        cpu: "250m"
+      limits:
+        memory: "500Mi"
+        cpu: "250m"
+
+```
+
+
+
+##### 压力测试
+
+```yaml
+# cat pod-stress.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-stress
+spec:
+  containers:
+  - name: pod-stress
+    image: registry.cn-beijing.aliyuncs.com/wangxiaochun/stress-ng
+    imagePullPolicy: IfNotPresent
+    command: ["/usr/bin/stress-ng", "-c 2", "--metrics-brief"]
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 200m
+      limits:
+        memory: 256Mi
+        cpu: 500m
+
+# 查看
+[root@master1 yaml]#kubectl exec pod-stress -- top
+Mem: 1853284K used, 120644K free, 4744K shrd, 55064K buff, 832920K cached
+CPU:  24% usr   0% sys   0% nic  74% idle   0% io   0% irq   0% sirq
+Load average: 0.35 0.30 0.17 3/513 14
+  PID  PPID USER     STAT   VSZ %VSZ CPU %CPU COMMAND
+    8     1 root     R     6904   0%   1  13% {stress-ng-cpu} /usr/bin/stress-ng
+    7     1 root     R     6904   0%   0  12% {stress-ng-cpu} /usr/bin/stress-ng
+    1     0 root     S     6264   0%   1   0% /usr/bin/stress-ng -c 2 --metrics-
+q   9     0 root     R     1520   0%   0   0% top
+```
+
+
+
+
+
+##### 基于Namespace级别的资源限制
+
+在 **Kubernetes 中基于 Namespace 级别的资源限制**，我们通常使用 **ResourceQuota** 和 **LimitRange** 来实现对命名空间中资源的使用限制。
+
+
+
+**资源限制的实现方式**
+
+| **方式**          | **对象**       | **限制类型**                   | **典型限制内容**                             |
+| ----------------- | -------------- | ------------------------------ | -------------------------------------------- |
+| **ResourceQuota** | **Namespace**  | **命名空间级别的资源总量限制** | 限制 Namespace 中 Pod、CPU、内存、存储的总量 |
+| **LimitRange**    | **Pod 和容器** | **单个 Pod/容器的资源限制**    | 限制每个 Pod/容器的 CPU 和内存的最小和最大值 |
+
+------
+
+
+
+**资源限制的工作机制**
+
+**1️⃣ ResourceQuota (限制 Namespace 资源总量)**
+
+- **作用范围**：
+  限制整个 Namespace 中的资源总量，包括 Pod 数量、CPU、内存和存储。
+- **常见的限制项目**：
+  - Pod 总数 (`pods`)
+  - 容器的总 CPU 请求 (`requests.cpu`) 和总限制 (`limits.cpu`)
+  - 容器的总内存请求 (`requests.memory`) 和总限制 (`limits.memory`)
+  - PersistentVolumeClaim (PVC) 的总存储使用量 (`requests.storage`)
+- **典型场景**：
+  限制一个项目团队在其 Namespace 中最多只能使用 10 个 Pod，CPU 总量不超过 10 核，内存总量不超过 32GiB。
+
+
+
+**2️⃣ LimitRange (限制单个 Pod 和容器的资源)**
+
+- **作用范围**：
+  限制 **每个 Pod 或每个容器** 的 CPU 和内存的最大、最小值。
+- **常见的限制项目**：
+  - 容器的最小 CPU 请求 (`min.cpu`) 和最大限制 (`max.cpu`)
+  - 容器的最小内存请求 (`min.memory`) 和最大限制 (`max.memory`)
+- **典型场景**：
+  每个 Pod 中的容器都必须请求最少 100m 的 CPU，但最多不能超过 2 核 CPU，最少 200Mi 的内存，最多不能超过 2GiB 的内存。
+
+
+
+**ResourceQuota示例（命名空间的资源总量限制）**
+
+限制 **整个命名空间中的 Pod 数量、CPU 和内存使用量**。
+
+```yaml
+# cat resource-quota.yaml
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: namespace-quota
+  namespace: my-namespace
+spec:
+  hard:
+    pods: "10"                    # 限制命名空间中最多有 10 个 Pod
+    requests.cpu: "10"            # 所有 Pod 的 CPU 请求总和不能超过 10 核
+    requests.memory: "32Gi"       # 所有 Pod 的内存请求总和不能超过 32Gi
+    limits.cpu: "20"              # 所有 Pod 中 CPU 限制的总和不能超过 20 核
+    limits.memory: "64Gi"         # 所有 Pod 中内存限制的总和不能超过 64Gi
+    persistentvolumeclaims: "5"   # 限制 Namespace 中的 PVC 数量为 5 个
+    requests.storage: "100Gi"     # 限制所有 PVC 请求的存储总量为 100Gi
+
+```
+
+
+
+**LimitRange示例（Pod和容器的资源限制）**
+
+为 **单个 Pod 和容器** 限制其 CPU 和内存的最小值和最大值。
+
+```yaml
+cat limit-range.yaml
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: container-limit-range
+  namespace: my-namespace
+spec:
+  limits:
+  - type: Pod                # 作用范围为POd
+    max:                     # max：指定 Pod 总的 CPU 和内存上限，CPU 不能超过 2 核，内存不能超过 4Gi。
+      cpu: "2"               # 每个 Pod 的最大 CPU 限制为 2 核
+      memory: "4Gi"          # 每个 Pod 的最大内存限制为 4 GiB
+    min:                     # min：指定 Pod 的最小资源请求，CPU 不低于 250m，内存不低于 128Mi。
+      cpu: "250m"            # 每个 Pod 的最小 CPU 请求为 250m
+      memory: "128Mi"        # 每个 Pod 的最小内存请求为 128Mi
+  - type: Container          # type: Container：作用范围为 Pod 内的每个容器
+    default:
+      cpu: "500m"            # 每个容器的默认 CPU 请求为 500m
+      memory: "512Mi"        # 每个容器的默认内存请求为 512Mi
+    defaultRequest:
+      cpu: "250m"            # 如果未指定请求，默认 CPU 请求为 250m
+      memory: "256Mi"        # 如果未指定请求，默认内存请求为 256Mi
+    max:
+      cpu: "1"               # 每个容器的最大 CPU 限制为 1 核
+      memory: "2Gi"          # 每个容器的最大内存限制为 2GiB
+    min:
+      cpu: "100m"            # 每个容器的最小 CPU 请求为 100m
+      memory: "128Mi"        # 每个容器的最小内存请求为 128Mi
+
+```
+
+
+
 
 
 
@@ -297,19 +963,13 @@ spec:
 
 可以看到，这个 Pod 通过 priorityClassName 字段，声明了要使用名叫 high-priority 的 PriorityClass。当这个 Pod 被提交给 Kubernetes 之后，Kubernetes 的 PriorityAdmissionController 就会自动将这个 Pod 的 spec.priority 字段设置为 1000000。
 
-前文讲过，调度器里维护着一个调度队列。所以，当 Pod 拥有了优先级之后，高优先级的 Pod 就可能会比低优先级的 Pod 提前出队，从而尽早完成调度过程。这个过程，就是“优先级”这个概念在 Kubernetes 里的主要体现。
+调度器里维护着一个调度队列。所以，当 Pod 拥有了优先级之后，高优先级的 Pod 就可能会比低优先级的 Pod 提前出队，从而尽早完成调度过程。这个过程，就是“优先级”这个概念在 Kubernetes 里的主要体现。
 
 ```ABAP
 当一个高优先级的 Pod 调度失败的时候，调度器的抢占能力就会被触发。这时，调度器就会试图从当前集群里寻找一个节点，使得当这个节点上的一个或者多个低优先级 Pod 被删除后，待调度的高优先级 Pod 就可以被调度到这个节点上。这个过程，就是“抢占”这个概念在 Kubernetes 里的主要体现
 ```
 
-为了方便叙述，我接下来会把待调度的高优先级 Pod 称为“抢占者”（Preemptor）。
 
-当上述抢占过程发生时，抢占者并不会立刻被调度到被抢占的 Node 上。事实上，调度器只会将抢占者的 spec.nominatedNodeName 字段，设置为被抢占的 Node 的名字。然后，抢占者会重新进入下一个调度周期，然后在新的调度周期里来决定是不是要运行在被抢占的节点上。这当然也就意味着，即使在下一个调度周期，调度器也不会保证抢占者一定会运行在被抢占的节点上。
-
-这样设计的一个重要原因是，调度器只会通过标准的 DELETE API 来删除被抢占的 Pod，所以，这些 Pod 必然是有一定的“优雅退出”时间（默认是 30s）的。而在这段时间里，其他的节点也是有可能变成可调度的，或者直接有新的节点被添加到这个集群中来。所以，鉴于优雅退出期间，集群的可调度性可能会发生的变化，**把抢占者交给下一个调度周期再处理，是一个非常合理的选择。**
-
-而在抢占者等待被调度的过程中，如果有其他更高优先级的 Pod 也要抢占同一个节点，那么调度器就会清空原抢占者的 spec.nominatedNodeName 字段，从而允许更高优先级的抢占者执行抢占，并且，这也就使得原抢占者本身，也有机会去重新抢占其他节点。这些，都是设置 **nominatedNodeName** 字段的主要目的
 
 **官方默认 PriorityClass 对照表：**
 
@@ -404,7 +1064,7 @@ Service主要有四种类型，实现不同的网络通信功能
 
 ## 5. Ingress
 
-Ingress 是 Kubernetes 中用来管理外部 HTTP/HTTPS 流量进入集群的 API 对象，配合 Ingress Controller 实现基于域名、路径等规则的七层反向代理路由功能。
+Ingress 是 Kubernetes 中用来管理外部 **HTTP/HTTPS** 流量进入集群的 API 对象，配合 Ingress Controller 实现基于域名、路径等规则的七层反向代理路由功能。
 
 
 
@@ -514,15 +1174,15 @@ Gateway API 是 Kubernetes Ingress 模型的下一代标准。它通过将 Gatew
 
 **Gateway API 解决了哪些 Ingress 的局限？**
 
-| 能力/特点          | Ingress（V1）               | Gateway API（V2）                           |
-| ------------------ | --------------------------- | ------------------------------------------- |
-| **协议支持**       | 主要是 HTTP/HTTPS           | 支持 HTTP、HTTPS、TCP、UDP、TLS             |
-| **资源粒度**       | 入口+路由 混在一个资源里    | 入口和路由解耦（Gateway + Route）           |
-| **多租户管理**     | 不好控制，单一 IngressClass | Gateway 独立，Route 可分团队管理            |
-| **负载均衡策略**   | 受限                        | 更丰富，比如 header、method、SNI 分流       |
-| **跨命名空间路由** | 不支持                      | ✅ 支持跨命名空间管理                        |
-| **可观测性**       | 依赖控制器                  | 定义标准的状态反馈                          |
-| **标准化**         | Controller 自定义较多       | 提供统一 API 规范，跨 Controller 兼容性更好 |
+| 能力/特点          | Ingress（V1）                            | Gateway API（V2）                           |
+| ------------------ | ---------------------------------------- | ------------------------------------------- |
+| **协议支持**       | 主要是 HTTP/HTTPS                        | 支持 HTTP、HTTPS、TCP、UDP、TLS             |
+| **资源粒度**       | 入口+路由 混在一个资源里                 | 入口和路由解耦（Gateway + Route）           |
+| **多租户管理**     | 不好控制，单一 IngressClass              | Gateway 独立，Route 可分团队管理            |
+| **负载均衡策略**   | 受限                                     | 更丰富，比如 header、method、SNI 分流       |
+| **跨命名空间路由** | 不支持(语法支持，大部分controller不支持) | ✅ 支持跨命名空间管理                        |
+| **可观测性**       | 依赖控制器                               | 定义标准的状态反馈                          |
+| **标准化**         | Controller 自定义较多                    | 提供统一 API 规范，跨 Controller 兼容性更好 |
 
 
 
@@ -1244,28 +1904,482 @@ Deployment **加载修改后的 ConfigMap** 只有两种方法：
 
 ## 11. helm
 
+![image-20250324193356822](../markdown_img/image-20250324193356822.png)
+
+
+
+### Helm 相关概念
+
+- **Helm**：Helm的客户端工具，负责和API Server 通信
+
+  Helm 和kubectl类似，也是Kubernetes API Server的命令行客户端工具
+
+  支持kubeconfig认证文件
+
+  需要事先从仓库或本地加载到要使用目标Chart，并基于Chart完成应用管理，Chart可缓存于Helm本地主机上
+  支持仓库管理和包管理的各类常用操作，例如Chart仓库的增、删、改、查，以及Chart包的制作、 发布、搜索、下载等
+
+- **Chart**：打包文件，将所有相关的资源清单文件YAML的打包文件
+
+  Chart  是一种打包格式，文件后缀为tar.gz或者 tgz，代表着可由Helm管理的有着特定格式的程序包，类似于RPM，DEB包格式
+
+  Chart 包含了应用所需的资源相关的各种yaml/json配置清单文件，比如：deployment,service 等，但不包含容器的镜像
+
+  Chart 可以使用默认配置，或者定制用户自已的配置进行安装应用
+
+  Chart 中的资源配置文件通常以模板(go template)形式定义，在部署时，用户可通过向模板参数赋值实现定制化安装的目的
+
+  Chart 中各模板参数通常也有**默认值**，这些默认值定义在Chart包里一个名为**`values.yml`**的文件中
+
+- **Release**：表示基于chart部署的一个实例。通过chart部署的应用都会生成一个唯一的Release,即使同一个chart部署多次也会产生多个Release.将这些release应用部署完成后，也会记录部署的一个版本，维护了一个release版本状态,基于此可以实现版本回滚等操作
+
+- **Repository**：chart包存放的仓库，相当于APT和YUM仓库
+
+
+
+### 使用Helm部署应用流程
+
+- 安装 helm 工具
+
+- 查找合适的 chart 仓库
+
+- 配置 chart 仓库
+
+- 定位 chart
+
+- 通过向Chart中模板文件中字串赋值完成其实例化，即模板渲染， 实例化的结果就可以部署到目标 Kubernetes上
+
+  模板字串的定制方式三种：
+
+  - 默认使用 chart 中的 **values.yaml 中定义的默认值**
+  - 直接在helm install的命令行，**通过--set选项进行**
+  - 自定义values.yaml，**由helm install -f values.yaml 命令加载该文件**
+
+- 同一个chart 可以部署出来的多个不同的实例，每个实例称为一个release
+
+  Chart 和 Release 的关系，相当于OOP开发中的Class和对象的关系,相当于image和container
+
+  应用release 安装命令：helm install 
+
+
+
+### 二进制安装 Helm
+
+```bash
+# 在kubernetes的管理节点部署
+[root@master1 ~]# wget -P /usr/local/src https://get.helm.sh/helm-v3.17.2-linux-amd64.tar.gz
+[root@master1 ~]# tar xf /usr/local/src/helm-v3.17.2-linux-amd64.tar.gz -C /usr/local/
+[root@master1 ~]# ls /usr/local/linux-amd64/
+helm  LICENSE  README.md
+[root@master1 ~]# ln -s /usr/local/linux-amd64/helm /usr/local/bin/
+
+# helm-v3版本显示效果如下
+[root@master1 ~]#helm version
+version.BuildInfo{Version:"v3.17.2", GitCommit:"cc0bbbd6d6276b83880042c1ecb34087e84d41eb", GitTreeState:"clean", GoVersion:"go1.23.7"}
+
+# Helm命令补会,重新登录生效
+# 方法1
+[root@master1 ~]# echo 'source <(helm completion bash)' >> .bashrc && exit
+
+# 方法2
+[root@master1 ~]# helm completion bash > /etc/bash_completion.d/helm  && exit
+```
+
+
+
+### Helm 命令用法说明
+
+#### **常用的 helm命令分类**
+
+- **Repostory 管理**
+
+  repo 命令，支持 repository 的`add`、`list`、`remove`、`update` 和 `index` 等子命令
+
+- **Chart 管理**
+
+  `create`、`package`、`pull`、`push`、`dependency`、`search`、`show` 和 `verify` 等操作
+
+- **Release 管理**
+
+  `install`、`upgrade`、`get`、`list`、`history`、`status`、`rollback `和 `uninstall` 等操作
+
+
+
+#### **Helm常见子命令**
+
+```bash
+version          # 查看helm客户端版本
+repo             # 添加、列出、移除、更新和索引chart仓库，相当于apt/yum仓库,可用子命令:add、index、list、remove、update
+search           # 根据关键字搜索chart包
+show             # 查看chart包的基本信息和详细信息，可用子命令:all、chart、readme、values
+pull             # 从远程仓库中拉取chart包并解压到本地，通过选项 --untar 解压,默认不解压
+create           # 创建一个chart包并指定chart包名字
+install          # 通过chart包安装一个release实例
+list             # 列出release实例名
+upgrade          # 更新一个release实例
+rollback         # 从之前版本回滚release实例，也可指定要回滚的版本号
+uninstall        # 卸载一个release实例
+history          # 获取release历史，用法:helm history release实例名
+package          # 将chart目录打包成chart存档文件.tgz中
+get              # 下载一个release,可用子命令:all、hooks、manifest、notes、values
+status           # 显示release实例的状态，显示已命名版本的状态
+template         # 本地渲染模版
+```
+
+
+
+#### **Helm 常见命令用法**
+
+```bash
+# 仓库管理
+helm repo list    # 列出已添加的仓库
+helm repo add [REPO_NAME] [URL]  # 添加远程仓库并命名,如下示例
+helm repo add myharbor https://harbor.wangxiaochun.com/chartrepo/myweb --username admin --password 123456
+helm repo remove [REPO1 [REPO2 ...]]   # 删除仓库
+helm repo update                       # 更新仓库,相当于apt update
+helm search hub  [KEYWORD]             # 从artifacthub网站搜索,无需配置本地仓库,相当于docker search
+helm search repo [KEYWORD]             # 本地仓库搜索,需要配置本地仓库才能搜索,相当于apt search
+helm search repo [KEYWORD] --versions  # 显示所有版本
+helm show chart [CHART]                # 查看chart包的信息,类似于apt info
+helm show values [CHART]               # 查看chart包的values.yaml文件内容
+
+# 拉取chart到本地
+helm pull repo/chartname               # 下载charts到当前目录下，表现为tgz文件,默认最新版本，相当于wget  
+helm pull chart_URL                    # 直接下载，默认为.tgz文件
+helm pull myrepo/myapp --version 1.2.3 --untar      # 直接下载指定版本的chart包并解压缩
+
+# 创建chart目录结构
+helm create NAME
+
+# 检查语法
+helm lint [PATH]  #默认检查当前目录
+
+# 安装
+helm install [NAME] [CHART] [--version <string> ]    # 安装指定版本的chart
+helm install [CHART] --generate-name                 # 自动生成  RELEASE_NAME
+helm install --set KEY1=VALUE1 --set KEY2=VALUE2  RELEASE_NAME CHART ...    #指定属性实现定制配置
+helm install -f values.yaml  RELEASE_NAME CHART..... # 引用文件实现定制配置
+helm install --debug --dry-run RELEASE_NAME CHART    # 调试并不执行，可以查看到执行的渲染结果
+
+# 删除
+helm uninstall RELEASE_NAME                          # 卸载RELEASE
+
+
+# 查看
+helm list                                            # 列出安装的release
+helm status RELEASE_NAME                             # 查看RELEASE的状态
+helm get notes RELEASE_NAME -n NAMESPACE             # 查看RELEASE的说明
+helm get values RELEASE_NAME -n NAMESPACE > values.yaml   # 查看RELEASE的生成值，可以导出方便以后使用
+helm get manifest RELEASE_NAME -n NAMESPACE          # 查看RELEASE的生成的资源清单文件
+
+# 升价和回滚
+helm upgrade RELEASE_NAME CHART --set key=newvalue       # release 更新
+helm upgrade RELEASE_NAME CHART -f mychart/values.yaml   # release 更新
+helm rollback RELEASE_NAME [REVISION]                    # release 回滚到指定版本，如果不指定版本，默认回滚至上一版本
+helm history RELEASE_NAME                                # 查看历史
+
+# 打包
+helm package mychart/ #将指定目录的chart打包为.tgz到当前目录下
+
+# 本地渲染
+helm template prometheus prometheus-community/prometheus \
+  --namespace monitoring \
+  --values custom-values.yaml \
+  > manifests/prometheus.yaml
+```
+
+
+
+#### 直接使用helm的问题
+
+- **封装度高：用户只看到了 Chart 名和 Values**
+
+- **渲染与应用一体，不可预审**
+  - Helm **一口气渲染并应用到集群**，没有中间过程暴露。
+  - 无法做到**提前查看渲染结果**，也无法轻易**让团队代码审查**。
+  - 例如，错误的 `values.yaml` 可能会导致：部署无效配置
+    - 销毁现有资源
+    - 暴露端口或敏感数据
+- **变更不易追踪**
+  - 直接运行 `helm upgrade` 没有 Git 记录。
+  - 变更 **只保留在 Helm Release Secret 里**，而不是 Git。
+  - 团队无法方便地 **审计** 或 **回滚** 到之前的某个 YAML 版本。
+- **对环境要求高**
+  - Helm 版本、插件、客户端环境不一致，会造成**行为不一致**。
+  - CI/CD 环境也要配置 Helm，而直接用 YAML 则只依赖 `kubectl`。
+
+
+
+**总结对比**
+
+| Helm 直接部署                    | 预渲染后 GitOps 或 Kubectl 部署 |
+| -------------------------------- | ------------------------------- |
+| 一步到集群，不可预审             | 渲染结果可见，先审查再部署      |
+| 变更只存在于 Helm Release Secret | 变更存档在 Git，版本可回溯      |
+| 渲染逻辑不透明                   | 渲染 YAML 透明可审计            |
+| 依赖 Helm 版本和环境             | 只需 kubectl 环境               |
+
+
+
+#### 目前**大规模生产实践中推荐的最佳模式**
+
+**Helm 做包管理**
+
+- 保留 Helm Chart 作为**官方交付物**。
+- 可以**统一维护依赖**、**参数化配置**、**版本控制**。
+- 团队不需要重复写一堆裸 YAML。
+
+**Template + GitOps 做部署交付**
+
+- **解耦 Helm 客户端**，避免依赖本地环境。
+- **全量 YAML 可读可审计**，符合安全和合规要求。
+- **GitOps 自动化**，保障部署流程一致可回溯。
+- **CI/CD 集成**，团队提前在 PR 阶段发现问题。
+
+
+
+#### 关于`crds.install=false`的解释
+
+`crds.install=false`的含义：**跳过 Helm 自动安装 CRD**
+
+
+
+**跳过 Helm 自动安装 CRD的原因**
+
+- **CRD 通常是全局唯一资源**，**所有命名空间共享**。
+   频繁执行 `helm upgrade` 或多次安装会**反复安装或升级 CRD**，有破坏风险。
+
+- **有些企业更希望**：
+
+  - **单独管理 CRD 生命周期**（比如用 `kubectl apply` 或专门的 CRD Chart）。
+
+  - **防止误操作**破坏已有 CRD 或 Custom Resource 数据。
+
+
+
+#### 实际工作流示例
+
+**手动或 CI 阶段安装 CRD**
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/crds.yaml
+```
+
+**跳过 CRD 安装部署 Chart**
+
+```bash
+helm install argo argo/argo-cd --set crds.install=false
+```
 
 
 
 
-## 12. NetworkPolicy
+
+## 12. CRD
 
 
 
-## 13. CRD
+### CRD定制资源
+
+#### CRD说明
+
+为了在k8s上能够正常的运行所需的服务，需要遵循以下方式来创建相关资源：
+
+- 合理的分析业务需求
+- 梳理业务需求的相关功能
+- 定制不同功能的资源配置文件
+- 应用资源配置文件，完善业务环境。
+
+当前所有的操作基本上都是在k8s内置的有限的资源对象中进行相关的操作，这些资源对象适用于通用的 业务场景，而在我们的业务场景中，多多少少的会涉及到特殊功能的资源对象。
+
+比如：监控场景需要监控的数据、日志场景需要收集的日志、流量场景需要传递的数据等等
+
+为了高效的定制我们需要的环境，那么需要拥有一些专用的资源方便我们来使用，而在k8s之上提供了一个专用的接口，可以方便我们自己来定制需要的资源。
+
+
+
+**扩展Kubernetes API常用方式：**
+
+- 二次开发 API Server 源码,适合在添加新的**核心类型**时采用
+- 开发自定义API Server并聚合至主API Server ,富于弹性但代码工作量大
+- 使用CRD( Custom Resource Definition )自定义资源类型 , 易用但限制较多，对应的控制器还需再自行开发
+
+![image-20250324173232195](D:\git_repository\cyber_security_learning\markdown_img\image-20250324173232195.png)
+
+示例: 查看calico 自定义的资源CRD
+
+```bash
+# calico环境创建的时候，就用到了很多CRD对象，而且我们为了让CRD能够生效，该软件还提供了一个controller的CRD控制器。这个控制器就是将CRD对象转换为真正有意义的现实的代码。
+[root@master1 statefulset]#kubectl get pod -n kube-system |grep -i calico
+calico-kube-controllers-77d59654f4-rwl4p       1/1     Running   22 (8h ago)   41d
+calico-node-7xpvt                              1/1     Running   25 (8h ago)   41d
+calico-node-8tn8p                              1/1     Running   22 (8h ago)   41d
+calico-node-qqmsz                              1/1     Running   24 (8h ago)   41d
+calico-node-wzdrm                              1/1     Running   24 (8h ago)   41d
+```
+
+
+
+##### CRD简介
+
+资源（Resource） 是 Kubernetes API 中的一个端点， 其中存储的是某个类别的 API 对象 的一个集合。 例如内置的 pods 资源包含一组 Pod 对象
+
+定制资源（Custom Resource） 是对 Kubernetes API 的扩展，不一定在默认的 Kubernetes 安装中就可用。定制资源所代表的是对特定 Kubernetes 安装的一种定制。 不过，很多 Kubernetes 核心功能现在都用定制资源来实现，这使得 Kubernetes 更加模块化。
+
+CRD( Custom Resource Definition ) 定制资源可以通过动态注册的方式在运行中的集群内或出现或消失，集群管理员可以独立于集群更新定制资源。一旦某定制资源被安装，用户可以使用 kubectl 来创建 和访问其中的对象，就像他们为 pods 这种内置资源所做的一样。
+
+CRD 功能是在 Kubernetes 1.7 版本被引入的，用户可以根据自己的需求添加自定义的 Kubernetes 对象资源。
+
+![image-20250324173658794](D:\git_repository\cyber_security_learning\markdown_img\image-20250324173658794.png)
+
+##### 定制CRD的控制器
+
+就定制资源本身而言，它只能用来存取结构化的数据。 当你将**定制资源**与**定制控制器**（Custom  Controller） 相结合时，定制资源就能够 提供真正的声明式 API（Declarative API）。
+
+使用声明式 API， 你可以声明或者设定你的资源的期望状态，并尝试让 Kubernetes 对象的当前状态同 步到其期望状态。控制器负责将结构化的数据解释为用户所期望状态的记录，并持续地维护该状态。
+
+**资源对象的定制方式:**
+
+- 在现有的控制器基础上，扩展资源对象
+- 从0开始定制资源对象和资源对象控制器，此方式需要具有编程语言的开发能力
+
+通常情况下，一个CRD会结合对应的Controller，并添加一些其它资源，组成一个专属应用的 **Operator**，来解决特定应用的功能
 
 
 
 
 
-## 14. calico
+## 13. NetworkPolicy
+
+### NetWork-Policy
+
+#### NetWork-Policy简介
+
+- 标准的 API 资源类型
+- 由网络插件负责转换为节点上的iptables Filter规则，已定义 Pod 间的通信许可
+- 主要针对 TCP、UDP的 SCTP 协议，实现在 IP地址 或者 Port层面 进行流量控制
+- **NetworkPolicy 就是针对一组 Pod 进行管控，要么是管控自己能够访问谁（Egress），要么是管控谁能访问我（Ingress）**
+  - NetworkPolicy 不是设置在集群全局的，它是 **作用于被选中的一组 Pod**（通过 `podSelector`）。
+  - 就像你给某些 Pod 装了防火墙，它们能不能访问别人、能不能被别人访问，全看你在 Policy 里怎么写。
 
 
 
-## 15. etcd修复
+#### Network-Policy的功能
+
+- 针对一组Pod，定义其同对端实体通信时，在入向（Ingress）或/和 出向（Egress）流量上的控制规则
+- 描述对端实体的方法有如下几种
+  - 一组 Pod 对象，通常基于标签选择器定义筛选条件
+  - 单个或一组名称空间
+  - IP地址块（但 Pod 同其所在的节点间的通信不受限制）
+- Network Policy 的具体实现依赖于 Network Plugin
 
 
 
+#### Network-Policy的生效机制
+
+- 默认情况下，一组Pod上的出向和入向流量均被允许
+- 同一方向上，适用于一组Pod的多个规则的生效遵循加法机制
+  - 一组Pod上，多个Ingress策略相加所生成的集合（并集）是为最终生效的效果
+  - 一组Pod上，多个Egress策略相同所生成的集合是为最终生效的策略	
+
+- 若同时定义了Ingress和Egress规则，针对一个对端，双向策略都为“许可”，通信才能真实实现
 
 
-## 16. cri-dockerd
+
+#### Network-Policy资源规范
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ...
+  namespace: ...          # NetworkPolicy是名称空间级别的资源
+spec:
+  egress:                 # 出向流量控制规则，默认开放
+    to:                   # 出向流量控制规则，默认为开放；流量目标的表示方式与Ingress.from相同 
+    ports:                # 出向流量的目标端口；流量目标端口的表示方式与Ingress.ports相同
+  ingress:                # 入向流量控制规则，默认开放
+    from:                 # 入向流量源，多个列表项之间为"或"逻辑；未给定任何值或未定义该字段，将匹配所有流量源；
+                          # 定义了该字段且至少存在一个item，则表示仅允许指定的流量源
+      ipBlock:            # 源IP地址段，通常是网络地址；不支持同NamespaceSelector或podSeletor同时使用；
+        cidr:             # CIDR格式的网络地址
+        except:           # 要排除的地址列表，可以是CIDR格式的子网地址
+      namespaceSelector:  # namespace标签选择器，用于表示源自匹配到的Namespace内的所有流量
+      podSelector:        # pod标签选择器，用于表示源自匹配到的Pod上的所有流量；可以同namespaceSelector同时使用
+                          # 用于匹配选定的namespace中的pod
+    ports:                # 入向流量的目标端口，即流量源要访问的目标端口，生效机制同from
+      port:               # 端口，同endPort字段同时使用时，表示端口范围的起始端口号
+      endpoint:           # 端口号：同port字段同时使用时，表示端口范围的结束端口号
+      protocol:           # 协议，仅支持TCP、UDP和SCTP，默认为TCP
+  podSelector:            # Pod标签选择器，用于选定流量规则适用的对象，必选字段
+  policyTypes:            # 规则类型，支持Ingress，Egress，默认在两个方向上同时生效
+```
+
+
+
+#### Network-Policy资源示例
+
+```yaml
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-all-ingress
+spec:
+  podSelector: {}
+  ingress:            
+  - {}     # 此处，配置了Ingress字段，且添加了一个列表元素，表示仅允许匹配到的流量源，而一个为空的元素则表示匹配所有流量源
+  policyTypes:
+  - Ingress
+```
+
+```yaml
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  # ingress:
+  ingress: []  # 此处，不匹配ingress字段，或使用如下两种方式之一，意义相同；它们表示不匹配任何流量源：ingress:|ingress:[]
+  policyTypes:
+  - ingress
+```
+
+```yaml
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-selector-ingresses
+  namespace: default
+spec:
+  podSelector: {}
+  ingress:
+  - from:  # 第一个from中两个列表元素namespaceSelector和ipBlock，它们是并列关系，即匹配两个规则，因此取或
+    - namespaceSelector:
+      matchExpressions:
+      - key: kubernetes.io/metadata.name
+        operator: in
+        values: ["default", "kuber-system", "monitor"]  # 如果同一名称空间中，没有匹配自己的名称空间，则名称空间内部无                                                           法通信
+    - ipBlock:
+      cidr: 192.168.10.0/24
+    ports: []  # ports为空，表示全匹配
+  - from:  # 第二个from中是第一个列表元素中的字段元素namespaceSelector和podSelector,即一个匹配规则两个条件，因此取与
+    - namespaceSelector:   # 两个from彼此间是或逻辑
+        matchLabels:
+          kubernetes.io/metadata.name: demo
+      podSelector:
+        matchExpressions:
+        - key: app
+          operator: in
+          values: ["demoapp","nginx"]
+    ports:
+    - port: 80
+      protocol: TCP
+  policyTypes:
+  - ingress
+```
+
+
