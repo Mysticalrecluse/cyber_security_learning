@@ -7684,6 +7684,40 @@ ECC就是这样一种内存技术。它的英文全称是："Error Checking and 
 
 服务器一般都部署在IDC机房中！只能使用demidecode命令查看
 
+```bash
+[root@devops-custom ~]# dmidecode |cat -n |grep -i memory
+   100  Physical Memory Array
+   102          Use: System Memory
+   109  Memory Device
+   127          Configured Memory Speed: Unknown
+   133  Memory Array Mapped Address
+   141  Memory Array Mapped Address
+[root@devops-custom ~]# dmidecode |tail -n +109
+Memory Device
+        Array Handle: 0x1000
+        Error Information Handle: Not Provided
+        Total Width: Unknown
+        Data Width: Unknown
+        Size: 4 GB
+        Form Factor: DIMM
+        Set: None
+        Locator: DIMM 0
+        Bank Locator: Not Specified
+        Type: RAM
+        Type Detail: Other
+        Speed: Unknown
+        Manufacturer: QEMU
+        Serial Number: Not Specified
+        Asset Tag: Not Specified
+        Part Number: Not Specified
+        Rank: Unknown
+        Configured Memory Speed: Unknown
+        Minimum Voltage: Unknown
+        Maximum Voltage: Unknown
+        Configured Voltage: Unknown
+......
+```
+
 
 
 
