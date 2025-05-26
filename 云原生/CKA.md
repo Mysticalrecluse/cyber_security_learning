@@ -598,7 +598,7 @@ candidate@master01:~# exit
 Task 
 重新配置 spline-reticulator namespace 中现有的 front-end Deployment，以公开现有容器 nginx 的端口 80/tcp  
 创建一个名为 front-end-svc 的新 Service ，以公开容器端口 80/tcp  
-配置新的 Service ，以通过 NodePort 公开各个 --  
+配置新的 Service ，以通过 NodePort 公开各个Pod
 ```
 
 
@@ -646,7 +646,7 @@ service/front-end-svc exposed
 # 测试
 candidate@master01:~# kubectl get svc -n spline-reticulator
 NAME            TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
-front-end-svc   NodePort   10.102.116.98   <none>        80:31549/TCP   34s
+front-end-svc   NodePort   10.102.116.98   <none>        80:31549/TCP   3s4s
 
 candidate@master01:~# curl 10.102.116.98
 Hello World ^_^
@@ -1098,6 +1098,87 @@ Hello World ^_^
 
 # 别忘记，做完后，退回到base节点，这样下一道题才能继续切节点。
 candidate@master01:~# exit
+```
+
+
+
+### 正常满足重定向的gateway
+
+```bash
+# 源ingress测试
+candidate@master01:~# curl --resolve ingress.web.k8s.local:80:10.99.167.108 http://ingress.web.k8s.local -Lk
+Hello World ^_^
+
+# gatewayAPI清单文件
+candidate@master01:~# cat gateway.yaml 
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: web-gateway
+spec:
+  gatewayClassName: nginx
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "gateway.web.k8s.local"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: web-cert
+    - name: http
+      protocol: HTTP
+      port: 80
+      hostname: "gateway.web.k8s.local"
+      
+candidate@master01:~# cat httprouteforredicret.yaml 
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web-redirect-route
+spec:
+  parentRefs:
+    - name: web-gateway
+      sectionName: http
+  hostnames:
+    - gateway.web.k8s.local
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            port: 443
+
+candidate@master01:~# cat httproute.yaml 
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web-route 
+spec:
+  parentRefs:
+  - name: web-gateway
+    sectionName: https
+  hostnames:
+  - gateway.web.k8s.local
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /
+    backendRefs:
+    - name: web
+      port: 80
+
+candidate@master01:~#  kubectl apply -f httproute.yaml 
+candidate@master01:~#  kubectl apply -f gateway.yaml 
+candidate@master01:~#  kubectl apply -f httprouteforredicret.yaml
+
+# 测试
+candidate@master01:~# curl --resolve gateway.web.k8s.local:80:10.103.27.21 --resolve gateway.web.k8s.local:443:10.103.27.21      http://gateway.web.k8s.local -Lk
+Hello World ^_^
+
+candidate@master01:~# curl https://gateway.web.k8s.local:31443 -Lk
+Hello World ^_^
 ```
 
 

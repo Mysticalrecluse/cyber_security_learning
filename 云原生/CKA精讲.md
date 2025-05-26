@@ -526,9 +526,15 @@ metrics-server 的 API 是通过创建 `APIService` 对象，注册到 kube-apis
 
 **具体行为是：**
 
+- 用户创建api资源，然后该资源保存在 etcd 中， 并且被 apiserver watch 监听
+
 - kube-apiserver **WATCH 监听** `apiservice` 资源对象。
 
   聚合层（Aggregation Layer）本质上是 **kube-apiserver 内置的一个 HTTP 反向代理功能模块**。
+
+  它通过 Shared Informer **watch APIService 资源变化**。
+
+  **自动将 APIService 中声明的 API 路径（如 `/apis/metrics.k8s.io/v1beta1`）注册进 HTTP 路由表**，从而挂载成为可访问 API。
 
 - 解析 `apiservice.spec.service.name` 和 `service.namespace`，
    **通过 Kubernetes Service 反向代理到对应扩展 API Server（如 metrics-server）**。
@@ -601,6 +607,68 @@ metrics-server 访问这些接口
 | **metrics-server 访问 Kubelet** | metrics-server 调用每个 Node 的 Kubelet `/stats/summary` 接口 |
 | **上报到 kube-apiserver**       | metrics-server 聚合数据后通过 Aggregation Layer 提供 `/apis/metrics.k8s.io/v1beta1` 接口 |
 | **kubectl top 查询**            | kubectl top 通过调用 kube-apiserver 这个聚合接口返回实时指标 |
+
+**metrics-server 会轮询每个 Node 上的 kubelet**
+
+- metrics-server 会定期向每个 node 的 kubelet 发起 HTTPS 请求：
+
+```http
+https://<node-ip>:10250/stats/summary
+```
+
+**metrics-server 通过 kube-apiserver 调用标准 API 获取 Node 列表：**
+
+```http
+GET /api/v1/nodes
+```
+
+**返回每个 Node 的状态信息（包括地址）：**
+
+```json
+"status": {
+  "addresses": [
+    {
+      "type": "InternalIP",
+      "address": "192.168.1.10"
+    }
+  ]
+}
+```
+
+**然后使用 InternalIP + 默认 kubelet 端口 10250 组装 URL2**
+
+```http
+https://192.168.1.10:10250/stats/summary
+```
+
+**metrics-server 如何访问 kubelet（权限与安全）**
+
+- **连接端口：** kubelet 的 HTTPS API server，默认 10250
+
+- **认证方式：**
+
+  - metrics-server 使用它自己的 ServiceAccount
+  - kubelet 必须允许这个身份访问 `/stats/summary`
+
+- **kubelet 启动参数中需允许：**
+
+  ```bash
+  --read-only-port=0
+  --authentication-token-webhook=true
+  --authorization-mode=Webhook
+  ```
+
+**kubelet 启动参数必须开启：**
+
+```bash
+--authentication-token-webhook=true
+--authorization-mode=Webhook
+```
+
+| 参数                                  | 含义                                                         |
+| ------------------------------------- | ------------------------------------------------------------ |
+| `--authentication-token-webhook=true` | 告诉 kubelet：遇到 Bearer Token 时，请回头去 apiserver 询问是否有效 |
+| `--authorization-mode=Webhook`        | 再次让 kubelet 去问 apiserver：这个请求的身份有权限吗？      |
 
 ```bash
 # metrics-server的pod，与kubelet通信，需要Kubernetes-ca证书验证kubelet的客户端证书
@@ -2381,5 +2449,4 @@ spec:
   policyTypes:
   - ingress
 ```
-
 
