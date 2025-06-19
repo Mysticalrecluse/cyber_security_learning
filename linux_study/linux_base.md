@@ -9813,6 +9813,208 @@ grub2-mkconfig -o /boot/grub2/grub.cfg
 
 #### systemd核心概念：unit
 - 查看unit类型
+> **Unit 是 systemd 中的基本管理对象，用于描述一个可被 systemd 控制的系统资源或行为单元。**
+
+通俗说法就是：
+
+> **一个 unit 就是一项由 systemd 管理的“东西”**，比如一个服务、一个挂载点、一个 socket、一个定时任务等。
+
+每个 unit 文件实际上描述了某种“资源”以及它的启动/停止/依赖/行为方式。
+
+它由两部分组成：
+
+```bat
+<name>.<type>
+```
+
+**Unit 是 systemd 的“通用抽象层”**
+
+以前：
+
+- 启动服务靠 `/etc/init.d/*`
+- 挂载靠 `/etc/fstab`
+- 定时任务靠 `cron`
+- 套接字靠 `inetd`
+
+现在：
+
+- **所有这些都统一由 unit 文件来描述和管理**，systemd 统一调度、并发、依赖、日志、监控，成为一个完整管理框架。
+
+
+
+✅ 1. **服务管理** —— 使用 `.service` unit 替代 `/etc/init.d/*`
+
+🔧 传统方式：
+
+```bash
+/etc/init.d/nginx start
+```
+
+🚀 systemd 方式：
+
+```bash
+# 启动 nginx 服务
+systemctl start nginx.service
+
+# 查看状态
+systemctl status nginx.service
+
+# 设置为开机启动
+systemctl enable nginx.service
+```
+
+unit 文件路径（可能在）：
+
+```swift
+/lib/systemd/system/nginx.service
+```
+
+
+
+✅ 2. **文件系统挂载** —— 使用 `.mount` unit 替代 `/etc/fstab`
+
+🔧 传统方式：
+
+在 `/etc/fstab` 中添加：
+
+```bash
+/dev/sdb1 /data ext4 defaults 0 2
+```
+
+🚀 systemd 方式：
+
+创建 unit 文件（自动与 `/data` 匹配）：
+
+```bash
+/etc/systemd/system/data.mount
+```
+
+内容如下：
+
+```ini
+[Unit]
+Description=Mount /data
+Before=local-fs.target
+
+[Mount]
+What=/dev/sdb1
+Where=/data
+Type=ext4
+Options=defaults
+
+[Install]
+WantedBy=multi-user.target
+```
+
+然后：
+
+```bash
+systemctl daemon-reexec
+systemctl enable --now data.mount
+```
+
+这就完成了 `/data` 的自动挂载，**完全不依赖 /etc/fstab**。
+
+
+
+✅ 3. **定时任务** —— 使用 `.timer` unit 替代 `cron`
+
+🔧 传统方式：
+
+```bash
+crontab -e
+# 添加：
+0 1 * * * /usr/local/bin/backup.sh
+```
+
+🚀 systemd 方式：
+
+创建两个 unit：
+
+`backup.service`（执行内容）：
+
+```ini
+[Unit]
+Description=Backup MySQL database
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/backup.sh
+```
+
+保存为 `/etc/systemd/system/backup.service`
+
+`backup.timer`（定时触发）：
+
+```ini
+[Unit]
+Description=Run backup daily at 1am
+
+[Timer]
+OnCalendar=*-*-* 01:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+保存为 `/etc/systemd/system/backup.timer`
+
+启动：
+
+```
+bashCopyEditsystemctl daemon-reload
+systemctl enable --now backup.timer
+```
+
+现在 systemd 会**每天凌晨1点自动执行你的脚本**，效果与 cron 等价甚至更强。
+
+
+
+✅ 4. **按需 socket 激活** —— 使用 `.socket` unit 替代 `inetd/xinetd`
+
+🔧 传统方式：
+
+用 `xinetd` 启动 telnet 服务，当用户连接 23 端口时启动服务。
+
+🚀 systemd 方式（以 nginx 举例）：
+
+`nginx.socket`：
+
+```ini
+[Unit]
+Description=Socket for nginx
+
+[Socket]
+ListenStream=80
+Accept=no
+
+[Install]
+WantedBy=sockets.target
+```
+
+`nginx.service`（注意配合 socket 激活）：
+
+```ini
+[Unit]
+Description=nginx web server
+After=network.target
+
+[Service]
+ExecStart=/usr/sbin/nginx -g 'daemon off;'
+StandardInput=socket
+```
+
+操作：
+
+```bash
+systemctl enable --now nginx.socket
+```
+
+此时 systemd 会监听 80 端口，有人连接后再自动启动 nginx。
+
+
+
 ```shell
 systemctl -t help
 
@@ -9940,18 +10142,74 @@ Service段的常用选项
 - Type：定义影响ExecStart及相关参数的功能的unit进程启动类型
   - simple: 默认值，这个daemon主要由ExecStart接的指令串来启动，启动后常驻于内存中
   - forking：由ExecStart启动的程序透过spawns延伸出其他子程序来作为此daemon的主要服务，原生父进程在启动结束后就停止
-  - oneshot：与simple类似，不过这个程序在工作完毕后就结束了，不会常驻在内存中
+  
+    > 以 MySQL 为例
+    >
+    > ```bash
+    > systemd
+    >   └── ExecStart=/usr/bin/mysqld_safe   ← 父进程
+    >          └── fork 出 /usr/sbin/mysqld  ← 真正运行的 daemon（子进程）
+    > ```
+    >
+    > systemd 最初启动的是 `mysqld_safe`，它只是个脚本，不是真正服务，它 fork 出 `mysqld` 后就结束了。
+  - oneshot：与simple类似，不过这个程序在工作完毕后就结束了，不会常驻在内存中，通常用于定时任务
+  
+    > 创建两个 unit：
+    >
+    > `backup.service`（执行内容）：
+    >
+    > ```ini
+    > [Unit]
+    > Description=Backup MySQL database
+    > 
+    > [Service]
+    > Type=oneshot
+    > ExecStart=/usr/local/bin/backup.sh
+    > ```
+    >
+    > 保存为 `/etc/systemd/system/backup.service`
+    >
+    > `backup.timer`（定时触发）：
+    >
+    > ```ini
+    > [Unit]
+    > Description=Run backup daily at 1am
+    > 
+    > [Timer]
+    > OnCalendar=*-*-* 01:00:00
+    > Persistent=true
+    > 
+    > [Install]
+    > WantedBy=timers.target
+    > ```
+    >
+    > 保存为 `/etc/systemd/system/backup.timer`
   - dbus：与simple类似，但这个daemon必须在取得一个D-Bus的名称之后，才会继续运作，因此通常也要同时设定BusName=才行
   - notify：在启动完成后会发送一个通知信息，要需要配合NotifyAccess来让Systemd接收信息
+  
+    > 只要你在 unit 文件中使用了 `Type=notify`，你就必须确保程序能够发出 `READY=1` 的通知，否则 systemd 无法判断服务是否就绪，会误判为启动失败。
+    >
+    > **实现方式（选择其一）：**
+    >
+    > | 方法              | 说明                                                         |
+    > | ----------------- | ------------------------------------------------------------ |
+    > | 使用 C 编写的程序 | 调用 `sd_notify(0, "READY=1");`（来自 `<systemd/sd-daemon.h>`） |
+    > | 使用 CLI 工具     | `systemd-notify --ready`（适合 shell 脚本）                  |
+    > | 使用 Python       | 使用 `python-systemd` 库的 `sd_notify()` 函数                |
+    > | 其他语言          | Go、Rust 等也有 systemd 的通知库可用                         |
   - idle：与simple类似，要执行这个daemon必须要所有的工作都顺利进行完毕后才会执行。这类的daemon通常是开机到最后才执行即可的服务
   
-- EnvironmentFile: 环境配置文件
-- ExecStart：指明启动unit要运行命令或脚本的绝对路径
-- ExecStartPre: ExecStart前运行
-- ExecStartpost：ExecStart后运行
-- ExecStop：指明停止unit要运行的命令或脚本
-- Restart：当设定Restart=1时，则当次daemon服务以外终止后，会再次自动启动此服务
-- PrivateTmp：设定为yse时，会在生成/tmp/systemd-UUID-NAME.service.XXXtmp/目录
+- **EnvironmentFile**: 环境配置文件
+
+- **ExecStart**：指明启动unit要运行命令或脚本的绝对路径
+
+- **ExecStartPre**: ExecStart前运行
+
+- **ExecStartpost**：ExecStart后运行
+
+- **ExecStop**：指明停止unit要运行的命令或脚本
+
+- **Restart**：当设定Restart=1时，则当次daemon服务以外终止后，会再次自动启动此服务
 
 Install段的常用选项
 - Alias：别名，可使用systemctl commandAlias.service

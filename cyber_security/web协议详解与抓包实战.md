@@ -1,7 +1,93 @@
+# 大纲
+
+以 TCP/IP 协议栈为依托，由上至下，从应用层至基础设施介绍协议
+
+- **应用层**
+  - 第1部分：HTTP/1.1
+  - 第2部分：Websocket
+  - 第3部分：HTTP/2.0
+- **应用层的安全基础设施**
+  - 第4部分：TLS/SSL
+- **传输层**
+  - 第5部分：TCP
+- **网络层及数据链路层**
+  - 第6部分：IP层和以太网
+
+
+
+## HTTP/1 的讲解逻辑
+
+- HTTP/1协议为什么会如此设计（遇到哪些问题和约束）
+  - 网络分层原理，REST架构
+- 协议的通用规则
+  - 协议格式，URI，方法与响应码概览
+- 连接与消息的路由
+- 内容协商与传输
+- cookie的设计与问题
+- 缓存的控制
+
+
+
+ HTTP/1.1写完之后，会发现其中有很多问题，比如HTTP1.1协议最缺乏的一个特性就是不支持服务器端主动的推送消息，这样的话，有一些页面需要实时刷新相关内容的时候，就很难使用HTTP1.1去实现。
+
+而使用轮询的方式去解决实时刷新的问题，效率是十分低下的，因此出现了支持服务器推送消息的WebSocket协议
+
+
+
+## WebSocket协议
+
+websocket协议可以看作是对http1.1协议的升级，下面的内容其实是按照整个Websocket协议的生命周期做讲解
+
+- 建议会话
+- 消息传输
+- 心跳
+- 关闭会话
+
+
+
+首先考虑HTTP1.1协议中，怎样升级，建立起Websocket的会话。
+
+然后讨论消息的双向传输时如何进行呢的
+
+会话是如何通过心跳检测保持的
+
+如何关闭Websocket会话
+
+
+
+## HTTP/2.0协议
+
+Websocket  协议在网络效率，多路复用方面，效果很一般。因此，出现了性能上做了全面优化且也支持服务器主动推送的HTTP/2.0协议
+
+而HTTP2.0协议有一个前置条件，就是必须开启TLS/SSL安全协议，所以要介绍将应用层协议整个加解密的TLS/SSL协议（这里会讨论非对称加密中如何协商出对称加密，会通过抓包来验证分析这一流程。）
+
+
+
+当我们介绍完所有应用层协议之后，会发现，当网络非常的缓慢，高并发，丢包率很高的时候，会出现很多问题，而这些问题已经无法单单通过应用层协议去解决，此时就需要去了解传输层中的TCP协议。
+
+
+
+## TCP协议
+
+- 建立连接
+- 传输数据（滑动窗口）
+- 拥塞控制（防止网络风暴）
+- 关闭连接
+
+
+
+
+
+
+
+
+
 # HTTP/1.1协议
+
 ## Web浏览器发起HTTP请求得典型场景
 ![Alt text](images/image01.png)
-- 详解过程
+- **详解过程**
+  
   - 首先服务器监听打开了443或者80端口
   - 浏览器从url中解析出域名
   - 根据域名查询DNS，获取域名对应得IP地址
@@ -10,18 +96,54 @@
   - 通过链接发起HTTP请求
   - 服务器接收到HTTP请求后，完成资源的表述，把客户端请求的文件如html页面作为包体返回给浏览器
   - 浏览器在渲染引擎中解析响应，根据这个响应中一些其他的超链接资源去构造其他HTTP请求
-
-- Hypertext Transfer Protocol(HTTP)协议
+  
+  
+  
+- **Hypertext Transfer Protocol(HTTP)协议**
 ![Alt text](images/image02.png)
 
 - a `stateless` application-level `request/response` protocol that uses `extensible semantics` and `self-descriptive` message payloads for flexibale interaction with network-based `hypertext information` systems
 (https://tools.ietf.org/html/rfc7230)
+
+
+
+- **Stateless**：无状态的，也就是说连续的两个请求中，后一个请求不能依赖前一个请求中相应的字段。或者head头部等。
+
+- **request/reponse**：这里说明一定是基于一个连接，首先由客户端发起请求，然后服务器才能在这个连接上发起response响应，它必须以这样的方式工作。
+
+- **extensible semantics**：语义可扩展，协议的设计允许不同版本之间兼容，并且新版本中增加的新功能不会影响老版本的正常工作。
+
+  > **HTTP 的语义可扩展表现在哪？**
+  >
+  > 例子：
+  >
+  > - HTTP/1.1 引入了 `Host` 头、持久连接（Keep-Alive）、管道化等新特性；
+  > - HTTP/1.0 的服务器并不了解这些新特性；
+  > - 但 **浏览器仍然可以向 HTTP/1.0 的服务器发送兼容的请求**，并且 **服务器可以正常响应**。
+  >
+  > 原因：
+  >
+  > - HTTP 的请求/响应结构是基于「**文本协议** + **键值对头部**」的形式；
+  > - **不认识的 header**，服务器/客户端是允许 **忽略** 的 —— 这是协议设计上的要求；
+  > - 所以 HTTP/1.1 客户端即使发送了一些 HTTP/1.1 才定义的头部，HTTP/1.0 的服务器看到不认识的头部时会 **跳过它们**，只处理它认识的那部分。
+
+  
+
+- **self-decriptive**：我们所传送的消息，是要一个子描述的消息，我们从一个请求中就能知道这个消息是视频还是文本还是音频，而不需要依赖于其他的请求
+
+- **hypertext information**：这个是一个超文本系统，我们传输的不只有文档，还有视频，音频等大颗粒度的内容
+
+
 
 - 推荐书籍
   - 《HTTPS权威指南》
   - 《TCP/IP协议详解》
 
 - RFC文档是对所有协议的最权威的定义  
+
+
+
+
 
 ## 基于ABNF语义定义的HTTP消息格式
 
@@ -39,35 +161,40 @@
 
 ![Alt text](images/image17.png)
 
-- ABNF——一种定义语法的元语言，可以防止不同服务器在处理http数据的时候，出现基于具有格式问题导致的解析解结果不同，比如空格和制表符或者其他空白符，短横线和下滑线等等一系列由于不规范导致的问题
+- ABNF——**巴克斯-瑙尔范式，是一种定义语法的元语言**，可以防止不同服务器在处理http数据的时候，出现基于具有格式问题导致的解析解结果不同，比如空格和制表符或者其他空白符，短横线和下滑线等等一系列由于不规范导致的问题
 
 - ABNF——常用于定义协议语法
 
-- ABNF (扩充巴克斯-瑙尔范式) 操作符
+- ABNF (扩充巴克斯-瑙尔范式) 
   - 包含两部分
-    - 操作符
-    - 核心语法规则
-  - 操作符
-    - 空白字符: 用来分隔定义中的各个元素
-      - 例：`method SP request-target SP HTTP-version CRLF`
-    - 选择/: 表示多条规则都是可供选择的规则
-      - 例：`start-line = request-line/status-line`
-    - 值范围 `%c##-##`
-      - 例：`OCTAL = "0"/"1"/"2"/"3"/"4"/"5"/"6"/"7"` 与 `%x30-37` 等价（十六进制30-37对照ascll码，即字符0-7）
-    - 序列组合(): 将规则组合起来，视为单个元素
-    - 不定量重复m*n：
-      - `*` 元素表示零个或更多元素：*(header-field CRLF)
-      - `1*` 元素一个或更多元素
-      - `2*4` 表示两个至四个元素
-    - 可选序列[]
-      - [message-body]
-  - 核心规则
-  ![Alt text](images/image18.png)
+    - **操作符**
+    - **核心语法规则**
+  
+  **操作符**
+  
+  - 空白字符: 用来分隔定义中的各个元素（并不是空格的意思，仅仅是便于观察）
+    - 例：`method SP request-target SP HTTP-version CRLF`
+  - 选择/: 表示多条规则都是可供选择的规则，相当于or
+    - 例：`start-line = request-line/status-line`
+  - 值范围 `%c##-##`
+    - 例：`OCTAL = "0"/"1"/"2"/"3"/"4"/"5"/"6"/"7"` 与 `%x30-37` 等价（十六进制30-37对照ascll码，即字符0-7）
+  - 序列组合(): 将规则组合起来，视为单个元素
+  - 不定量重复m*n：
+    - `*` 元素表示零个或更多元素：*(header-field CRLF)
+    - `1*` 元素一个或更多元素
+    - `2*4` 表示两个至四个元素
+  - 可选序列`[ ]`，表示可以有，也可以没有
+    - [message-body]
 
+  
+  
+  **核心规则**
+  ![Alt text](images/image18.png)
+  
 - 基于ABNF描述的HTTP协议格式
 ```shell
 # HTTP完整格式
-HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
+HTTP-message = start-line*(hearder-field CRLF) CRLF [message-body]
 # 详细解读
   start-line = request-line/status-line
     request-line = method SP request-target SP HTTP-version CRLF
@@ -151,7 +278,68 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
     # 匹配 elem foo 或 elem bar blat
     ```
 
+
+
+## OSI（Open System Interconnection Reference Model）概念模型
+
+![image-20250617164913865](../markdown_img/image-20250617164913865.png)
+
+
+
+OSI是一个概念模型，也就是说它从来没有被实现过，但是我们在实现网络协议的时候，必须要参考这样一个概念模型，才能非常好的理解网络中的协议分层
+
+
+
+**应用层：** HTTP，FTP，DNS，都在应用层，应用层解决的是业务问题
+
+**表示层：** 表示层负责把网络中的消息转换成应用层可以读取的消息
+
+> 比如：ssl，ssl加密的数据，用户是无法直接读取的，需要表示层做一次转换。所以TLS/SSL 工作在表示层
+
+**会话层：** 是一个完全概念化的一层，Session。他负责建立会话，握手，维持连接，关闭，但实际上传输层（TCP）和表示层，都有部分延伸到会话层，因此会话层只是一个概念。用来帮助理解会话这个概念。
+
+**传输层：** 包括TCP，UDP协议，主要解决进程与进程之间的通讯。除此之外，TCP还解决了数据传输的可靠性。
+
+**网络层：**IP协议，确保了在广域网中，可以把报文从一个主机发送到另一个主机上。
+
+**数据链路层：**负责局域网中的主机间数据交换。
+
+
+
+OSI仅仅是一个概念模型，而互联网上实际使用的是TCP/IP模型
+
+<img src="../markdown_img/image-20250617164938809.png" alt="image-20250617164938809" style="zoom:150%;" />
+
+
+
+### 抓包演示数据层层封装
+
+**应用层数据**
+
+![image-20250617184328846](../markdown_img\image-20250617184328846.png)
+
+**传输层头部数据**
+
+![image-20250617184405245](../markdown_img/image-20250617184405245.png)
+
+**网络层头部数据**
+
+![image-20250617184430070](../markdown_img/image-20250617184430070.png)
+
+**数据链路层头部数据**
+
+![image-20250617184522885](../markdown_img/image-20250617184522885.png)
+
+
+
+
+
+
+
+
+
 ## HTTP解决了什么问题
+
 - HTTP/1.1 创始人：Roy Thomas Fielding
   - 参与制订HTTP/1.0规范 (1996.5)
   - 参与制订URI规范 (1998.8)
@@ -162,6 +350,9 @@ HTTP-message = start-line*(hearder-field CRLF)CRLF[message-body]
     - 参与开发Apache httpd服务 
 
 - Form Follws Function (形式一定是为功能服务的)
+
+![image-20250617190811307](../markdown_img/image-20250617190811307.png)
+
 ```shell
 GET / HTTP/1.1
 Host: developer.mozilla.org
@@ -182,6 +373,10 @@ Accept-Language: fr
       - 客户端不能保持所有服务器信息，服务器不能保持多个请求间的状态信息
     - 独立的组件部署：新老组件并存
   - 向前兼容：自1993年起HTTP0.9/1.0（1996）已经被广泛使用
+
+
+
+
 
 ## 评估Web架构的七大关键属性
 - HTTP协议应当在以下属性中取得可接受的均衡：
@@ -212,6 +407,10 @@ Accept-Language: fr
 - 可配置性Configurability：应用部署后可通过修改配置提供新的功能
 - 可重用性Reusability：组件可以不做修改在其他应用上使用
   - 比如：浏览器渲染引擎，可以在多个浏览器IE,chrome使用，这就是可重用性的体现
+
+
+
+
 
 ## 从五种架构风格推导出HTTP的REST架构
 ### 5种架构风格
@@ -382,7 +581,9 @@ Accept-Language: fr
 - Reading Push：浏览器正在读取之前收到的本地数据
 
 
+
 ## URL和URI的区别
+
 ### 什么是URI
 - URL: RFC1738 (1994.12) , Uniform Resource Locator
   - 标识资源的位置，期望提供查找资源的方法
