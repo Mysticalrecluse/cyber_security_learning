@@ -629,6 +629,86 @@ PS1="\[\e[1;33m\][\u@\h \w] \$\[\e[0m\]"
 
 
 
+
+
+### 1.1.8 会话管理
+
+命令行的典型使用方式是，打开一个终端窗口（terminal window，以下简称"窗口"），在里面输入命令。用户与计算机的这种临时的交互，称为一次"会话"（session）
+
+会话的一个重要特点是，窗口与其中启动的进程是连在一起的。打开窗口，会话开始；关闭窗口，会话结束，会话内部的进程也会随之终止，不管有没有运行完
+
+一个典型的例子就是，SSH 登录远程计算机，打开一个远程窗口执行命令。这时，网络突然断线，再次登录的时候，是找不回上一次执行的命令的。因为上一次 SSH 会话已经终止了，里面的进程也随之消失 了。
+
+为了解决这个问题，会话与窗口可以"解绑"：窗口关闭时，会话并不终止，继续运行，等到以后需要的时候，再让会话"绑定" 其他窗口
+
+终端复用器软件就是会话与窗口的"解绑"工具，将它们彻底分离。
+
+
+
+- 它允许在单个窗口中，同时访问多个会话。这对于同时运行多个命令行程序很有用。
+- 它可以让新窗口"接入"已经存在的会话。
+-  它允许每个会话有多个连接窗口，因此可以多人实时共享会话。
+-  它还支持窗口任意的垂直和水平拆分。
+
+
+
+类似的终端复用器还有Screen，Tmux
+
+
+
+#### 1.1.8.1 screen
+
+利用screen 可以实现会话管理,如：新建会话,共享会话等
+
+注意：CentOS7 来自于base源，CentOS8 来自于epel源
+
+
+
+范例：安装 screen
+
+```bash
+# CentOS7 安装screen
+[root@centos7 ~]# yum -y install screen
+
+# CentOS8 安装screen
+[root@centos8 ~]# dnf -y install epel-release
+[root@centos8 ~]# dnf -y install screen
+
+# ubuntu
+[root@ubuntu ~]# apt install screen
+```
+
+
+
+**s**命令常见用法：
+
+```bash
+screen -S [SESSION]       # 创建新screen会话
+screen -x [SESSION]       # 加入screen会话
+screen -r [SESSION]       # 恢复某screen会话
+screen -ls                 # 显示所有已经打开的screen会话
+Ctrl + a, d               # 剥离当前screen会话
+exit                      # 退出并关闭screen会话
+```
+
+
+
+#### 1.1.8.2 tmux
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 1.2 常见信息获取
 
 ### 1.2.1 查看用户登录信息

@@ -37,13 +37,13 @@ bash -x script          # 逐行执行shell脚本
     - 内置变量：`$$`, `$?`, `$PS1`, `$PATH`, `$HISTSIZE`, `$SHLVL`(shell的嵌套层数)...
     - tip: `$_`表示上一条命令的最后一个参数
     - 用户自定义变量
-</br>
+    </br>
 - Shell中变量命名规则
     - 不能使用保留字
     - 变量名大写
     - 局部变量小写
     - 函数名小写
-</br>
+    </br>
 
 ### 变量分类即环境变量
 
@@ -54,7 +54,7 @@ bash -x script          # 逐行执行shell脚本
         ```shell
         export name=VALUE
         declare -x name=VALUE
-
+        
         # 或分两步实现
         name=VALUE
         export name
@@ -1289,7 +1289,6 @@ log_daemon_msg_pre () { :; }
   - <span style="color:green;font-weight:700">占位符：</span>在某些情况下，如果语法要求必须有一个命令，但实际上又不需要执行任何操作时，可以使用 : 作为占位符。例如，在if语句中可能只需要在条件成立时不执行任何操作，但又需要语法上的完整。
   - <span style="color:green;font-weight:700">函数桩：</span>在开发中，: 可用作函数体的临时占位符，这样的函数也被称为“桩”。这允许开发者在整体应用架构搭建期间先行定义函数接口，具体实现可以随后添加。
   - <span style="color:green;font-weight:700">保持接口一致性：</span>在脚本或程序中，如果某些情况下不需要执行任何操作，但为了保持接口的一致性或代码的可读性，可能会使用 :。
-
 
 
 

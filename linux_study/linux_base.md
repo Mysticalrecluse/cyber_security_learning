@@ -3637,6 +3637,7 @@ fdisk -l /dev/sda
 
 ![alt text](images/image17.png)
 ![alt text](images/image18.png)
+
 - 详细解读
   - 主引导程序（偏移地址0000H--0088H），它负责从活动分区中装载，并运行系统引导程序
   - 出错信息数据区，偏移地址0089H--00E1H为出错信息，00E2H--01BDH全为0字节 
@@ -11132,6 +11133,9 @@ acl beijingnet{
   - allow-update{}; 允许更新区域数据库中的内容
 
 #### view视图
+
+![image-20250704171522431](../markdown_img\image-20250704171522431.png)
+
 - View：视图，将ACL和区域数据库实现对应关系，以实现只能DNS
   - 一个bind服务器可以定义多个view，每个view中可定义一个或多个zone
   - 每个view用来匹配一组客户端
