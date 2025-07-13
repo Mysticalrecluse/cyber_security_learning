@@ -226,3 +226,242 @@ ctrl + w + hjk;| arrow # 切换窗口
 多文件分屏打开
 vim -o|O file1 file2
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# vim集成DeepSeek
+
+**在.bashrc里，放入环境变量，保证 deepseek 的 api keys 可以被调用**
+
+```bash
+export DEEPSEEK_API_KEY="sk-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+```
+
+
+
+**在PATH路径中，创建 deepseek-query.sh 脚本文件**
+
+```bash
+root@localhost:~# echo $PATH
+/root/.local/bin:/root/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+
+# 在/root/bin下，创建deepseek-query.sh
+root@localhost:~# mkdir bin
+
+# 写脚本文件
+root@localhost:~# cat bin/deepseek-query.sh 
+#!/bin/bash
+
+# === 配置 ===
+API_KEY="${DEEPSEEK_API_KEY}"
+MODEL="deepseek-chat"
+ENDPOINT="https://api.deepseek.com/v1/chat/completions"
+
+if [[ -z "$API_KEY" ]]; then
+  echo "[error] 请先导出 DEEPSEEK_API_KEY 环境变量"
+  exit 1
+fi
+
+#PROMPT="$*"
+
+if [[ -n "$1" ]]; then
+  PROMPT="$1"
+else
+  read -r PROMPT
+fi
+
+
+#DATA=$(cat <<EOF
+#{
+#  "model": "$MODEL",
+#  "messages": [
+#    {"role": "user", "content": "$PROMPT"}
+#  ]
+#}
+#EOF
+#)
+
+
+DATA=$(jq -n --arg prompt "$PROMPT" --arg model "$MODEL" '
+{
+  model: $model,
+  messages: [
+    { role: "user", content: $prompt }
+  ]
+}')
+
+
+#curl -sS "$ENDPOINT" \
+#  -H "Content-Type: application/json" \
+#  -H "Authorization: Bearer $API_KEY" \
+#  -d "$DATA" | jq -r '.choices[0].message.content'
+
+response=$(curl -sS "$ENDPOINT" \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $API_KEY" \
+  -d "$DATA")
+
+echo "$response" | jq -r '.choices[0].message.content'
+```
+
+
+
+**在.vimrc中配置，调用deepseek脚本**
+
+```bash
+
+" -------------- DeepSeek 集成 -----------------
+" Leader 键：\  （可自行 let mapleader = "," …）
+nnoremap <leader>ds :call DeepSeek_Query_Cursor()<CR>
+vnoremap <leader>ds :<C-u>call <SID>DeepSeek_Query_Visual()<CR>
+"vnoremap <leader>ds :<C-u>call DeepSeek_Query_Visual()<CR>
+
+" 关闭浮窗的快捷键
+nnoremap <silent> <leader>q :call popup_close(popup_list()[0])<CR>
+"
+"function! s:popup_show(msg) abort
+"  if has('popupwin')          " Vim 8.2+ 推荐用浮窗
+"    call popup_create(a:msg, #{minwidth:60, minheight:8, line:2, col:2,
+"          \ border:[1], borderchars:['─']})
+"  else                        " 老版本退化为只读新缓冲
+"    new
+"    setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile
+"    call setline(1, split(a:msg, "\n"))
+"  endif
+"endfunction
+"
+"" 普通模式：取光标所在行（或函数名等），可自行改成 expand('<cword>')
+"function! DeepSeek_Query_Cursor() abort
+""  let l:text = getline('.')
+""  let l:answer = system('echo '.shellescape(l:text).' | ~/bin/deepseek-query.sh')
+""  call <SID>popup_show(l:answer)
+"   let l:prompt = input('🤖 请输入你的问题: ')
+"   if empty(l:prompt)
+"     echohl WarningMsg | echo '[❌] 已取消，问题为空' | echohl None
+"     return
+"   endif
+""   let l:answer = system('echo '.shellescape(l:prompt).' | ~/bin/deepseek-query.sh')
+"   let l:answer = system("echo " . shellescape(l:prompt) . " | bash ~/bin/deepseek-query.sh")
+"   call <SID>popup_show(l:answer)
+"endfunction
+"
+"" 可视模式：取选区
+"function! DeepSeek_Query_Visual() abort
+"  " 保存选区两端
+"  let l_save = @@
+"  normal! "vy
+"  let l:text = @@
+"  let @@ = l_save
+"
+"  let l:answer = system('echo '.shellescape(l:text).' | ~/bin/deepseek-query.sh')
+"  call <SID>popup_show(l:answer)
+"endfunction
+
+
+let mapleader = "\\"
+
+" === 快捷键 ===
+nnoremap <leader>ds :call DeepSeek_Query_Cursor()<CR>
+vnoremap <leader>ds :<C-u>call <SID>DeepSeek_Query_Visual()<CR>
+nnoremap <silent> <leader>q :call popup_close(popup_list()[0])<CR>
+
+" === 浮窗显示函数 ===
+function! s:popup_show(msg) abort
+  if has('popupwin')
+    call popup_create(a:msg, {
+          \ 'minwidth': 60, 'minheight': 8,
+          \ 'line': 2, 'col': 2,
+          \ 'border': [1], 'borderchars': ['─'],
+          \ })
+  else
+    new
+    setlocal buftype=nofile bufhidden=wipe nobuflisted noswapfile
+    call setline(1, split(a:msg, "\n"))
+  endif
+endfunction
+
+" === 核心提问函数 ===
+function! s:deepseek_query_and_popup(text) abort
+  if empty(a:text)
+    echohl WarningMsg | echo '[❌] 内容为空，未发送' | echohl None
+    return
+  endif
+  let l:answer = system('bash ~/bin/deepseek-query.sh ' . shellescape(a:text))
+  call s:popup_show(l:answer)
+endfunction
+
+" === 普通模式：输入问题 ===
+function! DeepSeek_Query_Cursor() abort
+  let prompt = input('🤖 请输入你的问题: ')
+  if empty(prompt)
+    echohl WarningMsg | echo '[取消发送]' | echohl None
+    return
+  endif
+  call s:deepseek_query_and_popup(prompt)
+endfunction
+
+" === 可视模式：选择提问 ===
+"function! s:DeepSeek_Query_Visual() abort
+"  let l:save_reg = @@
+"  normal! "vy
+"  let l:text = @@
+"  let @@ = l:save_reg
+"  call s:deepseek_query_and_popup(l:text)
+"endfunction
+
+"function! s:DeepSeek_Query_Visual() abort
+"  " 获取可视选区范围（行号）
+"  let start = getpos("'<")[1]
+"  let end = getpos("'>")[1]
+"
+"  " 获取选中内容的所有行
+"  let lines = getline(start, end)
+"
+"  " 将多行拼接成一行（避免 JSON 解析失败）
+"  let text = join(lines, ' ')
+"
+"  call s:deepseek_query_and_popup(text)
+"endfunction
+
+function! s:DeepSeek_Query_Visual() abort
+  " 保存剪贴板内容
+  let l:save_reg = @@
+
+  " 复制可视选区内容
+  normal! "vy
+  let l:selected = @@
+
+  " 恢复剪贴板
+  let @@ = l:save_reg
+
+  " 手动输入提问内容
+  let l:prompt = input('🤖 请输入你的问题（选中内容将附在末尾）：')
+  if empty(l:prompt)
+    echohl WarningMsg | echo '[❌] 已取消，问题为空' | echohl None
+    return
+  endif
+
+  " 拼接用户问题和选中内容
+  let l:final_prompt = l:prompt . "\n\n" . l:selected
+
+  " 执行查询
+  call s:deepseek_query_and_popup(l:final_prompt)
+endfunction 
+```
+
+
+
