@@ -1,2 +1,3 @@
 ﻿  Assembling AddTwo.asm...
+AddTwo.obj : warning LNK4258: 指令“/ENTRY:main@0”与开关“/ENTRY:main”不兼容；已忽略
   learnAssem.vcxproj -> D:\git_repository\cyber_security_learning\Assembly_language_for_x86\learn\learnAssem\Debug\learnAssem.exe

@@ -15515,8 +15515,18 @@ cp /apps/nginx/sbin/nginx opt/nginx.old
 # 启动新版本
 kill -USR2 `cat /apps/nginx/logs/nginx.pid`   #-USER2,并来实现USR2
 
+# 向当前旧版本 master 进程发送 USR2 信号时，它会：
+## 将自身的 PID 重命名为 .oldbin（比如 /usr/local/nginx/logs/nginx.pid.oldbin）
+## 启动一个新的 Nginx master + worker 进程（使用的是新版本的 nginx 二进制）
+## 此时两个 master 共存，一个是 .oldbin（旧），一个是 nginx.pid（新）
+
 # 此时如果旧版worker进程有用户的旧的请求，会一直等待处理完后才会关闭，即平滑关闭
 kill -WINCH `cat /apps/nginx/logs/nginx.pid.oldbin`
+
+# 对旧版本（.oldbin）的 master 进程发送 WINCH 信号，它会：
+## 告诉旧 master 关闭所有它的 worker 进程（即停止处理请求）
+## 旧 master 自身还不退出，继续留着 pid 文件
+## 这是一个“预退场”动作，让新进程 takeover 请求
 
 # 如果有新请求，则由新版本提供服务
 

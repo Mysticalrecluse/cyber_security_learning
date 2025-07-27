@@ -1,0 +1,37 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "D:\\git_repository\\cyber_security_learning\\Assembly_language_for_x86\\learn\\learnAssem\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{6EDC3511-CF66-4605-8208-327911C765DD}|learnAssem\\learnAssem.vcxproj|D:\\git_repository\\cyber_security_learning\\Assembly_language_for_x86\\learn\\learnAssem\\learnAssem\\AddTwo.asm||{8B382828-6202-11D1-8870-0000F87579D2}",
+      "RelativeMoniker": "D:0:0:{6EDC3511-CF66-4605-8208-327911C765DD}|learnAssem\\learnAssem.vcxproj|solutionrelative:learnAssem\\AddTwo.asm||{8B382828-6202-11D1-8870-0000F87579D2}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "AddTwo.asm",
+              "DocumentMoniker": "D:\\git_repository\\cyber_security_learning\\Assembly_language_for_x86\\learn\\learnAssem\\learnAssem\\AddTwo.asm",
+              "RelativeDocumentMoniker": "learnAssem\\AddTwo.asm",
+              "ToolTip": "D:\\git_repository\\cyber_security_learning\\Assembly_language_for_x86\\learn\\learnAssem\\learnAssem\\AddTwo.asm",
+              "RelativeToolTip": "learnAssem\\AddTwo.asm",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.001001|",
+              "WhenOpened": "2025-06-05T09:38:22.667Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
