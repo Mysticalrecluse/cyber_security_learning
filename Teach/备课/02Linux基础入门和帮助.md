@@ -647,8 +647,8 @@ PS1="\[\e[1;33m\][\u@\h \w] \$\[\e[0m\]"
 
 - 它允许在单个窗口中，同时访问多个会话。这对于同时运行多个命令行程序很有用。
 - 它可以让新窗口"接入"已经存在的会话。
--  它允许每个会话有多个连接窗口，因此可以多人实时共享会话。
--  它还支持窗口任意的垂直和水平拆分。
+- 它允许每个会话有多个连接窗口，因此可以多人实时共享会话。
+- 它还支持窗口任意的垂直和水平拆分。
 
 
 
@@ -680,7 +680,7 @@ PS1="\[\e[1;33m\][\u@\h \w] \$\[\e[0m\]"
 
 
 
-**s**命令常见用法：
+**命令常见用法**：
 
 ```bash
 screen -S [SESSION]       # 创建新screen会话
@@ -694,6 +694,235 @@ exit                      # 退出并关闭screen会话
 
 
 #### 1.1.8.2 tmux
+
+![image-20250708101353256](D:\git_repository\cyber_security_learning\markdown_img\image-20250708101353256-1753666244760-1.png)
+
+Tmux 是一个终端复用器（terminal multiplexer），类似 screen，但是更易用，也更强大
+
+Tmux 就是会话与窗口的"解绑"工具，将它们彻底分离，功能如下
+
+- 它可以让新窗口"接入"已经存在的会话。它允许在单个窗口中，同时访问多个会话。这对于同时运行多个命令行程序很有用。 
+- 它可以让新窗口"接入"已经存在的会话。
+- 它允许每个会话有多个连接窗口，因此可以多人实时共享会话。
+- 它还支持窗口任意的垂直和水平拆分
+
+
+
+##### 1.1.8.2.1 安装tmux
+
+```bash
+# Rocky
+[root@rocky8 ~]# yum install tmux
+
+# Ubuntu
+[root@ubuntu2204 ~]# apt update
+[root@ubuntu2204 ~]# apt install tmux
+```
+
+
+
+启动和退出
+
+```bash
+[root@ubuntu2204 ~]# tmux
+
+[root@ubuntu2204 ~]# exit
+[exited]
+```
+
+
+
+tmux 窗口有大量的快捷键。所有快捷键都要通过前缀键唤起。默认的前缀键是 **Ctrl+b** ，即先按下  **Ctrl+b** ，快捷键才会生效。帮助命令的快捷键是 Ctrl+b ? 然后，按下 q 键，就可以退出帮助
+
+
+
+##### 1.1.8.2.2 tmux的基本概念
+
+![image-20250708104618323](D:\git_repository\cyber_security_learning\markdown_img\image-20250708104618323-1753666244761-2.png)
+
+
+
+```bat
+会话 > 窗口 > 窗格
+
+一个会话可以有多个窗口； 一个窗口可以有多个窗格
+```
+
+
+
+##### 1.1.8.2.3 查看整体结构
+
+```bat
+Ctrl + b s       # 查看整体架构
+```
+
+![image-20250708105409416](D:\git_repository\cyber_security_learning\markdown_img\image-20250708105409416.png)
+
+
+
+
+
+##### 1.1.8.2.4 会话相关操作
+
+###### 查看会话
+
+```bash
+[root@localhost ~]# tmux ls
+prac: 2 windows (created Tue Jul  8 10:11:14 2025)
+prac2: 1 windows (created Tue Jul  8 10:31:39 2025)
+prac3: 1 windows (created Tue Jul  8 10:50:57 2025)
+```
+
+
+
+###### 创建会话
+
+第一个启动的 Tmux 窗口，编号是0，第二个窗口的编号是1，以此类推。这些窗口对应的会话，就是 0号会话、1号会话。使用编号区分会话，不太直观（当然也可以后续在tmux中更改会话名称），更好的方法是为会话起名。下面命令新建一个指定名称的会话。
+
+```bash
+tmux new -s <session-name>
+```
+
+
+
+###### 更改会话名
+
+```bash
+# 进入tmux对应会话后，执行
+Ctrl + b  $
+```
+
+
+
+###### 会话间移动
+
+```bash
+Ctrl + b (      # 向前移动
+Ctrl + b )      # 向后移动
+
+Ctrl + b s      #  直接在面板选择要选定的会话，然后回车进入
+```
+
+
+
+###### 分离会话
+
+```bash
+Ctrl + b d
+```
+
+
+
+###### 删除会话
+
+```bash
+ot@localhost ~]# tmux ls
+prac: 2 windows (created Tue Jul  8 10:11:14 2025)
+prac2: 1 windows (created Tue Jul  8 10:31:39 2025)
+prac3: 1 windows (created Tue Jul  8 10:50:57 2025)
+
+# 删除会话
+[root@localhost ~]# tmux kill-session -t 
+
+[root@localhost ~]# tmux ls
+prac: 2 windows (created Tue Jul  8 10:11:14 2025)
+prac2: 1 windows (created Tue Jul  8 10:31:39 2025)
+```
+
+
+
+##### 1.1.8.2.5 窗口相关操作
+
+进入会话后，默认有一个窗口
+
+![image-20250708111647939](D:\git_repository\cyber_security_learning\markdown_img\image-20250708111647939.png)
+
+
+
+###### 窗口改名
+
+```bash
+Ctrl + b ,     # 修改窗口名称
+```
+
+
+
+###### 创建窗口
+
+```bash
+Ctrl + b c   
+```
+
+
+
+###### 窗口间移动
+
+```bash
+Ctrl + b 1|2|3...
+```
+
+
+
+###### 删除窗口
+
+```bash
+Ctrl + b x
+```
+
+
+
+
+
+##### 1.1.8.2.6 窗格相关操作
+
+###### 上下切分窗格
+
+```bash
+Ctrl + b "
+```
+
+
+
+###### 左右切分窗格
+
+```bash
+Ctrl + b %
+```
+
+
+
+###### 光标在窗格间移动
+
+```bash
+Ctrl + b ;          # 光标切换到上一个窗格
+Ctrl + b o          # 光标切换到下一个窗格
+
+Ctrl + b q [num]    # 光标移动到指定窗格
+```
+
+
+
+###### 更改窗格大小
+
+```bash
+Ctrl+b Ctrl+<arrow key>    #按箭头方向调整窗格大小
+```
+
+
+
+###### 窗格全屏展示
+
+```bash
+Ctrl + b z         #当前窗格全屏显示，再使用一次会变回原来大小
+```
+
+
+
+###### 删除窗格
+
+```bash
+Ctrl + b x
+```
 
 
 
@@ -1463,591 +1692,15 @@ zh_SG.UTF-8
 
 
 
-## 1.5 文件与目录管理命令
 
-### 1.5.1 目录管理相关命令
 
-#### 1.5.1.1 文件系统目录
 
-Linux目录结构示意图
 
+## 1.5 文本管理
 
+### 1.5.1 文件查看
 
-<img src="../../markdown_img/image-20250607112545599.png" alt="image-20250607112545599" style="zoom:150%;" />
-
-
-
-#### 1.5.1.2 路径的表示方法
-
-路径分类
-
-```basic
-绝对路径
-	以正斜杠/ 即根目录开始,是一个完整的文件的位置路径。
-	可用于指定任何一个文件的时候
-	示例：/path/to/dir/file.txt
-
-相对路径名
-	不以斜线开始，是指相对于当前工作目录的路径。
-	特殊场景下，是相对于某目录的位置可以作为一个简短的形式指定一个文件名
-	示例：current_path/to/dir/file.txt
-```
-
-
-
-#### 1.5.1.3 命令 pwd
-
-```bash
-pwd -P    # 输出真实物理路径
-pwd -L    # 默认，输出链接路径
-```
-
-
-
-示例：
-
-```bash
-[root@magedu ~]# mkdir -p a/b/c
-[root@magedu ~]# tree a
-a
-└── b
-    └── c
-    
-[root@magedu ~]# cd a/b/c/
-[root@magedu ~/a/b/c]# ln -s ../../../../etc/default default
-[root@magedu ~/a/b/c]# cd default
-
-# pwd默认 pwd -L
-[root@magedu ~/a/b/c/default]# pwd
-/root/a/b/c/default
-[root@magedu ~/a/b/c/default]# pwd -P
-/etc/default
-```
-
-
-
-#### 1.5.1.4 基名与文件名
-
-```bash
-bashename <dir> #只输出文件名
- 
-# 示例：
-[root@magedu ~/a/b/c/default]# basename `which cat`
-cat
-
-dirname <dir>  # 只输出路径
-
-# 示例：
-[root@magedu ~/a/b/c/default]# dirname `which cat`
-/usr/bin
-```
-
-
-
-#### 1.5.1.5 路径间移动 cd
-
-```bash
-cd -P  # 移动到真实物理路径
-
-# 示例
-cd -P /bin  # 实际移动到/usr/bin
-
-cd ~  # 移动到家目录
-cd ~username  # 移动到指定用户的家目录
-
-cd -  # 移动到上次所在的目录，之所以能移动到上次所在目录是因为有系统变量记录了这个数据
-# $OLDPWD 记录上次所在目录；$PWD 记录当前所在目录
-```
-
-
-
-#### 1.5.1.6 查看目录 tree
-
-```bash
-# 查看指定目录数据的层级
-tree -L 1 /
-```
-
-```bash
-# 每个文件和目录前显示完整的相对路径
-tree -f 
-[root@magedu ~]# tree -f a
-a
-└── a/b
-    └── a/b/c
-        └── a/b/c/default -> ../../../../etc/default
-
-4 directories, 0 files
-
-[root@magedu ~]# tree -f /root/a
-/root/a
-└── /root/a/b
-    └── /root/a/b/c
-        └── /root/a/b/c/default -> ../../../../etc/default
-
-4 directories, 0 files
-```
-
-```bash
-# 每个文件和目录前显示最新更改时间
-[root@magedu ~]# tree -D a
-[Jun  7 11:36]  a
-└── [Jun  7 11:36]  b
-    └── [Jun  7 11:40]  c
-        └── [Jun  7 11:40]  default -> ../../../../etc/default
-
-4 directories, 0 files
-```
-
-```bash
-# 每个文件和目录前显示文件大小
-[root@magedu ~]# tree -s a
-[       4096]  a
-└── [       4096]  b
-    └── [       4096]  c
-        └── [         23]  default -> ../../../../etc/default
-```
-
-```bash
-# 每个文件和目录前显示文件/目录拥有者
-[root@magedu ~]# tree -u a
-[root    ]  a
-└── [root    ]  b
-    └── [root    ]  c
-        └── [root    ]  default -> ../../../../etc/default
-
-4 directories, 0 files
-```
-
-```bash
-# 每个文件和目录前显示权限标示
-tree -p
-[root@magedu ~]# tree -p a
-[drwxr-xr-x]  a
-└── [drwxr-xr-x]  b
-    └── [drwxr-xr-x]  c
-        └── [lrwxrwxrwx]  default -> ../../../../etc/default
-
-4 directories, 0 files
-```
-
-```bash
-# 使用通配符对tree的目录进行筛选
-tree -P pattern  # 这里的pattern不支持正则表达式，仅支持通配符
-[Sun Oct 15 10:33:09 26] root@rocky9:~ #tree -P 'r*.txt' /Storage/
- /Storage/
- └── test
-    ├── rename.txt
-    └── robots.txt
- 1 directory, 2 files
- 
-常用通配符:
-* 匹配任意数量的字符（包括零个）。
-? 匹配任意一个字符。
-[...] 匹配方括号中的任意一个字符。
-```
-
-
-
-#### 1.4.1.7 创建目录 mkdir
-
-```bash
-语法格式：mkdir [pv] [-m mode] directory_name...
-
-# mkdir在指定路径创建目录
-mkdir /Storage/test   # 在Storage目录下创建一个test目录
-
-# 默认在当前路径创建目录
-mkdir dir1            # 在当前目录下创建名为dir1的目录
-
-# 一次创建多个同级目录，每个目录间用空格隔开
-mkdir dir1 dir2 dir3
-
-# 创建多级目录
-mkdir -p dir1/dir2/dir3
-
-# -v 会显示创建每个目录的详细信息 
-[Sun Oct 15 11:12:00 39] root@rocky9:/ #mkdir -pv /Storage/test/dir1/dir2/dir3
-mkdir: created directory '/Storage/test/dir1'
-mkdir: created directory '/Storage/test/dir1/dir2'
-mkdir: created directory '/Storage/test/dir1/dir2/dir3'
-```
-
-
-
-### 1.4.2 文件管理相关命令
-
-#### 1.4.2.1 查看文件列表 ls
-
-```bash
-语法格式：ls [OPTION]... [FILE]...
-
-# -a 显示包含隐藏文件在内的所有内容 (.开头的是隐藏文件)
-# 命令：ls -a
-[root@magedu ~]# ls -a
-.  ..  a  a.txt  .bash_history  .bashrc  .cache  .profile  snap  .ssh  .viminfo
-
-# -i 显示文件索引节点(inode)
-# 命令：ls -i
-[root@magedu ~]# ls -i
-136601235 baidu.html  137507906 ps_demo.txt  136601225 rename.txt  136601224 robots.txt
-
-# -l 以长格式显示目录下内容列表
-# 长格式输出信息：文件名、文件类型、权限、硬链接数、所有者、组、文件大小、修改时间
-# 命令：ls -l
-[root@magedu ~]# ls -l
-total 12
-drwxr-xr-x 3 root root 4096 Jun  7 11:36 a
--rw-r--r-- 1 root root    4 Jun  7 11:37 a.txt
-drwx------ 4 root root 4096 May 29 03:17 snap
-
-# -t 用文件目录的更改时间排序
-# 命令ls -t
-[root@magedu ~]# ls -tl
-total 12
--rw-r--r-- 1 root root    4 Jun  7 11:37 a.txt
-drwxr-xr-x 3 root root 4096 Jun  7 11:36 a
-drwx------ 4 root root 4096 May 29 03:17 snap
-
-# 按文件大小，从大到小排序
-# 命令：ls -S
-[root@magedu ~]# ls -lS
-total 12
-drwxr-xr-x 3 root root 4096 Jun  7 11:36 a
-drwx------ 4 root root 4096 May 29 03:17 snap
--rw-r--r-- 1 root root    4 Jun  7 11:37 a.txt
-
-# ls后面支持通配符过滤，不加单引号
-[root@magedu ~]# ls -l *.txt
--rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
--rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
--rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
-
-# ls查询目录
-# 命令：ls -d
-[root@magedu ~]# ls -dl a
-a
-[root@magedu ~]# ls -dl a
-drwxr-xr-x 3 root root 4096 Jun  7 11:36 a
-```
-
-##### 1.4.2.1.1 关于文件的时间属性详解
-
-- atime: 记录最后一次的访问时间
-- mtime: 记录最后一次文件数据部分的修改时间
-- ctime: 记录最后一次文件元数据的修改时间
-
-
-
-##### 1.4.2.1.2 ls查看文件的3个时间属性
-
-```bash
-# 默认显示文件的mtime
-ls -l
-
-# 显示文件的ctime
-ls -l --time=ctime
-
-# 显示文件的atime
-ls -l --time=atime
-```
-
-
-
-#### 1.4.4.2 创建或刷新文件 touch
-
-```bash
-# 如果文件存在则刷新时间，如果不存在则创建空文件
-
-touch -a          # 改变atime, ctime
-touch -m          # 改变mtime, ctime
-touch -h          # 刷新链接文件本身，默认刷新目标文件
-touch -c          # 只刷新已存在的文件，如果文件不存在，也不会创建文件
-
-touch -r          # 使用某个文件的修改时间作为当前文件的修改时间
-[root@magedu ~]# touch -r a.txt a
-[root@magedu ~]# stat a
-File: a
-Size: 4096      	Blocks: 8          IO Block: 4096   directory
-Device: 8,2	Inode: 786603      Links: 3
-Access: (0755/drwxr-xr-x)  Uid: (    0/    root)   Gid: (    0/    root)
-Access: 2025-06-07 12:34:12.345909603 +0800
-Modify: 2025-06-07 12:29:27.365516871 +0800
-Change: 2025-06-07 12:37:12.969865960 +0800
-Birth: 2025-06-07 11:36:50.554401972 +0800
- 
-touch -t    
-# 修改atime,mtime到指定日期时间
-# 比如01020304，指2024-01-02 03:04:00
-# 比如0102030405， 指2001-02-03 04:05:00
-[root@magedu ~]# touch -t 0102030405 a.txt 
-[root@magedu ~]# stat a.txt 
-File: a.txt
-Size: 4         	Blocks: 8          IO Block: 4096   regular file
-Device: 8,2	Inode: 786607      Links: 1
-Access: (0644/-rw-r--r--)  Uid: (    0/    root)   Gid: (    0/    root)
-Access: 2001-02-03 04:05:00.000000000 +0800
-Modify: 2001-02-03 04:05:00.000000000 +0800
-Change: 2025-06-07 12:38:17.148370169 +0800
-Birth: 2025-06-07 12:29:27.365516871 +0800
-
-
-# 示例
-[root@magedu ~]# touch `date +%F-%T`.txt
-[root@magedu ~]# ls
-2025-06-07-12:39:21.txt
-```
-
-
-
-#### 1.4.4.3 复制文件 cp
-
-```bash
-语法格式：cp [OPTION] SOURCE DEST
-
-# -b 覆盖已存在的目标前先对其做备份，后缀为~
-[root@magedu ~]# echo fff > fstab
-[root@magedu ~]# ls
-2025-06-07-12:39:21.txt  a  a1.txt  a.txt  fstab  snap
-[root@magedu ~]# cp -b /etc/fstab .
-[root@magedu ~]# ls
-2025-06-07-12:39:21.txt  a  a1.txt  a.txt  fstab  fstab~  snap
-
-# -S 指定备份文件的后缀名
-[root@magedu ~]# cp -S .bak /etc/fstab .
-[root@magedu ~]# ls
-2025-06-07-12:39:21.txt  a  a1.txt  a.txt  fstab  fstab~  fstab.bak  snap
-
-# -i 覆盖前会先询问用户（推荐使用）
-[root@magedu ~]# cp -i /etc/fstab .
-cp: overwrite './fstab'? y
-
-# -r 递归处理，将目录及其中的为文件一同复制
-[root@magedu ~]# cp -r a d
-[root@magedu ~]# ls
-2025-06-07-12:39:21.txt  a  a1.txt  a.txt  d  fstab  fstab~  fstab.bak  snap  zero
-[root@magedu ~]# tree d
-d
-└── b
-    └── c
-        └── default -> ../../../../etc/default
-
-4 directories, 0 files
-
-
-# -a 复制特殊文件，使用-a
-[root@magedu ~]# cp -a /dev/zero .
-[root@magedu ~]# ls
-2025-06-07-12:39:21.txt  a  a1.txt  a.txt  fstab  fstab~  fstab.bak  snap  zero
-```
-
-
-
-#### 1.4.4.4 移动及重命名文件 mv
-
-```bash
-# 语法1：mv 目标文件 目标路径
-[root@magedu ~]# ls
-2025-06-07-12:39:21.txt  a  a1.txt  a.txt  d  fstab  fstab~  fstab.bak  snap  zero
-[root@magedu ~]# mv a1.txt /opt
-[root@magedu ~]# ls /opt/
-a1.txt
-[root@magedu ~]# ls
-2025-06-07-12:39:21.txt  a  a.txt  d  fstab  fstab~  fstab.bak  snap  zero
-
-# 语法2：mv -t 目标路径 目标文件
-[root@magedu ~]# mv -t /opt fstab
-[root@magedu ~]# ls /opt/
-a1.txt  fstab
-
-# 语法3：mv -bi 目标文件 目标路径
-# i: 如果会覆盖文件则提示
-# b: 覆盖文件时会备份被覆盖的文件
-[root@magedu ~]# echo bbb > a1.txt
-[root@magedu ~]# ls
-2025-06-07-12:39:21.txt  a  a1.txt  a.txt  d  fstab~  fstab.bak  snap  zero
-[root@magedu ~]# mv -bi a1.txt /opt/
-mv: overwrite '/opt/a1.txt'? y
-[root@magedu ~]# ls /opt/
-a1.txt  a1.txt~  fstab
-```
-
-
-
-#### 1.4.4.5 批量重命名 rename
-
-##### 1.4.4.5.1 Rocky—rename
-
-Rocky中自带rename命令，但是功能简单，只能做比较简单的批量重命名
-
-```bash
-# 语法： rename <要改的字段> <改之后的字段> <使用通配符表示改的文件>
-
-[root@localhost ~/test]# touch {1..10}.txt
-[root@localhost ~/test]# ls
-10.txt  1.txt  2.txt  3.txt  4.txt  5.txt  6.txt  7.txt  8.txt  9.txt
-[root@localhost ~/test]# rename txt py *
-[root@localhost ~/test]# ls
-10.py  1.py  2.py  3.py  4.py  5.py  6.py  7.py  8.py  9.py
-```
-
-
-
-##### 1.4.4.5.2 Ubuntu—rename
-
-Ubuntu中的rename需要自行下载
-
-```bash
-[root@magedu ~/test]# apt install -y rename
-```
-
-使用示例
-
-```bash
-[root@magedu ~/test]# touch {1..10}.txt
-[root@magedu ~/test]# ls
-10.txt  1.txt  2.txt  3.txt  4.txt  5.txt  6.txt  7.txt  8.txt  9.txt
-
-[root@magedu ~/test]# rename "s/txt/py/" *
-[root@magedu ~/test]# ls
-10.py  1.py  2.py  3.py  4.py  5.py  6.py  7.py  8.py  9.py
-
-[root@magedu ~/test]# rename "s/(.*).py/\1hello.py/g" *
-[root@magedu ~/test]# ls
-10hello.py  2hello.py  4hello.py  6hello.py  8hello.py
-1hello.py   3hello.py  5hello.py  7hello.py  9hello.py
-```
-
-
-
-#### 1.4.4.6 删除文件 rm
-
-```bash
-语法格式：rm [OPTION]...FILE...
-
-# -f 强制删除文件，即在删除文件时不提示确认，并自动忽略不存在的文件
-# -r 递归删除，目标是目录的话，整个目录文件全部删除
-```
-
-`rm` 是危险命令，建议用以下命令替换
-
-```bash
-alias rm='dir=/Storage/backup/data`date +%F-%H-%M-%S`;mkdir -p $dir;mv -t $dir'
-# 将所有要删除的文件，移动到创建的垃圾箱目录中
-```
-
-
-
-### 1.4.3 历史命令与命令补齐
-
-#### 1.4.3.1 命令补全
-
-功能需求
-
-```basic
-在linux系统环境里面，我们管理各种应用都是通过命令来实现的，但是有很多时候，命令太长记不住，我们只记住前面的1-2个字母，后面的内容不知道。
-对于linux来说，它提供了命令补全的能力，也就是说，我们可以通过 Tab键的方式，将我们要敲出来的命令在命令行自动补全。
-- 用户给定的字符串只有一条惟一对应的命令，直接补全，否则，再次Tab会给出列表
-```
-
-补全功能
-
-```basic
-在linux系统里面，关于Tab键补全的功能，主要体现在两个方面：
-- 路径的补全
-- 命令的补全
-```
-
-
-
-#### 1.4.3.2 命令补全实践
-
-路径补全
-
-```bash
-# 单Tab键自动补全文件路径
-[root@rocky9 ~]# ls /etc/hostn^C
-[root@rocky9 ~]# ls /etc/hostname
-
-# 双Tab键查看满足要求的目录
-[root@rocky9 ~]# ls /etc/de
-debuginfod/ default/ depmod.d/
-```
-
-命令补全
-
-```bash
-# Tab键查看满足要求的命令
-[root@rocky9 ~]# time^C
-[root@rocky9 ~]# time
-time  timedatectl  timeout times
-```
-
-
-
-#### 1.4.3.3 history命令
-
-history命令解析
-
-```bash
-[root@magedu ~]# history --help
-history: history [-c] [-d offset] [n] or history -anrw [filename] or history -ps arg [arg...]
-    Display or manipulate the history list.
-    
-    Display the history list with line numbers, prefixing each modified
-    entry with a `*'.  An argument of N lists only the last N entries.
-    
-    Options:
-      -c	clear the history list by deleting all of the entries
-      ......
-```
-
-##### 常用history命令
-
-重复执行上一条命令
-
-```basic
-- 重复前一个命令使用上方向键，并回车执行
-- 按 !! 并回车执行
-```
-
-重复执行之前的命令
-
-```basic
-- 按 !n 执行history命令列表中的第n编号的命令
-- 按 !string 重复前一个以“string”开头的命令
-```
-
-```basic
-- 按 ctrl-r来在命令历史中搜索命令
-（reverse-i-search）`’：
-- 按 Ctrl+g：从历史搜索模式
-```
-
-
-
-#### 1.4.3.4 Linux快捷键
-
-```basic
-命令行切换：
-	Ctrl + A           光标迅速回到行首
-	Ctrl + E           光标迅速回到行尾
-	Ctrl + k           删除光标到行尾的内容
-	Ctrl + u           删除光标到行首的内容
-	Ctrl + y           粘贴删除的内容
-```
-
-
-
-
-
-
-
-## 1.6 文本管理
-
-### 1.6.1 文件查看
-
-#### 1.6.1.1 文件查看 cat
+#### 1.5.1.1 文件查看 cat
 
 cat 可以查看文本内容
 
@@ -2109,7 +1762,7 @@ cat命令实践
 
 
 
-#### 1.6.1.2 tac和rev逆向
+#### 1.5.1.2 tac和rev逆向
 
 tac 逆向显示文件内容
 
@@ -2144,7 +1797,7 @@ zyx
 
 
 
-#### 1.6.1.3 信息过滤 grep
+#### 1.5.1.3 信息过滤 grep
 
 grep 负责从数据源中检索对应的字符串，行过滤（简单使用，后续详解）
 
@@ -2180,9 +1833,9 @@ abc
 
 
 
-### 1.6.2 分页查看
+### 1.5.2 分页查看
 
-#### 1.6.2.1 more解读
+#### 1.5.2.1 more解读
 
 more 可以实现分页查看文件，可以配合管道实现输出信息的分页
 
@@ -2224,7 +1877,7 @@ m/getty.
 
 
 
-#### 1.6.2.2  less解读
+#### 1.5.2.2  less解读
 
 less 也可以实现分页查看文件或STDIN输出，less 命令是man命令使用的分页器
 
@@ -2257,9 +1910,9 @@ less 也可以实现分页查看文件或STDIN输出，less 命令是man命令�
 
 
 
-### 1.6.3 头尾查看
+### 1.5.3 头尾查看
 
-#### 1.6.3.1 head命令
+#### 1.5.3.1 head命令
 
 head 可以显示文件或标准输入的前面行
 
@@ -2303,7 +1956,7 @@ root:
 
 
 
-#### 1.6.3.2 tail命令
+#### 1.5.3.2 tail命令
 
 tail 和 head 相反，查看文件或标准输入的倒数行
 
@@ -2342,9 +1995,9 @@ hplip:x:121:7:HPLIP system user,,,:/run/hplip:/bin/false
 
 
 
-### 1.6.4 文件编辑器安装与基本使用
+### 1.5.4 文件编辑器安装与基本使用
 
-#### 1.6.4.1 nano编辑器安装步骤
+#### 1.5.4.1 nano编辑器安装步骤
 
 nano简介
 
@@ -2376,7 +2029,7 @@ Ctrl + W: 搜索文本
 
 
 
-#### 1.6.4.2 vim编辑器的基本操作
+#### 1.5.4.2 vim编辑器的基本操作
 
 vim简介
 
@@ -2410,11 +2063,11 @@ vi | vim [文件名]
 
 
 
-## 1.7 输出格式化
+## 1.6 输出格式化
 
-### 1.7.1 echo解读
+### 1.6.1 echo解读
 
-#### 1.7.1.1 echo命令
+#### 1.6.1.1 echo命令
 
 命令简介
 
@@ -2434,7 +2087,7 @@ OPTIONS：
 
 
 
-#### 1.7.1.2 echo实践
+#### 1.6.1.2 echo实践
 
 实践1 - 引号信息输出
 
@@ -2463,7 +2116,7 @@ helloworld
 
 
 
-### 1.7.2 字体颜色
+### 1.6.2 字体颜色
 
 ```bat
 # 提示符样式如下：
@@ -2496,7 +2149,9 @@ S：显示的样式如下
 
 
 
-## 1.8 获得帮助
+
+
+## 1.7 获得帮助
 
 
 
@@ -2514,7 +2169,7 @@ S：显示的样式如下
 
 
 
-### 1.8.1 whatis & whereis
+### 1.7.1 whatis & whereis
 
 whatis 使用数据库来显示命令的简短描述，以及对应的man手册的章节
 
@@ -2564,9 +2219,9 @@ passwd: /usr/bin/passwd /etc/passwd /usr/share/man/man5/passwd.5.gz /usr/share/m
 
 
 
-### 1.8.2 查看命令的帮助
+### 1.7.2 查看命令的帮助
 
-#### 1.8.2.1 内部命令帮助
+#### 1.7.2.1 内部命令帮助
 
 格斯：
 
@@ -2593,7 +2248,7 @@ history: history [-c] [-d offset] [n] or history -anrw [filename] or history -ps
 
 
 
-#### 1.8.2.2 外部命令及软件帮助
+#### 1.7.2.2 外部命令及软件帮助
 
 格式：
 
@@ -2617,7 +2272,7 @@ info COMMAND
 
 
 
-### 1.8.3 外部命令的 --help 或 -h 选项
+### 1.7.3 外部命令的 --help 或 -h 选项
 
 显示用法总结和参数列表，大多数命令使用，但并非所有的
 
@@ -2663,7 +2318,7 @@ Options:
 
 
 
-### 1.8.4 man命令
+### 1.7.4 man命令
 
 man 是单词 manual 的简写，是Linux系统中的帮助手册和文档
 
@@ -2800,13 +2455,121 @@ original size modulo 2^32 8049
 
 
 
+**实现：man手册高亮并实时翻译**
+
+**修改`.vimrc`**
+
+```bash
+[root@localhost ~]# vim .bashrc
+export MANPAGER="vim -M +MANPAGER -"
+```
+
+```bash
+[root@localhost ~]# git clone https://gitee.com/mirrors/minpac.git  ~/.vim/pack/minpac/opt/minpac
+```
+
+```bash
+[root@localhost ~]# cat .vimrc
+colorscheme murphy
+
+runtime! ftplugin/man.vim
+
+if exists('*minpac#init')
+  " Minpac is loaded.
+  call minpac#init()
+  call minpac#add('k-takata/minpac', {'type': 'opt'})
+
+  " Other plugins
+  call minpac#add('tpope/vim-eunuch')
+  call minpac#add('yegappan/mru')
+  call minpac#add('bujnlc8/vim-translator')
+endif
+
+if has('eval')
+  " Minpac commands
+  command! PackUpdate packadd minpac | source $MYVIMRC | call minpac#update('', {'do': 'call minpac#status()'})
+  command! PackClean  packadd minpac | source $MYVIMRC | call minpac#clean()
+  command! PackStatus packadd minpac | source $MYVIMRC | call minpac#status()
+endif
 
 
-### 1.8.5  系统及第三方应用官方文档
+if !has('gui_running')
+  " 设置文本菜单
+  if has('wildmenu')
+    set wildmenu
+    set cpoptions-=<
+    set wildcharm=<C-Z>
+    nnoremap <F10>      :emenu <C-Z>
+    inoremap <F10> <C-O>:emenu <C-Z>
+  endif
+endif
+
+
+let g:translator_cache=1
+let g:translator_cache_path='~/.cache'
+let g:translator_channel='baidu'
+let g:translator_target_lang = 'zh'  " 目标语言为中文
+let g:translator_source_lang = 'auto'
+let g:translator_outputype='popup'
+
+" 普通模式翻译光标所在单词
+noremap <leader>tc :<C-u>Tc<CR>
+
+" 可视模式翻译选中内容
+vnoremap <leader>tv :<C-u>Tv<CR>
+
+autocmd FileType man setlocal readonly
+```
+
+```bash
+# 首次执行
+:PackUpdate       # 可能执行多次
+```
+
+![image-20250709113543163](D:\git_repository\cyber_security_learning\markdown_img\image-20250709113543163-1753667186907-5.png)
 
 
 
-#### 1.8.5.1  Linux官方在线文档和知识库
+补充：由于Rocky 中自带的vim，编译选项缺失，要想像Ubuntu中一样，正常使用各种功能，需要将自动的vim卸载后，自行编译安装
+
+```bash
+yum install perl perl-devel
+yum install python3-devel
+yum groupinstall "Development Tools"
+yum install ncurses-devel
+git clone https://github.com/vim/vim.git
+cd vim
+./configure \
+  --with-features=huge \
+  --enable-multibyte \
+  --enable-cscope \
+  --enable-terminal \
+  --enable-perlinterp=yes \
+  --enable-python3interp=yes \
+  --with-python3-command=python3 \
+  --enable-rubyinterp=yes \
+  --enable-luainterp=yes \
+  --enable-gui=no \
+  --without-x \
+  --prefix=/usr/local
+
+make -j$(nproc)
+sudo make install
+```
+
+
+
+
+
+
+
+
+
+### 1.7.5  系统及第三方应用官方文档
+
+
+
+#### 1.7.5.1  Linux官方在线文档和知识库
 
 通过发行版官方的文档光盘或网站可以获得安装指南、部署指南、虚拟化指南等
 
@@ -2822,7 +2585,7 @@ http://tldp.org
 
 
 
-#### 1.8.5.2 通过在线文档获取帮助
+#### 1.7.5.2 通过在线文档获取帮助
 
 通过在线文档获取帮助
 
@@ -2840,7 +2603,7 @@ https://jenkins.io/zh/doc/
 
 
 
-### 1.8.6 TLDR命令
+### 1.7.6 TLDR命令
 
 当我们在使用一个不熟悉的命令时，可以使用 -h 或 --help 选项来查看帮助，或者使用 man 手册还查看 更详细的文档，但这两种方式，会列出所有选项，而有些选项很少使用，根据二八原则，只有一小部份 选项才是最常用的，如是基于此，有人开发了一个开源的查看命令工具，此工具只列出命令的常用选项的帮助。
 
@@ -2896,7 +2659,18 @@ Options:
 
 
 
+```bash
+# 设置语言环境
+[root@centos7 ~]#LANG=zh_CN.UTF-8
 
+# 设置别名以使用样式
+root@localhost:~# alias tldr
+alias tldr='tldr -t base16'
+```
+
+
+
+![image-20250709113234934](../../markdown_img/image-20250709113234934.png)
 
 
 

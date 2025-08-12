@@ -1254,13 +1254,681 @@ hello
 
 
 
+## 1.3 文件与目录管理命令
+
+### 1.3.1 目录管理相关命令
+
+#### 1.3.1.1 文件系统目录
+
+Linux目录结构示意图
+
+
+
+<img src="D:\git_repository\cyber_security_learning\markdown_img\image-20250607112545599-1753666630096-1.png" alt="image-20250607112545599" style="zoom:150%;" />
+
+
+
+#### 1.3.1.2 路径的表示方法
+
+路径分类
+
+```basic
+绝对路径
+	以正斜杠/ 即根目录开始,是一个完整的文件的位置路径。
+	可用于指定任何一个文件的时候
+	示例：/path/to/dir/file.txt
+
+相对路径名
+	不以斜线开始，是指相对于当前工作目录的路径。
+	特殊场景下，是相对于某目录的位置可以作为一个简短的形式指定一个文件名
+	示例：current_path/to/dir/file.txt
+```
+
+
+
+#### 1.3.1.3 命令 pwd
+
+```bash
+pwd -P    # 输出真实物理路径
+pwd -L    # 默认，输出链接路径
+```
+
+
+
+示例：
+
+```bash
+[root@magedu ~]# mkdir -p a/b/c
+[root@magedu ~]# tree a
+a
+└── b
+    └── c
+    
+[root@magedu ~]# cd a/b/c/
+[root@magedu ~/a/b/c]# ln -s ../../../../etc/default default
+[root@magedu ~/a/b/c]# cd default
+
+# pwd默认 pwd -L
+[root@magedu ~/a/b/c/default]# pwd
+/root/a/b/c/default
+[root@magedu ~/a/b/c/default]# pwd -P
+/etc/default
+```
+
+
+
+#### 1.3.1.4 基名与文件名
+
+```bash
+bashename <dir> #只输出文件名
+ 
+# 示例：
+[root@magedu ~/a/b/c/default]# basename `which cat`
+cat
+
+dirname <dir>  # 只输出路径
+
+# 示例：
+[root@magedu ~/a/b/c/default]# dirname `which cat`
+/usr/bin
+```
+
+
+
+#### 1.3.1.5 路径间移动 cd
+
+```bash
+cd -P  # 移动到真实物理路径
+
+# 示例
+cd -P /bin  # 实际移动到/usr/bin
+
+cd ~  # 移动到家目录
+cd ~username  # 移动到指定用户的家目录
+
+cd -  # 移动到上次所在的目录，之所以能移动到上次所在目录是因为有系统变量记录了这个数据
+# $OLDPWD 记录上次所在目录；$PWD 记录当前所在目录
+```
+
+
+
+#### 1.3.1.6 查看目录 tree
+
+```bash
+# 查看指定目录数据的层级
+tree -L 1 /
+```
+
+```bash
+# 每个文件和目录前显示完整的相对路径
+tree -f 
+[root@magedu ~]# tree -f a
+a
+└── a/b
+    └── a/b/c
+        └── a/b/c/default -> ../../../../etc/default
+
+4 directories, 0 files
+
+[root@magedu ~]# tree -f /root/a
+/root/a
+└── /root/a/b
+    └── /root/a/b/c
+        └── /root/a/b/c/default -> ../../../../etc/default
+
+4 directories, 0 files
+```
+
+```bash
+# 每个文件和目录前显示最新更改时间
+[root@magedu ~]# tree -D a
+[Jun  7 11:36]  a
+└── [Jun  7 11:36]  b
+    └── [Jun  7 11:40]  c
+        └── [Jun  7 11:40]  default -> ../../../../etc/default
+
+4 directories, 0 files
+```
+
+```bash
+# 每个文件和目录前显示文件大小
+[root@magedu ~]# tree -s a
+[       4096]  a
+└── [       4096]  b
+    └── [       4096]  c
+        └── [         23]  default -> ../../../../etc/default
+```
+
+```bash
+# 每个文件和目录前显示文件/目录拥有者
+[root@magedu ~]# tree -u a
+[root    ]  a
+└── [root    ]  b
+    └── [root    ]  c
+        └── [root    ]  default -> ../../../../etc/default
+
+4 directories, 0 files
+```
+
+```bash
+# 每个文件和目录前显示权限标示
+tree -p
+[root@magedu ~]# tree -p a
+[drwxr-xr-x]  a
+└── [drwxr-xr-x]  b
+    └── [drwxr-xr-x]  c
+        └── [lrwxrwxrwx]  default -> ../../../../etc/default
+
+4 directories, 0 files
+```
+
+```bash
+# 使用通配符对tree的目录进行筛选
+tree -P pattern  # 这里的pattern不支持正则表达式，仅支持通配符
+[Sun Oct 15 10:33:09 26] root@rocky9:~ #tree -P 'r*.txt' /Storage/
+ /Storage/
+ └── test
+    ├── rename.txt
+    └── robots.txt
+ 1 directory, 2 files
+ 
+常用通配符:
+* 匹配任意数量的字符（包括零个）。
+? 匹配任意一个字符。
+[...] 匹配方括号中的任意一个字符。
+```
+
+
+
+#### 1.3.1.7 创建目录 mkdir
+
+```bash
+语法格式：mkdir [pv] [-m mode] directory_name...
+
+# mkdir在指定路径创建目录
+mkdir /Storage/test   # 在Storage目录下创建一个test目录
+
+# 默认在当前路径创建目录
+mkdir dir1            # 在当前目录下创建名为dir1的目录
+
+# 一次创建多个同级目录，每个目录间用空格隔开
+mkdir dir1 dir2 dir3
+
+# 创建多级目录
+mkdir -p dir1/dir2/dir3
+
+# -v 会显示创建每个目录的详细信息 
+[Sun Oct 15 11:12:00 39] root@rocky9:/ #mkdir -pv /Storage/test/dir1/dir2/dir3
+mkdir: created directory '/Storage/test/dir1'
+mkdir: created directory '/Storage/test/dir1/dir2'
+mkdir: created directory '/Storage/test/dir1/dir2/dir3'
+```
+
+
+
+### 1.3.2 文件管理相关命令
+
+#### 1.3.2.1 查看文件列表 ls
+
+```bash
+语法格式：ls [OPTION]... [FILE]...
+
+# -a 显示包含隐藏文件在内的所有内容 (.开头的是隐藏文件)
+# 命令：ls -a
+[root@magedu ~]# ls -a
+.  ..  a  a.txt  .bash_history  .bashrc  .cache  .profile  snap  .ssh  .viminfo
+
+# -i 显示文件索引节点(inode)
+# 命令：ls -i
+[root@magedu ~]# ls -i
+136601235 baidu.html  137507906 ps_demo.txt  136601225 rename.txt  136601224 robots.txt
+
+# -l 以长格式显示目录下内容列表
+# 长格式输出信息：文件名、文件类型、权限、硬链接数、所有者、组、文件大小、修改时间
+# 命令：ls -l
+[root@magedu ~]# ls -l
+total 12
+drwxr-xr-x 3 root root 4096 Jun  7 11:36 a
+-rw-r--r-- 1 root root    4 Jun  7 11:37 a.txt
+drwx------ 4 root root 4096 May 29 03:17 snap
+
+# -t 用文件目录的更改时间排序
+# 命令ls -t
+[root@magedu ~]# ls -tl
+total 12
+-rw-r--r-- 1 root root    4 Jun  7 11:37 a.txt
+drwxr-xr-x 3 root root 4096 Jun  7 11:36 a
+drwx------ 4 root root 4096 May 29 03:17 snap
+
+# 按文件大小，从大到小排序
+# 命令：ls -S
+[root@magedu ~]# ls -lS
+total 12
+drwxr-xr-x 3 root root 4096 Jun  7 11:36 a
+drwx------ 4 root root 4096 May 29 03:17 snap
+-rw-r--r-- 1 root root    4 Jun  7 11:37 a.txt
+
+# ls后面支持通配符过滤，不加单引号
+[root@magedu ~]# ls -l *.txt
+-rw-r--r--. 1 root root  270 Oct 13 20:48 ps_demo.txt
+-rw-r--r--. 1 root root 2814 Jan  3  2020 rename.txt
+-rw-r--r--. 1 root root 2814 Jan  3  2020 robots.txt
+
+# ls查询目录
+# 命令：ls -d
+[root@magedu ~]# ls -dl a
+a
+[root@magedu ~]# ls -dl a
+drwxr-xr-x 3 root root 4096 Jun  7 11:36 a
+```
+
+##### 1.3.2.1.1 关于文件的时间属性详解
+
+- atime: 记录最后一次的访问时间
+- mtime: 记录最后一次文件数据部分的修改时间
+- ctime: 记录最后一次文件元数据的修改时间
+
+
+
+##### 1.3.2.1.2 ls查看文件的3个时间属性
+
+```bash
+# 默认显示文件的mtime
+ls -l
+
+# 显示文件的ctime
+ls -l --time=ctime
+
+# 显示文件的atime
+ls -l --time=atime
+```
+
+
+
+#### 1.3.4.2 创建或刷新文件 touch
+
+```bash
+# 如果文件存在则刷新时间，如果不存在则创建空文件
+
+touch -a          # 改变atime, ctime
+touch -m          # 改变mtime, ctime
+touch -h          # 刷新链接文件本身，默认刷新目标文件
+touch -c          # 只刷新已存在的文件，如果文件不存在，也不会创建文件
+
+touch -r          # 使用某个文件的修改时间作为当前文件的修改时间
+[root@magedu ~]# touch -r a.txt a
+[root@magedu ~]# stat a
+File: a
+Size: 4096      	Blocks: 8          IO Block: 4096   directory
+Device: 8,2	Inode: 786603      Links: 3
+Access: (0755/drwxr-xr-x)  Uid: (    0/    root)   Gid: (    0/    root)
+Access: 2025-06-07 12:34:12.345909603 +0800
+Modify: 2025-06-07 12:29:27.365516871 +0800
+Change: 2025-06-07 12:37:12.969865960 +0800
+Birth: 2025-06-07 11:36:50.554401972 +0800
+ 
+touch -t    
+# 修改atime,mtime到指定日期时间
+# 比如01020304，指2024-01-02 03:04:00
+# 比如0102030405， 指2001-02-03 04:05:00
+[root@magedu ~]# touch -t 0102030405 a.txt 
+[root@magedu ~]# stat a.txt 
+File: a.txt
+Size: 4         	Blocks: 8          IO Block: 4096   regular file
+Device: 8,2	Inode: 786607      Links: 1
+Access: (0644/-rw-r--r--)  Uid: (    0/    root)   Gid: (    0/    root)
+Access: 2001-02-03 04:05:00.000000000 +0800
+Modify: 2001-02-03 04:05:00.000000000 +0800
+Change: 2025-06-07 12:38:17.148370169 +0800
+Birth: 2025-06-07 12:29:27.365516871 +0800
+
+
+# 示例
+[root@magedu ~]# touch `date +%F-%T`.txt
+[root@magedu ~]# ls
+2025-06-07-12:39:21.txt
+```
+
+
+
+#### 1.3.4.3 复制文件 cp
+
+```bash
+语法格式：cp [OPTION] SOURCE DEST
+
+# -b 覆盖已存在的目标前先对其做备份，后缀为~
+[root@magedu ~]# echo fff > fstab
+[root@magedu ~]# ls
+2025-06-07-12:39:21.txt  a  a1.txt  a.txt  fstab  snap
+[root@magedu ~]# cp -b /etc/fstab .
+[root@magedu ~]# ls
+2025-06-07-12:39:21.txt  a  a1.txt  a.txt  fstab  fstab~  snap
+
+# -S 指定备份文件的后缀名
+[root@magedu ~]# cp -S .bak /etc/fstab .
+[root@magedu ~]# ls
+2025-06-07-12:39:21.txt  a  a1.txt  a.txt  fstab  fstab~  fstab.bak  snap
+
+# -i 覆盖前会先询问用户（推荐使用）
+[root@magedu ~]# cp -i /etc/fstab .
+cp: overwrite './fstab'? y
+
+# -r 递归处理，将目录及其中的为文件一同复制
+[root@magedu ~]# cp -r a d
+[root@magedu ~]# ls
+2025-06-07-12:39:21.txt  a  a1.txt  a.txt  d  fstab  fstab~  fstab.bak  snap  zero
+[root@magedu ~]# tree d
+d
+└── b
+    └── c
+        └── default -> ../../../../etc/default
+
+4 directories, 0 files
+
+
+# -a 复制特殊文件，使用-a
+[root@magedu ~]# cp -a /dev/zero .
+[root@magedu ~]# ls
+2025-06-07-12:39:21.txt  a  a1.txt  a.txt  fstab  fstab~  fstab.bak  snap  zero
+```
+
+
+
+#### 1.3.4.4 移动及重命名文件 mv
+
+```bash
+# 语法1：mv 目标文件 目标路径
+[root@magedu ~]# ls
+2025-06-07-12:39:21.txt  a  a1.txt  a.txt  d  fstab  fstab~  fstab.bak  snap  zero
+[root@magedu ~]# mv a1.txt /opt
+[root@magedu ~]# ls /opt/
+a1.txt
+[root@magedu ~]# ls
+2025-06-07-12:39:21.txt  a  a.txt  d  fstab  fstab~  fstab.bak  snap  zero
+
+# 语法2：mv -t 目标路径 目标文件
+[root@magedu ~]# mv -t /opt fstab
+[root@magedu ~]# ls /opt/
+a1.txt  fstab
+
+# 语法3：mv -bi 目标文件 目标路径
+# i: 如果会覆盖文件则提示
+# b: 覆盖文件时会备份被覆盖的文件
+[root@magedu ~]# echo bbb > a1.txt
+[root@magedu ~]# ls
+2025-06-07-12:39:21.txt  a  a1.txt  a.txt  d  fstab~  fstab.bak  snap  zero
+[root@magedu ~]# mv -bi a1.txt /opt/
+mv: overwrite '/opt/a1.txt'? y
+[root@magedu ~]# ls /opt/
+a1.txt  a1.txt~  fstab
+```
+
+
+
+#### 1.3.4.5 批量重命名 rename
+
+##### 1.3.4.5.1 Rocky—rename
+
+Rocky中自带rename命令，但是功能简单，只能做比较简单的批量重命名
+
+```bash
+# 语法： rename <要改的字段> <改之后的字段> <使用通配符表示改的文件>
+
+[root@localhost ~/test]# touch {1..10}.txt
+[root@localhost ~/test]# ls
+10.txt  1.txt  2.txt  3.txt  4.txt  5.txt  6.txt  7.txt  8.txt  9.txt
+[root@localhost ~/test]# rename txt py *
+[root@localhost ~/test]# ls
+10.py  1.py  2.py  3.py  4.py  5.py  6.py  7.py  8.py  9.py
+```
+
+
+
+##### 1.3.4.5.2 Ubuntu—rename
+
+Ubuntu中的rename需要自行下载
+
+```bash
+[root@magedu ~/test]# apt install -y rename
+```
+
+使用示例
+
+```bash
+[root@magedu ~/test]# touch {1..10}.txt
+[root@magedu ~/test]# ls
+10.txt  1.txt  2.txt  3.txt  4.txt  5.txt  6.txt  7.txt  8.txt  9.txt
+
+[root@magedu ~/test]# rename "s/txt/py/" *
+[root@magedu ~/test]# ls
+10.py  1.py  2.py  3.py  4.py  5.py  6.py  7.py  8.py  9.py
+
+[root@magedu ~/test]# rename "s/(.*).py/\1hello.py/g" *
+[root@magedu ~/test]# ls
+10hello.py  2hello.py  4hello.py  6hello.py  8hello.py
+1hello.py   3hello.py  5hello.py  7hello.py  9hello.py
+```
+
+
+
+#### 1.3.4.6 删除文件 rm
+
+```bash
+语法格式：rm [OPTION]...FILE...
+
+# -f 强制删除文件，即在删除文件时不提示确认，并自动忽略不存在的文件
+# -r 递归删除，目标是目录的话，整个目录文件全部删除
+```
+
+`rm` 是危险命令，建议用以下命令替换
+
+```bash
+alias rm='dir=/Storage/backup/data`date +%F-%H-%M-%S`;mkdir -p $dir;mv -t $dir'
+# 将所有要删除的文件，移动到创建的垃圾箱目录中
+```
 
 
 
 
-## 1.3 重定向与管道
 
-### 1.3.1 标准输入和输出
+## 1.4 历史命令与命令补齐
+
+### 1.4.1 命令补全
+
+功能需求
+
+```basic
+在linux系统环境里面，我们管理各种应用都是通过命令来实现的，但是有很多时候，命令太长记不住，我们只记住前面的1-2个字母，后面的内容不知道。
+对于linux来说，它提供了命令补全的能力，也就是说，我们可以通过 Tab键的方式，将我们要敲出来的命令在命令行自动补全。
+- 用户给定的字符串只有一条惟一对应的命令，直接补全，否则，再次Tab会给出列表
+```
+
+补全功能
+
+```basic
+在linux系统里面，关于Tab键补全的功能，主要体现在两个方面：
+- 路径的补全
+- 命令的补全
+```
+
+
+
+### 1.4.2 命令补全实践
+
+路径补全
+
+```bash
+# 单Tab键自动补全文件路径
+[root@rocky9 ~]# ls /etc/hostn^C
+[root@rocky9 ~]# ls /etc/hostname
+
+# 双Tab键查看满足要求的目录
+[root@rocky9 ~]# ls /etc/de
+debuginfod/ default/ depmod.d/
+```
+
+命令补全
+
+```bash
+# Tab键查看满足要求的命令
+[root@rocky9 ~]# time^C
+[root@rocky9 ~]# time
+time  timedatectl  timeout times
+```
+
+
+
+### 1.4.3 命令行展开
+
+- 所谓命令行展开，即把命令行中给定的特殊符号自动替换为相应字符串的机制。在Bash Shell中有些符号有特殊含义
+
+  - `~` : 自动替换为用户家目录
+  - `~USERNAME`: 自动替换为指定用户的家目录
+  - `{}`: 可包含一个以逗号分隔的字符串或序列，能够将其展开为多个字符串
+
+  ```shell
+  a{d,c,b}e  # ade, ace, abe
+  /tmp/{a,b,c}  # /tmp/a, /tmp/b, /tmp/c
+  /tmp/{a,b}/z  # /tmp/a/z, /tmp/b/z
+  {1..6}  # 1,2,3,4,5,6
+  {1..10..2}  # 1,3,5,7,9
+  {a..d}  # a,b,c,d
+  ```
+
+
+
+
+
+### 1.4.4 history命令
+
+![image-20250708150622052](D:\git_repository\cyber_security_learning\markdown_img\image-20250708150622052-1753666737301-3.png)
+
+```bash
+# 语法：
+history -c  
+# 清空历史命令，仅清空命令缓存区的命令，不影响.bash_history
+
+history -d offset
+[Tue Oct 17 10:52:59 22] root@rocky9:~ #history | tail -n 10
+ 1011  cat .bash_history 
+ 1012  cat oldfile.txt 
+ 1013  getent passwd root
+ 1014  getent passwd | tail -n 10
+ 1015  getent passwd
+ 1016  history
+ 1017  history -d 999
+ 1018  history | tail -n 20 # 1018
+ 1019  history | tail -n 30
+ 1020  history | tail -n 10
+[Tue Oct 17 10:54:14 23] root@rocky9:~ #history -d 1017
+[Tue Oct 17 10:54:35 24] root@rocky9:~ #history | tail -n 10
+ 1012  cat oldfile.txt 
+ 1013  getent passwd root
+ 1014  getent passwd | tail -n 10
+ 1015  getent passwd
+ 1016  history
+ 1017  history | tail -n 20 # 1017
+ 1018  history | tail -n 30
+ 1019  history | tail -n 10
+ 1020  history -d 1017
+ 1021  history | tail -n 10
+
+# 删除命令缓存区中指定编号的历史命令
+# 删除后，后面的命令编号会依次往前提
+
+history n  # 显示最近的n条命令，等同于history|tail -n <num>
+
+history -a # 立即追加命令缓存区中的命令到历史文件中
+
+history -w # 将命令缓存区的当前内容覆盖到.bash_history文件。
+history -w <new_file> # 将命令缓存区中的内容存储到指定文件中
+
+history -r # 从.bash_history读取命令到命令缓存区，通常在开始新会话时使用。
+history -r <new_file> # 从指定文件中读取命令到缓存区
+
+history -p <指定历史命令> # 将指定的数据显示在标准输出
+# 输出的指令不会执行，也不会出现在历史缓存区中
+[Tue Oct 17 14:13:14 50] root@rocky9:Storage #history
+    1  ls
+    2  touch test2.txt
+    3  echo "hello" >> test2.txt 
+    4  cat test2.txt 
+    5  history
+[Tue Oct 17 14:13:22 51] root@rocky9:Storage #history -p \!-2
+cat test2.txt 
+
+history -s # 将参数作为单独的条目添加到历史列表的末尾。
+# 这允许你将一个或多个命令手动添加到历史记录中。
+history -s "echo hello" # 将echo hello加入历史缓存区，但是不会执行
+```
+
+
+
+**history命令解析**
+
+```bash
+[root@magedu ~]# history --help
+history: history [-c] [-d offset] [n] or history -anrw [filename] or history -ps arg [arg...]
+    Display or manipulate the history list.
+    
+    Display the history list with line numbers, prefixing each modified
+    entry with a `*'.  An argument of N lists only the last N entries.
+    
+    Options:
+      -c	clear the history list by deleting all of the entries
+      ......
+```
+
+
+
+**常用history命令**
+
+重复执行上一条命令
+
+```basic
+- 重复前一个命令使用上方向键，并回车执行
+- 按 !! 并回车执行
+```
+
+重复执行之前的命令
+
+```basic
+- 按 !n 执行history命令列表中的第n编号的命令
+- 按 !string 重复前一个以“string”开头的命令
+```
+
+```basic
+- 按 ctrl-r来在命令历史中搜索命令
+（reverse-i-search）`’：
+- 按 Ctrl+g：从历史搜索模式退出
+```
+
+
+
+### 1.4.5 Linux快捷键
+
+```basic
+命令行切换：
+	Ctrl + A           光标迅速回到行首
+	Ctrl + E           光标迅速回到行尾
+	Ctrl + k           删除光标到行尾的内容
+	Ctrl + u           删除光标到行首的内容
+	Ctrl + y           粘贴删除的内容
+```
+
+
+
+
+
+
+
+
+
+
+
+## 1.5 重定向与管道
+
+### 1.5.1 标准输入和输出
 
 Linux 系统中有三个最基本的IO设备
 
@@ -1307,7 +1975,7 @@ lr-x------ 1 root root 64  6月  4 14:26 3 -> /proc/199933/fd/
 
 
 
-#### 1.3.1.1 认识文件描述符
+#### 1.5.1.1 认识文件描述符
 
  
 
@@ -1331,7 +1999,7 @@ lr-x------ 1 root root 64  6月  4 14:26 3 -> /proc/199933/fd/
 
 
 
-##### 1.3.1.1.1 用户视角 VS 程序视角中的文件描述符
+##### 1.5.1.1.1 用户视角 VS 程序视角中的文件描述符
 
 | 角色 | 如何访问文件       | 举例                    |
 | ---- | ------------------ | ----------------------- |
@@ -1344,7 +2012,7 @@ lr-x------ 1 root root 64  6月  4 14:26 3 -> /proc/199933/fd/
 
 
 
-##### 1.3.1.1.2 文件描述符的来源
+##### 1.5.1.1.2 文件描述符的来源
 
 ```C
 int fd = open("file.txt", O_RDONLY);
@@ -1361,7 +2029,7 @@ int fd = open("file.txt", O_RDONLY);
 
 
 
-##### 1.3.1.1.3 文件描述符如何使用
+##### 1.5.1.1.3 文件描述符如何使用
 
 ```C
 read(fd, buf, 100);   // 从 fd 对应的文件中读数据
@@ -1383,13 +2051,13 @@ close(fd);            // 关闭 fd
 
 
 
-### 1.3.2 I/O重定向 redirect
+### 1.5.2 I/O重定向 redirect
 
 I/O重定向：将默认的输入，输出或错误对应的设备改变，指向新的目标
 
 
 
-#### 1.3.2.1 标准输出和标准错误重定向
+#### 1.5.2.1 标准输出和标准错误重定向
 
 STDOUT和STDERR默认是使用当前终端，但也可以重定向到指定终端或指定文件
 
@@ -1591,7 +2259,7 @@ fstab
 
 
 
-#### 1.3.2.2 单行重定向与多行重定向输出
+#### 1.5.2.2 单行重定向与多行重定向输出
 
 ```bash
 单行重定向：
@@ -1625,7 +2293,7 @@ cat > cat2.log <<EOF  # EOF是结束符
 
 
 
-#### 1.3.2.3 标准输入重定向
+#### 1.5.2.3 标准输入重定向
 
 ```ABAP
 使用标准输入的前提：命令支持标准输入
@@ -1633,7 +2301,7 @@ cat > cat2.log <<EOF  # EOF是结束符
 
 
 
-##### 1.3.2.3.1 tr 命令
+##### 1.5.2.3.1 tr 命令
 
 用于转换字符、删除字符和压缩重复的字符。它从标准输入读取数据并将结果输出到标准输出
 
@@ -1695,7 +2363,7 @@ tmpfs 198824 0 198824 0% /run/user/0
 
 
 
-##### 1.3.2.3.2 bc 命令
+##### 1.5.2.3.2 bc 命令
 
 `bc` 是 Linux 中非常常用的**任意精度计算器语言（Basic Calculator）**，支持整数、浮点数、变量、自定义函数等，非常适合用于命令行中的数学计算，尤其是 **shell 脚本中的浮点数计算**。
 
@@ -1743,9 +2411,9 @@ quit  # 退出
 
 
 
-#### 1.3.2.4 高级重定向写法
+#### 1.5.2.4 高级重定向写法
 
-##### 1.3.2.4.1 cmd <<< "string"
+##### 1.5.2.4.1 cmd <<< "string"
 
 含义是 here-string ，表示传给给cmd的stdin的内容从这里开始是一个字符串。
 
@@ -1775,7 +2443,7 @@ ROCKY86
 
 
 
-##### 1.3.2.4.2 cmd1 < <(cmd2)
+##### 1.5.2.4.2 cmd1 < <(cmd2)
 
 名称为 Process substitution ,是由两个部分组成
 
@@ -1817,7 +2485,7 @@ lr-x------ 1 root root 64  6月  4 17:10 /dev/fd/63 -> 'pipe:[1264724]'
 
 
 
-### 1.3.3 管道
+### 1.5.3 管道
 
 在shell 中，可以将两个或多个命令(程序|进程)连接起来，将前一个命令的输出作为后一个命令的输入， 就像拿水管将两个命令连起来
 
@@ -1942,7 +2610,7 @@ New password: Retype new password: passwd: password updated successfully
 
 
 
-#### 1.3.3.1 tee管道
+#### 1.5.3.1 tee管道
 
 将标准输入复制到每个指定文件，并显示到标准输出
 

@@ -1,0 +1,85 @@
+<mxfile host="Electron" modified="2025-08-12T09:49:30.832Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.2.5 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="kl1s90TdbaHrebak4zuZ" version="24.2.5" type="device">
+  <diagram name="第 1 页" id="Olv_wE1Fds6lTu1FuMXY">
+    <mxGraphModel dx="2460" dy="1182" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=1;strokeWidth=2;" edge="1" parent="1" source="WPYZJVXb6Vcsid4nS24X-1" target="WPYZJVXb6Vcsid4nS24X-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-6" style="edgeStyle=orthogonalEdgeStyle;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;strokeWidth=2;" edge="1" parent="1" source="WPYZJVXb6Vcsid4nS24X-1" target="WPYZJVXb6Vcsid4nS24X-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-1" value="&lt;b&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;APT 仓库&lt;/font&gt;&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="398" y="204" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-7" style="edgeStyle=orthogonalEdgeStyle;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;strokeWidth=2;" edge="1" parent="1" source="WPYZJVXb6Vcsid4nS24X-2" target="WPYZJVXb6Vcsid4nS24X-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-2" value="&lt;span&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;pool (软件包)&lt;/font&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="78" y="323" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-11" style="edgeStyle=orthogonalEdgeStyle;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;strokeWidth=2;" edge="1" parent="1" source="WPYZJVXb6Vcsid4nS24X-3" target="WPYZJVXb6Vcsid4nS24X-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-3" value="&lt;span&gt;&lt;font style=&quot;font-size: 15px;&quot;&gt;dists（元数据）&lt;/font&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="709" y="323" width="130" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-8" value="&lt;b&gt;dpkg-scanpackages -m pool &amp;gt; dists/stable/main/binary-amd64/Packages 生成元数据&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="226" y="315" width="447" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-18" style="edgeStyle=orthogonalEdgeStyle;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;strokeWidth=2;" edge="1" parent="1" source="WPYZJVXb6Vcsid4nS24X-10" target="WPYZJVXb6Vcsid4nS24X-17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-10" value="&lt;font style=&quot;font-size: 15px;&quot;&gt;Release&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=none;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="712" y="570" width="124" height="47" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-12" value="&lt;b&gt;由 packages 和 packages.gz 生成 Release文件&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="783" y="412" width="274" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-14" value="&lt;b&gt;apt-ftparchive -c release.conf release dists/stable &amp;gt; dists/stable/Release&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="753" y="514" width="471" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-15" value="&lt;b&gt;准备 release.conf 文件，这个文件里面包含了：&lt;/b&gt;&lt;div style=&quot;line-height: 150%;&quot;&gt;&lt;span style=&quot;orphans: 4; white-space-collapse: preserve; color: rgb(51, 51, 51); font-family: &amp;quot;Open Sans&amp;quot;, &amp;quot;Clear Sans&amp;quot;, &amp;quot;Helvetica Neue&amp;quot;, Helvetica, Arial, &amp;quot;Segoe UI Emoji&amp;quot;, sans-serif;&quot;&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;这个仓库支持哪些架构（amd64、arm64...）&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 150%;&quot;&gt;&lt;span style=&quot;orphans: 4; white-space-collapse: preserve; color: rgb(51, 51, 51); font-family: &amp;quot;Open Sans&amp;quot;, &amp;quot;Clear Sans&amp;quot;, &amp;quot;Helvetica Neue&amp;quot;, Helvetica, Arial, &amp;quot;Segoe UI Emoji&amp;quot;, sans-serif;&quot;&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;每个架构对应的索引文件路径，&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;line-height: 150%;&quot;&gt;&lt;span style=&quot;orphans: 4; white-space-collapse: preserve; color: rgb(51, 51, 51); font-family: &amp;quot;Open Sans&amp;quot;, &amp;quot;Clear Sans&amp;quot;, &amp;quot;Helvetica Neue&amp;quot;, Helvetica, Arial, &amp;quot;Segoe UI Emoji&amp;quot;, sans-serif;&quot;&gt;&lt;font style=&quot;font-size: 11px;&quot;&gt;这些索引文件的大小与校验值&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;" style="text;html=1;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="799" y="434" width="275" height="88" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-23" style="edgeStyle=orthogonalEdgeStyle;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" edge="1" parent="1" source="WPYZJVXb6Vcsid4nS24X-17" target="WPYZJVXb6Vcsid4nS24X-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-17" value="&lt;font style=&quot;font-size: 15px;&quot;&gt;InRelease&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=none;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="22" y="570" width="124" height="47" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-19" value="&lt;b&gt;对 InRelease 进行签名&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="337" y="529" width="153" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-20" value="&lt;b&gt;gpg --default-key &amp;lt;你的KEYID&amp;gt; --clearsign -o dists/stable/InRelease dists/stable/Release&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="181" y="559" width="505" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-28" style="edgeStyle=orthogonalEdgeStyle;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" edge="1" parent="1" source="WPYZJVXb6Vcsid4nS24X-22" target="WPYZJVXb6Vcsid4nS24X-26">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-22" value="&lt;span style=&quot;font-size: 15px;&quot;&gt;使用key，生成公钥给客户端&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=none;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="-24.5" y="721" width="217" height="47" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-24" value="&lt;div&gt;&lt;b&gt;# 生成公钥&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;gpg --armor --export 1234ABCD5678EF90 &amp;gt; repo-public.key&lt;/b&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="-275" y="654" width="328" height="38" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-32" style="edgeStyle=orthogonalEdgeStyle;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=default;align=center;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;endArrow=classic;" edge="1" parent="1" source="WPYZJVXb6Vcsid4nS24X-26" target="WPYZJVXb6Vcsid4nS24X-31">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-26" value="&lt;span style=&quot;font-size: 15px;&quot;&gt;把文本公钥“去装甲”为二进制.gpg&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=none;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="614" y="721" width="276" height="47" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-29" value="&lt;b&gt;gpg --dearmor -o /etc/apt/trusted.gpg.d/my-repo.gpg repo-public.key&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="210" y="709" width="375" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-31" value="&lt;span style=&quot;font-size: 15px;&quot;&gt;在客户端配置源&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;font-size: 15px;&quot;&gt;/etc/apt/sources.list&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=none;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="989" y="721" width="276" height="47" as="geometry" />
+        </mxCell>
+        <mxCell id="WPYZJVXb6Vcsid4nS24X-33" value="&lt;b&gt;deb http://10.0.0.202 stable main&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontFamily=Helvetica;fontSize=11;fontColor=default;labelBackgroundColor=default;" vertex="1" parent="1">
+          <mxGeometry x="1022" y="692" width="187" height="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
