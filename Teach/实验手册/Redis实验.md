@@ -334,14 +334,13 @@ WantedBy=multi-user.target
 
 
 
-
-
 6台设备上所有配置文件初始相同，全部开启集群模式
 
 ```bash
 # 每个节点修改redis配置，必须开启cluster功能的参数
 # 手动修改配置文件
 vim /etc/redis/redis.conf
+protected-mode no
 bind 0.0.0.0
 requirepass 123456
 masterauth 123456
@@ -366,6 +365,16 @@ redis-cli -a 123456 -c
 
 # 查看集群中具体节点状态
 redis-cli -a 123456 --cluster info 10.0.0.38:6379
+
+# 查看节点信息
+[root@redis01 data]#cat nodes-6379.conf 
+e0ebffbbdf7de5912d7b7e3d5faaf18e07e06c14 10.0.0.208:6379@16379,,tls-port=0,shard-id=d2e08db1e85edde07a340f280ff0faedb167f656 myself,master - 0 1756140205000 1 connected 0-5460
+8fb5440a1f7e05d6b213e8de7cb5dbaf28f22ad8 10.0.0.213:6379@16379,,tls-port=0,shard-id=418b53012dead1a8a001b57a8fe0ec064067c2c9 slave 2c6b27a9ebe7c60b2fb0f97704a9dbebe52061c1 0 1756140205000 2 connected
+31f91b60013484c659b5609730782a508034a086 10.0.0.212:6379@16379,,tls-port=0,shard-id=d2e08db1e85edde07a340f280ff0faedb167f656 slave e0ebffbbdf7de5912d7b7e3d5faaf18e07e06c14 0 1756140205939 1 connected
+baf2124a3fc74800b2b36e71bc4654b5e47fe741 10.0.0.210:6379@16379,,tls-port=0,shard-id=a1c1b1f9709c6e5b95a9d5033697466ac42d913c master - 0 1756140205000 3 connected 10923-16383
+58e6a7a024f1d86efad842f224ac11e6d993b6fc 10.0.0.211:6379@16379,,tls-port=0,shard-id=a1c1b1f9709c6e5b95a9d5033697466ac42d913c slave baf2124a3fc74800b2b36e71bc4654b5e47fe741 0 1756140205000 3 connected
+2c6b27a9ebe7c60b2fb0f97704a9dbebe52061c1 10.0.0.209:6379@16379,,tls-port=0,shard-id=418b53012dead1a8a001b57a8fe0ec064067c2c9 master - 0 1756140205000 2 connected 5461-10922
+vars currentEpoch 6 lastVoteEpoch 0
 ```
 
 
