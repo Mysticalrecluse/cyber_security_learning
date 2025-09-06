@@ -458,8 +458,8 @@ nginx运行在企业内网的最外层，也就是边缘节点，因此它处理
 
 ### **5. 图示化状态机**
 
-```
-plaintextCopy codeWAIT_REQUEST  --(RequestReceived)--> PARSE_HEADERS
+```ini
+WAIT_REQUEST  --(RequestReceived)--> PARSE_HEADERS
 PARSE_HEADERS --(HeadersParsed)--> PROCESS_BODY
 PROCESS_BODY  --(BodyProcessed)--> SEND_RESPONSE
 SEND_RESPONSE --(ResponseSent)--> DONE
@@ -2324,7 +2324,7 @@ Context:	server  # 只能出现在server的配置块下
 ``````nginx
 listen unix:/var/run/nginx.sock; // 监听unix.socket地址
 listen 127.0.0.1:8000;
-listen 127.0.0.1;
+listen 127.0.0.1;   # 默认使用80端口
 listen 8000;
 listen *:8000;
 listen localhost:8000 bind;

@@ -16618,7 +16618,7 @@ server {
     server_name www.wang.org;
     location / {
         proxy_pass http:/10.0.0.18/;
-        proxy_set_header Host $http_host; # 转发主机头至后端服务器
+        echo; # 转发主机头至后端服务器
         proxy_connect_timeout 10s;
     }
 }
