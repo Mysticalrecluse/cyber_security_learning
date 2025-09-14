@@ -4577,6 +4577,218 @@ Context: http, server
 
 
 
+
+
+
+
+### preaccess阶段：对请求做限制的limit_req模块
+
+
+
+#### 模块介绍
+
+**生效阶段：** NGX_HTTP_PREACCESS_PHASE 阶段
+
+**模块：** http_limit_req_module
+
+```bat
+默认编译进nginx，通过 --without-http_limit_req_module 禁用功能
+```
+
+ **生效算法：**leaky bucket算法
+
+**生效范围：**
+
+- 全部 worker 进程（基于共享内存）
+- 进入 preaccess 阶段前不生效
+
+
+
+#### leaky bucket 算法
+
+![image-20250908115210634](../markdown_img/image-20250908115210634.png)
+
+
+
+```bat
+对于突发流量，使用 Leaky Bucket 可以把它限制为每秒处理3M流量
+limit_requset 可以把突发流量限制为每秒处理多少个请求
+```
+
+
+
+#### limit_req 指令
+
+**定义共享内存（包括大小），以及 key 关键字和限制速率**
+
+```nginx
+Syntax:  limit_req_zone key zone=name:size rate=rate;  # rate单位为 r/s 或者 r/m
+Default: ——
+Context: http
+```
+
+
+
+**限制并发连接数**
+
+```bash
+# burst 默认为0
+# nodelay，对burst中的请求不再采用延时处理的做法，而是立刻处理
+Syntax:  limit_req zone=name [burst=number] [nodelay]; 
+Default: ——
+Context: http,server,location
+```
+
+
+
+**限制发生时的日志级别**
+
+```nginx
+Syntax:  limit_req_log_level info | notice | warn | error;
+Default: limit_req_log_level error;
+Context: http,server,location
+```
+
+
+
+**限制发生时向客户端返回的错误码**
+
+```nginx
+Syntax:  limit_red_status code;
+Default: limit_red_status 503;
+Context: http,server,location
+```
+
+
+
+
+
+总结：
+
+```bat
+limit_req 就是“漏桶（leaky bucket）”限流：按固定速率漏水处理请求，超出的先排队（burst），排不下的拒绝；加上 nodelay 就是不排队，能放的立刻放行，其余直接拒。
+```
+
+
+
+#### 实验示例
+
+```nginx
+http {
+  limit_req_zone $binary_remote_addr zone=api:10m rate=5r/s;  # 每 IP 平均 5 r/s
+}
+server {
+  location /api/ {
+    limit_req zone=api burst=10;        # 或者：burst=10 nodelay
+    limit_req_status 429;               # 超限返回 429（默认 503）
+  }
+}
+```
+
+场景：**同一瞬间**有 **15** 个请求打到 `/api/`。
+
+**没有 `nodelay`**（默认 *排队*）：
+
+- 允许 **1 个**马上处理，**10 个**进入“漏桶队列”（`burst`），**4 个**超出队列被拒。
+- 之后队列里的 10 个按 **5 r/s**“漏出”，大约 **2 秒**全部处理完。
+
+**加了 `nodelay`**（*不排队*）：
+
+- 允许 **11 个**立即放行（相当于“瞬时突发”），**4 个**直接拒；
+- <span style="color:tomato">**之后在“债”还清前（约 2 秒内），再来的新请求多数会被拒，直到平均速率回到 5 r/s**</span>
+
+
+
+
+
+
+
+### access阶段：对IP做限制的access模块
+
+这个模块可以控制哪些IP可以访问某些URL，或者不可以访问某些URL
+
+
+
+#### 模块介绍
+
+**生效阶段：**NGX_HTTP_ACCESS_PHASE阶段
+
+**模块：**http_access_module
+
+```bat
+默认编译进nginx，通过--without-http_access_module禁用功能
+```
+
+**生效范围：**进入access阶段前不生效。
+
+
+
+#### access 相关指令
+
+```nginx
+Syntax:   allow address | CIDR | unix: | all;
+Default:  —
+Context:  http,server,location,limit_except
+```
+
+```nginx
+Syntax:   deny address | CIDR | unix: | all;
+Default:  —
+Context:  http,server,location,limit_except
+```
+
+
+
+#### **示例**
+
+```nginx
+location / {
+    deny 192.168.1.1;
+    allow 192.168.1.0/24;
+    allow 10.1.1.0/16;
+    deny all;
+}
+```
+
+```bat
+注意access模块是顺序执行，当满足一条规则后，不会继续向下执行。
+```
+
+
+
+
+
+### access阶段：对用户名密码做限制的auth_basic模块
+
+#### 功能
+
+基于HTTP Basic Authutication 协议进行用户名密码的认证
+
+```bat
+默认编译进Nginx：
+    通过--without-http_auth_basic_module禁用功能
+```
+
+
+
+```nginx
+Syntax:   auth_basic string | off;
+Default:  auth_basic off;
+Context:  http,server,location,limit_except
+```
+
+```nginx
+Syntax:   auth_basic_user_file file;
+Default:  —
+Context:  http,server,location,limit_except
+```
+
+
+
+
+
+
+
 ### 变量的运行原理
 
 ![alt text](nginx_images\image-14.png)
