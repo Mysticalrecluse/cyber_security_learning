@@ -6746,3 +6746,187 @@ Context: http, server,location;
 
 
 
+## 缓存
+
+### 用好浏览器的缓存
+
+浏览器中的缓存是否生效，可以通过使用nginx中的指令进行控制，而浏览器中的缓存对用户的体验是最大的
+
+
+
+#### 浏览器缓存与Nginx缓存对比
+
+**浏览器缓存**
+
+- **优点**
+  - 使用有效缓存时，没有网络消耗，速度最快
+  - 即使有网络消耗，但对失效缓存使用**304**响应做到网络流量消耗最小化
+- **缺点**
+  - 仅提升一个用户的体验
+
+
+
+**Nginx缓存**
+
+- **优点**
+  - 提升所有用户的体验
+  - 相比浏览器缓存，有效降低上游服务的负载
+  - 通过304响应减少Nginx与上游服务间的流量消耗
+- **缺点**
+  - 用户仍然保持网络消耗
+
+
+
+```bat
+实际生产中，通常同时使用浏览器和Nginx缓存
+```
+
+
+
+#### 浏览器缓存
+
+![image-20250918010910011](../markdown_img/image-20250918010910011.png)
+
+
+
+##### Etag头部详解
+
+**ETagHTTP **响应头是资源的特定版本的标识符。这可以让缓存更高效，并节省带宽，因为如果内容没有改变，web服务器不需要发送完整的响应。而如果内容发生了变化，使用ETag有助于防止资源的同时更新相互覆盖（“空中碰撞”）
+
+
+
+如果给定URL中的资源更改，则一定要生成新的Etag值。因此Etags类似于指纹，也可能被某些服务器用于跟踪。比较etags能快速确定此资源是否变化，但也可能被跟踪服务器永久留存
+
+
+
+**etag指令**
+
+```nginx
+Syntax: etag on |off;
+Default: etag on;
+Context: http,server,location
+```
+
+**生成规则**
+
+```C
+ngx_sprintf(etag->value.data, "\"%xT-%xO\"",
+                    r->header_out.last_modified_time,
+                    r->headers_out.content_length_n)
+```
+
+
+
+**If-None-Match详解**
+
+**If-None-Match** 是一个条件式请求首部。对于 GET 和 HEAD 请求方法来说，当且仅当服务器上没有任何资源的Etag属性值与这个首部中列出的相匹配的时候，服务器端才会返回请求的资源，响应码为200。对于其他方法来说，当且仅当最终确认没有已存在的资源的ETag属性值与这个首部中所列出的相匹配的时候，才会对请求进行相应的处理。
+
+
+
+对于 GET 和 HEAD 方法来说，当验证失败的时候，服务器端必须返回响应码304（Not Modified，未改变）。对于能够引发服务器状态改变的方法，则返回412（Precondition Failed，前置条件失败）。需要注意的是，服务器端在生成状态码为304的响应的时候，必须同时生成以下会存在对应的200响应中的首部：Cache-Control、Content-Location、Date、ETag、Expires和Vary。
+
+
+
+当与 `If-Modified-Since` 一同使用的时候，`If-None-Match`优先级更高（假如服务器支持的话） 
+
+
+
+以下是两个常见的应用场景：
+
+- 采用 GET 或 HEAD 方法，来更新拥有特定的Etag属性的缓存。
+- 采用其他方法，尤其是PUT，将`If-None-Match used`的值设置为 *，用来生成事先并不知道是否存在的文件，可以确保先前并没有进行过类似的上传操作，防止之前操作数据的丢失。这个问题属于 **更新丢失问题** 的一种
+
+
+
+**If-Modified-Since头部详解**
+
+**If-Modified-Since** 是一个条件式请求首部，服务器只在所请求的资源在给定的日期时间之后对内容进行过修改的情况下才会将资源返回，状态码为200。如果请求的资源从那时起未经修改，那么返回一个不带有消息主体的304响应，而在`Last-Modified`首部中会带有上次修改时间。不同于`If-Unmodified-Since`，`If-Modified-Since` 只可以在 GET 或 HEAD 请求中。
+
+当与`if-None-Match` 一同出现时，它（If-Modified-Since）会被忽略掉，除非服务器不支持 `If-None-Match`。
+
+
+
+### Nginx决策浏览器过期缓存是否生效
+
+#### expires 指令
+
+用来告诉浏览器缓存的过期时间的
+
+```nginx
+Syntax: expires [modified] time;
+        expires epoch|max|off;
+Default: expires off
+Context: http,server,location,if in location
+```
+
+- **max：**
+  - Expires: Thu,31 Dec 2037 23:55:55 GMT
+  - Cache-Control：max-age=315360000（10年）
+- **off: **不添加或者修改Expires和Cache-Control字段
+- **epoch：**
+  - Expires: Thu, 01 Jan 1970 00:00:01 GMT
+  - Cache-Control: no-cache
+- **time: **设定具体时间，可以携带单位
+  - 一天内的具体时刻可以加@，比如下午六点半：@18h30m
+    - 设定好Expires，自动计算Cache-Control
+    - 如果当前时间未超过当天的time时间，则Expires到当天time，否则是第二天的time时刻
+  - **正数**
+    - 设定Cache-Control时间，计算出Expires
+  - **负数**
+    - Cache-Control：no-cache，计算出 Expires
+
+
+
+#### 示例
+
+```nginx
+proxy_cache_path /data/nginx/tmpcache levels=2:2 keys_zone=two:10m loader_threshold=300 load_files=200 max_size=200m inactive=1m;
+
+server {
+    server_name cache.mystical.tech;
+    
+    root html/;
+    error_log logs/cacherr.log debug;
+    location /{
+        expires 1h;
+        #expires -1h;
+        #expires @20h30m;
+        #if_modified_since off;
+        #proxy_cache two;
+        #proxy_cache_valid 200 10m;
+        #add_header X-Cache-Status $upstream_cache_status;
+        #proxy_cache_use_stale error timeout updating;
+        #proxy_cache_revalidate on;
+        #proxy_hide_header Set-Cookie;
+        #proxy_ignore_header Set-Cookie;
+        
+        #proxy_force_ranges on;
+        #proxy_pass http:///localhost:8012;
+    }
+}
+```
+
+
+
+
+
+#### not_modified过滤模块
+
+**功能**
+
+客户端拥有缓存，但不确认缓存是否过期，于是在请求中传入`If-Modified-Since` 或者 `If-None-Match`头部，该模块通过将其值与响应中的Last-Modified值相比较，决定是通过200返回全部内容，还是返回304 Not Modified头部，表示浏览器仍使用之前的缓存。
+
+
+
+**使用前提**
+
+原返回响应码为200
+
+![image-20250918020541710](D:\git_repository\cyber_security_learning\markdown_img\image-20250918020541710.png)
+
+
+
+
+
+### 缓存的基本用法
+
