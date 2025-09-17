@@ -4785,6 +4785,758 @@ Context:  http,server,location,limit_except
 
 
 
+![image-20250915092329827](../markdown_img/image-20250915092329827.png)
+
+```bash
+#Ubuntu下载
+[root@NAT ~]#apt install -y apache2-utils
+```
+
+
+
+#### 示例配置
+
+```nginx
+[root@ubuntu2204 nginx]#cat conf.d/access.mystical.tech.conf 
+server {
+    server_name access.mystical.tech;
+    error_log logs/error.log debug; 
+    default_type text/plain;
+    root /apps/nginx/html/;
+    location / {
+        satisfy any;
+        auth_basic "test_auth_basic";
+        auth_basic_user_file /apps/nginx/example/auth.pass;
+    }
+}
+```
+
+
+
+
+
+### access阶段: 使用第三方做权限控制的auth_request模块
+
+统一的用户权限验证系统
+
+#### 功能
+
+向上游的服务转发请求，若上游服务返回的响应码是2XX，则继续执行，若上游服务返回的是401或403，则将响应返回给客户端
+
+
+
+#### 原理
+
+收到请求后，生成子请求，通过反向代理技术把请求传递给上游服务
+
+
+
+#### 默认未编译进Nginx
+
+```bash
+--with-http_auth_request_module
+```
+
+
+
+#### 指令
+
+```nginx
+# 根据url生成子请求，根据子请求的响应码决定是继续执行，还是返回响应
+Syntax: auth_request uri|off
+Default: auth_request off;
+Context: http,server,location
+```
+
+```nginx
+Syntax: auth_request_set $variable value;
+Default: —;
+Context: http,server,location
+```
+
+
+
+#### 示例
+
+```nginx
+server {
+    server_name access.mystical.tech;
+    error_log logs/error.log debug;
+    #root html/;
+    default_type text/plain;
+    location /auth_basic {
+        satisfy any;
+        auth_basic "test auth_basic";
+        auth_basic_user_file example/auth.pass;
+        deny all;
+    }
+    
+    location / {
+        auth_request /test_auth;
+    }
+    
+    location = /test_auth {
+        proxy_pass http://127.0.0.1:8090/auth_upstream;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI $request_uri;
+    }
+}
+
+server {
+    listen 8090;
+    location /auth_upstream {
+        return 200 'auth success!';
+    }
+}
+```
+
+
+
+### access阶段的satisfy指令
+
+限制所有access阶段模块的satisfy指令
+
+
+
+#### 指令
+
+```nginx
+Syntax: satisfy all|any;
+Default: satisfy all;
+Context: http, server, location
+
+# 如果是satisfy all，表示必须access模块，auth_basic模块，auth_request模块三个都放行，才能允许放行
+# 如果是satisfy any，表示只要access模块，auth_basic模块，auth_request模块三个模块有一个放行，就允许放行
+```
+
+
+
+<img src="D:\git_repository\cyber_security_learning\markdown_img\image-20250915103353230.png" alt="image-20250915103353230" style="zoom:150%;" />
+
+
+
+
+
+### precontent阶段：按序访问资源的try_files模块
+
+
+
+#### 指令
+
+```nginx
+Syntax: try_files file ... [uri] [=code];
+Default: —;
+Context: server, location
+```
+
+
+
+#### 功能
+
+依次试图访问多个url对应的文件（由root或者alias指令指定），当文件存在时直接返回文件内容，如果所有文件都不存在，则按最后一个URL结果或者code返回
+
+
+
+#### 示例
+
+```nginx
+server {
+    server_name tryfiles.mystical.tech;
+    error_log logs/myerror.log info;
+    root html/;
+    default_type text/plain;
+    
+    location /first {
+        try_files /system/maintenance.html $uri $uri/index.html $uri.html @lasturl;
+    }
+    
+    location @lasturl {
+        return 200 'lasturl!\n';
+    }
+    
+    location /second {
+        try_files $uri $uri/index.html $uri.html =404;
+    }
+}
+```
+
+
+
+
+
+### precontent阶段：实时拷贝流量的mirror模块
+
+mirror模块可以帮助我们创建一个镜像流量，比如生产环境下，我们处理一些请求，这些请求可能需要把他们同步的copy一份到测试环境，或者开发环境。
+
+默认编译进Nginx
+
+
+
+#### 指令
+
+处理请求时，生成子请求访问其他服务，对子请求的返回值不做处理
+
+```nginx
+Syntax: mirror uri | off;
+Default: mirror off;
+Context: http, server, location
+```
+
+```nginx
+Syntax: mirror_request_body on | off;
+Default: mirror_request_body on;
+Context: http, server, location
+```
+
+
+
+#### 示例
+
+```bash
+# 创建一个上游服务
+server {
+    listen 10020;
+    location / {
+        return 200 'mirror response!';
+    }
+}
+
+# 主配置文件
+server {
+    listen 8001;
+    error_log logs/error.log debug;
+    
+    location / {
+        mirror /mirror;
+        mirror_request_body off;
+    }
+    
+    location = /mirror {
+        internal;
+        proxy_pass http://127.0.0.1:10020$request_uri;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header X-Original-URI $request_uri;
+    }
+}
+```
+
+
+
+mirror模块可以做简单的流量拷贝，对于我们在多个环境下需要对用户流量进行处理非常有帮助。
+
+```bat
+mirror 的价值是“真实请求混合下的对比与放大”，用来实测找到拐点和第一个瓶颈；不是简单“按镜像比例线性推算”。正确姿势是小比例镜像 → 观测 → 阶梯放大/倍增 → 找拐点 → 优化复测。
+```
+
+#### （简版流程）
+
+1. **镜像 5%–10% 只读接口**到 perf（`mirror` + `mirror_request_body off`），打上 `X-Request-ID` 便于比对。
+2. **观测**：在 perf 上抓 p95/p99、错误率、CPU、GC、连接池等待、DB 慢查询、Redis RTT、队列长度。
+3. **放大/抽样调参**：
+   - 方式 A：把镜像比例从 5%→10%→15%…**阶梯拉升**；
+   - 方式 B：用 replay/压测（GoReplay/vegeta/wrk）在 perf **倍增**镜像流量（1×→2×→3×）。
+4. **判定容量**：当满足 SLO（例如 p95<200ms、错误率<1%）的**最高稳定 RPS**就是“容量”；再看在哪个资源先到 70–80%（第一个瓶颈）。
+5. **修复&复测**：针对热点 SQL、索引、N+1、线程/连接池、缓存策略等逐项优化，重复 3–4 步。
+
+
+
+#### 真实场景与Nginx配置
+
+##### 真实场景
+
+我们准备把 `/api/search` 的后端从 **v1** 切到 **v2**（K8s 集群里），又想顺手给 **压测环境**喂同样的真实流量做容量评估。要求：
+
+- 只镜像**只读**接口（GET/HEAD），写操作一律不镜像；
+- 只抽取 10% 用户做镜像（按 IP+UA 一致性哈希，避免抖动）；
+- 镜像到 **两个环境**：`v2-canary` 和 `perf-staging`；
+- 镜像的响应**不影响**线上用户；镜像请求的**鉴权头**要脱敏。
+
+##### Nginx 配置示例
+
+```nginx
+http {
+  # 上游池
+  upstream api_v1     { server 10.0.0.10:8080; }
+  upstream api_v2_canary { server 10.0.0.20:8080; }
+  upstream api_perf      { server 10.0.0.30:8080; }
+
+  # 1) 一致性抽样：10% 进镜像
+  split_clients "${remote_addr}${http_user_agent}" $mirror_bucket {
+    10%   1;
+    *     0;
+  }
+
+  # 2) 只在 GET 且命中特定路径时镜像
+  map "$mirror_bucket:$request_method:$uri" $do_mirror {
+    default                               0;
+    "~^1:GET:/api/(search|suggest|items)" 1;
+  }
+
+  server {
+    listen 80;
+    server_name api.example.com;
+
+    # 主请求：永远走 v1
+    location /api/ {
+      # 只读接口镜像，不需要 body
+      mirror_request_body off;                  # <== 关键
+      # 同时镜像到两个“内部”位置（可写多条 mirror）
+      if ($do_mirror) {
+        mirror /_shadow_canary;
+        mirror /_shadow_perf;
+      }
+
+      proxy_set_header X-Request-ID $request_id;
+      proxy_pass http://api_v1;
+    }
+
+    # 镜像 → v2 灰度
+    location = /_shadow_canary {
+      internal;                                 # 只能由 mirror 子请求进入
+      proxy_set_header Authorization "";        # 脱敏（按需保留）
+      proxy_set_header X-Mirror         "1";
+      proxy_set_header X-Mirror-Target  "v2-canary";
+      proxy_set_header X-Orig-Host      $host;
+      proxy_set_header X-Request-ID     $request_id;
+
+      proxy_connect_timeout 200ms;              # 镜像后端慢也不拖主链路
+      proxy_read_timeout    800ms;
+      proxy_pass_request_body off;              # 双保险（与 mirror_request_body off 协同）
+      proxy_pass http://api_v2_canary$request_uri;
+    }
+
+    # 镜像 → 压测环境
+    location = /_shadow_perf {
+      internal;
+      proxy_set_header Authorization "";
+      proxy_set_header X-Mirror         "1";
+      proxy_set_header X-Mirror-Target  "perf";
+      proxy_set_header X-Orig-Host      $host;
+      proxy_set_header X-Request-ID     $request_id;
+
+      proxy_connect_timeout 200ms;
+      proxy_read_timeout    800ms;
+      proxy_pass_request_body off;
+      proxy_pass http://api_perf$request_uri;
+    }
+  }
+}
+```
+
+##### 工作机制（一句话）
+
+- 用户请求打到 `/api/…` 时，**主链路**仍走 `api_v1` 返回结果；
+- 若满足条件（GET + 路径 + 10% 抽样），Nginx **并行**触发 2 个子请求，分别丢给 `v2-canary` 和 `perf`；
+- 子请求的响应会被**丢弃**，只用于日志/监控比对，**不会影响**用户响应
+
+
+
+### content阶段：详解root和alias指令 (static模块)
+
+
+
+#### 指令
+
+```nginx
+Syntax: alias path;
+Default: —
+Context: location
+```
+
+```nginx
+Syntax: root path;
+Default: root html;
+Context: http,server,location,if in location
+```
+
+
+
+#### 功能
+
+```bat
+将url映射为文件路径，以返回静态文件内容
+```
+
+
+
+#### 示例
+
+```nginx
+server {
+    server_name static.mystical.tech;
+    error_log logs/myerror.log info;
+    
+    location /root {
+        root html;      # 访问 html/root/index.html
+    }
+    
+    location /alias {     # 访问static.mystical.tech/alias，实际访问路径：html/index.html
+        alias html;
+    }
+    
+    location ~ /root/(\w+\.txt) {
+        root html/first/$1;      # 访问static.mystical.tech/root/1.txt，实际访问路径：html/first/1.txt/root/1.txt
+    }
+    
+    location ~ /alias/(\w+\.txt) {
+        alias html/first/$1;     # 访问static.mystical.tech/alias/1.txt，实际访问路径：html/first/1.txt
+    }
+    
+    location /RealPath/ {
+        alias html/realpath/;
+        return 200 '$request_filename:$document_root:$realpath_root\n';
+    }
+}
+```
+
+
+
+### static模块详解
+
+生成待访问文件的三个相关变量
+
+```bash
+# 问题：访问/RealPath/1.txt时，这三个变量的值各为多少
+location /RealPath/ {
+    alias html/realpath/;
+}
+
+# 相关变量
+request_filename                # 待访问文件的完整路径
+document_root                   # 由URI和root/alias规则生成的文件夹路径
+realpath_root                   # 将document_root中的软链接等换成真实路径
+```
+
+
+
+#### 静态文件返回时的content-type
+
+```nginx
+Syntax: types {...}
+Default: types {text/html html; image/gif gif; image/jpeg jpg;}
+Context: http,server,location
+
+Syntax: default_type mime-type;
+Default: default_type text/plain;
+Context: http,server,location
+
+Syntax: types_hash_bucket_size size;
+Default: type_hash_bucket_size 64;
+Context: http,server,location
+
+Syntax: types_hash_max_size size;
+Default: types_hash_max_size 1024;
+Context: http,server,location
+```
+
+
+
+### static模块对URL不以斜杠结尾却访问目录的做法
+
+```bat
+如果URL不以斜杠结尾，则会触发301重定向
+```
+
+
+
+#### 示例
+
+```bash
+[root@ubuntu2204 conf.d]#cat dir.mystical.tech.conf 
+server {
+    server_name dir.mystical.tech;
+    server_name_in_redirect on;
+    listen 8088;
+    port_in_redirect off;
+    #absolute_redirect off;
+
+    root html/;
+}
+
+# 结果
+[root@ubuntu2204 conf.d]#curl 127.1:8088/first -I
+HTTP/1.1 301 Moved Permanently
+Server: nginx/1.26.2
+Date: Mon, 15 Sep 2025 06:37:57 GMT
+Content-Type: text/html
+Content-Length: 169
+Location: http://dir.mystical.tech/first/                
+Connection: keep-alive
+
+# 三个变量都是用于控制location后的值
+# server_name_in_redirect on，用来判断是否在location显示server_name
+# port_in_redirect off        用来显示是否在location记录端口
+# absolute_redirect off       是否只记录路径，不记录前面的host
+```
+
+
+
+
+
+### 使用content模块提升多个小文件性能
+
+#### 功能
+
+当页面需要访问多个小文件时，把它们的内容合并到一次http响应中返回，提升性能
+
+
+
+#### 模块
+
+```nginx
+ngx_http_concat_module
+# 模块开发者（Tengine https://github.com/alibaba/nginx-http-concat）
+--add-module=../nginx-http-concat/
+```
+
+
+
+#### 使用
+
+```bash
+# 在URI后加上??,后通过多个，逗号分隔文件
+# 如果还有参数，则在最后通过?添加参数
+# 示例
+https://g.alicdn.com/??kissy/k/6.2.4/seed-min.js,kg/global-util/1.0.7/index-min.js,tb/tracker/4.3.5/index.js,kg/tb-nav/2.5.3/index-min.js,secdev/sufei_data/3.3.5/index.js
+```
+
+
+
+#### 指令
+
+```nginx
+Syntax: concat on|off
+Default: concat off
+Context: http,server,location
+
+Syntax: concat_types MIME types;
+Default: concat_types: text/css application/x-javascript;
+Context: http,server,location
+
+Syntax: concat_unique on|off;
+Default: concat_unique on;
+Context: http,server,location
+
+Syntax: concat_max_files numberp;
+Default: concat_max_files 10;
+Context: http,server,location
+
+Syntax: concat_delimiter string;
+Default: NONE;
+Context: http,server,location
+
+Syntax: concat_ignore_files_error on|off;
+Default: off;
+Context: http,server,location
+```
+
+
+
+#### 示例
+
+```nginx
+server {
+    server_name concat.mystical.tech;
+    error_log logs/myerror.log debug;
+    concat on;
+    root html;
+    
+    location /concat {
+        concat_max_files 20;
+        concat_types text/plain;
+        concat_unique on;
+        concat_delimiter ':::';
+        concat_ignore_file_error on;
+    }
+}
+```
+
+![image-20250915150733983](../markdown_img/image-20250915150733983.png)
+
+
+
+
+
+### http过滤模块的调用过程
+
+http11个阶段中，在content阶段，会生成返回给客户的响应内容。对用户的响应内容还需要做再加工处理。而http过滤模块正是对响应内容做处理的。因此它实际上是在log之前，content之后，去介入请求的处理的。
+
+
+
+#### 过滤模块的位置
+
+![image-20250915153530484](../markdown_img/image-20250915153530484.png)
+
+
+
+#### 返回响应-加工响应内容
+
+**HTTP 过滤模块**
+
+- **copy_filter：**复制包体内容
+- **postpone_filter：**处理子请求
+- **header_filter：**构造响应头部
+- **write_filter：**发送响应
+
+```bash
+# 模块优先级从下往上
+&ngx_http_write_filter_module,
+&ngx_http_header_filter_module,
+&ngx_http_postpone_filter_module,
+&ngx_http_copy_filter_module,
+```
+
+
+
+### 用过滤模块更改响应中的字符串：sub模块
+
+#### 功能
+
+将响应中指定的字符串，替换成新的字符串
+
+
+
+#### 模块
+
+```bat
+ngx_http_sub_filter_module模块，默认未编译进Nginx，通过--with-http_sub_module启用
+```
+
+
+
+#### 指令
+
+```nginx
+# 替换响应中的字符串
+Syntax: sub_filter string replacement;
+Default: —
+Context: http,server,location
+```
+
+```nginx
+# 是否返回原先的last_modified
+Syntax: sub_filter_last_modified on| off;
+Default: sub_filter_last_modified off;
+Context: http,server,location
+```
+
+```nginx
+# 只修改一次，还是全部修改
+Syntax: sub_filter_once on|off;
+Default: sub_filter_once on;
+Context: http,server,location
+```
+
+```nginx
+# 只针对什么样类型的响应进行替换
+Syntax: sub_filter_types mime-type...;
+Default: sub_filter_types text/html;
+Context: http,server,location
+```
+
+
+
+#### 示例
+
+```bash
+server {
+    server_name sub.mystical.tech;
+    error_log logs/myerror.log info;
+    
+    location / {
+        #sub_filter 'Nginx.org' '$host/nginx';
+        #sub_filter 'Nginx.com' '$host/nginx';
+        #sub_filter_once on;
+        #sub_filter_once off;
+        #sub_filter_last_modified off;
+        #sub_filter_last_modified on;
+    }
+}
+```
+
+
+
+### 用过滤模块在http响应的前后添加内容：addition模块
+
+#### 功能
+
+在响应前或者响应后增加内容，而增加内容的方式是通过新增子请求的响应完成
+
+
+
+#### 模块
+
+```bat
+ngx_http_addition_filter_module
+默认未编译进Nginx
+通过--with-http_addition_module启用
+```
+
+
+
+#### 指令
+
+```nginx
+# 响应前添加内容（后面反向代理uri的内容）
+Syntax: add_before_body uri;
+Default: —
+Context: http,server,location
+```
+
+```nginx
+# 响应后添加内容（后面反向代理uri的内容）
+Syntax: add_after_body uri;
+Default: —
+Context: http,server,location
+```
+
+```nginx
+# 只针对什么样类型的响应添加内容
+Syntax: addition_types mime-type ...;
+Default: addition_types text/html;
+Context: http,server,location
+```
+
+
+
+#### 示例
+
+```nginx
+server {
+    server_name addition.mystical.tech;
+    error_log logs/myerror.log info
+       
+    location / {
+        add_before_body /before_action;
+        add_after_body /after_action;
+        addition_types *;
+    }
+    location /before_action {
+        return 200 'new content before\n';
+    }
+     location /after_action {
+        return 200 'new content after\n';
+    }
+    location /testhost {
+        uninitialized_variable_warn on;
+        set $foo 'testhost';
+        return 200 '$gzip_ratio\n';
+    }
+}
+
+# 访问addition.mystical.tech，返回
+[root@ubuntu2204 conf.d]#curl addition.mystical.tech/a.txt
+new content before
+a
+new content after
+```
+
+
+
+
+
 
 
 
@@ -4813,6 +5565,28 @@ Context:  http,server,location,limit_except
 
 - 我们的变量值在一个请求的持续处理中，是可能持续变化的，有一些是不会变化的，比如http头部，方法名，有一些是持续变化的，比如limit_rate限流限速，因此我们在读取这类值的那一刻，它的值并不代表请求处理之前的值，有一些时刻变化的变量值，它只反应我们在使用的那一刻的数值
 
+
+
+#### 存放变量的哈希表
+
+```nginx
+# 这里关注nginx变量的长度
+Syntax: variables_hash_bucket_size size;
+Default: variables_hash_bucket_size 64;
+Context: http
+```
+
+```nginx
+# 这里关注nginx变量数量
+Syntax: variables_hash_max_size size;
+Default: variables_hash_max_size 1024;
+Context: http
+```
+
+
+
+
+
 #### http框架提供的请求相关变量
 框架提供的变量不需要我们引入新的http模块，而且框架提供的变量往往反应了用户发来的请求，被nginx处理的过程细节
 
@@ -4839,6 +5613,8 @@ limit_rate: $limit_rate
 hostname: $hostname
 content_length: $content_length
 status: $status';
+body_bytes_sent: $body_bytes_sent,bytes_sent: $bytes_sent
+time: $request_time,$msec,$time_iso8601,$time_local';
     }
 }
 
@@ -4861,14 +5637,355 @@ status: 200
 ```
 
 #### http框架提供的变量分类
-- httpq请求相关变量
-  - arg_参数名：url中某个具体参数的值
-  - query_string: 与args变量完全相同
-  - args: 全部URL参数
-- TCP连接相关变量
-- Nginx处理请求过程中产生的变量
-- 发送HTTP响应时相关的变量
-- Nginx系统变量
+- **http请求相关变量**
+  - **arg_参数名**：url中某个具体参数的值
+  - **query_string**: 与args变量完全相同
+  - **args:** 全部URL参数
+  - **is_args**：如果请求URL中有参数则返回?，否则返回空
+  - **content_length**：HTTP请求中标识包体长度的Content-Length头部的值
+  - **content_type**：标识请求包体类型的Content-Type头部的值
+  - **uri: **请求的URI（不同于URL，不包括?后的参数）
+  - **document_uri：**与uri完全相同
+  - **request_uri：**请求的URI（包括URI以及完整的参数）
+  - **scheme：**协议名，例如HTTP或者HTTPS
+  - **request_method：**请求方法，例如GET或者POST
+  - **request_length：**所有请求内容的大小，包括请求行，头部，包体等
+  - **remote_user：**由HTTP Basic Authentication 协议传入的用户名
+  - **request_body_file：**临时存放请求包体的文件
+    - 如果包体非常小，则不会存文件
+    - client_body_in_file_only 强制所有包体存入文件，且可决定是否删除
+  - **request_body：**请求中的包体，这个变量当且仅当使用反向代理，且设定用内存暂存包体是才有效
+  - **request：**原始的url请求，含有方法与协议版本，例如GET/?a=1&b=22 HTTP/1.1
+  - **host：**
+    - 先从请求行中获取
+    - 如果含有Host头部，则用其值替换掉请求行中的主机名
+    - 如果前两者都取不到，则使用匹配上的server_name
+  - **http_头部名字**：返回一个具体请求头部的值
+    - **特殊**：(值可能需要处理)
+      - http_host
+      - http_user_agent
+      - http_referer
+      - http_via
+      - http_x_forwarded_for
+      - http_cookie
+    - **通用**：（值可以直接使用）
+- **TCP连接相关变量**
+  - **binary_remote_addr：**客户端地址的整型格式，对于IPV4是4字节，对于IPv6是16字节
+  - **connection：**递增的连接序号
+  - **connection_requests：**当前连接上执行过的请求数，对keepalive连接有意义
+  - **remote_addr：**客户端地址
+  - **remote_port：**客户端端口
+  - **proxy_protocol_addr：**若使用了proxy_protocol协议则返回协议中的地址，否则返回空
+  - **proxy_protocol_port：**若使用了proxy_protocol协议则返回协议中的端口，否则返回空
+  - **server_addr：**服务器地址
+  - **server_port：**服务器端口
+  - **TCP_INFO：**tcp内核层参数，包括`$tcpinfo_rtt`, `$tcpinfo_rttvar`, `$tcpinfo_snd_cwnd`, `$tcpinfo_rcv_space`
+  - **server_protocol：**服务器协议，例如HTTP/1.1
+- **Nginx处理请求过程中产生的变量**
+  - **request_time：**请求处理到现在的耗时，单位为秒，精确到毫秒
+  - **server_name：**匹配上请求的server_name值
+  - **https：**如果开启 TLS/SSL，则返回on，否则返回空
+  - **request_completion：**若请求处理完则返回ok，否则返回空
+  - **request_id：**以16禁止输出的请求标识id，该id共含16个字节，是随机生成的
+  - **request_filename：**待访问文件的完整路径
+  - **document_root：**由URI和root/alias规则生成的文件夹路径
+  - **realpath_root：**将document_root中的软链接等换成真实路径
+  - **limit_rate：**返回客户端响应时的速度上限，单位为每秒字节数。可以通过set指令修改对请求产生效果
+- **发送HTTP响应时相关的变量**
+  - **body_bytes_sent：**响应中body包体的长度
+  - **bytes_sent：**全部http响应长度
+  - **status：**http响应中的返回码
+  - **sent_trailer_名字：**把响应结尾内容里值返回
+  - **sent_http_头部名字：**响应中某个具体头部的值
+    - **sent_http_content_type**
+    - **sent_http_content_length**
+    - **sent_http_location**
+    - **sent_http_last_modified**
+    - **sent_http_connection**
+    - **sent_http_keep_alive**
+    - **sent_http_transfer_encoding**
+    - **sent_http_cache_control**
+    - **sent_http_link**
+- **Nginx系统变量**
+  - **time_local：**以本地时间标准输出的当前时间，例如`14/Nov/2018:15:55:37 +0800`
+  - **time_iso8601：**使用ISO 8601标准输出的当前时，例如`2018-11-14T15:55:37 +08:00`
+  - **nginx_version**：Nginx版本号
+  - **pid：**所属worker进程的进程id
+  - **pipe：**使用了管道则返回p，否则返回.
+  - **hostname：**所在服务器的主机名，与hostname命令输出一致
+  - **msec：**1970年1月1日到现在的时间，单位为秒，小数点后精确到毫秒
+
+
+
+
+### 使用变量防盗链的referer模块
+
+#### 使用场景
+
+某网站通过URL引用了你的页面，当用户在浏览器上点击url时，http请求的头部中会通过referer头部，将该网站当前页面的URL带上，告诉服务器本次请求是由这个页面发起的
+
+
+
+#### 目的
+
+拒绝非正常的网站访问我们站点的资源
+
+
+
+#### 思路
+
+通过referer模块，用invalid_referer变量根据配置判断referer头部是否合法
+
+
+
+#### referer模块
+
+默认编译进Nginx，通过`--without-http_referer_module`禁用
+
+
+
+#### referer模块的指令
+
+```nginx
+Syntax: valid_referers none|blocked|server_names|string ...;
+Default: —
+Context: server,location
+
+# valid_referers指令，可以同时携带多个参数，表示多个referer头部都生效
+# 参数值
+none           # 允许缺失referer头部的请求访问
+block          # 允许referer头部没有对应的值的请求访问
+server_name    # 若referer中站点域名和server_name中的本机域名某个匹配，则允许该请求访问
+表示域名及URL的字符串，对域名可在前缀或者后缀中含有*通配符         # 若referer头部的值匹配字符串后，则允许访问
+正则表达式                                                  # 若referer头部的值匹配正则表达式后，则允许访问 
+
+# invalid_referer变量
+- 允许访问时变量值为空
+- 不允许访问时变量值为1
+```
+
+```nginx
+Syntax: referer_hash_bucket_size size;
+Default: referer_hash_bucket_size 64;
+Context: server,location
+```
+
+```nginx
+Syntax: referer_hash_max_size size;
+Default: referer_hash_max_size 2048;
+Context: server,location
+```
+
+
+
+#### 示例
+
+```nginx
+server {
+    server_name referer.mystical.tech;
+    
+    error_log logs/myerror.log debug;
+    root html;
+    location / {
+        valid_referers none blocked server_names *.mystical.pub ;
+        if ($invalid_referer) {
+            return 403;
+        }
+        
+        return 200 'valid\n';
+    }
+}
+```
+
+
+
+
+
+因为对于攻击者来说，在报文中伪造referer头部的成本很低，所以referer模块的防盗链功能很容易基本失效
+
+
+
+### 更强的防盗链解决方案：secure_link模块
+
+#### 使用secure_link功能防盗链的过程
+
+- 由某服务器（也可以是Nginx）生成加密后的安全链接URL，返回给客户端
+- 客户端使用安全URL访问Nginx，由Nginx的`secure_link`变量判断是否验证通过
+
+```bat
+- A 生成带签名的临时 URL（含 md5/expires 等），把链接返给浏览器。
+
+- B(Nginx) 用 secure_link 校验：签名不对 → 403；过期 → 410；通过 → 放行资源。
+
+- 这样一来，URL 只在有效期内可用，过期即失效，能有效阻止“长期盗用/长期外链”。
+```
+
+
+
+#### 原理
+
+- 哈希算法是不可逆的
+- 客户端只能拿到执行过哈希算法的URL
+- 仅生成URL的服务器，验证URL是否安全的Nginx这两者，才保存执行哈希算法前的原始字符串
+- 原始字符串通常由以下部分有序组成
+  - 资源位置，例如HTTP中指定资源的URL，防止攻击者拿到一个安全URL后可以访问任意资源
+  - 用户信息，例如用户IP地址，限制其他用户盗用安全URL
+  - 时间戳，使安全URL及时过期
+  - 密钥，仅服务器端拥有，增加攻击者猜测出原始字符串的难度
+
+
+
+#### 模块
+
+```nginx
+使用 ngx_http_secure_link_module 模块
+默认未编译进 nginx，
+需要通过 --with-http_secure_link_module 添加
+```
+
+
+
+#### secure_link模块指令
+
+```nginx
+Syntax: secure_link expression;
+Default: —
+Context: http,server,location
+```
+
+```nginx
+Syntax: secure_link_md5 expression;
+Default: —
+Context: http,server,location
+```
+
+```nginx
+Syntax: secure_link_secret word;
+Default: —
+Context: location
+```
+
+
+
+![image-20250917172733613](D:\git_repository\cyber_security_learning\markdown_img\image-20250917172733613.png)
+
+
+
+
+
+#### 变量值及带过期时间的配置示例
+
+**命令行生成安全链接**
+
+```bash
+# 原请求
+/test1.txt?md5=md5生成值&expires=时间戳（如2147483647）
+
+# 生成md5
+echo -n '时间戳URL客户端IP密钥' | openssl md5 -binary | openssl base64 | tr +/ -_ |tr -d =
+```
+
+
+
+**nginx配置**
+
+```bash
+secure_link $arg_md5,$arg_expires;
+secure_link_md5 "$secure_link_expires$uri$remote_addr secret";
+```
+
+
+
+#### 示例配置
+
+```nginx
+server {
+    server_name securelink.mystical.tech;
+    error_log logs/myerror.log info;
+    default_type text/plain;
+    location / {
+        secure_link $arg_md5,$arg_expires;
+        secure_link_md5 "$secure_link_expires$uri$remote_addr secret";
+        
+        if ($secure_link = "") {
+            return 403;
+        }
+        
+        if ($secure_link = "0") {
+            return 410;
+        }
+        
+        return 200 '$secure_link: $secure_link_expires\n';
+    }
+    
+    location /p/ {
+        secure_link_secret mysecret2;
+        
+        if ($secure_link = "") {
+            return 403;
+        }
+    }
+}
+```
+
+```bash
+# 测试
+echo -n '2147483647/test1.txt116.62.160.193 secret'| openssl md5 binary|openssl base64|tr +/ -_ | tr -d =
+生成MD5值XXXXXXXXXXX
+
+curl 'securelink.mystical.tech/test1.txt?md5=xxxxxxxxxxx&expires=2147483647'
+返回1:2147483647
+```
+
+
+
+#### 仅对URI进行哈希的简单办法
+
+- 将请求URL分为3个部分
+
+  ```http
+  /prefix/hash/link
+  ```
+
+- Hash生成方式
+
+  - 对"link密钥"做md5哈希求值
+
+- 用secure_link_secret secret; 配置密钥
+
+
+
+#### 示例
+
+```bash
+......
+location /p/ {
+        secure_link_secret mysecret2;
+        
+        if ($secure_link = "") {
+            return 403;
+        }
+        
+        rewrite ^ /secure/$secure_link;
+    }
+    
+location /secure/ {
+       alias html/;
+       internal;
+}
+    
+# 生成md5
+echo -n 'test1.txtmysecret2' | openssl md5 -hex
+(stdin)=c3f9b32bf901b04c052ea9511e29a918
+
+# 测试
+curl 'securelink.mystical.tech/p/c3f9b32bf901b04c052ea9511e29a918/test1.txt'
+test1
+```
+
+
+
+
 
 # 反向代理与负载均衡
 
