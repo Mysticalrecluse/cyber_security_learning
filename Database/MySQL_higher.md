@@ -8139,7 +8139,7 @@ systemctl start mysqld
 
 常用的逻辑备份工具包括`mysqldump`、`mysqldumper`、`phpMyAdmin`等
 
-mysqldump是MySQL官方提供的客户端备份工具，通过mysql协议连接至mysql服务器进行备份，mysqldump命令是将数据库中的数据备份成一个文本文件，数据表的结构和数据都存储在文本文件中
+mysqldump是MySQL官方提供的客户端备份工具，通过mysql协议连接至mysql服务器进 是将数据库中的数据备份成一个文本文件，数据表的结构和数据都存储在文本文件中
 
 - InnoDB建议备份策略
 ```shell

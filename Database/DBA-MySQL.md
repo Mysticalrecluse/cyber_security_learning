@@ -1,4 +1,4 @@
-# MySQL历史及知识体系
+# 数据库基本概念
 
 ## 什么是数据库
 
@@ -413,8 +413,8 @@ OLTP（联机事务处理）和OLAP（联机分析处理）是两种数据库处
 
 ### OLTP（联机事务处理）
 
-1. **定义**： OLTP是⼀种⾯向⽇常业务操作的数据库处理⽅式，⽤于⽀持⽇常的事务性操作，例如插⼊、更新和删 除记录。 
-2. **特点**： OLTP系统通常涉及⼤量的短期交易，每个交易可能只涉及到少量的数据。它强调实时性、⾼并发和数 据⼀致性。 
+1. **定义**： OLTP（Online Transaction Processing）是⼀种⾯向⽇常业务操作的数据库处理⽅式，⽤于⽀持⽇常的事务性操作，例如插⼊、更新和删除记录。 
+2. **特点**： OLTP系统通常涉及⼤量的短期交易，每个交易可能只涉及到少量的数据。它强调实时性、⾼并发和数据⼀致性。 
 3. **目标**： 主要⽤于记录业务活动的原⼦性操作，例如订单处理、在线购物、银⾏交易等。OLTP系统通常针对操 作型数据库设计，采⽤规范化的数据库结构以避免数据冗余。 
 4. **性能指标**： OLTP系统的性能关注点通常在于处理速度、并发性和事务的⼀致性。
 
@@ -422,7 +422,7 @@ OLTP（联机事务处理）和OLAP（联机分析处理）是两种数据库处
 
 ### OLAP（联机分析处理）
 
-1. **定义**： OLAP是⼀种⽤于⽀持决策⽀持和业务智能的数据库处理⽅式，强调对⼤量历史数据的分析和查询。 
+1. **定义**： OLAP（Online Analytical Processing）是⼀种⽤于⽀持决策⽀持和业务智能的数据库处理⽅式，强调对⼤量历史数据的分析和查询。 
 2. **特点**： OLAP系统通常涉及复杂的查询和分析操作，需要处理⼤量的数据。它强调数据的分析、汇总和报告 功能。 
 3. **⽬标**： 主要⽤于⽀持决策制定、趋势分析、数据挖掘等，例如销售趋势分析、业务预测等。OLAP系统通常 采⽤多维度数据库结构，以便更好地⽀持多维度数据的查询和分析。 
 4. **性能指标**： OLAP系统的性能关注点通常在于查询速度、数据汇总和灵活性
@@ -440,9 +440,86 @@ OLTP（联机事务处理）和OLAP（联机分析处理）是两种数据库处
 
 综合来说，OLTP和OLAP分别服务于业务操作和决策⽀持两个不同层⾯的需求，数据库系统在设计上需要考虑满⾜ 这两种处理⽅式的要求
 
+```bat
+OLTP和OLAP结合（HTAP）的挑战：
+1. 如何保证在进行数据分析的时候，不影响在线业务
+2. 如何保证数据的实时性，即在查询的时候，数据是实时更新的数据
+```
 
 
 
+
+
+# MySQL历史及知识体系介绍
+
+## 什么是MySQL
+
+MySQL 是最流⾏的开源数据库（ https://db-engines.com/en/ranking）
+
+<img src="../markdown_img/image-20250923093636007.png" alt="image-20250923093636007" style="zoom:150%;" />
+
+
+
+MySQL被⼴泛⽤于Web开发、企业应⽤、嵌⼊式系统等各种场景。其稳定性、性能和灵活性使其成为许多开发者 和企业的⾸选数据库系统之⼀。
+
+以下是MySQL的⼀些关键特点和概念： 
+
+1. **关系型数据库管理系统（RDBMS）**：MySQL采⽤关系型数据库模型，数据存储在表格中，表之间通过关系建 ⽴联系。这种结构有助于更有效地组织和管理数据。 
+2. **开源**：MySQL是开源软件（**遵循 GPL 协议**），⽤户可以免费获取、使⽤、修改和分发它。这使得MySQL成 为许多⼩型和中⼩型项⽬的⾸选数据库。 
+3. **跨平台性**：MySQL可以在各种操作系统上运⾏，包括Windows、Linux、macOS等，提供了很⼤的灵活性。 
+4. **SQL语言**：MySQL使⽤结构化查询语⾔（SQL）作为与数据库交互的标准语⾔。SQL提供了⼀套强⼤的操作 数据库的命令，包括查询、更新、插⼊和删除等。 
+5. **ACID属性**：MySQL遵循ACID属性，确保事务的原⼦性（Atomicity）、⼀致性（Consistency）、隔离性 （Isolation）和持久性（Durability）。 
+6. **复制和故障转移**：MySQL⽀持复制机制，允许将数据从⼀个数据库服务器复制到另⼀个服务器，以实现数据 备份、负载均衡和故障转移。 
+7. **存储引擎**：MySQL⽀持多种存储引擎，如InnoDB、MyISAM等，每种引擎有不同的特性和优势，使⽤户能够 根据具体需求选择合适的存储引擎。 
+8. **⼤社区和支持**：由于MySQL的⼴泛使⽤，它拥有庞⼤的社区和⽀持⽹络，⽤户可以在社区中找到⼤量的⽂ 档、教程和解决问题的资源。
+
+
+
+
+
+## MySQL历史
+
+1995年，MySQL 1.0发布，仅供内部使⽤。
+
+1996年，MySQL 3.11.1发布，直接跳过了MySQL 2.x版本。
+
+1999年，MySQL AB公司成⽴。同年，发布MySQL 3.23，该版本集成了Berkeley DB存储引擎。该引擎由 Sleepycat公司开发，⽀持事务。在集成该引擎的过程中，对源码进⾏了改造，为后续可插拔式存储引擎架构奠定 基础。
+
+2000年，ISAM升级为MyISAM存储引擎。同年，MySQL基于GPL协议开放源码。
+
+2002年，MySQL 4.0发布，集成了后来⼤名鼎鼎的InnoDB存储引擎。该引擎由Innobase公司开发，⽀持事务，⽀持⾏级锁，适⽤于OLTP等⾼并发场景。
+
+2005年，MySQL 5.0发布，开始⽀持游标，存储过程，触发器，视图，XA事务等特性。同年，Oracle收购 Innobase公司。
+
+2008年，Sun以10亿美⾦收购MySQL AB。同年，发布MySQL 5.1，其开始⽀持定时器（Event scheduler），分区，基于⾏的复制等特性。
+
+2009年，Oracle以74亿美⾦收购Sun公司。
+
+2010年， MySQL 5.5 发布。
+
+2013年，MySQL 5.6 发布。
+
+2015年，MySQL 5.7 发布。
+
+2018年，MySQL 8.0 发布。
+
+
+
+
+
+## MySQL发布史
+
+- **5.7 LTS 已停止维护，因此推荐使用8.0/8.4（8.4部分改动差异较大）**
+
+<img src="../markdown_img/image-20250923104153411.png" alt="image-20250923104153411" style="zoom:150%;" />
+
+
+
+
+
+## MySQL知识体系
+
+<img src="../markdown_img/image-20250923104734075.png" alt="image-20250923104734075" style="zoom:150%;" />
 
 
 
@@ -957,7 +1034,7 @@ table_open_cache_instances = 64
 
 
 
-### 上述参数含义
+### 上述部分参数含义
 
 **back_log = 2048**
 
@@ -1047,6 +1124,514 @@ table_open_cache_instances = 64
 - **影响**：`mysql.user` 中 **以主机名写的账号**（如 `'u'@'app01.mydomain'`）将不匹配，必须改用 IP/网段（如 `'u'@'10.0.%'`、`'u'@'%'`）。
 - **变更方式**：启动参数/配置文件项，**需要重启** mysqld 生效。
 - **常见收益**：显著降低登录抖动与 “Host 'x' is not allowed to connect to this MySQL server” 等因 DNS 引起的问题。
+
+
+
+
+
+
+
+# MySQL体系架构
+
+## MySQL体系介绍
+
+
+
+<img src="../markdown_img/image-20250923110708645.png" alt="image-20250923110708645" style="zoom:150%;" />
+
+
+
+各组件的作用如下：
+
+- **Connectors**：MySQL Connector是MySQL提供的⼀组官⽅的数据库连接器，⽤于在不同编程语⾔中连接和 操作MySQL数据库。这些连接器充当数据库驱动程序，提供了与MySQL服务器进⾏通信的接⼝。
+
+- **连接池和线程管理**：连接池是⼀个保存和复⽤数据库连接的缓冲区。它允许在需要时从池中获取连接，⽽不 是每次请求时都重新创建连接。线程管理是MySQL⽤于处理客户端请求的组件。对于每个客户端连接， MySQL会为其分配⼀个线程来处理查询和其他数据库操作。这⾥会验证⽤户的账号密码。
+
+- **SQL Interface**：接受客户端发起的 SQL 语句。
+
+- **Parser（查询解析器）**：解析器是MySQL数据库管理系统中的⼀个重要组件，其主要作⽤是解析SQL语句。 解析器负责将⽤户提交的SQL语句转换为MySQL数据库可以理解和执⾏的内部数据结构，以便数据库引擎能 够执⾏相应的操作。
+
+  MySQL 解析器作⽤包括：
+
+  1. 语法分析：解析器对SQL语句进⾏语法分析，确保其符合MySQL⽀持的SQL语法规范。如果SQL语句有 语法错误，解析器将报告错误信息。
+  2. 构建查询树：解析器将合法的SQL语句转换为⼀棵查询树（Query Tree）或查询语法树（Syntax  Tree）。这颗树结构表示SQL语句的层次结构和语法关系，有助于数据库引擎进⾏后续的优化和执⾏。
+  3. 表达式分析：解析器负责识别SQL语句中的表达式，包括数学运算、逻辑运算、函数调⽤等。它将表达 式解析为内部表示，以便数据库引擎能够正确执⾏这些表达式。
+  4. 权限检查：解析器可能涉及到对⽤户权限的检查，确保⽤户有权执⾏提交的SQL语句。这包括对表、列 的访问权限等。
+
+- **Optimizer（优化器）**：MySQL优化器是MySQL中的⼀个关键组件，其主要作⽤是分析和优化SQL查询语句，以提⾼查询性能。优化器的主要作⽤包括：查询重写（等价重写）、索引选择、连接顺序优化、⼦查询优化等。
+
+- **Caches（缓存）**：
+
+  MySQL中有多种类型的缓存，⽤于提⾼查询性能和减轻数据库负担。以下是MySQL中常⻅的⼏种缓存：
+
+  1. 查询缓存(Query Cache)（MySQL5.6,5.7不建议使用，8.0已移除）：
+     - 描述： 查询缓存存储已经执⾏过的查询的结果集，当相同的查询再次被执行时，可以直接返回缓 存中的结果，而不必再次执⾏查询。
+     - 注意： 在MySQL 8.0版本中，查询缓存被移除，因为它在⾼并发和写⼊负载下可能导致性能问 题。
+  2.  InnoDB缓冲池(InnoDB Buffer Pool)：
+     - 描述： InnoDB存储引擎使⽤缓冲池来缓存表数据和索引。这是⼀个内存区域，⽤于存储热点数据，减 少对磁盘的读取次数。
+     - 配置： 可以通过配置参数  **innodb_buffer_pool_size** 来调整InnoDB缓冲池的⼤⼩。
+
+- **可插拔的存储引擎**：
+
+  MySQL 是⼀个⽀持可插拔存储引擎的关系型数据库管理系统。每个存储引擎都有其独特的特性、优势和适⽤ 场景。
+
+  以下是 MySQL 中⼀些常⻅的可插拔存储引擎：
+
+  1. **InnoDB**：
+     - 特点： 默认的存储引擎，⽀持事务、⾏级锁定、外键等特性，适⽤于事务性应⽤。
+     - 适⽤场景： 适⽤于⼤多数 OLTP（联机事务处理）应⽤，要求事务⽀持和数据⼀致性。
+  2. **MyISAM**：
+     - 特点： 不⽀持事务，表级锁定，适⽤于读密集型操作。
+     - 适⽤场景： 适⽤于读操作频繁、写操作相对较少的场景，⽐如数据仓库、⽇志分析等。
+  3. **Memory（或 Heap）**:
+     - 特点： 将表数据存储在内存中，适⽤于需要⾮常快速访问的临时表。
+     - 适⽤场景： 适⽤于需要频繁读写的临时数据，但不适合⽤于持久性数据。
+  4. **CSV**：
+     - 特点： 将表数据存储为逗号分隔的⽂本⽂件，适⽤于数据交换和导⼊导出。
+     - 适⽤场景： 适⽤于需要频繁读写的临时数据，但不适合⽤于持久性数据。
+  5. **Archive**：
+     - 特点： 压缩存储，适⽤于存储⼤量归档数据。
+     - 适⽤场景： 适⽤于⼤量历史数据的归档和查询。
+  6. **Blackhole**：
+     - 特点： 丢弃写⼊的数据，不存储实际数据，⽤于数据复制和同步。
+     - 适⽤场景： 适⽤于数据复制和同步，将写⼊操作传递到其他 MySQL 服务器。
+  7. **TokuDB**：
+     - 特点： ⽀持⾼度压缩、⾼性能的存储引擎。
+     - 适⽤场景： 适⽤于⼤数据量、⾼写⼊负载的场景，例如⽇志、分析等。
+
+- **文件系统**：⽂件系统是计算机系统⽤于组织和存储⽂件的⼀种机制，它提供了⽂件的层次结构、存储管理、 ⽂件访问权限和元数据等功能。⽂件系统通常在存储介质（如硬盘、固态硬盘、光盘等）上创建⼀个逻辑 层，⽤户和应⽤程序可以通过⽂件系统来对⽂件进⾏访问和管理。常⻅的⽂件系统包括：EXT3、EXT4、 XFS。
+
+- **日志**：错误⽇志、慢查询⽇志、General log、Binary Log、Relay log、Redo log 等。
+
+​	
+
+
+
+## 一条SQL查询语句是如何执行的
+
+
+
+![image-20250923112747541](../markdown_img/image-20250923112747541.png)
+
+
+
+### 连接器
+
+连接器负责跟客户端建⽴连接、获取权限、维持和管理连接
+
+```bash
+# mysql -h127.0.0.1 -uroot -p
+```
+
+如果⽤户名密码不对，会收到⼀个"Access denied for user"的错误。
+
+如果⽤户名密码正确，连接器会从权限表⾥⾯查出⽤户拥有的权限。这就意味着，如果修改了权限，只对新创建的连接⽣效。
+
+因为建⽴连接的成本⽐较⾼，所以推荐使⽤⻓连接。
+
+```mysql
+mysql> show global status like 'thread%';
++-------------------+-------+
+| Variable_name     | Value |
++-------------------+-------+
+| Threads_cached    | 0     |
+| Threads_connected | 1     |
+| Threads_created   | 1     |
+| Threads_running   | 2     |
++-------------------+-------+
+4 rows in set (0.02 sec)
+
+# 当前Treads_running是2，查看为什么是2
+# 可以发现两个再跑线程，一个是event_scheduler
+# 把 event_scheduler=ON 后，MySQL 会启动一个事件调度器守护线程（在 SHOW FULL PROCESSLIST 里显示为 User=event_scheduler, Command=Daemon）。它负责按计划检查/触发 EVENT。
+# 另一个是执行SHOW FULL PROCESSLIST这个查询语句临时开启的线程
+# 因此Threads_running = 2
+mysql> SHOW FULL PROCESSLIST;
++----+-----------------+-----------+------+---------+------+------------------------+-----------------------+
+| Id | User            | Host      | db   | Command | Time | State                  | Info                  |
++----+-----------------+-----------+------+---------+------+------------------------+-----------------------+
+| 13 | root            | localhost | NULL | Query   |    0 | init                   | SHOW FULL PROCESSLIST |
+| 14 | event_scheduler | localhost | NULL | Daemon  |  188 | Waiting on empty queue | NULL                  |
++----+-----------------+-----------+------+---------+------+------------------------+-----------------------+
+2 rows in set, 1 warning (0.00 sec)
+
+# 可以上线
+```
+
+
+
+**含义与解读**
+
+| 指标                  | 含义（瞬时值）                                      | 你看到什么就代表什么                                         |
+| --------------------- | --------------------------------------------------- | ------------------------------------------------------------ |
+| **Threads_connected** | 当前“已建立”的客户端连接数（包含 `Sleep`）          | 等价于「现在有多少连接占着 MySQL」。会受 `wait_timeout`、应用连接池大小影响。 |
+| **Threads_running**   | 当前正在执行的连接线程数（非 `Sleep`）              | 反映**并发正在跑的请求数**，与 CPU/IO 压力、锁等待强相关。持续高说明在“排队/争用”。 |
+| **Threads_cached**    | 线程缓存里**可复用**的空闲工作线程数量              | 新连上来可直接复用而**无需新建线程**。为 0 代表“此刻没有空闲可复用的线程”，不等于“线程缓存关闭”。 |
+| **Threads_created**   | 自服务器启动以来 **新创建**的工作线程总数（累积值） | 线程缓存没命中时就会+1。若启动后一直增长，说明连接“频繁建/销”，缓存太小或没有连接池。 |
+
+> 你现在的值：`connected=2, running=2, cached=0, created=2`
+>  解读：目前只有两条连接且都在执行；没有空闲可复用线程；这两条连接到来时各新建了一个线程（因此 created=2）。
+
+
+
+#### Threads_connected详解
+
+- 它统计的是**当前已建立的“客户端会话”数量**（不管是 `Sleep` 还是在执行中）。
+  - ✅ 包括：**应用的连接池里的连接**、**`mysql` 命令行**、**备份/监控程序（如 mysqld_exporter）**、从库连到主库的复制 **I/O 连接**（在主库上看是个普通用户会话）等——只要是“外部客户端”连进来，都算。
+  - ❌ **不包括**：MySQL **内部/守护**线程，例如 `event_scheduler`、从库上的复制 SQL/I/O 线程、InnoDB 的后台线程、Page Cleaner、Purge、统计线程、MySQL X Plugin 的内部工作线程等。这些在 `PROCESSLIST` 里常显示为 `User = 'system user'` 或 `Command=Daemon`，**不计入** `Threads_connected`。
+
+> 这也解释了你之前看到的现象：`Threads_connected`=1，但 `SHOW FULL PROCESSLIST` 里还有 `event_scheduler`；那条守护线程**不会**把 `Threads_connected` 撑大。
+
+
+
+#### 详解连接池
+
+**连接池是在应用/中间件里实现的**（HikariCP、Go `database/sql`、Node `mysql2` 等），维护一组到 MySQL 的**已建立连接**。
+
+每次访问时，从池里**借用现成连接**（checkout）→ 执行 SQL → **归还**（check-in），避免反复 `connect/auth` 的开销。
+
+连接池还能**限制并发**（最大连接数）、维持少量**预热空闲连接**，并做**健康检查**与**回收**。
+
+> 几点容易忽略的小差别/最佳实践：
+>
+> 1. **不等于“永远长连接”**：池会按 `idleTimeout` 回收空闲连接；MySQL 侧也会按 `wait_timeout` 踢掉长时间空闲的连接。让
+>     **`idleTimeout` < MySQL 的 `wait_timeout`**，避免“池里以为还活着、其实被服务器踢掉”的假死。
+> 2. **一个连接同一时刻只给一个线程用**；用完必须归还（否则泄漏）。
+> 3. 建议开启**预 ping**（`SELECT 1`/`mysql_ping`）和**最大存活时间**（如 30 分钟）：服务器重启或网络抖动时能自动淘汰坏连接。
+> 4. 注意**会话状态重置**（autocommit、事务隔离级别、临时变量）；很多池支持自动 reset。
+> 5. 池大小要结合 MySQL 承载能力：多服务实例会**相乘**，总和不要逼近 `max_connections`。
+
+
+
+##### 连接池实现
+
+**python实现连接池**
+
+```bash
+# 安装依赖
+[root@ubuntu2204 ~]#pip install sqlalchemy pymysql
+
+# python脚本
+[root@ubuntu2204 ~]#cat demo_pool_reuse.py 
+import argparse, threading, time, collections
+from sqlalchemy import create_engine, text
+
+def run_test(url, pool_size=3, max_overflow=0, workers=6, hold_sec=2.0, rounds=3,
+             echo_pool=False, no_pool=False):
+    if no_pool:
+        # 对比用：不使用连接池（每次新建/销毁连接），看不到 conn_id 复用
+        from sqlalchemy.pool import NullPool
+        engine = create_engine(url, poolclass=NullPool, future=True)
+    else:
+        engine = create_engine(
+            url,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_pre_ping=True,
+            pool_recycle=3600,      # 尽量避免运行中被服务器踢掉
+            pool_timeout=30,
+            echo_pool=echo_pool,    # True 时会打印 check-out/in 日志
+            future=True,
+        )
+
+    all_ids = []
+    lock = threading.Lock()
+
+    def worker(i, barrier):
+        barrier.wait()  # 让同一轮的线程同时开始，便于观察并发受限
+        with engine.begin() as conn:  # 从池借连接，用完自动归还
+            conn_id = conn.execute(text("SELECT CONNECTION_ID()")).scalar()
+            with lock:
+                print(f"[round={r:02d} task={i:02d}] got conn_id={conn_id}, holding {hold_sec}s")
+                all_ids.append(conn_id)
+            # 模拟业务占用连接
+            conn.execute(text(f"SELECT SLEEP({hold_sec})"))
+
+    for r in range(rounds):
+        print(f"\n=== Round {r} ===")
+        barrier = threading.Barrier(workers)
+        ts = [threading.Thread(target=worker, args=(i, barrier)) for i in range(workers)]
+        [t.start() for t in ts]
+        [t.join() for t in ts]
+        # 小歇片刻，便于观察下一轮复用
+        time.sleep(0.5)
+
+    # 统计 conn_id 使用次数
+    counter = collections.Counter(all_ids)
+    print("\n=== Summary ===")
+    print(f"unique conn_ids: {len(counter)} | pool_size={pool_size} max_overflow={max_overflow} no_pool={no_pool}")
+    for cid, cnt in counter.most_common():
+        print(f"conn_id={cid} used {cnt} times")
+
+    engine.dispose()
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--url", default="mysql+pymysql://root:123456@10.0.0.202:3306/test")
+    ap.add_argument("--pool-size", type=int, default=3)
+    ap.add_argument("--max-overflow", type=int, default=0)
+    ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument("--hold-sec", type=float, default=2.0)
+    ap.add_argument("--rounds", type=int, default=3)
+    ap.add_argument("--echo-pool", action="store_true")
+    ap.add_argument("--no-pool", action="store_true", help="禁用连接池做对比")
+    args = ap.parse_args()
+
+    run_test(args.url, args.pool_size, args.max_overflow, args.workers,
+             args.hold_sec, args.rounds, args.echo_pool, args.no_pool)
+
+
+# 执行脚本
+# 正常（有连接池）运行：
+[root@ubuntu2204 ~]#python3 demo_pool_reuse.py --pool-size 3 --max-overflow 0 --workers 6 --rounds 3
+
+=== Round 0 ===
+[round=00 task=00] got conn_id=15, holding 2.0s
+[round=00 task=01] got conn_id=16, holding 2.0s
+[round=00 task=05] got conn_id=17, holding 2.0s
+[round=00 task=02] got conn_id=16, holding 2.0s
+[round=00 task=03] got conn_id=15, holding 2.0s
+[round=00 task=04] got conn_id=17, holding 2.0s
+
+=== Round 1 ===
+[round=01 task=05] got conn_id=16, holding 2.0s
+[round=01 task=04] got conn_id=17, holding 2.0s
+[round=01 task=03] got conn_id=15, holding 2.0s
+[round=01 task=00] got conn_id=16, holding 2.0s
+[round=01 task=01] got conn_id=15, holding 2.0s
+[round=01 task=02] got conn_id=17, holding 2.0s
+
+=== Round 2 ===
+[round=02 task=01] got conn_id=15, holding 2.0s
+[round=02 task=05] got conn_id=16, holding 2.0s
+[round=02 task=00] got conn_id=17, holding 2.0s
+[round=02 task=02] got conn_id=15, holding 2.0s
+[round=02 task=03] got conn_id=16, holding 2.0s
+[round=02 task=04] got conn_id=17, holding 2.0s
+
+=== Summary ===
+unique conn_ids: 3 | pool_size=3 max_overflow=0 no_pool=False
+conn_id=15 used 6 times
+conn_id=16 used 6 times
+conn_id=17 used 6 times
+
+
+# 查看mysql
+mysql> show processlist;
++----+-----------------+------------------+------+---------+------+------------------------+-------------------+
+| Id | User            | Host             | db   | Command | Time | State                  | Info              |
++----+-----------------+------------------+------+---------+------+------------------------+-------------------+
+|  5 | event_scheduler | localhost        | NULL | Daemon  |   70 | Waiting on empty queue | NULL              |
+| 11 | root            | localhost        | NULL | Query   |    0 | init                   | show processlist  |
+| 15 | root            | 10.0.0.201:58274 | test | Query   |    1 | User sleep             | SELECT SLEEP(2.0) |
+| 16 | root            | 10.0.0.201:58280 | test | Query   |    1 | User sleep             | SELECT SLEEP(2.0) |
+| 17 | root            | 10.0.0.201:58296 | test | Query   |    1 | User sleep             | SELECT SLEEP(2.0) |
++----+-----------------+------------------+------+---------+------+------------------------+-------------------+
+5 rows in set, 1 warning (0.00 sec)
+
+# 对比（无连接池）运行：
+[root@ubuntu2204 ~]#python3 demo_pool_reuse.py --no-pool --workers 6 --rounds 3
+
+=== Round 0 ===
+[round=00 task=00] got conn_id=18, holding 2.0s
+[round=00 task=03] got conn_id=21, holding 2.0s
+[round=00 task=02] got conn_id=20, holding 2.0s
+[round=00 task=01] got conn_id=19, holding 2.0s
+[round=00 task=04] got conn_id=23, holding 2.0s
+[round=00 task=05] got conn_id=22, holding 2.0s
+
+=== Round 1 ===
+[round=01 task=04] got conn_id=28, holding 2.0s
+[round=01 task=02] got conn_id=26, holding 2.0s
+[round=01 task=00] got conn_id=24, holding 2.0s
+[round=01 task=01] got conn_id=25, holding 2.0s
+[round=01 task=03] got conn_id=27, holding 2.0s
+[round=01 task=05] got conn_id=29, holding 2.0s
+
+=== Round 2 ===
+[round=02 task=04] got conn_id=31, holding 2.0s
+[round=02 task=00] got conn_id=33, holding 2.0s
+[round=02 task=03] got conn_id=30, holding 2.0s
+[round=02 task=01] got conn_id=34, holding 2.0s
+[round=02 task=02] got conn_id=35, holding 2.0s
+[round=02 task=05] got conn_id=32, holding 2.0s
+
+=== Summary ===
+unique conn_ids: 18 | pool_size=3 max_overflow=0 no_pool=True
+conn_id=18 used 1 times
+conn_id=21 used 1 times
+conn_id=20 used 1 times
+conn_id=19 used 1 times
+conn_id=23 used 1 times
+conn_id=22 used 1 times
+conn_id=28 used 1 times
+conn_id=26 used 1 times
+conn_id=24 used 1 times
+conn_id=25 used 1 times
+conn_id=27 used 1 times
+conn_id=29 used 1 times
+conn_id=31 used 1 times
+conn_id=33 used 1 times
+conn_id=30 used 1 times
+conn_id=34 used 1 times
+conn_id=35 used 1 times
+conn_id=32 used 1 times
+```
+
+你会看到并发“活跃连接”≈ `pool_size`，其余线程在应用侧排队；轮次间隙会留下少量 `Sleep` 连接（连接池保留的空闲连接，供下次复用）。
+
+
+
+
+
+#### Threads_cached详解
+
+##### Threads_cache是什么
+
+- **定义**：`Threads_cached` 是**当前线程缓存**（thread cache）中**可复用的空闲工作线程数量**。
+   这些线程**不绑定任何客户端连接**，只是为了下一次“有新连接到来”时，直接复用，免去创建 OS 线程的开销。
+
+- **命中（cache hit）**：当有新客户端连接到来时，**如果 `Threads_cached > 0`**，MySQL **从缓存取一条线程**服务该连接，**不会**增加 `Threads_created`。<span style="color:tomato">**(命中线程缓存时，`Threads_cached` 会减 1)**</span>
+
+- **不命中（cache miss）**：若缓存为空，MySQL **新建一个线程**来服务该连接，此时 **`Threads_created` +1。**
+
+> 注意：这是**线程缓存**，不是“连接池”。连接是否复用由应用侧连接池控制；服务器端只是复用**工作线程**。
+
+
+
+**示例**
+
+```bash
+# 当前Thread_cached = 6
+mysql> show global status like 'thread%';
++-------------------+-------+
+| Variable_name     | Value |
++-------------------+-------+
+| Threads_cached    | 6     |
+| Threads_connected | 1     |
+| Threads_created   | 7     |
+| Threads_running   | 2     |
++-------------------+-------+
+4 rows in set (0.00 sec)
+
+# 在另一个主机连接mysql服务
+[root@ubuntu2204 ~]#/usr/local/mysql8.0/bin/mysql -uroot -h 10.0.0.202 -p
+
+# 再次查看
+mysql> show global status like 'thread%';
++-------------------+-------+
+| Variable_name     | Value |
++-------------------+-------+
+| Threads_cached    | 5     |
+| Threads_connected | 2     |
+| Threads_created   | 7     |
+| Threads_running   | 2     |
++-------------------+-------+
+4 rows in set (0.00 sec)
+
+# 发现Thread_cached - 1 ,Thread_created没变
+```
+
+
+
+**MySQL_OS线程数，P_S线程数，和Thread_cached的关系**
+
+```bat
+OS_线程数  ≈  P_S_线程数  +  Threads_cached  +  误差项ε
+```
+
+> 其中 ε 来自“采样瞬间差 + 未被 P_S 记录的极少数线程”。
+
+
+
+**示例**
+
+```bash 
+# OS线程数
+[root@ubuntu2204 ~]#pstree|grep mysql
+        |-mysqld---43*[{mysqld}]        # mysqld 43 个线程
+        
+# P_S_线程数
+mysql> SELECT COUNT(*) AS ps_total_threads
+    -> FROM performance_schema.threads;
++------------------+
+| ps_total_threads |
++------------------+
+|               38 |
++------------------+
+
+# 查看P_S线程详情
+mysql> SELECT THREAD_ID, THREAD_OS_ID, NAME, TYPE
+    -> FROM performance_schema.threads
+    -> ORDER BY THREAD_OS_ID;
++-----------+--------------+---------------------------------------------+------------+
+| THREAD_ID | THREAD_OS_ID | NAME                                        | TYPE       |
++-----------+--------------+---------------------------------------------+------------+
+|         1 |         1171 | thread/sql/main                             | BACKGROUND |
+|         3 |         1216 | thread/innodb/io_ibuf_thread                | BACKGROUND |
+|         4 |         1217 | thread/innodb/io_read_thread                | BACKGROUND |
+|         5 |         1218 | thread/innodb/io_read_thread                | BACKGROUND |
+|         6 |         1219 | thread/innodb/io_read_thread                | BACKGROUND |
+|         7 |         1220 | thread/innodb/io_read_thread                | BACKGROUND |
+|         8 |         1221 | thread/innodb/io_write_thread               | BACKGROUND |
+|         9 |         1222 | thread/innodb/io_write_thread               | BACKGROUND |
+|        10 |         1223 | thread/innodb/io_write_thread               | BACKGROUND |
+|        11 |         1224 | thread/innodb/io_write_thread               | BACKGROUND |
+|        12 |         1225 | thread/innodb/page_flush_coordinator_thread | BACKGROUND |
+|        14 |         1244 | thread/innodb/log_checkpointer_thread       | BACKGROUND |
+|        15 |         1245 | thread/innodb/log_flush_notifier_thread     | BACKGROUND |
+|        16 |         1246 | thread/innodb/log_flusher_thread            | BACKGROUND |
+|        17 |         1247 | thread/innodb/log_write_notifier_thread     | BACKGROUND |
+|        18 |         1248 | thread/innodb/log_writer_thread             | BACKGROUND |
+|        19 |         1249 | thread/innodb/log_files_governor_thread     | BACKGROUND |
+|        22 |         1545 | thread/innodb/srv_lock_timeout_thread       | BACKGROUND |
+|        23 |         1546 | thread/innodb/srv_error_monitor_thread      | BACKGROUND |
+|        24 |         1547 | thread/innodb/srv_monitor_thread            | BACKGROUND |
+|        25 |         1548 | thread/innodb/buf_resize_thread             | BACKGROUND |
+|        26 |         1549 | thread/innodb/srv_master_thread             | BACKGROUND |
+|        27 |         1550 | thread/innodb/dict_stats_thread             | BACKGROUND |
+|        28 |         1551 | thread/innodb/fts_optimize_thread           | BACKGROUND |
+|        30 |         1552 | thread/mysqlx/worker                        | BACKGROUND |
+|        31 |         1553 | thread/mysqlx/worker                        | BACKGROUND |
+|        29 |         1554 | thread/mysqlx/acceptor_network              | BACKGROUND |
+|        35 |         1558 | thread/innodb/buf_dump_thread               | BACKGROUND |
+|        36 |         1559 | thread/innodb/clone_gtid_thread             | BACKGROUND |
+|        37 |         1560 | thread/innodb/srv_purge_thread              | BACKGROUND |
+|        38 |         1561 | thread/innodb/srv_worker_thread             | BACKGROUND |
+|        39 |         1562 | thread/innodb/srv_worker_thread             | BACKGROUND |
+|        40 |         1563 | thread/innodb/srv_worker_thread             | BACKGROUND |
+|        41 |         1564 | thread/sql/event_scheduler                  | FOREGROUND |
+|        42 |         1565 | thread/sql/signal_handler                   | BACKGROUND |
+|        43 |         1566 | thread/mysqlx/acceptor_network              | BACKGROUND |
+|        44 |         1568 | thread/sql/compress_gtid_table              | FOREGROUND |
+|        77 |         1671 | thread/sql/one_connection                   | FOREGROUND |
++-----------+--------------+---------------------------------------------+------------+
+38 rows in set (0.00 sec)
+
+# Thread_cached 线程数
+mysql> show global status like 'thread%';
++-------------------+-------+
+| Variable_name     | Value |
++-------------------+-------+
+| Threads_cached    | 6     |
+| Threads_connected | 1     |
+| Threads_created   | 7     |
+| Threads_running   | 2     |
++-------------------+-------+
+4 rows in set (0.00 sec)
+```
+
+> 根据上述讲解，该示例的误差项ε = 1
+
+
+
+
+
+
+
+
+
+### 分析器
 
 
 
