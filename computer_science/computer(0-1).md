@@ -8820,6 +8820,14 @@ AMD 平台的芯片组规则比较清晰：
 
 
 
+#### 内存在服务器中的安装
+
+![image-20250925100545629](../markdown_img/image-20250925100545629.png)
+
+
+
+
+
 #### 远程查看IDC机房中服务器的配置参数
 
 服务器一般都部署在IDC机房中！只能使用demidecode命令查看
@@ -8834,29 +8842,335 @@ AMD 平台的芯片组规则比较清晰：
    141  Memory Array Mapped Address
 [root@devops-custom ~]# dmidecode |tail -n +109
 Memory Device
-        Array Handle: 0x1000
+        Array Handle: 0x0031
         Error Information Handle: Not Provided
-        Total Width: Unknown
-        Data Width: Unknown
+        Total Width: 72 bits
+        Data Width: 64 bits
+        Size: 32 GB
+        Form Factor: DIMM
+        Set: None
+        Locator: DIMM 1
+        Bank Locator: P0 CHANNEL A    # 表示内存条插的位置，在CPU0的A通道上
+        Type: DDR4
+        Type Detail: Synchronous Registered (Buffered)
+        Speed: 2933 MT/s
+        Manufacturer: Samsung
+        Serial Number: 440FEB5D
+        Asset Tag: Not Specified
+        Part Number: M393A4K40DB2-CVF
+        Rank: 2
+        Configured Memory Speed: 2933MT/s
+        Minimum Voltage: 1.2 V
+        Maximum Voltage: 1.2 V
+        Configured Voltage: 1.2 V
+......
+```
+
+**重点信息讲解**
+
+- **位宽信息：**Data Width 是说一次IO并行能提供 64bits 的数据。但要注意到 Total Width 是 72bits。说明因为服务器内存使用的是ECC内存，需要 8bit 冗余存储位来进行数据的校验和纠错。
+
+- **容量信息：**Size这一行的输出是这条内存的容量是32GB。另外 Type Detail 输出的 Synchronnous Registed (Buffered)，表明这是一个带寄存器颗粒的内存。正是因为是带了寄存器颗粒，所以这条内存可以做到32GB的大容量
+- **内存代际：**内存代际分DDR，DDR2，DDR3，DDR4，DDR5等。输出中的 Type 行表明了这是一个 DDR4 的内存，Speed行的输出表明这个内存的数据频率是 2933 MT/s
+
+
+
+![image-20250925103111989](D:\git_repository\cyber_security_learning\markdown_img\image-20250925103111989.png)
+
+
+
+#### 内核是如何检测到内存布局的
+
+在内核启动的时候，内核请求中断号15H，并设置操作码为E820H。然后BIOS就会向内核报告可用的物理内存地址范围。
+
+最后会保存到e820_table全局变量中。
+
+```C
+//file:arch/x86/boot/memory.c
+static void detect_memory_e820(void)
+{
+    struct boot_e820_entry *desc = boot_params.e820_table;
+    
+    initregs(&ireg);
+    ireg.ax = 0xe820;
+    ......
+    do {
+        intcall(0x15, &ireg, $oreg); // 内核请求中断号15H，并设置操作码为E820H
+        ...
+        *desc++ = buf;
+        count++;
+    }while (ireg.ebx && count < ARRAY_SIZE(boot_params.e820_table));
+    
+    boot_params.e820_entries = count;
+}
+```
+
+
+
+#### dmesg查看
+
+![image-20250925104030391](../markdown_img/image-20250925104030391.png)
+
+查看
+
+```bash
+[root@ubuntu2204 ~]#dmesg|grep e820
+[    0.000000] BIOS-e820: [mem 0x0000000000000000-0x000000000009e7ff] usable
+[    0.000000] BIOS-e820: [mem 0x000000000009e800-0x000000000009ffff] reserved
+[    0.000000] BIOS-e820: [mem 0x00000000000dc000-0x00000000000fffff] reserved
+[    0.000000] BIOS-e820: [mem 0x0000000000100000-0x00000000bfecffff] usable
+[    0.000000] BIOS-e820: [mem 0x00000000bfed0000-0x00000000bfefefff] ACPI data
+[    0.000000] BIOS-e820: [mem 0x00000000bfeff000-0x00000000bfefffff] ACPI NVS
+[    0.000000] BIOS-e820: [mem 0x00000000bff00000-0x00000000bfffffff] usable
+[    0.000000] BIOS-e820: [mem 0x00000000f0000000-0x00000000f7ffffff] reserved
+[    0.000000] BIOS-e820: [mem 0x00000000fec00000-0x00000000fec0ffff] reserved
+[    0.000000] BIOS-e820: [mem 0x00000000fee00000-0x00000000fee00fff] reserved
+[    0.000000] BIOS-e820: [mem 0x00000000fffe0000-0x00000000ffffffff] reserved
+[    0.000000] BIOS-e820: [mem 0x0000000100000000-0x000000013fffffff] usable
+[    0.002041] e820: update [mem 0x00000000-0x00000fff] usable ==> reserved
+[    0.002046] e820: remove [mem 0x000a0000-0x000fffff] usable
+[    0.002266] e820: update [mem 0xc0000000-0xffffffff] usable ==> reserved
+[    1.636851] e820: reserve RAM buffer [mem 0x0009e800-0x0009ffff]
+[    1.636854] e820: reserve RAM buffer [mem 0xbfed0000-0xbfffffff]
+```
+
+```bat
+usable(可用)     # 表示可用内存
+reserved(保留)   # 表示这段物理地址范围不能当作普通内存给操作系统使用。它通常被固件或硬件占用，用于特殊用途或供设备做内存映射                  （MMIO），因此 OS 和应用不会在这块区域上分配页框。
+```
+
+
+
+### 初期memblock内存分配器
+
+
+
+- **理解内核初期内存分配器**
+- **了解内存启动时 KDump、页管理等机制对内存的消耗**
+- **理解伙伴系统中可用内存的由来**
+
+
+
+#### 为什么我的内存少了
+
+```bash
+[root@ubuntu2204 ~]#dmidecode |grep -A 10 "Memory Device"|head -10
+Memory Device
+        Array Handle: 0x01A2
+        Error Information Handle: No Error
+        Total Width: 32 bits
+        Data Width: 32 bits
         Size: 4 GB
         Form Factor: DIMM
         Set: None
-        Locator: DIMM 0
-        Bank Locator: Not Specified
-        Type: RAM
-        Type Detail: Other
-        Speed: Unknown
-        Manufacturer: QEMU
-        Serial Number: Not Specified
-        Asset Tag: Not Specified
-        Part Number: Not Specified
-        Rank: Unknown
-        Configured Memory Speed: Unknown
-        Minimum Voltage: Unknown
-        Maximum Voltage: Unknown
-        Configured Voltage: Unknown
-......
+        Locator: RAM slot #0
+        Bank Locator: RAM slot #0
+[root@ubuntu2204 ~]#free -h
+               total        used        free      shared  buff/cache   available
+内存：      3.8Gi       627Mi       2.8Gi       1.0Mi       333Mi       2.9Gi
+交换：      2.0Gi          0B       2.0Gi
 ```
+
+```bat
+使用dmidecode检测内存，发现共4GB，但是free -h 发现只有3.8Gi,为什么少了0.2M
+```
+
+
+
+#### 补充：理解伙伴系统
+
+> 伙伴系统 = **内核的物理页分配器**
+> 虚拟内存 = **地址空间与页表管理 + 页缓存/回收/换页等一整套 VM 机制**
+
+**后续详解**
+
+
+
+```bat
+提到物理内存管理，可能会想到伙伴系统，但其实Linux在启动的时候采用的是更简单的初期分配器
+包括：bootmem、memblock
+```
+
+
+
+####  memblock 内存分配器
+
+![image-20250925111714599](../markdown_img/image-20250925111714599.png)
+
+
+
+
+
+```C
+struct memblock_region {
+    phys_addr_t base;   // 物理起始地址
+    phys_addr_t size;   // 区间大小
+    unsigned long flags;
+    int nid;            // NUMA 节点
+};
+
+struct memblock_type {
+    const char *name;              // "memory" 或 "reserved"
+    unsigned long cnt;             // 当前已用的 region 个数
+    unsigned long max;             // 数组容量
+    phys_addr_t total_size;        // 所有 region 的大小之和
+    struct memblock_region *regions; // 👉 指向 struct memblock_region 的“数组首元素”
+};
+
+// regions指向一段连续结构体数组的指针
+// 这段数组的元素类型是 struct memblock_region，每个元素直接保存一个地址区间（base 起始物理地址 + size 大小），外加一些标记/节点号等元数据，不是再存一个“指向区间的指针”。
+```
+
+
+
+
+
+#### memblock的构建
+
+```C
+//file:arch/x86/kernel/setup.c
+void __init setup_arch(char **cmdline_p)
+{
+    ...
+    // 保存物理内存检测结果
+    e820__memory_setup();
+    ...
+        
+    // memblock内存分配器初始化
+    e820__memblock_setup();
+}
+```
+
+```C
+//file:arch/x86/kernel/e820.c
+void __init e820__memblock_setup(void)
+{
+    ...
+    for (i = 0; i < e820_table->nr_entries; i++) {
+        struct e820_entry *entry = &e820_table->entries[i];
+        ...
+        if (entry->type == E820_TYPE_SOFT_RESERVED)
+            memblock_reserve(entry->addr, entry->size);
+        
+        memblock_add(entry->addr, entry->size);
+    }
+    
+    // 打印 memblock 创建结果
+    memblock_dump_all();
+}
+```
+
+```bat
+首先内核启动，BIOS想内核报告内存（usable/reserved）地址范围，并保存到e820_table中
+遍历e820_table，将usable和reserved分别生成结构体并加入数组，构建memblock
+```
+
+
+
+##### 查看memblock日志的方法
+
+- 修改 `/boot/grub/grub.cfg`文件
+- 添加 `memblock=debug`启动参数
+- 重启服务器
+- 查看 `/proc/cmdline`确认
+
+![image-20250925114409869](../markdown_img/image-20250925114409869.png)
+
+
+
+#### 内核启动时内存消耗
+
+##### KDump机制
+
+内核为了在崩溃时能记录崩溃的现场，方便以后排查分析，设计实现了一套kdump机制。
+
+kdump机制实际上在服务器上启动了两个内核，第一个是正常使用的内核，第二个是崩溃发生时的应急内核。如果发生系统崩溃的时候kdump使用 kexec 启动到第二个内核中运行。这样第一个内核中的内存就得以保留下来。然后可以把崩溃时的所有运行状态都收集到dump core中。
+
+
+
+##### KDump机制内存开销
+
+```C
+//file:arch/x86/kernel/setup.c
+static int __init reserve_crashkernel_low(void)
+{
+    ...
+    // 申请内存
+    low_base = memblock_phys_alloc_range(low_size, CRASH_ALIGN, 0, CRASH_ADDR_LOW_MAX);
+    pr_info("Reserving %ldMB of low memory at %ldMB for crashkernel (low RAM limit: %ldMB)\n",
+           (unsigned long)(low_size >> 20),
+           (unsigned long)(low_size >> 20),
+           (unsigned long)(low_mem_limit >> 20));
+    ...
+}
+
+static void __init reserve_crashkernel(void)
+{
+    ...
+    // 申请内存
+    low_base = memblock_phys_alloc_range(low_size, CRASH_ALIGN, 0, CRASH_ADDR_LOW_MAX);
+    pr_info("Reserving %ldMB of memory at %ldMB for crashkernel (System RAM: %ldMB)\n",
+           (unsigned long)(crash_size >> 20),
+           (unsigned long)(crash_base >> 20),
+           (unsigned long)(total_mem >> 20));
+}
+```
+
+```bat
+Ubuntu 默认不启用 Kdump
+```
+
+
+
+###### 一键开启步骤（Ubuntu 22.04 示例）
+
+```bash
+sudo apt-get install -y kdump-tools crash
+sudo dpkg-reconfigure kdump-tools     # 选择启用；建议 crashkernel 256–512M
+# 或手动：编辑 /etc/default/kdump-tools：USE_KDUMP=1，CRASHKERNEL=512M
+sudo update-grub
+sudo systemctl enable --now kdump-tools
+sudo reboot
+```
+
+
+
+###### 启用后自检
+
+```bash
+cat /proc/cmdline | grep crashkernel      # 应该能看到参数
+cat /sys/kernel/kexec_crash_size          # > 0
+grep -i "Crash kernel" /proc/iomem
+kdump-config status                        # 显示 Crash kernel loaded
+```
+
+> 提醒：如果机器开启了 **Secure Boot**，请使用发行版自带已签名的 crash 内核（安装 `kdump-tools` 即可），否则 kexec 可能被拒绝。
+
+
+
+**正常开启后，日志显示如下**
+
+
+
+![image-20250925143759477](../markdown_img/image-20250925143759477.png)
+
+
+
+
+
+##### 页面管理模型
+
+
+
+![image-20250925143931215](../markdown_img/image-20250925143931215.png)
+
+
+
+![image-20250925145018440](../markdown_img/image-20250925145018440.png)
+
+
+
+![image-20250925161834635](D:\git_repository\cyber_security_learning\markdown_img\image-20250925161834635.png)
 
 
 
