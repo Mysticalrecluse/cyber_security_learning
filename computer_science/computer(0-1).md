@@ -9061,7 +9061,7 @@ void __init e820__memblock_setup(void)
 ```
 
 ```bat
-首先内核启动，BIOS想内核报告内存（usable/reserved）地址范围，并保存到e820_table中
+首先内核启动，BIOS向内核报告内存（usable/reserved）地址范围，并保存到e820_table中
 遍历e820_table，将usable和reserved分别生成结构体并加入数组，构建memblock
 ```
 
@@ -9166,17 +9166,337 @@ kdump-config status                        # 显示 Crash kernel loaded
 
 
 
+###### 解析struct page
+
+Linux 需要为**每个物理页框 PFN**维护一个 `struct page` 元数据。
+
+> **每个物理页框（大小 = `PAGE_SIZE`，常见 4 KiB）对应一个 `struct page` 元数据**。
+
+- **它是什么**：**每个物理页框（PFN）对应的一条元数据记录**。描述该物理页当前被谁持有、是否脏/写回、映射计数、所在 LRU 等
+
+- **它在哪**：在现代内核（`SPARSEMEM + VMEMMAP`）里，`struct page` 数组被映射在一段专用的内核虚拟区（vmemmap）。
+
+
+
+在 **FLATMEM** 模型下，内核会为从 PFN=0 到 `max_pfn-1` 的**每一个物理页框**分配一条 `struct page` 记录（即所谓 `mem_map[]` 数组覆盖整段物理地址空间）。
+
+> PFN = 物理地址 >> `PAGE_SHIFT`（通常 4 KiB 时 `PAGE_SHIFT=12`）
+
+
+
+###### 系统级物理地址空间
+
+- **“系统级物理地址空间的上限”主要由 CPU（更准确：CPU/内存控制器的“物理地址位宽 PA width”）决定**，再叠加**主板/芯片组/固件**的支持能力；它和你现在插了多少内存条（实际 DRAM 容量）**不是一回事**。
+- **可安装/可识别的 DRAM 上限**必须同时满足：
+   **CPU 的 PA 位宽** × **主板/插槽与内存控制器能力** × **固件/OS 支持**。
+   任何一环更低，都会降低最终可用内存上限。
+
+
+
+**举例（感知一下量级）**
+
+- 32 位 x86（无 PAE）：**4 GB** 物理地址上限。
+- 32 位 x86（PAE=36 位）：**64 GB** 上限。
+- 64 位 x86_64 常见物理位宽：**46 位=64 TB**，**48 位=256 TB**，新一代可到 **52 位≈4 PB**。
+   （这些是“理论可寻址上限”，不代表主板就让你插到那么大。）
+
+> 注意区分：**虚拟地址位宽**（比如 x86-64 常见 48/57 位）与 **物理地址位宽**是两码事；前者管进程虚拟空间，后者决定能覆盖多大“系统物理地址尺子”。
+
+
+
+物理地址空间是一把连续的“**地址尺子**”，上限由 **PA 位宽**定死；而你装了多少 DRAM，只是把这把尺子上的**某些区间**用作 **System RAM**。
+
+尺子上还会塞进 **设备 MMIO 窗口/固件保留** 等非 DRAM 区域（我们前面说的 *holes*）。所以**即便 CPU 能寻址得很大，真正给 DRAM 的连续空间也会被这些窗口切开**。
+
+
+
+**影响因素**
+
+**主板/内存槽/通道数**：物理能插多少就是硬上限。
+
+**固件设置**：比如 *Above 4G Decoding/Memory Remap* 决定能否把被低位 MMIO“顶出去”的 DRAM remap 到 4 GB 以上。
+
+**操作系统**：32 位 OS（无 PAE）看不到 4 GB 以上；大内存还需合适的页表模式/配置。
+
+**设备**：大量 PCIe 设备需要大 MMIO 窗口，会占用地址空间。
+
+
+
+```bat
+PA / PA 位宽是什么
+- PA = Physical Address，物理地址。它是在“系统级物理地址空间”这把连续尺子上的刻度，用来给DRAM、MMIO 设备窗口等做寻址。
+- PA 位宽（Physical Address width）：CPU（更准确说 CPU+内存控制器）支持的物理地址线的位数。如果位宽是 N，理论上能寻址 2^N 字节的物理地址空间。
+	- 例：PA=36 → 可寻址 2³⁶ = 64 GiB（约 68.7 GB）
+	- 例：PA=46 → 2⁴⁶ = 64 TiB
+	- 例：PA=48 → 2⁴⁸ = 256 TiB
+	- 例：PA=52 → 2⁵² ≈ 4 PiB
+```
+
+>  注意：**PA 位宽 ≠ 你装了多少内存**。它只是“尺子长度”，实际 DRAM 只覆盖其中若干区间，其余区间可能给 MMIO/固件保留或留空（holes）。
+
+
+
+```bat
+PAE 是什么
+- PAE（Physical Address Extension）：x86 32 位处理器的一项扩展，把物理地址位宽从传统的 32 位（4 GiB 上限）扩到36 位（64 GiB 上限），同时把分页结构从两级改为三级，以便在仍然32 位虚拟地址（每进程 4 GiB 空间）的前提下，内核可以管理更大的物理内存。
+- 数学上：2³⁶ 字节 = 64 GiB（GiB=1024³ 字节）。这就是你看到“PAE=36 → 64 GB（准确说 64 GiB）”的由来。
+
+PAE 做了什么（简述）
+- 改用 三级页表：在 32 位模式下新增 PDPT（Page Directory Pointer Table），CR3 指向 PDPT，PDPT→页目录→页表→物理页框。
+- 虚拟地址仍是 32 位（单进程最多 4 GiB），但物理页框号可扩到 36 位，于是系统总物理内存可达 64 GiB。
+- 仍支持 4 KiB 页与 2 MiB 大页（PAE 下称 2M Page，PSE/PS 位）。
+```
+
+> 实务上：32 位 **Linux** 配合 PAE 可管理到 64 GiB 物理内存；32 位 **Windows** 家庭版即使开启 PAE也常被限制在 4 GB（出于兼容/授权），服务器版支持更高——这是**操作系统与授权策略**的差异，不是 PAE 做不到。
+
+
+
+**如何在机器上查**
+
+- **Linux**
+  - `lscpu | grep "Address sizes"` 可同时看到虚拟/物理地址位宽（如 `48 bits physical, 48 bits virtual`）。
+  - `cat /proc/iomem` 查看哪些物理区段是 **System RAM**、哪些是 **MMIO/Reserved**。
+- **影响可用内存的设置**
+  - BIOS 里的 **Above 4G Decoding/Memory Remap** 决定被低位 MMIO“顶出去”的 DRAM 能否搬到 4 GiB 以上（64 位系统建议开启）。
+
+
+
+###### 理解MMIO
+
+- **MMIO**：把**设备的寄存器/缓冲区**映射到**CPU的物理地址空间**里。CPU 读写这些地址，就像访问内存一样，但实际被**主板/SoC 的地址解码器**转发给设备。
+
+- 常见用途：
+  - **控制寄存器**（非预取、非缓存，读写有副作用）
+  - **帧缓冲/大缓冲**（可 *prefetchable* / *write-combining*，如显卡 framebuffer）
+  - **Doorbell/队列**：用来“敲门”提交 DMA 任务（NVMe、NIC 的队列门铃）
+
+**为什么它会造成“物理地址里的洞**
+
+- 设备需要一段**物理地址窗口**（BAR）供 CPU 访问，固件/OS 会给它们分配地址。
+- 这段地址 **不是 DRAM**，因此在物理地址图里表现为**非 System RAM**；对 OS 看，就是 **hole（无 DRAM）**。
+- 32 位时代典型现象：**3.25–4 GB** 被大量 **PCIe MMIO** 占据，RAM 被“顶出去”。
+   64 位 + “Above 4G Decoding/Memory Remap” 会把被顶出的 RAM **重映射到 4 GB 以上**，所以 RAM 不丢，只是位置变了。
+
+
+
+###### PCIe 设备是怎么拿到 MMIO 地址的
+
+1. **PCIe 配置空间**里有若干 **BAR**（Base Address Register）。
+2. 固件/OS **枚举**设备，读 BAR 大小，**在物理地址空间分配**合适窗口，并把基址写回 BAR。
+3. 从此，CPU 访问这段物理地址就“打到”设备的寄存器/缓冲。
+
+- 查询举例（Linux）：
+
+  ```bash
+  lspci -vv
+  # /sys 暴露已分配的窗口
+  cat /sys/bus/pci/devices/0000:01:00.0/resource
+  ```
+
+
+
+###### 理解DMA
+
+- **PIO（程序控制 I/O）时代：CPU 用指令一口一口把数据从设备读到寄存器**再**写到内存**，CPU亲自“搬砖”，线程常常要**等待**（阻塞或轮询），CPU 也被占着干体力活。
+
+- **DMA**时代：**设备自带的 DMA 引擎**直接把数据在**设备 ↔ 内存**之间搬运；CPU只负责**下命令+收尾**。CPU/线程在等待 I/O 完成时可以去干别的事（或被调度去跑别的线程）。
+
+但：**CPU不能在数据还没到内存就随便读**。必须等 DMA 完成并被内核通知“可以用了”；否则读到的是旧数据或未定义数据。
+
+
+
+
+
+###### 与 DMA / IOMMU 的关系（常被混淆）
+
+- **MMIO** 是 **CPU↔设备** 的**寄存器/门铃/小缓冲**通道（走 CPU 的地址总线）。
+- **DMA** 是 **设备↔系统内存（DRAM）** 的数据通道。设备用自己的 DMA 引擎访问**主存物理地址**（或 IOMMU 映射的 IOVA）。
+- **IOMMU** 影响 DMA 地址翻译，不影响 MMIO（MMIO 仍由 CPU→设备的物理地址窗口决定）。
+
+
+
+1. **设备侧地址（IOVA）**
+   - 在**启用 IOMMU**并按规范走 DMA API 时，设备**通常看到的是 IOVA**；IOMMU 把 **IOVA → HPA（主机物理地址）** 翻译并做权限检查。
+   - 例外：若 **IOMMU 关闭**或设 **直通（iommu=pt）**，设备看到的就是**物理/总线地址**（等价于 IOVA=HPA 的 1:1 映射）。
+2. **CPU 怎么读结果**
+   - CPU **不通过 IOMMU** 取数。CPU 访问内存走的是**自己的 MMU**：**CPU 虚拟地址（VA）→ HPA**。
+   - 驱动分配了一块内存（CPU 以 VA 访问），把这块内存经 `dma_map_*` 映到 IOVA。设备 DMA 把数据写到那块内存对应的 **HPA**。
+   - **DMA 完成后**（并做了必要的缓存一致性处理），CPU 仍用**自己的 VA**去读这块缓冲区；底层页表把 VA 翻到同一个 **HPA**，数据就“在那里”。
+3. **更高级的 SVA（可选了解）**
+   - 在 **SVA/PASID** 场景，设备甚至能**直接使用进程的虚拟地址**（IOVA==进程 VA），IOMMU 复用/镜像进程页表把 **VA→HPA**；但**CPU 仍走自己的 MMU**，两边只是共享地址空间视图。
+4. **小结图（常见路径）**
+   - **设备 DMA**：`IOVA --(IOMMU)--> HPA --(内存控制器)--> DRAM`
+   - **CPU 访问**：`VA --(CPU MMU)--> HPA --(内存控制器)--> DRAM`
+   - 两条路径都落在**同一块 HPA/DRAM**，只是**翻译者不同**（IOMMU vs CPU MMU）。
+5. **两个易错点**
+   - CPU **不能在 DMA 未完成**就读内存；要等中断/完成队列通知并按平台需要做 **cache 同步**（x86 多数天然一致，ARM/RISC-V 需 `dma_sync_*`）。
+   - **MMIO**（CPU 写设备寄存器/门铃）不走 IOMMU；IOMMU只管**设备做 DMA**时的地址翻译与隔离。
+
+这么理解就完全对齐了：**设备看 IOVA（或直通时看 HPA），IOMMU 负责 IOVA→HPA；CPU 一直用自己的 VA→HPA 去读同一块内存**。
+
+
+
+###### MMU详解
+
+**MMU 是什么 & 有什么用**
+
+**MMU 是 CPU 里的地址转换与内存保护硬件**。核心职责：
+
+1. **地址翻译**：把程序使用的**虚拟地址 VA** 转为 **物理地址 PA**（给内存控制器/总线使用）。
+2. **内存保护与隔离**：按页粒度校验访问权限（读/写/执行、用户/内核），实现**进程隔离**。
+3. **属性控制**：为每段内存设定 **缓存策略**（WB/WC/UC 等）、**共享性**、**内存类型**（普通内存/设备内存）和**执行权限（NX/UXN/PXN）**。
+4. **支撑 OS 高级机制**：缺页中断（demand paging）、写时复制（COW）、内核/用户空间分离、ASLR、零拷贝、巨页/透明大页（THP）、NUMA、文件页缓存等。
+
+> 和 **IOMMU** 区分：MMU 管 **CPU VA→PA**；IOMMU 管 **设备 DMA 的 IOVA→PA**。
+
+
+
+**MMU 如何工作（简化的硬件路径）**
+
+1. **指令发起内存访问**（取指或读/写数据）携带 **VA**。
+2. **TLB 查找**：先在 **TLB（Translation Lookaside Buffer）** 里找 VA→PA 的缓存项：
+   - **命中**：得到 **PA + 权限/属性** → 发往缓存/内存或 MMIO。
+   - **未命中**：触发 **硬件页表遍历（page walk）**。
+3. **硬件页表遍历**：按**多级页表**结构，从根表走到叶表（PTE）：
+   - 读取中间表项（有效位、下一层表基址）直到叶子 PTE；
+   - 叶子提供 **页框号（PFN）+ 权限/属性**；
+   - 成功则把映射填回 TLB（可能顺带填入页表遍历缓存/页走查缓存）。
+4. **权限/属性检查**：若请求与 PTE 权限冲突（如写只读、用户执行内核页、不可执行等）→ **页故障（page fault）**。
+5. **页故障交给内核**：
+   - **缺页（not present）**：内核可装入页（从文件/匿名分配/从 swap 回页），设 PTE 有效再恢复执行。
+   - **越权**：通常向进程发送异常信号（如 `SIGSEGV`）。
+
+> **TLB 是关键**：它大幅降低每次访问都走多级页表的代价。现代 CPU 有 **指令 TLB**、**数据 TLB**、有时还有 **二级 TLB**。
+
+
+
+
+
+
+
+###### 图例
+
+![image-20250926165641205](../markdown_img/image-20250926165641205.png)
+
+
+
+
+
 ![image-20250925145018440](../markdown_img/image-20250925145018440.png)
 
 
 
 ![image-20250925161834635](D:\git_repository\cyber_security_learning\markdown_img\image-20250925161834635.png)
 
+**大多数现代内核（`CONFIG_SPARSEMEM_VMEMMAP=y`）下，`struct page` 的那一大坨元数据确实是放在“vmemmap”这段内核虚拟地址区里**。但要注意两点：
+
+1. **vmemmap 是一段“内核虚拟地址范围”**，用来连续地映射整片 `struct page` 数组；
+2. **这些 `struct page` 仍然占用普通 DRAM 物理页**（只是通过 vmemmap 映射出来），并不是“有个独立的特别存储”。
+
+**关于上述比例计算**
+
+- 以 4 KiB 页、`sizeof(struct page)=64B` 估算：
+   **64 / 4096 = 1/64 ≈ 1.5625%** 的 DRAM 用于 `struct page` 元数据 —— 这个思路是对的。
+- 但 **`struct page` 的实际大小会随内核配置变化**（如 `DEBUG`, `KASAN`, `MEMCG`, `NUMA` 等）；在一些配置下可能是 56B、64B、80B 甚至更大，所以比例不是固定 1.56%。
+
+> 另外还会有少量**页表开销**（给 vmemmap 这段映射本身用的大页页表）、**zone/node 结构、位图**、SLAB 元数据等，真实总开销会略高于 1.56%。
+
+
+
+ 
+
+
+
+###### FLAT模型和DISCONTIG模型的痛点
+
+早期模型为了让 `pfn_to_page(pfn)` 只做一次加法，会为 **0..max_pfn** 的所有 PFN 都分配一条 `struct page`。这样即便某些 PFN 区间**根本没有 DRAM**（被 MMIO 占用或空窗，称为 *holes*），也会为它们分配元数据，白白浪费大量内存。
+
+
+
+###### 内存管理的初始阶段
+
+**固件（BIOS/UEFI/ACPI 或 DT）负责：**
+
+- 在开机早期**提供“内存地图（firmware memory map）”**：哪些物理地址是 *System RAM*，哪些是 *Reserved/ACPI/Runtime*，哪些是 *Memory-Mapped I/O*（PCIe MMIO、MMCONFIG 等）。
+- x86 传统是 e820；UEFI 是 EFI memory map；ARM/ARM64 多数来自 DT/ACPI。
+
+**内核负责：**
+
+1. **构建 memblock：**
+   - 把固件标记为 **System RAM** 的区间加入 `memblock.memory`。
+   - 把这些 RAM 里的**内核镜像、initrd、ACPI NVS、crashkernel 等**标成 `memblock.reserved`（仍是 DRAM，但早期不可分配）。
+   - （非 RAM 的区段＝“holes/MMIO/空窗”**不进** `memblock.memory`。）
+2. **据 memblock 初始化页管理：**
+   - SPARSEMEM 仅对 `memblock.memory` 覆盖的 section 设为 *present* 并建立 `struct page`/vmemmap；holes 完全跳过。
+   - 把未保留的页用 `memblock_free_all()` 交给伙伴系统（buddy）接管。
+3. **构建并维护 iomem 资源树：**
+   - 以固件内存图为“种子”，建立 **/proc/iomem** 这棵**地址资源树**（既含 RAM，也含 MMIO/Reserved）。
+   - 后续 PCI/驱动枚举时，将各设备 BAR、MMCONFIG 等窗口**注册为资源**；驱动用 `request_mem_region()`/`devm_ioremap_resource()` 在这棵树里申请占用，做**冲突检测**。
+   - 运行期热插拔（内存/PCIe）也会动态更新这棵树。
+
+```bat
+总结：“固件枚举并标注内存地图；内核据此构建 memblock（只收 System RAM）与 iomem 资源树（管理整条物理地址空间的资源与冲突）。”
+```
+
+
+
+###### SPARS模型详解
+
+- **切分单位**：SPARSEMEM 把**系统物理地址空间**按固定粒度切成 **section**（常见 128 MB/256 MB/1 GB；新内核还有更细的 *sub-section* 粒度）这把尺子**覆盖 DRAM 与非 DRAM（hole/MMIO）**，只是后续会标记哪些“真的有内存”。
+- **present 位图**：启动早期根据 **memblock.memory**（只含 System RAM 区间）把对应的 section 标成 **present**。
+  - **present=1**：这段 section 里确有 DRAM → 为它建立 `struct page` 元数据（VMEMMAP 下为该段建立 vmemmap 映射）。
+  - **present=0**：hole（无 DRAM）或纯 MMIO → **不分配**任何 `struct page`。
+- **VMEMMAP 的节省**（现代默认 `SPARSEMEM_VMEMMAP`）：
+   vmemmap 是一段连续的**虚拟**区域，用来“放所有 `struct page`”。但只有 **present 的 section** 才实际**映射物理页**支撑这些元数据；**hole 对应的 vmemmap 区域不映射** → 从根上消除元数据浪费。
+- **reserved vs hole**（解决容易混的问题）：
+  - **reserved（RAM 内预留）**：有 DRAM，但被内核/固件占用（如内核镜像、ACPI NVS、crashkernel）。这类页**仍有 `struct page`**，只是带 `PG_reserved`/不加入伙伴系统。
+  - **hole**：**没有 DRAM**（或是设备 MMIO 窗口）。**不 present、无 `struct page`**。
+- **热插拔为何容易**：新增/移除内存就是把某些 section 的 **present/online** 置位或清除：
+   新内存来 → 标 present → 为其建 vmemmap/`struct page` → online 进相应 zone；
+   下线 → 迁移/回收可移动页 → offline → 撤销 present/解除映射。
+
+> 一句话：**SPARSEMEM 覆盖整张“物理地址尺子”，用 \*present\* 把“有 DRAM 的 section”筛出来，只给这些 section 分配 `struct page`；hole 一律不建条目。**
 
 
 
 
 
+#### memblock向伙伴系统交接
+
+
+
+
+
+### 内存NUMA信息感知
+
+```bat
+NUMA 是一种重要的性能优化技术手段
+```
+
+
+
+- **理解为什么NUMA会影响程序的运行性能**
+- **理解内核是如何获取到硬件的NUMA信息的**
+
+
+
+#### NUMA介绍
+
+NUMA 全称是 `Non-uniform memory access` 是非一致性内存访问
+
+![image-20250926220408259](../markdown_img/image-20250926220408259.png)
+
+
+
+
+
+
+
+
+
+
+
+#### Linux识别NUMA信息
 
 
 
