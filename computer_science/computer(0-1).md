@@ -9488,15 +9488,365 @@ NUMA 全称是 `Non-uniform memory access` 是非一致性内存访问
 
 
 
+```bat
+CPU的UPI总线是服务器CPU才有的，用于实现扩展互联的
+```
+
+![image-20250928092036331](../markdown_img/image-20250928092036331.png)
+
+CPU扩展性的设计极大地提升了服务器上的CPU核数与内存容量
+
+但同时也带来一个问题，那就是CPU物理核在访问不同的内存条的时候延迟是不同的。这就是非一致性内存访问。
+
+```bat
+根据上图可以看出，每个CPU有自己从属的内存条，如果CPU访问自己的内存条，则借助内存控制器，寻址访问速度很快，但如果要访问其他CPU的从属内存条，就必须使用UPI总线，这就导致速度会慢一些，最总导致非一致性内存访问。
+```
+
+![image-20250928092645828](D:\git_repository\cyber_security_learning\markdown_img\image-20250928092645828.png)
 
 
 
+```bat
+扩展：其实不仅仅是跨CPU访问存在延时差异。在服务器高核心CPU上，由于Mesh架构、以及存在两个内存控制器，物理核访问不同的内存控制器上的内存条也会有差异。只不过是这个差异没有跨CPU差异大。
+```
 
 
+
+```bash
+[root@ubuntu2204 ~]#apt install -y numactl
+[root@ubuntu2204 ~]#numactl --hardware
+available: 2 nodes (0-1)
+node 0 cpus: 0 1 2 3 
+node 0 size: 7838 MB
+node 0 free: 6208 MB
+node 1 cpus: 4 5 6 7 
+node 1 size: 7934 MB
+node 1 free: 6589 MB
+node distances:
+node   0   1
+  0:  10  20
+  1:  20  10
+  
+# 上述信息解析
+# 共有两个node
+# node 0
+# CPU: 1,2,3,4
+# 内存: 7838MB
+
+# node 1
+# CPU: 4,5,6,7
+# 内存: 7934MB
+
+#同node访问延迟较低
+#跨node访问延迟较高
+```
 
 
 
 #### Linux识别NUMA信息
+
+![image-20250928094136501](../markdown_img/image-20250928094136501.png)
+
+
+
+在操作系统和硬件中间，其实中间还存在着一层固件，英文名叫firmware
+
+它是位于主板上的使用 SPI Nor Flash 存储着的软件。起着在硬件和操作系统中间承上启下的作用。负责着硬件自检、初始化硬件设备、加载操作系统引导程序，并提供接口将控制权转移到操作系统
+
+固件的接口规范是ACPI（Advanced Configuration and Power Interface），高级配置和电源接口
+
+```http
+标准文档
+https://uefi.org/sites/default/files/resources/ACPI_Spec_6_5_Aug29.pdf
+```
+
+![image-20250928095432687](D:\git_repository\cyber_security_learning\markdown_img\image-20250928095432687.png)
+
+接口规范的第17章中描述了 NUMA 相关的内容。在 ACPI 中定义了两个表，分别是：
+
+- SRAT (System Resource Affinity Table)。在这个表中表示的是CPU核和内存的关系图。包括有几个node，每个node里面有那几个CPU逻辑核，有哪些内存。
+
+![image-20250928102938247](D:\git_repository\cyber_security_learning\markdown_img\image-20250928102938247.png)
+
+- SLIT (System Locality Information Table)。在这个表中记录的是各个结点之间的距离
+
+```c
+//file:arch/x86/kernel/setup.c
+void __init_setup_arch(char **cmdline_p)
+{
+    //保存物理内存检测结果
+    e820__memory_setup();
+    ...
+    // memblock内存分片器初始化
+    e820__memblock_setup();
+    // 内存初始化（包括 NUMA 机制初始化）
+    initmem_init();
+}
+```
+
+```C
+//file:arch/x86/mm/numa.c
+static int __init numa_init(int (*init_func)(void))
+{
+    ...
+        
+    //2.1 把numa相关的信息保存在 numa_meminfo 中
+    init_func();
+    
+    //2.2 memblock 添加 NUMA 信息，并为每个 node 申请对象
+    numa_register_memblks(&numa_meminfo);
+    
+    ...
+    // 用于将各个 CPU core 与 NUMA 节点关联
+    numa_init_array();
+    return 0;
+}
+```
+
+**解析SRAT表**
+
+```C
+//file:drivers/acpi/numa/srat.c
+int __init acpi_numa_init(void)
+{
+    ...
+    // 解析 SRAT 表中的 NUMA 信息
+    // 具体包括：CPU_AFFINITY、MEMORY_AFFINITY 等
+    if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
+        ...
+    }
+    ...
+}
+```
+
+**解析完的信息都存储在 numa_meminfo 中**
+
+```C
+//file:arch/x86/mm/numa.c
+static struct numa_meminfo numa_meminfo __initdata_or_meminfo;
+
+//file:arch/x86/mm/numa_internal.h
+struct numa_meminfo {
+    int nr_blks;
+    struct numa_memblk blk[NR_NODE_MEMBLKS];
+}
+```
+
+**给 memblock 内存分配器中每一个 region 设置 node 信息**
+
+```C
+//file:arch/x86/mm/numa.c
+static int __init numa_register_memblks(struct numa_meminfo *mi)
+{
+    ...
+    //1.将每一个 memblock region 与 NUMA 节点号关联
+    for (i = 0; i < mi->nr_blks; i++) {
+        struct numa_memblk *mb = &mi->blk[i];
+        memblock_set_node(mb->start, mb->end - mb->start, &memblock.memory, mb->nid);
+    }
+    ......
+    //2.为所有可能存在的node申请pglist_data结构体空间
+    for_each_node_mask(nid, node_possible_map) {
+        ...
+        //为nid申请一个pglist_data结构体
+        alloc_node_data(nid);
+    }
+    
+    //3.打印MemBlock内存分配器的详细调试信息
+    memblock_dump_all();
+}
+```
+
+
+
+**查看memblock日志**
+
+- 修改 /boot/grub/grub.cfg 文件
+- 添加 memblock=debug 启动参数
+- 重启服务器
+- 查看 /proc/cmdline 确认
+- 输入 dmseg 查看日志
+
+![image-20250928114226686](../markdown_img/image-20250928114226686.png)
+
+![image-20250928114319251](../markdown_img/image-20250928114319251.png)
+
+
+
+
+
+
+
+### 内核伙伴系统(Buddy System)物理内存管理
+
+![image-20250928114854049](../markdown_img/image-20250928114854049.png)
+
+
+
+- **理解伙伴系统是如何更精细地管理物理内存页面的**
+
+
+
+#### 伙伴系统相关数据结构
+
+##### Linux下的 node 和 zone
+
+![image-20250928115323467](../markdown_img/image-20250928115323467.png)
+
+![image-20250928115555404](../markdown_img/image-20250928115555404.png)
+
+- **ZONE_DMA：**地址段最低的一块内存区域，ISA (Industry Standard Architecture) 设备 DMA 访问
+- **ZONE_DMA32: ** 该Zone用于支持32-bits地址总线的DMA设备，只在64-bits系统里才有效
+- **ZONE_NORMAL：**在X86-64架构下，DMA和DMA32之外的内存全部在NORMAL的Zone里管理。
+
+
+
+##### Zone下管理的pages
+
+
+
+![image-20250928115848574](D:\git_repository\cyber_security_learning\markdown_img\image-20250928115848574.png)
+
+```bash
+# cat /proc/zoneinfo
+Node 0,zone      DMA
+  pages free     3973
+  managed        3973
+Node 1,zone      DMA32
+  pages free     390390
+  managed        427659
+Node 0,zone      Normal
+  pages free     15021616
+  managed        15990165
+Node 1,zone      Normal
+  pages free     16012823
+  managed        16514393
+```
+
+
+
+```bat
+# 实际输出
+[root@ubuntu2204 ~]#cat /proc/zoneinfo
+Node 0, zone      DMA
+  per-node stats
+      nr_inactive_anon 102487
+      nr_active_anon 304
+      nr_inactive_file 43072
+      nr_active_file 53629
+      nr_unevictable 6946
+      nr_slab_reclaimable 13329
+      nr_slab_unreclaimable 11418
+      nr_isolated_anon 0
+      nr_isolated_file 0
+  ......
+```
+
+
+
+##### 相关数据结构
+
+![image-20250928142928309](../markdown_img/image-20250928142928309.png)
+
+
+
+
+
+#### 伙伴系统的物理页面管理
+
+![image-20250928143407185](../markdown_img/image-20250928143407185.png)
+
+
+
+```bash
+[root@ubuntu2204 ~]#cat /proc/pagetypeinfo 
+```
+
+![image-20250928151529981](../markdown_img/image-20250928151529981.png)
+
+
+
+##### 伙伴系统申请内存
+
+```C
+alloc_pages()
+```
+
+
+
+![image-20250928151824725](../markdown_img/image-20250928151824725.png)
+
+
+
+#### memblock向伙伴系统交接
+
+
+
+**总结：**
+
+内核在运行时，是采用伙伴系统进行物理页的管理的。既能满足大块内存的分配，也能解决小内存块的需求
+
+原因是在实现上，伙伴系统通过维护4K、8K、16K、......、4M 等 11 种不同大小的空闲内存链表，可以用于各种大小内存使用时的分配。而且通过页面的合并与拆分，也能保证页面可以灵活地在各个空闲链表之间流转。
+
+不过伙伴系统虽然比内核启动时的memblock内存分配器管理内存的颗粒度小了很多。但仍然是4KB。对于内核运行时，程序运行时的各种小对象来说，这仍然太大了。
+
+所以在内核和各种语言中为了解决小对象的分配和频繁的系统调用，又有多种分配器存在
+
+- 内核在伙伴系统之上建立了一层SLAB内存分配器
+- 各种应用和语言在虚拟内存基础上建立了各自的分配器
+  - Glibc中的ptmalloc
+  - Golang语言中的tcmalloc
+  - FreeBSD的jemalloc
+  - 微软开源的mimalloc
+  - 各家互联网大厂也都针对自己的业务场景开发更合适的分配器，以便达到最佳性能。
+
+
+
+
+
+### 内核SLAB内存分配器
+
+实际上的服务器中各种内核对象也可能会消耗不少内存。这部分内存开销如何查看。
+
+
+
+虽然伙伴系统比memblock有了很大的进步，最小管理粒度已经到了4KB。
+
+但应用中存在各种大小不一的结构体对象
+
+伙伴系统无法用来为内核的各种对象提供存储分配
+
+所以，内核又搞了个自己专用的内存分配器 - SLAB分配器
+
+
+
+#### SLAB和buddy伙伴系统的关系
+
+**伙伴系统（buddy allocator）是 Linux 的“物理页分配器”**，负责按**页为单位**（2^order 个连续页）向内核各处供给物理内存；而 **SLAB/SLUB/SLOB** 是“对象分配器”，在拿到一批页后再切成很多小对象给内核子系统使用。SLAB 不是替代 buddy，而是**建立在 buddy 之上**。
+
+##### 伙伴系统负责给谁分配？
+
+面向“一页或多页”的所有请求，典型包括：
+
+- **SLAB/SLUB** 的底层页源：
+   `kmem_cache_create()` 的缓存需要整页（或多页）来建 slab，这些页来自 `alloc_pages()`（buddy）。
+- **直接页分配 API**（需要连续物理页）：
+  - `alloc_pages(gfp, order)` / `__get_free_pages(gfp, order)`
+  - `__get_free_page(gfp)`（order=0，单页）
+- **内核栈**：一般每个内核线程/进程内核栈是 2 页（order=1）。
+- **页表页**：创建/扩展页表时分配单页。
+- **页缓存 / 文件缓存**：读写文件、page cache 命中/缺页时需要页。
+- **匿名页（用户态内存）**：进程缺页（COW/新建匿名映射）时从 buddy 取页。
+- **网络子系统**：如直接用页作为 skb 数据缓冲（如 GRO/大报文），需要页。
+- **DMA/设备驱动**：需要**连续物理内存**的缓冲区（小到中等尺寸），用 `dma_alloc_attrs()`/`dma_alloc_coherent()`，底层往往仍来自 buddy；更大块连续内存通常借助 **CMA**（Contiguous Memory Allocator，和 buddy 协作）。
+- **huge page**：例如 2 MiB（PMD 级）或 1 GiB（PUD 级）的大页，需要高阶连续页，buddy 负责供给（常配合内存压实 compaction）。
+- **vmalloc**：虽然 `vmalloc` 需要**虚拟连续/物理不连续**的页，但这些离散物理页也依赖 buddy 提供。
+
+![image-20250928170931647](D:\git_repository\cyber_security_learning\markdown_img\image-20250928170931647.png)
+
+
+
+
 
 
 
