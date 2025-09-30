@@ -9816,7 +9816,7 @@ alloc_pages()
 
 伙伴系统无法用来为内核的各种对象提供存储分配
 
-所以，内核又搞了个自己专用的内存分配器 - SLAB分配器
+所以，**内核又搞了个自己专用的内存分配器** - SLAB分配器
 
 
 
@@ -9843,6 +9843,91 @@ alloc_pages()
 - **vmalloc**：虽然 `vmalloc` 需要**虚拟连续/物理不连续**的页，但这些离散物理页也依赖 buddy 提供。
 
 ![image-20250928170931647](D:\git_repository\cyber_security_learning\markdown_img\image-20250928170931647.png)
+
+
+
+
+
+
+
+- **理解内核SLAB分配器原理与实现**
+- **理解SLAB分配器和伙伴系统的关系**
+- **学会查看SLAB分配器工作状况**
+
+
+
+#### SLAB分配器工作原理
+
+内核中的 “集装箱” SLAB
+
+![image-20250929102141105](../markdown_img/image-20250929102141105.png)
+
+一个 slab 内只分配特定大小，甚至是特定的对象。这样当一个对象释放内存后，另一个同类对象可以直接使用这块内存。通过这种办法拿极大地降低了碎片发生的几率
+
+
+
+#### SLAB内存分配器实现
+
+**结构体定义**
+
+```C
+//file: include/linux/slab_def.h
+struct kmem_cache {
+    struct kmem_cache_node **node;
+    ......
+}
+
+//file: mm/slab.h
+struct kmem_cache_node {
+    // 三个链表
+    struct list_head slabs_partial;
+    struct list_head slabs_full;
+    struct list_head slabs_free;
+    ......
+}
+```
+
+
+
+**提前申请SLAB**
+
+![image-20250929102738107](../markdown_img/image-20250929102738107.png)
+
+
+
+![image-20250929103412497](../markdown_img/image-20250929103412497.png)
+
+
+
+##### SLAB分配器接口
+
+- **kmem_cache_create：**方便地创建一个基于 slab 的内核对象管理
+- **kmem_cache_alloc：**快速为某个对象申请内存
+- **kmem_cache_free：**归还对象占用的内存给 slab 管理器
+
+
+
+
+
+#### SLAB分配器与伙伴系统
+
+![image-20250929111100107](../markdown_img/image-20250929111100107.png)
+
+
+
+
+
+##### 内存系统总结
+
+
+
+
+
+
+
+
+
+#### 查看SLAB运行状况
 
 
 
