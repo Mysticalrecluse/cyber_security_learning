@@ -760,3 +760,112 @@ LimitNPROC=65535          #修改打开最大的进程数，默认值为4096
 LimitMEMLOCK=infinity     #无限制使用内存，以前旧版需要修改，否则无法启动服务，8.X当前版本无需修改
 ```
 
+
+
+
+
+## Elasticsearch插件
+
+通过使用各种插件可以实现对 ES 集群的**状态监控**, **数据访问**, **管理配置**等功能
+
+
+
+### Head插件
+
+Head 是一个 ES 在生产较为常用的插件，目前此插件更新较慢，还是2018年4月的版本
+
+
+
+#### 浏览器安装插件
+
+**离线安装**
+
+先下载Head插件文件,再离线安装，支持Chrome 内核的各种浏览器，比如：edge，chrome
+
+**注意：要打开开发者模式**
+
+![image-20250120175237353](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175237353-1760095121912-1.png)
+
+```bash
+# 下载Head插件安装包
+https://www.mysticalrecluse.com/script/tools/ElasticSearch-Head-0.1.5_0.zip
+
+# 解压后将文件夹导入浏览器
+```
+
+![image-20250120175807173](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175807173-1760095121912-2.png)
+
+![image-20250120175837414](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175837414-1760095121912-3.png)
+
+![image-20250120175856082](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175856082-1760095121912-4.png)
+
+**输入地址链接**
+
+![image-20250120175956894](D:\git_repository\cyber_security_learning\markdown_img\image-20250120175956894-1760095121912-5.png)
+
+
+
+### Cerebro插件
+
+#### cerebro插件介绍
+
+![image-20250121152023926](D:\git_repository\cyber_security_learning\markdown_img\image-20250121152023926-1760095121912-6.png)
+
+Cerebro 是开源的 elasticsearch 集群 Web 管理程序，此工具应用也很广泛，此项目升级比 Head 频繁
+
+当前最新版本为Apr 10, 2021发布的 v0.9.4
+
+Cerebro v0.9.3 版本之前需要 java1.8 或者更高版本
+
+Cerebro v0.9.4 版本更高版本需要 Java11
+
+
+
+**github链接**
+
+```http
+https://github.com/lmenezes/cerebro
+```
+
+![image-20250121152207033](D:\git_repository\cyber_security_learning\markdown_img\image-20250121152207033-1760095121912-7.png)
+
+
+
+#### 包安装
+
+**注意：安装cerebro内存建议大于3G以上**
+
+```bash
+#依赖JDK
+[root@ubuntu2004 ~]# apt update && apt -y install openjdk-11-jdk
+
+# #下载包,官方提供了DEB和RPM包
+[root@ubuntu2204 ~]# wget https://mirror.ghproxy.com/https://github.com/lmenezes/cerebro/releases/download/v0.9.4/cerebro_0.9.4_all.deb
+
+#安装
+[root@ubuntu2004 ~]# dpkg -i cerebro_0.9.4_all.deb
+
+# 启动
+[root@ubuntu2004 ~]# systemctl start cerebro.service 
+
+# 修改配置文件
+[root@ubuntu2004 ~]# vim /etc/cerebro/application.conf
+data.path: "/var/lib/cerebro/cerebro.db" #取消此行注释
+#data.path = "./cerebro.db" #注释此行，默认路径是/usr/share/cerebro/cerebro.db
+
+#此目录自动生成
+[root@ubuntu2204 ~]#l l -d /var/lib/cerebro
+drwxr-xr-x 2 cerebro cerebro 4096  1月 21 15:52 /var/lib/cerebro/
+
+# 重启服务
+[root@ubuntu2204 ~]#systemctl restart cerebro.service
+
+# 默认监听9000端口
+
+# 访问浏览器：10.0.0.132:9000,并输入es集群IP连接
+```
+
+![image-20250121155806662](D:\git_repository\cyber_security_learning\markdown_img\image-20250121155806662-1760095121912-8.png)
+
+![image-20250121155819105](D:\git_repository\cyber_security_learning\markdown_img\image-20250121155819105-1760095121912-9.png)
+

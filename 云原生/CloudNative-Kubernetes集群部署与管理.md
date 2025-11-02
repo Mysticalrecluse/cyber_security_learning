@@ -1,10 +1,10 @@
-## Kubernetes集群部署
+# Kubernetes集群部署
 
 
 
-### Kubernetes 集群组件运行模式
+## Kubernetes 集群组件运行模式
 
-#### **独立组件模式** 
+### **独立组件模式** 
 
 - 各关键组件都以二进制方式部署于主机节点上，并以守护进程形式运行 
 - 各附件Add-ons 则以Pod形式运行 
@@ -15,7 +15,7 @@
 
 
 
-#### **静态Pod模式**
+### **静态Pod模式**
 
 - **kubelet和容器运行时docker以二进制部署，运行为守护进程**
 - 除此之外所有组件为Pod 方式运行
@@ -30,7 +30,7 @@
 
 
 
-### 基于Kubeadm和Docker部署kubernetes高可用集群
+## 基于Kubeadm和Docker部署kubernetes高可用集群
 
 
 ![alt text](images/image23.png)
@@ -59,7 +59,7 @@ kubeadm是Kubernetes社区提供的集群构建工具
 
 
 
-#### 部署环境说明
+### 部署环境说明
 
 ![alt text](images/image25.png)
 
@@ -82,7 +82,7 @@ kubeadm是Kubernetes社区提供的集群构建工具
 
 
 
-#### 网络地址规划
+### 网络地址规划
 
 ``````bash
 物理主机网络        10.0.0.0/24 
@@ -94,7 +94,7 @@ kubeadm是Kubernetes社区提供的集群构建工具
 
 
 
-#### 基于 kubeadm 和 Docker 实现Kuberenetes集群流程说明
+### 基于 kubeadm 和 Docker 实现Kuberenetes集群流程说明
 
 - 每个节点主机的初始环境准备
 - 准备代理服务,以便访问k8s.gcr.io，或根据部署过程提示的方法获取相应的I国内镜像的image（可选）
@@ -110,7 +110,7 @@ kubeadm是Kubernetes社区提供的集群构建工具
 
 
 
-#### 初始环境准备
+### 初始环境准备
 
 - 硬件准备环境: 每个主机至少2G以上内存,CPU2核以上
 - 操作系统: 最小化安装支持Kubernetes的Linux系统
@@ -125,7 +125,7 @@ kubeadm是Kubernetes社区提供的集群构建工具
 
 
 
-**检查每台机器的product_uuid，project_uuid要具备唯一性**
+#### **检查每台机器的product_uuid，project_uuid要具备唯一性**
 
 ``````bash
 [root@ubuntu2204 ~]#cat /sys/class/dmi/id/product_uuid
@@ -139,7 +139,7 @@ e0c84d56-f33b-6754-eab2-d5e7cb846dc1
 
 
 
-**每天机器上设置hostname,并配置/etc/hosts**
+#### **每天机器上设置hostname,并配置/etc/hosts**
 
 ``````bash
 # cat >> /etc/hosts <<EOF
@@ -158,7 +158,7 @@ EOF
 
 
 
-**使用ssh打通每台机器**
+#### **使用ssh打通每台机器**
 
 ``````bash
 ssh-keygen
@@ -170,7 +170,7 @@ for i in {101..108}; do scp -r .ssh 10.0.0.$i:/root/; done
 
 
 
-**设置每台主机的主机名**
+#### **设置每台主机的主机名**
 
 ``````bash
 for i in {1..3} ;do ssh 10.0.0.10$i hostnamectl set-hostname master$i;done
@@ -181,7 +181,7 @@ ssh 10.0.0.108 hostnamectl set-hostname ha2
 
 
 
-**实现主机时间同步**
+#### **实现主机时间同步**
 
 ``````bash
 timedatectl set-timezone Asia/Shanghai
@@ -203,7 +203,7 @@ systemctl restart chrony
 
 
 
- **关闭SELinux**
+####  **关闭SELinux**
 
 ``````bash
  ~# setenforce 0
@@ -212,7 +212,7 @@ systemctl restart chrony
 
 
 
-**关闭防火墙**
+#### **关闭防火墙**
 
 ``````bash
 # Rocky
@@ -224,7 +224,7 @@ systemctl disable --now ufw
 
 
 
- **禁用 Swap 设备**
+####  **禁用 Swap 设备**
 
 ``````bash
 #方法1
@@ -248,7 +248,7 @@ systemctl disable --now ufw
 
 
 
-**内核优化**  
+#### **内核优化**  
 
 根据硬件和业务需求,对内核参数做相应的优化 
 
@@ -258,11 +258,11 @@ systemctl disable --now ufw
 
 
 
-#### 实现高可用的反向代理
+### 实现高可用的反向代理
 
 
 
-**实现 keepalived**
+#### **实现 keepalived**
 
 在两台主机ha1和ha2 按下面步骤部署和配置 keepalived
 
@@ -325,7 +325,7 @@ vrrp_instance VI_1 {
 
 
 
-**实现 Haproxy**
+#### **实现 Haproxy**
 
 通过 Harproxy 实现 kubernetes Api-server的四层反向代理和负载均衡功能
 
@@ -403,7 +403,7 @@ listen  kubernetes-api-6443
 
 
 
-#### 在master和worker上安装docker
+### 在master和worker上安装docker
 
 ``````bash
 # master
@@ -413,7 +413,7 @@ bash install_docker_offline.sh
 
 
 
-####  所有主机安装 cri-dockerd(v1.24以后版本)
+###  所有主机安装 cri-dockerd(v1.24以后版本)
 
 ```````bash
 wget https://mirror.ghproxy.com/https://github.com/Mirantis/cri-dockerd/releases/download/v0.3.14/cri-dockerd_0.3.14.3-0.ubuntu-jammy_amd64.deb
@@ -444,7 +444,7 @@ systemctl status cri-docker.service
 
 
 
-#### 所有主机配置 cri-dockerd(v1.24以后版本
+### 所有主机配置 cri-dockerd(v1.24以后版本
 
 ``````bash
 # vim /lib/systemd/system/cri-docker.service
@@ -455,7 +455,7 @@ ExecStart=/usr/bin/cri-dockerd --container-runtime-endpoint fd:// --pod-infra-co
 
 
 
-#### 所有 master 和 node 节点安装kubeadm等相关包
+### 所有 master 和 node 节点安装kubeadm等相关包
 
 所有 master 和 node 节点都安装kubeadm, kubelet,kubectl 相关包
 
@@ -477,7 +477,7 @@ apt-get install -y kubelet kubeadm kubectl
 
 
 
-#### 在第一个 master 节点运行 kubeadm init 初始化命令
+### 在第一个 master 节点运行 kubeadm init 初始化命令
 
 ``````
 K8S_RELEASE_VERSION=1.30.2 && kubeadm init --control-plane-endpoint kubeapi.wang.org --kubernetes-version=v${K8S_RELEASE_VERSION} --pod-network-cidr 10.244.0.0/16 --service-cidr 10.96.0.0/12 --image-repository registry.aliyuncs.com/google_containers --token-ttl=0 --upload-certs --cri-socket=unix:///run/cri-dockerd.sock
@@ -691,7 +691,7 @@ kubeadm reset -f
 
 
 
-#### 将其他的master和worker主机加入集群
+### 将其他的master和worker主机加入集群
 
 
 
@@ -739,7 +739,7 @@ kubeadm join kubeapi.wang.org:6443 --token jizd9o.tjfoyvdoisbklfi5 \
 
 
 
-#### 安装网络插件flanny
+### 安装网络插件flanny
 
 ``````bash
 wget https://mirror.ghproxy.com/https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
@@ -750,7 +750,7 @@ kubectl apply -f kube-flannel.yml
 
 
 
-#### 查看是否部署成功
+### 查看是否部署成功
 
 ``````bash
 [root@ubuntu2204 ~]#kubectl get nodes
@@ -766,7 +766,7 @@ node3     Ready    <none>          92m   v1.30.8
 
 
 
-#### 启用自动补全脚本
+### 启用自动补全脚本
 
 ```bash
 # 在 Ubuntu / Debian 系统上
@@ -786,7 +786,7 @@ source /root/.bashrc
 
 
 
-### 基于Kubeadm和Containerd部署Kubernetes
+## 基于Kubeadm和Containerd部署Kubernetes
 
 部署环境Ubuntu 22.04.X
 
@@ -798,7 +798,7 @@ root@k8s-node2
 
 
 
-#### 安装运行时
+### 安装运行时
 
 ```bash
 # 所有节点都部署containerd，runc，cni，nerdctl（node节点选做）
@@ -884,7 +884,7 @@ ubuntu_install_containerd
 
 
 
-#### 部署 kubeadm、kubectl、kubelet
+### 部署 kubeadm、kubectl、kubelet
 
 ```bash
 # Debian/Ubuntu
@@ -912,7 +912,7 @@ systemctl enable kubelet && systemctl start kubelet
 
 
 
-#### 配置代理
+### 配置代理
 
 ```bash
 [root@master1 ~]# vim .bashrc
@@ -927,7 +927,7 @@ export no_proxy="localhost,127.0.0.1,::1,10.0.0.0/8,10.96.0.0/12,10.244.0.0/16,1
 
 
 
-#### 下载 Kubernetes 镜像
+### 下载 Kubernetes 镜像
 
 提前下载镜像的好处：防止初始化的时候由于镜像下载超时而报错
 
@@ -964,11 +964,11 @@ nerdctl pull registry.cn-hangzhou.aliyuncs.com/google_containers/coredns:v1.10.1
 
 
 
-#### 内核参数优化
+### 内核参数优化
 
 ```bash
 [root@master1 ~]# vim /etc/sysctl.conf
-net.ipv4.ip_forward=1                     # 数据包跨网卡传输，必须打开
+net.ipv4ls                     # 数据包跨网卡传输，必须打开
 vm.max_map_count=262144
 kernel.pid.max=4194303
 fs.file-max=100000
@@ -1029,7 +1029,7 @@ root     hard   msgqueue 819200
 
 
 
-#### Kubernetes 集群初始化
+### Kubernetes 集群初始化
 
 ```bash
 # 这里的版本一定要和上面的kubeadm匹配，否则容易报错
@@ -1043,7 +1043,7 @@ k8s_release_version=1.32.0 && kubeadm init --control-plane-endpoint master1.myst
 
 
 
-#### Kubernetes - 基于init文件初始化 - 推荐
+### Kubernetes - 基于init文件初始化 - 推荐
 
 ```bash
 # kubeadm config print init-defaults # 输出默认初始化配置
@@ -1151,7 +1151,7 @@ mode: ipvs
 ```
 
 - `SystemdCgroup = true` 表示使用 `systemd` 驱动
-- `SystemdCgroup = true` 或不存在该字段，则表示使用 `cgroupfs`
+- `SystemdCgroup = false` 或不存在该字段，则表示使用 `cgroupfs`
 
 
 
@@ -1191,7 +1191,7 @@ systemctl restart kubelet
 
 
 
-#### 将node节点加入集群
+### 将node节点加入集群
 
 ````bash
 kubeadm join master1.mystical.org:6443 --token 75y4xk.fceeqawwqvujq7la \
@@ -1200,7 +1200,7 @@ kubeadm join master1.mystical.org:6443 --token 75y4xk.fceeqawwqvujq7la \
 
 
 
-#### 部署网络插件Calico
+### 部署网络插件Calico
 
 ```bash
 curl https://raw.githubusercontent.com/projectcalico/calico/v3.28.1/manifests/calico.yaml -o
@@ -1253,7 +1253,7 @@ worker3.feng.org   (64512)   10.0.0.124/24
 
 
 
-### 二进制部署高可用k8s集群部署
+## 二进制部署高可用k8s集群部署
 
 - 多master、实现master高可用和高性能，master最少三个，分布在不同可用区
 - 单独的etcd分布式集群，高可用持久化Kubernetes资源对象数据，并实现高可用
@@ -1296,11 +1296,11 @@ worker3.feng.org   (64512)   10.0.0.124/24
 
 
 
-#### Linux Kernel 升级（选做）
+### Linux Kernel 升级（选做）
 
 k8s,docker,cilium等很多功能、**特性需要较新的linux内核支持，所以有必要在集群部署前对内核进行升级**；CentOS7 和 Ubuntu16.04可以很方便的完成内核升级。
 
-##### CentOS7
+#### CentOS7
 
 红帽企业版 Linux 仓库网站 [https://www.elrepo.org，主要提供各种硬件驱动（显卡、网卡、声卡等）和内核升级相关资源；兼容](https://www.elrepo.xn--org,();-2o3fa1948e1xbtycqzkwdwf25rn5cinbb925a0zdt91bfjp0v1chhnvsmjj7bb70codjwwk02l531a36exp2iil2ag45h/) CentOS7 内核升级。如下按照网站提示载入elrepo公钥及最新elrepo版本，然后按步骤升级内核（以安装长期支持版本 kernel-lt 为例）
 
@@ -1333,7 +1333,7 @@ reboot
 
 
 
-##### Ubuntu16.04
+#### Ubuntu16.04
 
 ```bash
 打开 http://kernel.ubuntu.com/~kernel-ppa/mainline/ 并选择列表中选择你需要的版本（以4.16.3为例）。
@@ -1348,9 +1348,9 @@ $ sudo dpkg -i *.deb
 
 
 
-#### 部署 keepalived 和 haproxy
+### 部署 keepalived 和 haproxy
 
-##### 实现 keepalived
+#### 实现 keepalived
 
 ```bash
 # haproxy1.mystical.org 和 haproxy2.mystical.org 这两个服务器上部署
@@ -1419,7 +1419,7 @@ Executing: /lib/systemd/systemd-sysv-install enable keepalived
 
 
 
-**实现 Haproxy**
+#### **实现 Haproxy**
 
 通过 Harproxy 实现 kubernetes Api-server的四层反向代理和负载均衡功能
 
@@ -1495,9 +1495,9 @@ listen  kubernetes-api-6443
 
 
 
-#### 部署harbor
+### 部署harbor
 
-##### 申请证书（生产环境中不建议使用自签证书）
+#### 申请证书（生产环境中不建议使用自签证书）
 
 要使用https的harbor，建议使用商业版的证书，而不是自签证书
 
@@ -1515,7 +1515,7 @@ listen  kubernetes-api-6443
 
 
 
-##### **添加一块数据盘，用来放harbor的镜像**
+#### **添加一块数据盘，用来放harbor的镜像**
 
 ```bash
 # 查看新加磁盘是否识别
@@ -1580,7 +1580,7 @@ tmpfs                             tmpfs  407M     0  407M    0% /run/user/0
 
 
 
-##### 部署harbor
+#### 部署harbor
 
 harbor下载网址
 
@@ -1713,7 +1713,7 @@ https://harbor.mysticalrecluse.com/
 
 
 
-##### nerdctl测试登录harbor
+#### nerdctl测试登录harbor
 
 在harbor2节点测试登录harbor服务器，以验证是否能够登录harbor及push镜像
 
@@ -1776,7 +1776,7 @@ elapsed: 1.1 s                                                                  
 
 
 
-#### kubeasz部署高可用Kubernetes
+### kubeasz部署高可用Kubernetes
 
 ![image-20250407123739224](D:\git_repository\cyber_security_learning\markdown_img\image-20250407123739224.png)
 
@@ -1875,7 +1875,7 @@ done
 
 
 
-#### 下载kubeasz项目及组件
+### 下载kubeasz项目及组件
 
 ```bash
 # 现部署k8sv1.30
@@ -1888,7 +1888,7 @@ done
 
 
 
-#### 生产并自定义hosts文件
+### 生产并自定义hosts文件
 
 ```bash
 [root@haproxy1 1.30]#cd /etc/kubeasz/
@@ -1995,7 +1995,7 @@ prom_namespace: "monitor"
 
 
 
-#### 编辑ansible hosts文件
+### 编辑ansible hosts文件
 
 指定etcd节点、master节点、node节点、VIP、运行时、网络组件类型、Service IP与Pod IP范围等配置信息
 
@@ -2036,7 +2036,7 @@ ansible_python_interpreter=/usr/bin/python3.10
 
 
 
-#### 启用Kubeasz部署 — 环境初始化
+### 启用Kubeasz部署 — 环境初始化
 
 ```bash
 [root@haproxy1 kubeasz]#./ezctl setup k8s-cluster1 00
@@ -2074,7 +2074,7 @@ localhost                  : ok=31   changed=21   unreachable=0    failed=0    s
 
 
 
-#### 部署ETCD集群
+### 部署ETCD集群
 
 ```bash
 # 部署etcd集群,02
@@ -2098,7 +2098,7 @@ https://10.0.0.208:2379 is healthy: successfully committed proposal: took = 92.9
 
 
 
-#### 部署容器运行时containerd
+### 部署容器运行时containerd
 
 由证书签发机构签发的证书不需要执行分发步骤，证书可被信任
 
@@ -2195,7 +2195,7 @@ PLAY RECAP *********************************************************************
 
 
 
-#### 部署 Kubernetes master 节点
+### 部署 Kubernetes master 节点
 
 可选更改启动脚本参数以及路径等自定义功能
 
@@ -2211,7 +2211,7 @@ master-02   Ready,SchedulingDisabled   master   8m8s   v1.30.1
 
 
 
-#### 部署 Kubernetes Node 节点
+### 部署 Kubernetes Node 节点
 
 ```bash
 [root@haproxy1 kubeasz]#./ezctl setup k8s-cluster1 05
@@ -2232,7 +2232,7 @@ worker-02   Ready                      node     33s    v1.30.1
 
 
 
-#### 部署网络服务calico
+### 部署网络服务calico
 
 可选更改calico的镜像地址及各种配置信息
 
@@ -2426,7 +2426,7 @@ Environment="NO_PROXY=127.0.0.1,localhost,::1,10.0.0.0/8,10.244.0.0/16,10.96.0.0
 
 
 
-#### 验证Pod通信
+### 验证Pod通信
 
 ```bash
 [root@master-01 ~]#kubectl run net-test1 --image=centos:7.9.2009 sleep 10000000
@@ -2448,7 +2448,7 @@ PING 223.6.6.6 (223.6.6.6) 56(84) bytes of data.
 
 
 
-### 集群节点伸缩管理
+## 集群节点伸缩管理
 
 集群管理主要是添加master、添加node、删除master与删除node等节点管理及监控
 
@@ -2495,7 +2495,7 @@ Use "ezctl help <command>" for more information about a given command.
 
 
 
-#### 添加Node节点
+### 添加Node节点
 
 ```bash
 # 1. 打通新加入的Node节点和集群内其他节点的ssh
@@ -2515,7 +2515,7 @@ worker-02        Ready                      node     137m   v1.30.1
 
 
 
-#### 添加master节点
+### 添加master节点
 
 ```bash
 # 1. 打通新加入的master节点和集群内其他节点的ssh
@@ -2536,7 +2536,7 @@ worker-02        Ready                      node     155m    v1.30.1
 
 
 
-#### 删除node节点
+### 删除node节点
 
 ```bash
 # 本质上是忽略daemonset,强制drain驱逐node上的pod，再踢出node节点
@@ -2581,7 +2581,7 @@ worker-02        Ready                      node     3h10m   v1.30.1
 
 
 
-### 升级集群
+## 升级集群
 
 对当前 Kubernetes 集群进行版本更新，解决已知 Bug 或新增某些功能
 
@@ -2630,7 +2630,7 @@ statefulsets                        sts          apps/v1                        
 
 
 
-#### 批量更新
+### 批量更新
 
 ```bash
 # 当前集群版本
@@ -2754,7 +2754,7 @@ worker-02        Ready                      node     16m   v1.30.11
 
 
 
-#### 手动更新
+### 手动更新
 
 **方式1**：将二进制文件同步到其它路径，修改service文件加载新版本二进制：**即用新版本替换旧版本**
 
@@ -2830,13 +2830,13 @@ node/k8s-10-0-0-213 uncordoned
 
 
 
-### 部署Kubernetes内部域名解析服务—CoreDNS
+## 部署Kubernetes内部域名解析服务—CoreDNS
 
 目前常用的dns组件有kube-dns和Coredns两个，到k8s版本1.17.X都可以使用，kube-dns和coredns用于解析k8s集群中service name所对应得到IP地址，从Kubernetes v1.18开始不支持使用kube-dns
 
 
 
-#### 部署Coredns
+### 部署Coredns
 
 复制coredns.yaml模版
 
@@ -2923,7 +2923,7 @@ data:
           max_concurrent 1000
         }
         cache 30             # 启用service解析缓存，单位为秒
-        # 检测域名解析是否有死循环，如coredns转发给内网DNS服务器，而内网DNS服务器又转给coredns，如果发现解析是死循环，则强制           中止CoreDNS进程（Kubernetes会重建）
+        # 检测域名解析是否有死循环，如coredns转发给内网DNS服务器，而内网DNS服务器又转给coredns，如果发现解析是死循环，则强制中止CoreDNS进程（Kubernetes会重建）
         loop
         # 检测corefile是否更改，在重新编辑configmap配置后，默认2分钟后会优雅的自动加载
         reload
@@ -3072,7 +3072,7 @@ spec:
 
 
 
-### Kubectl 常用命令
+## Kubectl 常用命令
 
 **kubectl命令行使用简介**
 
@@ -3085,3 +3085,119 @@ https://kubernetes.io/zh-cn/docs/reference/kubectl/generated/
 | 基础命令     | **create/delete/edit/get/describe/logs/scale**               | 增删改查     |
 | 配置命令     | **Label**：标签管理<br />**apply**：动态配置<br />**cluster-info/top**：集群状态 |              |
 | 集群管理命令 | **cordon**：警戒线，标记node不被调度<br />**uncordon**：取消警戒线标记为cordon的node<br />**drain**：驱逐node上的pod，用于node下线等场景<br />**taint**：给node标记污点，实现反亲和与node反亲和性<br />**api-resources/api-versions/version**：api资源<br />**config**：客户端kube-config配置 | node节点管理 |
+
+
+
+
+
+# 补充
+
+## kubeadm init 过程详细解读
+
+在 `kubeadm init` 过程中，整个流程如下
+
+- `kubeadm init` 校验环境（Swap、端口、版本、CRI Socket）；
+
+- 生成证书和配置文件；
+
+- 启动 kubelet（systemd service）；
+
+- kubelet 以 **静态 Pod 模式（Static Pod）** 运行控制平面组件（API Server、Controller、Scheduler）；
+
+- kubeadm 检查这些组件“容器是否能启动”；
+
+- kubeadm 报告 “Your Kubernetes control-plane has initialized successfully!”。
+
+
+
+
+
+
+
+## kubeadm 和 kubelet 的关系
+
+实际上 **在 `kubeadm init` 成功之前，kubelet 是“启动了进程，但还没有完全进入工作状态”**。
+
+也就是说，它**启动了 systemd 服务，但并不能正常工作**，要等 kubeadm 生成配置并放好静态 Pod 文件后，它才“真地跑起来”。
+
+
+
+**两个概念要区分清楚**
+
+| 名称                 | 含义                           | 是否已启动 | 是否能工作        |
+| -------------------- | ------------------------------ | ---------- | ----------------- |
+| systemd kubelet 服务 | `/usr/bin/kubelet` 进程启动    | ✅ 是       | ⚠️ 否（暂时 idle） |
+| kubelet 进入管理循环 | kubelet 拿到配置，开始管理 Pod | ❌ 否       | ✅ 是（成功后）    |
+
+也就是说，**kubelet 进程存在**，但 **还没有初始化集群配置环境**，所以它“活着但不干活”。
+
+
+
+### kubeadm 与 kubelet 的协作机制
+
+**具体机制：**
+
+1. kubeadm 调用 `systemctl enable --now kubelet`，确保 kubelet 进程已启动；
+
+2. kubelet 启动后，尝试读取配置文件：
+
+   - `/var/lib/kubelet/config.yaml`
+   - `/etc/kubernetes/kubelet.conf`
+
+3. 此时这些文件**还不存在**（因为 kubeadm 还没生成它们）；
+
+4. kubelet 报告：
+
+   ```
+   failed to load Kubelet config file /var/lib/kubelet/config.yaml: no such file or directory
+   ```
+
+   然后进入 **“sleep + retry”** 模式，等待配置文件出现；
+
+5. 当 kubeadm 完成证书、配置生成后，它会：
+
+   - 写入 `/etc/kubernetes/kubelet.conf`（集群级 kubeconfig）
+   - 写入 `/var/lib/kubelet/config.yaml`（本地配置）
+   - 写入静态 Pod manifests 到 `/etc/kubernetes/manifests/`；
+
+6. kubelet 看到这些文件存在，立刻加载并启动管理循环；
+
+7. 它会发现 `/etc/kubernetes/manifests/` 下的 YAML 文件，于是按静态 Pod 模式拉起：
+
+   - `kube-apiserver`
+   - `kube-controller-manager`
+   - `kube-scheduler`
+
+8. 控制平面组件启动成功后，`kubeadm` 再检测健康状态并打印：
+
+   ```
+   Your Kubernetes control-plane has initialized successfully!
+   ```
+
+
+
+
+
+### 为什么 kubelet 一开始不能工作（技术原因）
+
+- **缺少集群认证信息**
+   kubelet 必须使用 `/etc/kubernetes/kubelet.conf` 与 apiserver 交互，这个文件由 kubeadm 生成。
+   在生成前，kubelet没有任何凭证，所以拒绝工作。
+
+- **缺少本地运行参数**
+   kubelet 启动时必须读取 `--config=/var/lib/kubelet/config.yaml`，否则不知道用哪个 CRI socket、哪个 cgroup driver、Pod CIDR 等配置。
+
+- **缺少静态 Pod 定义**
+   kubelet 的主要任务之一是监控 `/etc/kubernetes/manifests/`，在 init 成功前，这个目录是空的。
+   所以 kubelet 也“无事可做”。
+
+
+
+
+
+
+
+
+
+
+
