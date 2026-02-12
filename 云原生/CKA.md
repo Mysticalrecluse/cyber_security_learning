@@ -1447,13 +1447,17 @@ candidate@master01:~$ exit
 [candidate@base] $ ssh cka000048 
 
 Task 
-名为 nginx-static 的 NGINX Deployment 正在 nginx-static namespace 中运行。它通过名为 nginx-config 的 ConfigMap进行配置。 
+名为 nginx-static 的NGINX Deployment 正在 nginx-static namespace 中运行。它通过名为 nginx-config 的 ConfigMap 进行配置。
 
-更新 nginx-config ConfigMap 以仅允许 TLSv1.3 连接。 
+首先，更新ConfigMap nginx-config 以允许 TLSv1.2 连接。 
+提示：将指令ssl_protocols 设置为 ssl_protocols TLSv1.2 TLSv1.3; 以允许 TLSv1.2 
 注意：您可以根据需要重新创建、重新启动或扩展资源。 
 
 您可以使用以下命令测试更改: 
 candidate@cka000048$ curl -k --tls-max 1.2 https://web.k8snginx.local 
+由于已经允许TLSv1.2，所以此命令应该成功。 
+
+最后将ConfigMap nginx-config 设置为不可变。 
 ```
 
 
@@ -1471,68 +1475,39 @@ candidate@cka000048$ curl -k --tls-max 1.2 https://web.k8snginx.local
 # 考试时务必先按照题目要求，ssh到对应节点做题。做完后，务必要exit退回到candidate@base初始节点。 
 candidate@master01:~# ssh master01
 
-# 导出 nginx-config ConfigMap 
-# 由于 ConfigMap 的 immutable 属性设置为 true，不能直接更新现有的 ConfigMap。 
-# 需要先导出现有的ConfigMap，然后删除现有的 ConfigMap ，并重新创建一个新的 ConfigMap 
-candidate@master01:~# kubectl get cm -n nginx-static nginx-config -o yaml > config.yaml
-candidate@master01:~# kubectl delete cm -n nginx-static nginx-config
-candidate@master01:~# vim config.yaml
-......
+candidate@master01:~# kubectl edit cm -n nginx-static nginx-config
+apiVersion: v1
 data:
   nginx.conf: |
     server {
       listen 443 ssl;
       server_name web.k8snginx.local;
 
-      ssl_certificate /etc/nginx/ssl/tls.crt;CAT
+      ssl_certificate /etc/nginx/ssl/tls.crt;
       ssl_certificate_key /etc/nginx/ssl/tls.key;
 
-      ssl_protocols TLSv1.3;  # 更改这里，删掉TLSv1.2
+      ssl_protocols TLSv1.2 TLSv1.3;   # 增加TLSv1.2
       ssl_ciphers 'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256';
-......
-  name: nginx-config2  # 更改configmap名称
-  namespace: nginx-static
-......
+      ssl_prefer_server_ciphers on;
 
-candidate@master01:~# kubectl apply -f config.yaml 
-configmap/nginx-config2 created
+      location / {
+        root /usr/share/nginx/html;
+        index index.html;
+      }
+    }
+    
+# 使用TLS1.2访问 
+candidate@master01:~$ curl -k --tls-max 1.2 https://web.k8snginx.local
+Hello World ^_^ My Wechat is shadowooom
 
-# 修改deploy
-candidate@master1:~# kubectl edit deployments.apps -n nginx-static nginx-static 
-deployment.apps/nginx-static edited
-......
-    - configMap:
-        defaultMode: 420
-        name: nginx-config2    # 更改configmap名称
-
-# 检查：确保新的pod是running的
-candidate@master01:~$ kubectl get pod -n nginx-static 
-NAME                            READY   STATUS    RESTARTS   AGE
-nginx-static-7885fbc486-vjfls   1/1     Running   0          16m
-
-# 测试
-candidate@master1:~$ curl -k --tls-max 1.2 https://web.k8snginx.local 
-curl: (35) error:0A00042E:SSL routines::tlsv1 alert protocol version
-
-# 别忘记，做完后，退回到base节点，这样下一道题才能继续切节点。
-candidate@master01:~# exit
-```
-
-```ABAP
-注意：当 ConfigMap 设置了 immutable: true 后：
-Deployment 加载修改后的 ConfigMap 只有两种方法：
-
-修改 ConfigMap 名称
-- 创建一个新的 ConfigMap（使用新名称）；
-- 同步修改 Deployment 中挂载的 configMap.name 字段；
-- 重新部署或 rollout restart Deployment；
-- ✅ 不会中断服务，推荐方式。
-
-删除并重建 Deployment
-- 删除原 Deployment；
-- 保证 ConfigMap 在此之前已经更新；
-- 重新创建 Deployment；
-- ⚠️ 会影响服务可用性，仅适用于非生产或可容忍场景。
+# 添加：immutable：true
+candidate@master01:~$ kubectl edit cm -n nginx-static nginx-config
+...
+immutable: true    # 添加immutable: true
+kind: ConfigMap
+metadata:
+  annotations:
+...
 ```
 
 
