@@ -3029,3 +3029,132 @@ spec:
     requests:
       storage: 2Gi
 ```
+
+
+
+### nfs-csi
+
+通过 nfs-csi 学 CSI 的本质不是学  “存储”，学 “kubelet 如何把存储能力外包出去”
+
+#### 部署 nfs-csi
+
+```bash
+# 直接部署
+[root@master1 ~/k8s-yaml/Storage/csi/nfs]# curl -skSL https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/deploy/install-driver.sh | bash -s master --
+Installing NFS CSI driver, version: master ...
+serviceaccount/csi-nfs-controller-sa created
+serviceaccount/csi-nfs-node-sa created
+clusterrole.rbac.authorization.k8s.io/nfs-external-provisioner-role created
+clusterrolebinding.rbac.authorization.k8s.io/nfs-csi-provisioner-binding created
+clusterrole.rbac.authorization.k8s.io/nfs-external-resizer-role created
+clusterrolebinding.rbac.authorization.k8s.io/nfs-csi-resizer-role created
+csidriver.storage.k8s.io/nfs.csi.k8s.io created
+deployment.apps/csi-nfs-controller created
+daemonset.apps/csi-nfs-node created
+NFS CSI driver installed successful
+
+# 下载yaml文件
+wget https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/deploy/rbac-csi-nfs.yaml
+wget https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/deploy/csi-nfs-driverinfo.yaml
+wget https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/deploy/csi-nfs-controller.yaml
+wget https://raw.githubusercontent.com/kubernetes-csi/csi-driver-nfs/master/deploy/csi-nfs-node.yaml
+
+# 查看
+[root@master1 ~/k8s-yaml/Storage/csi/nfs]# kubectl get all -n kube-system 
+......
+
+NAME                          DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+daemonset.apps/calico-node    3         3         3       3            3           kubernetes.io/os=linux   157d
+daemonset.apps/csi-nfs-node   3         3         3       3            3           kubernetes.io/os=linux   11m
+daemonset.apps/kube-proxy     3         3         3       3            3           kubernetes.io/os=linux   157d
+
+NAME                                      READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/calico-kube-controllers   1/1     1            1           157d
+deployment.apps/coredns                   2/2     2            2           157d
+deployment.apps/csi-nfs-controller        1/1     1            1           11m
+
+......
+```
+
+
+
+**关键认知：**
+
+- Controller：负责 Provision（创建 PV）-> csi-nfs-controller-xxx（Deployment）
+- Node：负责 Mount（真正干活）-> csi-nfs-node-xxx（DaemonSet）
+
+
+
+#### 创建 StorageClass（CSI版本）
+
+```yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nfs-csi
+provisioner: nfs.csi.k8s.io      # 这里的 provisioner，通过 CSIDRIVER 资源调用
+parameters:
+  server: master1
+  share: /data/sc-nfs
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+```
+
+```bash
+# CSIDRIVER 资源查看
+[root@master1 ~/k8s-yaml/Storage/csi/nfs]# grep -rni -A 10 csidriver nfs-csi/
+nfs-csi/csi-nfs-driverinfo.yaml:3:kind: CSIDriver
+nfs-csi/csi-nfs-driverinfo.yaml-4-metadata:
+nfs-csi/csi-nfs-driverinfo.yaml-5-  name: nfs.csi.k8s.io
+nfs-csi/csi-nfs-driverinfo.yaml-6-spec:
+nfs-csi/csi-nfs-driverinfo.yaml-7-  attachRequired: false
+nfs-csi/csi-nfs-driverinfo.yaml-8-  volumeLifecycleModes:
+nfs-csi/csi-nfs-driverinfo.yaml-9-    - Persistent
+nfs-csi/csi-nfs-driverinfo.yaml-10-  fsGroupPolicy: File
+
+[root@master1 ~/k8s-yaml/Storage/csi/nfs/nfs-csi]# kubectl apply -f storageclass.yaml 
+storageclass.storage.k8s.io/nfs-csi created
+
+[root@master1 ~/k8s-yaml/Storage/csi/nfs/nfs-csi]# kubectl get storageclasses.storage.k8s.io 
+NAME      PROVISIONER                                   RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+nfs-csi   nfs.csi.k8s.io                                Delete          Immediate           false                  2m39s
+sc-nfs    k8s-sigs.io/nfs-subdir-external-provisioner   Delete          Immediate           false                  80d
+```
+
+
+
+#### 创建 PVC
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-csi-test
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs-csi
+  resources:
+    requests:
+      storage: 
+```
+
+```bash
+# 创建并查看
+[root@master1 ~/k8s-yaml/Storage/csi/nfs/nfs-csi]# kubectl apply -f pvc.yaml 
+persistentvolumeclaim/pvc-csi-test created
+
+[root@master1 ~/k8s-yaml/Storage/csi/nfs/nfs-csi]# kubectl get pvc
+NAME           STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   VOLUMEATTRIBUTESCLASS   AGE
+pvc-csi-test   Bound    pvc-8e52100f-1b8b-4968-a0bd-2c1449ee485f   1Gi        RWX            nfs-csi        <unset>                 4s
+pvc-nfs-sc     Bound    pvc-592c857e-9ed5-414e-8ee7-692429131600   100Mi      ROX,RWX        sc-nfs         <unset>                 80d
+
+[root@master1 ~/k8s-yaml/Storage/csi/nfs/nfs-csi]# kubectl get pv
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                  STORAGECLASS   VOLUMEATTRIBUTESCLASS   REASON   AGE
+pvc-592c857e-9ed5-414e-8ee7-692429131600   100Mi      ROX,RWX        Delete           Bound    default/pvc-nfs-sc     sc-nfs         <unset>                          80d
+pvc-8e52100f-1b8b-4968-a0bd-2c1449ee485f   1Gi        RWX            Delete           Bound    default/pvc-csi-test   nfs-csi        <unset>                          8s
+
+```
+
+
+
